@@ -1,0 +1,213 @@
+#Natural Etch-a-Sketch
+v_x = 32
+v_y = 32
+v_prev_x = 32
+v_prev_y = 32
+v_direction = 0
+v_prev_direction = 0
+v_counter = 0
+v_clear_threshold = 40
+
+def draw_diagonal {
+    # Choose diagonal direction (1=up-right, 2=down-right, 3=down-left, 4=up-left)
+    v_diag_dir = random(1, 4, 0)
+    v_step_size = random(3, 8, 0)
+    v_steps = random(4, 10, 0)
+    
+    for v_i in (1, v_steps, 1) then
+        # First movement (horizontal)
+        for v_step in (1, v_step_size, 1) then
+            if v_diag_dir == 1 then
+                v_x = v_x + 1  # Right for up-right
+            endif
+            if v_diag_dir == 2 then
+                v_x = v_x + 1  # Right for down-right
+            endif
+            if v_diag_dir == 3 then
+                v_x = v_x - 1  # Left for down-left
+            endif
+            if v_diag_dir == 4 then
+                v_x = v_x - 1  # Left for up-left
+            endif
+            
+            # Boundary checks
+            if v_x < 0 then
+                v_x = 0
+            endif
+            if v_x > 63 then
+                v_x = 63
+            endif
+            
+            plot(v_prev_x, v_prev_y, white)
+            plot(v_x, v_y, red)
+            v_prev_x = v_x
+            v_prev_y = v_y
+            rest(0.005)
+        endfor v_step
+        
+        # Second movement (vertical)
+        for v_step in (1, v_step_size, 1) then
+            if v_diag_dir == 1 then
+                v_y = v_y - 1  # Up for up-right
+            endif
+            if v_diag_dir == 2 then
+                v_y = v_y + 1  # Down for down-right
+            endif
+            if v_diag_dir == 3 then
+                v_y = v_y + 1  # Down for down-left
+            endif
+            if v_diag_dir == 4 then
+                v_y = v_y - 1  # Up for up-left
+            endif
+            
+            # Boundary checks
+            if v_y < 0 then
+                v_y = 0
+            endif
+            if v_y > 63 then
+                v_y = 63
+            endif
+            
+            plot(v_prev_x, v_prev_y, white)
+            plot(v_x, v_y, red)
+            v_prev_x = v_x
+            v_prev_y = v_y
+            rest(0.005)
+        endfor v_step
+    endfor v_i
+}
+
+def draw_square {
+    v_initial_dir = random(1, 4, 0)
+    v_size = random(6, 15, 0)
+    
+    for v_side in (1, 4, 1) then
+        v_current_dir = ((v_initial_dir + v_side - 1) % 4) + 1
+        
+        for v_i in (1, v_size, 1) then
+            if v_current_dir == 1 then
+                v_y = v_y - 1
+            endif
+            if v_current_dir == 2 then
+                v_x = v_x + 1
+            endif
+            if v_current_dir == 3 then
+                v_y = v_y + 1
+            endif
+            if v_current_dir == 4 then
+                v_x = v_x - 1
+            endif
+            
+            # Single condition boundary checks
+            if v_x < 0 then
+                v_x = 0
+            endif
+            if v_x > 63 then
+                v_x = 63
+            endif
+            if v_y < 0 then
+                v_y = 0
+            endif
+            if v_y > 63 then
+                v_y = 63
+            endif
+            
+            plot(v_prev_x, v_prev_y, white)
+            plot(v_x, v_y, red)
+            v_prev_x = v_x
+            v_prev_y = v_y
+            rest(0.005)
+        endfor v_i
+    endfor v_side
+}
+
+def draw_line {
+    v_direction = random(1, 4, 0)
+    v_line_length = random(8, 20, 0)
+    
+    for v_i in (1, v_line_length, 1) then
+        if v_direction == 1 then
+            v_y = v_y - 1
+        endif
+        if v_direction == 2 then
+            v_x = v_x + 1
+        endif
+        if v_direction == 3 then
+            v_y = v_y + 1
+        endif
+        if v_direction == 4 then
+            v_x = v_x - 1
+        endif
+        
+        # Single condition boundary checks
+        if v_x < 0 then
+            v_x = 0
+        endif
+        if v_x > 63 then
+            v_x = 63
+        endif
+        if v_y < 0 then
+            v_y = 0
+        endif
+        if v_y > 63 then
+            v_y = 63
+        endif
+        
+        plot(v_prev_x, v_prev_y, white)
+        plot(v_x, v_y, red)
+        v_prev_x = v_x
+        v_prev_y = v_y
+        rest(0.005)
+    endfor v_i
+}
+
+def travel {
+    # Choose pattern type including diagonal
+    v_pattern = random(1, 3, 0)
+    
+    if v_pattern == 1 then
+        call draw_square
+    endif
+    if v_pattern == 2 then
+        call draw_line
+    endif
+    if v_pattern == 3 then
+        call draw_diagonal
+    endif
+}
+
+def dissolve_screen {
+    for v_fade in (1, 10, 1) then
+        v_brightness = round(40 - (v_fade * (40/10)))
+        draw_rectangle(0, 0, 64, 64, dark_gray:{v_brightness}, true, 50)
+        rest(0.02)
+    endfor v_fade
+    clear()
+}
+
+# Initialize
+v_counter = 0
+v_clear_threshold = 30
+
+# Run forever
+while 1 == 1 then
+    call travel
+    rest(0.01)
+    
+    # Increment counter
+    v_counter = v_counter + 1
+    
+    # Check if we should clear
+    if v_counter >= v_clear_threshold then
+        rest(1)
+        call dissolve_screen
+        v_counter = 0
+        # Set new random clear threshold
+        v_clear_threshold = random(15, 50, 0)
+        # Reset to a random position anywhere on screen
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_prev_x = v_x
+        v_prev_y = v_y
+    endif
+endwhile

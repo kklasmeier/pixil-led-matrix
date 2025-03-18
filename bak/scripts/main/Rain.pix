@@ -1,0 +1,157 @@
+throttle(.55)
+
+# Initialize variables
+v_num_drops = 20  # Number of raindrops
+v_max_x = 63     # Display width - 1
+v_max_y = 63     # Display height - 1
+v_running = 1    # Run forever
+
+# Create arrays for raindrop positions and speeds
+create_array(v_drop_x, v_num_drops)       # X positions
+create_array(v_drop_y, v_num_drops)       # Y positions
+create_array(v_drop_speed, v_num_drops)   # Fall speeds
+create_array(v_drop_intensity, v_num_drops) # Drop color intensities
+
+# Wind variables
+v_wind = 0          # Current wind speed (-1 to 1)
+v_wind_target = 0   # Target wind speed to move towards
+v_wind_timer = 0    # Counter for wind changes
+
+# Lightning variables
+v_lightning_active = 0  # If we're in middle of lightning
+v_lightning_frames = 0  # How long to show this flash
+v_lightning_intensity = 0 # Current flash intensity
+
+# Function to reset drop position based on wind
+def reset_drop {
+    # If wind is blowing right, allow spawning from left edge
+    if v_wind > 0.2 then
+        v_drop_x[v_i] = random(-10, v_max_x - 10, 0)
+    endif
+    if v_wind <= 0.2 then
+        if v_wind < -0.2 then
+            v_drop_x[v_i] = random(10, v_max_x + 10, 0)
+        endif
+        if v_wind >= -0.2 then
+            v_drop_x[v_i] = random(0, v_max_x, 0)
+        endif
+    endif
+    
+    v_drop_y[v_i] = random(-20, -1, 0)
+    v_drop_speed[v_i] = random(1.5, 4, 1)
+    v_drop_intensity[v_i] = random(40, 90, 0)
+}
+
+# Initialize drops with random positions and speeds
+for v_i in (0, v_num_drops - 1, 1) then
+    call reset_drop
+endfor v_i
+
+# Animation loop
+while v_running == 1 then
+    begin_frame
+    
+    # Update wind
+    v_wind_timer = v_wind_timer + 1
+    if v_wind_timer > 100 then  # Change wind every ~3 seconds
+        v_wind_timer = 0
+        v_wind_target = random(-1.2, 1.2, 1)  # New random wind target
+    endif
+    
+    # Gradually move current wind toward target
+    if v_wind < v_wind_target then
+        v_wind = v_wind + 0.02
+    endif
+    if v_wind > v_wind_target then
+        v_wind = v_wind - 0.02
+    endif
+    
+    # Update and draw raindrops
+    for v_i in (0, v_num_drops - 1, 1) then
+        # Calculate drop position
+        v_y = v_drop_y[v_i]
+        v_x = v_drop_x[v_i]
+        
+        # Apply wind to x position
+        v_drop_x[v_i] = v_x + v_wind * (v_drop_speed[v_i] / 4)
+        v_x = v_drop_x[v_i]
+        
+        # Draw raindrop with wind angle if it's in visible range
+        if v_x >= -2 then
+            if v_x <= v_max_x + 2 then
+                v_tail = v_y - v_drop_speed[v_i]
+                v_tail_x = v_x - v_wind  # Adjust tail x for wind angle
+                draw_line(v_x, v_y, v_tail_x, v_tail, {45}:{v_drop_intensity[v_i]})
+            endif
+        endif
+        
+        # Update position
+        v_drop_y[v_i] = v_y + v_drop_speed[v_i]
+        
+        # Check if drop needs resetting (hit bottom or went off sides)
+        if v_y >= 62 then
+            if v_x >= 0 then
+                if v_x <= v_max_x then
+                    # Create splash effect with random variations
+                    v_bounce = random(1, 2.5, 1)  # Random bounce height
+                    v_spread = random(1, 2, 1)    # Random spread
+                    
+                    # Adjust splash angle slightly based on wind
+                    v_wind_offset = v_wind / 2
+                    
+                    # Left splash particle
+                    draw_line(v_x - v_spread + v_wind_offset, 63, v_x - v_spread/2 + v_wind_offset, 63 - v_bounce, {45}:{v_drop_intensity[v_i]}, 100)
+                    # Right splash particle
+                    draw_line(v_x + v_spread/2 + v_wind_offset, 63, v_x + v_spread + v_wind_offset, 63 - v_bounce, {45}:{v_drop_intensity[v_i]}, 100)
+                    # Center splash particle
+                    draw_line(v_x + v_wind_offset, 63, v_x + v_wind_offset, 63 - v_bounce - 0.5, {45}:{v_drop_intensity[v_i]}, 100)
+                endif
+            endif
+            call reset_drop
+        endif
+        if v_y < 62 then
+            # Check if drop went way off sides
+            if v_x < -15 then
+                call reset_drop
+            endif
+            if v_x > v_max_x + 15 then
+                call reset_drop
+            endif
+        endif
+    endfor v_i
+    
+    # Lightning effect
+    if v_lightning_active == 1 then
+        # Draw current flash
+        draw_rectangle(0, 0, 64, 64, white:{v_lightning_intensity}, false)
+        
+        # Update flash
+        v_lightning_frames = v_lightning_frames - 1
+        if v_lightning_frames <= 0 then
+            # Check if we should chain another flash
+            v_chain = random(0, 130, 0)
+            if v_chain > 70 then
+                # Chain another flash
+                v_lightning_frames = random(1, 3, 0)
+                v_lightning_intensity = random(30, 60, 0)
+            endif
+            if v_chain <= 70 then
+                # End lightning sequence
+                v_lightning_active = 0
+            endif
+        endif
+    endif
+    if v_lightning_active == 0 then
+        # Check for new lightning
+        v_lightning = random(0, 100, 0)
+        if v_lightning > 98 then
+            # Start lightning sequence
+            v_lightning_active = 1
+            v_lightning_frames = random(2, 4, 0)
+            v_lightning_intensity = random(10, 40, 0)
+        endif
+    endif
+    
+    end_frame
+    rest(0.03)
+endwhile

@@ -1,0 +1,590 @@
+# Optimized A* Pathfinding Visualization
+# Uses priority tracking instead of full grid scans
+
+throttle(0)
+v_iterations = 0
+
+# Configuration
+v_grid_size = 64
+v_delay = 0
+v_wall_chance = 15  # Percentage chance of wall placement
+
+# Create arrays for algorithm data
+create_array(v_grid, 4096)        # 0=empty, 1=wall
+create_array(v_f_score, 4096)     # Total estimated cost
+create_array(v_g_score, 4096)     # Cost from start
+create_array(v_came_from_x, 4096) # Path tracking - x coordinates
+create_array(v_came_from_y, 4096) # Path tracking - y coordinates
+create_array(v_in_open_set, 4096) # Track if node is in open set
+create_array(v_dir_order, 4) # Bias order
+
+# Priority tracking arrays
+create_array(v_open_x, 2048)       # X coordinates of open nodes
+create_array(v_open_y, 2048)       # Y coordinates of open nodes
+create_array(v_open_f, 2048)       # F scores of open nodes
+create_array(v_open_count, 1)      # Number of nodes in open set
+
+# Helper function to calculate index from x,y
+def calc_index {
+    v_index = int(v_x) + int(v_y) * 64
+}
+
+# Helper function to calculate heuristic (Manhattan distance)
+def calc_heuristic {
+    v_h = abs(v_x - v_end_x) + abs(v_y - v_end_y)
+}
+
+# Helper function to add node to open set
+def add_to_open_set {
+    # Get current count
+    v_count = v_open_count[0]
+    
+    # Add node to open set arrays
+    v_open_x[v_count] = v_x
+    v_open_y[v_count] = v_y
+    v_open_f[v_count] = v_f
+    
+    # Mark as in open set
+    call calc_index
+    v_in_open_set[v_index] = 1
+    
+    # Increment count
+    v_open_count[0] = v_count + 1
+}
+
+# Helper function to get lowest f_score node
+def get_lowest_f_node {
+    v_min_f = 99999
+    v_min_index = -1
+    v_count = v_open_count[0]
+    
+    # Find minimum f_score and its index
+    for v_i in (0, v_count - 1, 1) then
+        if v_open_f[v_i] < v_min_f then
+            v_min_f = v_open_f[v_i]
+            v_min_index = v_i
+        endif
+    endfor v_i
+    
+    # If found, get coordinates and remove from open set
+    if v_min_index != -1 then
+        v_current_x = v_open_x[v_min_index]
+        v_current_y = v_open_y[v_min_index]
+        
+        # Remove from tracking arrays by swapping with last element
+        v_last_index = v_count - 1
+        v_open_x[v_min_index] = v_open_x[v_last_index]
+        v_open_y[v_min_index] = v_open_y[v_last_index]
+        v_open_f[v_min_index] = v_open_f[v_last_index]
+        
+        # Update count
+        v_open_count[0] = v_last_index
+        
+        # Mark as not in open set
+        v_x = v_current_x
+        v_y = v_current_y
+        call calc_index
+        v_in_open_set[v_index] = 0
+    endif
+}
+
+def init_grid {
+    # Clear arrays
+    for v_i in (0, 4095, 1) then
+        v_grid[v_i] = 0
+        v_f_score[v_i] = 99999
+        v_g_score[v_i] = 99999
+        v_in_open_set[v_i] = 0
+    endfor v_i
+    
+    # Reset open set
+    v_open_count[0] = 0
+
+    # Choose random field pattern
+    v_pattern = random(1, 6, 0)
+    
+    if v_pattern == 1 then
+        # print("Using dot pattern")
+        # Current random dots pattern
+        for v_y in (1, 62, 1) then
+            for v_x in (1, 62, 1) then
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance then
+                    call calc_index
+                    v_grid[v_index] = 1
+                    draw_rectangle(v_x, v_y, 1, 1, dark_gray:90, true)
+                endif
+            endfor v_x
+        endfor v_y
+    endif
+
+    if v_pattern == 2 then
+        # print("Using horizontal lines pattern")
+        # Horizontal lines pattern
+        for v_y in (1, 62, 2) then  # Skip every other row
+            for v_x in (1, 58, 3) then  # Space between lines
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance + 10 then  # Increased chance
+                    # Random width between 2 and 6 pixels
+                    v_width = random(2, 6, 0)
+                    call calc_index
+                    # Mark grid positions as wall
+                    for v_i in (0, v_width, 1) then
+                        if v_x + v_i < 63 then
+                            v_grid[v_index + v_i] = 1
+                        endif
+                    endfor v_i
+                    draw_line(v_x, v_y, v_x + v_width, v_y, white:90)
+                endif
+            endfor v_x
+        endfor v_y
+    endif
+
+    if v_pattern == 3 then
+        # print("Using vertical lines pattern")
+        # Vertical lines pattern
+        for v_x in (1, 62, 2) then  # Skip every other column
+            for v_y in (1, 58, 3) then  # Space between lines
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance + 10 then  # Increased chance
+                    # Random height between 2 and 6 pixels
+                    v_height = random(2, 6, 0)
+                    call calc_index
+                    # Mark grid positions as wall
+                    for v_i in (0, v_height, 1) then
+                        if v_y + v_i < 63 then
+                            v_grid[v_index + (v_i * 64)] = 1
+                        endif
+                    endfor v_i
+                    draw_line(v_x, v_y, v_x, v_y + v_height, white:90)
+                endif
+            endfor v_y
+        endfor v_x
+    endif
+
+    if v_pattern == 4 then
+        # print("Using small circles pattern")
+        # Small circles pattern
+        for v_y in (1, 62, 3) then  # Reduced spacing
+            for v_x in (1, 62, 3) then
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance + 15 then  # Increased chance
+                    # Mark the circle area as wall
+                    call calc_index
+                    v_grid[v_index] = 1
+                    v_grid[v_index + 1] = 1
+                    v_grid[v_index + 64] = 1
+                    v_grid[v_index + 65] = 1
+                    draw_circle(v_x, v_y, 1, white:90, true)
+                endif
+            endfor v_x
+        endfor v_y
+    endif
+
+    if v_pattern == 5 then
+        # print("Using cross pattern")
+        # Christian crosses pattern
+        for v_y in (1, 58, 4) then  # Leave room for full crosses
+            for v_x in (1, 62, 4) then
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance + 15 then  # Increased chance
+                    call calc_index
+                    # Vertical part (longer at bottom)
+                    v_grid[v_index] = 1
+                    v_grid[v_index + 64] = 1
+                    v_grid[v_index + 128] = 1
+                    v_grid[v_index + 192] = 1  # Extra length at bottom
+                    # Horizontal part
+                    v_grid[v_index - 1] = 1
+                    v_grid[v_index + 1] = 1
+                    # Draw cross
+                    draw_line(v_x, v_y, v_x, v_y + 3, white:90)  # Vertical line
+                    draw_line(v_x - 1, v_y + 1, v_x + 1, v_y + 1, white:90)  # Horizontal line
+                endif
+            endfor v_x
+        endfor v_y
+    endif
+
+    if v_pattern == 6 then
+        # print("Using diagonal lines pattern")
+        # Diagonal lines pattern with varying lengths
+        for v_y in (1, 58, 3) then  # Reduced spacing for density
+            for v_x in (1, 58, 3) then
+                v_wall_roll = random(1, 100, 0)
+                if v_wall_roll <= v_wall_chance + 15 then  # Increased chance
+                    # Random length between 2 and 5 pixels
+                    v_length = random(2, 5, 0)
+                    
+                    # Randomly choose direction (forward or backward diagonal)
+                    v_direction = random(1, 2, 0)
+                    
+                    call calc_index
+                    
+                    if v_direction == 1 then
+                        # Forward diagonal (\)
+                        for v_i in (0, v_length, 1) then
+                            if v_x + v_i < 63 then
+                            if v_y + v_i < 63 then
+                                v_grid[v_index + v_i + (v_i * 64)] = 1
+                            endif
+                            endif
+                        endfor v_i
+                        draw_line(v_x, v_y, v_x + v_length, v_y + v_length, white:90)
+                    endif
+                    
+                    if v_direction == 2 then
+                        # Backward diagonal (/)
+                        for v_i in (0, v_length, 1) then
+                            if v_x + v_i < 63 then
+                            if v_y - v_i >= 0 then
+                                v_grid[v_index + v_i - (v_i * 64)] = 1
+                            endif
+                            endif
+                        endfor v_i
+                        draw_line(v_x, v_y, v_x + v_length, v_y - v_length, white:90)
+                    endif
+                endif
+            endfor v_x
+        endfor v_y
+    endif
+
+    # Clear start and end areas
+    for v_y in (v_start_y - 2, v_start_y + 2, 1) then
+        for v_x in (v_start_x - 2, v_start_x + 2, 1) then
+            call calc_index
+            v_grid[v_index] = 0
+        endfor v_x
+    endfor v_y
+
+    for v_y in (v_end_y - 2, v_end_y + 2, 1) then
+        for v_x in (v_end_x - 2, v_end_x + 2, 1) then
+            call calc_index
+            v_grid[v_index] = 0
+        endfor v_x
+    endfor v_y
+}
+
+# Helper function to randomize direction order
+def randomize_directions {
+    # First direction
+    v_dir_order[0] = random(0, 3, 0)
+    
+    # Second direction
+    v_temp = random(0, 3, 0)
+    while v_temp == v_dir_order[0] then
+        v_temp = random(0, 3, 0)
+    endwhile
+    v_dir_order[1] = v_temp
+    
+    # Third direction
+    v_temp = random(0, 3, 0)
+    while v_temp == v_dir_order[0] then
+    while v_temp == v_dir_order[1] then
+        v_temp = random(0, 3, 0)
+    endwhile
+    endwhile
+    v_dir_order[2] = v_temp
+    
+    # Fourth direction (only remaining option)
+    for v_i in (0, 3, 1) then
+        v_used = 0
+        if v_i == v_dir_order[0] then
+            v_used = 1
+        endif
+        if v_i == v_dir_order[1] then
+            v_used = 1
+        endif
+        if v_i == v_dir_order[2] then
+            v_used = 1
+        endif
+        if v_used == 0 then
+            v_dir_order[3] = v_i
+        endif
+    endfor v_i
+}
+
+def setup_movement_bias {
+    # Choose random bias type
+    v_bias_type = random(1, 7, 0)
+    
+    if v_bias_type == 1 then
+        # Right bias (prefers moving right first)
+        # print("Using right bias")
+        v_dir_order[0] = 2  # Right
+        v_dir_order[1] = 3  # Down
+        v_dir_order[2] = 1  # Up
+        v_dir_order[3] = 0  # Left
+    endif
+    
+    if v_bias_type == 2 then
+        # Down bias (prefers moving down first)
+        # print("Using down bias")
+        v_dir_order[0] = 3  # Down
+        v_dir_order[1] = 2  # Right
+        v_dir_order[2] = 0  # Left
+        v_dir_order[3] = 1  # Up
+    endif
+    
+    if v_bias_type == 3 then
+        # Diagonal bias (based on target location)
+        # print("Using diagonal bias")
+        if v_end_x > v_start_x then
+            if v_end_y > v_start_y then
+                # Target is down-right
+                v_dir_order[0] = 2  # Right
+                v_dir_order[1] = 3  # Down
+                v_dir_order[2] = 0  # Left
+                v_dir_order[3] = 1  # Up
+            endif
+            if v_end_y < v_start_y then
+                # Target is up-right
+                v_dir_order[0] = 2  # Right
+                v_dir_order[1] = 1  # Up
+                v_dir_order[2] = 0  # Left
+                v_dir_order[3] = 3  # Down
+            endif
+        endif
+        if v_end_x < v_start_x then
+            if v_end_y > v_start_y then
+                # Target is down-left
+                v_dir_order[0] = 0  # Left
+                v_dir_order[1] = 3  # Down
+                v_dir_order[2] = 2  # Right
+                v_dir_order[3] = 1  # Up
+            endif
+            if v_end_y < v_start_y then
+                # Target is up-left
+                v_dir_order[0] = 0  # Left
+                v_dir_order[1] = 1  # Up
+                v_dir_order[2] = 2  # Right
+                v_dir_order[3] = 3  # Down
+            endif
+        endif
+    endif
+    
+    if v_bias_type == 4 then
+        # Manhattan bias (alternates horizontal/vertical)
+        # print("Using manhattan bias")
+        if (v_iterations % 2) == 0 then
+            # Vertical priority
+            v_dir_order[0] = 3  # Down
+            v_dir_order[1] = 1  # Up
+            v_dir_order[2] = 2  # Right
+            v_dir_order[3] = 0  # Left
+        endif
+        if (v_iterations % 2) == 1 then
+            # Horizontal priority
+            v_dir_order[0] = 2  # Right
+            v_dir_order[1] = 0  # Left
+            v_dir_order[2] = 3  # Down
+            v_dir_order[3] = 1  # Up
+        endif
+    endif
+    
+    if v_bias_type == 5 then
+        # Spiral bias (clockwise priority)
+        # print("Using spiral bias")
+        v_dir_order[0] = 2  # Right
+        v_dir_order[1] = 3  # Down
+        v_dir_order[2] = 0  # Left
+        v_dir_order[3] = 1  # Up
+    endif
+    
+    if v_bias_type == 6 then
+        # Snake bias (zigzag pattern)
+        # print("Using snake bias")
+        # Moving right
+        v_dir_order[0] = 2  # Right
+        v_dir_order[1] = 1  # Up
+        v_dir_order[2] = 3  # Down
+        v_dir_order[3] = 0  # Left
+    endif
+    
+    if v_bias_type == 7 then
+        # Exploratory (fully random)
+        # print("Using exploratory bias")
+        call randomize_directions
+    endif
+}
+
+def run_pathfinding {
+    # Set start and end points
+    v_start_x = 5
+    v_start_y = 5
+    v_end_x = 58
+    v_end_y = 58
+
+    # Initialize grid
+    call init_grid
+
+    # Draw start and end
+    draw_circle(v_start_x, v_start_y, 2, green:90, true)
+    draw_circle(v_end_x, v_end_y, 2, red:90, true)
+
+    # Initialize starting point
+    v_x = v_start_x
+    v_y = v_start_y
+    call calc_index
+    v_g_score[v_index] = 0
+    call calc_heuristic
+    v_f = v_h
+    v_f_score[v_index] = v_f
+    call add_to_open_set
+
+    # Setup initial movement bias
+    call setup_movement_bias
+
+    # Main algorithm loop
+    v_found = 0
+    v_iterations = 0
+    
+    while v_found == 0 then
+        v_iterations = v_iterations + 1
+        
+        # Get next node to process
+        call get_lowest_f_node
+        
+        # Check if no path found
+        if v_current_x == -1 then
+            # print("No path found!")
+            v_found = 2
+            
+            # Visual indication of failure - flash start point red
+            for v_i in (0, 3, 1) then
+                draw_circle(v_start_x, v_start_y, 2, red:90, true)
+                rest(0.2)
+                draw_circle(v_start_x, v_start_y, 2, blue:90, true)
+                rest(0.2)
+            endfor v_i
+        endif
+
+        if v_current_x != -1 then
+            # Visualize current node
+            draw_rectangle(v_current_x, v_current_y, 1, 1, yellow:90, true)
+            draw_rectangle(v_current_x, v_current_y, 1, 1, blue:35, true)
+            
+            # Check if reached end
+            if v_current_x == v_end_x then
+                if v_current_y == v_end_y then
+                    # print("Path found!")
+                    v_found = 1
+                endif
+            endif
+
+            # Process neighbors if not at end
+            if v_found == 0 then
+                v_x = v_current_x
+                v_y = v_current_y
+                call calc_index
+                v_current_index = v_index
+                
+                # Define neighbor offsets
+                v_offsets_x = -1  # Start with left neighbor
+                v_offsets_y = 0
+                
+                for v_dir in (0, 3, 1) then
+                    v_neighbor_x = v_current_x + v_offsets_x
+                    v_neighbor_y = v_current_y + v_offsets_y
+                    
+                    # Quick bounds check
+                    if v_neighbor_x >= 0 then
+                    if v_neighbor_x < 64 then
+                    if v_neighbor_y >= 0 then
+                    if v_neighbor_y < 64 then
+                        v_x = v_neighbor_x
+                        v_y = v_neighbor_y
+                        call calc_index
+                        
+                        # Process if not a wall
+                        if v_grid[v_index] == 0 then
+                            # Calculate tentative g score
+                            v_tentative_g = v_g_score[v_current_index] + 1
+
+                            if v_tentative_g < v_g_score[v_index] then
+                                # This is a better path - record it
+                                v_came_from_x[v_index] = v_current_x
+                                v_came_from_y[v_index] = v_current_y
+                                v_g_score[v_index] = v_tentative_g
+                                
+                                # Calculate f score
+                                call calc_heuristic
+                                v_f = v_tentative_g + v_h
+                                v_f_score[v_index] = v_f
+
+                                # Add to open set if not already there
+                                if v_in_open_set[v_index] == 0 then
+                                    call add_to_open_set
+                                    draw_rectangle(v_x, v_y, 1, 1, cyan:35, true)
+                                endif
+                            endif
+                        endif
+                    endif
+                    endif
+                    endif
+                    endif
+
+                    # Rotate to next neighbor (left->up->right->down)
+                    if v_dir == 0 then
+                        v_offsets_x = 0
+                        v_offsets_y = -1
+                    endif
+                    if v_dir == 1 then
+                        v_offsets_x = 1
+                        v_offsets_y = 0
+                    endif
+                    if v_dir == 2 then
+                        v_offsets_x = 0
+                        v_offsets_y = 1
+                    endif
+                endfor v_dir
+            endif
+        endif
+    endwhile
+
+    # Draw final path if found
+    if v_found == 1 then
+        # print("Path found! Starting path reconstruction")
+        v_current_x = v_end_x
+        v_current_y = v_end_y
+        
+        v_done = 0
+        while v_done == 0 then
+            # Draw current position
+            draw_rectangle(v_current_x, v_current_y, 1, 1, green:90, true)
+            # print(f"Drawing path at: x={v_current_x}, y={v_current_y}")
+            
+            # Check if we've reached start
+            if v_current_x == v_start_x then
+                if v_current_y == v_start_y then
+                    # print("Path reconstruction complete")
+                    v_done = 1
+                endif
+            endif
+            
+            # If not done, move to next position
+            if v_done == 0 then
+                # Get next position
+                v_x = int(v_current_x)
+                v_y = int(v_current_y)
+                call calc_index
+                v_next_x = v_came_from_x[v_index]
+                v_next_y = v_came_from_y[v_index]
+                
+                # Update position
+                v_current_x = v_next_x
+                v_current_y = v_next_y
+            endif
+        endwhile
+        
+    endif
+}
+
+# Main loop
+while true then
+    # print("Starting new pathfinding attempt...")
+    call run_pathfinding
+    sync_queue
+    rest(3)    # Wait to view result
+    clear()    # Clear display
+    sync_queue # Ensure clear happens
+endwhile

@@ -1,0 +1,98 @@
+# First Martian Sprites (Green)
+define_sprite(martian_leg_up, 8, 8)
+    draw_rectangle(2, 2, 4, 2, green, 100, true)  # Body
+    draw_line(3, 4, 3, 6, green, 100)            # Left leg up
+    draw_line(4, 4, 4, 5, green, 100)            # Right leg down
+endsprite
+
+define_sprite(martian_leg_down, 8, 8)
+    draw_rectangle(2, 2, 4, 2, green, 100, true)  # Body
+    draw_line(3, 4, 3, 5, green, 100)            # Left leg down
+    draw_line(4, 4, 4, 6, green, 100)            # Right leg up
+endsprite
+
+# Second Martian Sprites (Red)
+define_sprite(martian2_leg_up, 8, 8)
+    draw_rectangle(2, 2, 4, 2, red, 100, true)   # Body
+    draw_line(3, 4, 3, 6, red, 100)             # Left leg up
+    draw_line(4, 4, 4, 5, red, 100)             # Right leg down
+endsprite
+
+define_sprite(martian2_leg_down, 8, 8)
+    draw_rectangle(2, 2, 4, 2, red, 100, true)   # Body
+    draw_line(3, 4, 3, 5, red, 100)             # Left leg down
+    draw_line(4, 4, 4, 6, red, 100)             # Right leg up
+endsprite
+
+# Variables for First Martian (Left to Right)
+v_x = 0          # Start at left edge
+v_y = 32         # Center vertically
+v_step = 1       # Move right
+v_leg = 0        # Leg state (0 = up, 1 = down)
+
+# Variables for Second Martian (Right to Left)
+v_x2 = 56        # Start at right edge
+v_y2 = 32        # Same vertical level
+v_step2 = -1     # Move left
+v_leg2 = 0       # Leg state (0 = up, 1 = down)
+
+# Draw Background Grid (8x8 cells across 64x64)
+for v_yy in (0, 63, 8)
+    draw_line(0, v_yy, 63, v_yy, gray, 50)  # Horizontal lines (dim gray)
+endfor v_yy
+
+for v_xx in (0, 63, 8)
+    draw_line(v_xx, 0, v_xx, 63, gray, 50)  # Vertical lines
+endfor v_xx
+
+# Show initial sprites
+show_sprite("martian_leg_up", v_x, v_y)      # Green Martian starts leg up
+show_sprite("martian2_leg_up", v_x2, v_y2)   # Red Martian starts leg up
+sync_queue
+rest(2)
+
+# Animation loop (until they meet or pass)
+while v_x < 56 and v_x2 > 0 then
+    begin_frame(true)
+    
+    # First Martian (Green)
+    if v_leg == 1 then
+        print("Green Leg Down")
+        v_leg = 0
+        hide_sprite("martian_leg_down")
+        show_sprite("martian_leg_up", v_x, v_y)
+    else
+        print("Green Leg Up")
+        v_leg = 1
+        hide_sprite("martian_leg_up")
+        show_sprite("martian_leg_down", v_x, v_y)
+    endif
+    
+    # Second Martian (Red)
+    if v_leg2 == 1 then
+        print("Red Leg Down")
+        v_leg2 = 0
+        hide_sprite("martian2_leg_down")
+        show_sprite("martian2_leg_up", v_x2, v_y2)
+    else
+        print("Red Leg Up")
+        v_leg2 = 1
+        hide_sprite("martian2_leg_up")
+        show_sprite("martian2_leg_down", v_x2, v_y2)
+    endif
+    
+    end_frame
+    
+    v_x = v_x + v_step    # Green moves right
+    v_x2 = v_x2 + v_step2 # Red moves left
+    rest(0.01)            # Fast for smooth motion
+    sync_queue
+endwhile
+
+# Cleanup
+hide_sprite("martian_leg_up")
+hide_sprite("martian_leg_down")
+hide_sprite("martian2_leg_up")
+hide_sprite("martian2_leg_down")
+dispose_all_sprites()
+clear()

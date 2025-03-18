@@ -1,0 +1,86 @@
+# Expanding/Contracting Circles Lightshow
+
+throttle(0)
+# Initialize base parameters
+v_centerX = 32
+v_centerY = 32
+v_radius = 25
+v_angle = 0
+v_color_base = 45
+v_fade_start = 99
+
+# Animation control variables
+v_frame_mode = 1
+v_speed = 5
+v_rest = 0
+v_rest_time = 0.05
+v_effect_duration = 0
+v_effect_max_time = 2   # Change effect every 3 iterations
+v_burnout_enabled = 0
+v_burnout_min = 100
+v_burnout_max = 500
+
+# Wave pattern variables
+v_wave_amp = 10         # Wave amplitude
+
+while 1 then
+    rest(.2)
+    # Change effects periodically
+    if v_effect_duration > v_effect_max_time then
+        v_effect_duration = 0
+        
+        # Random frame mode
+        if random(0, 100, 0) > 50 then
+            v_rest = 0.05
+        else
+            v_rest = 0
+        endif
+        
+        # Random speed and effects
+        v_speed = random(2, 8, 0)
+        v_wave_amp = random(5, 15, 0)
+        
+        # Random burnout
+        if random(0, 100, 0) > 70 then
+            v_burnout_enabled = 1
+            v_rest_time = 0.01
+        else
+            v_burnout_enabled = 0
+            v_rest_time = 0.05
+        endif
+    endif
+
+
+    
+    clear
+
+    # Expanding/Contracting Circles Pattern
+    v_current_radius = v_radius + v_wave_amp * sin(v_angle)
+    for v_r in (0, v_current_radius, 2) then
+        for v_a in (0, 360, 10) then
+            v_x = v_centerX + v_r * cos(v_a)
+            v_y = v_centerY + v_r * sin(v_a)
+            v_intensity = v_fade_start * (1 - v_r / v_current_radius)
+            rest(0.0005)
+
+            if v_burnout_enabled == 1 then
+                plot(v_x, v_y, {v_color_base}:{v_intensity}, random(v_burnout_min, v_burnout_max, 0))
+            else
+                plot(v_x, v_y, {v_color_base}:{v_intensity})
+            endif
+        endfor v_a
+        rest(v_rest)
+    endfor v_r
+
+    # Update animation
+    v_angle = v_angle + v_speed
+    v_color_base = v_color_base + 1
+    if v_color_base > 99 then
+        v_color_base = 1
+    endif
+
+    v_effect_duration = v_effect_duration + 1
+    rest(v_rest_time)
+    rest(random(v_rest_time, v_rest_time + .25, 2))
+
+endwhile

@@ -1,0 +1,99 @@
+# Expanding Rings Animation with Color Cycling
+# Creates multiple rings that expand outward with cycling color transitions
+
+# Ring properties
+v_num_rings = 15  # Number of active rings
+v_spawn_rate = 18  # New ring every 20 frames
+
+# Arrays for ring properties
+create_array(v_x, v_num_rings)      # Center x
+create_array(v_y, v_num_rings)      # Center y
+create_array(v_radius, v_num_rings) # Current radius
+create_array(v_active, v_num_rings) # Is ring currently active
+create_array(v_color, v_num_rings)  # Color index for each ring
+create_array(v_speed, v_num_rings)  # Expansion speed
+
+# Initialize variables
+v_frame_count = 0
+v_color_cycle = 0     # Main color cycle (0-5)
+v_cycle_count = 0     # Counter for color cycling timing
+v_i = 0
+v_radius_val = 0
+v_bright = 0
+v_color_val = 0
+
+# Initialize all rings as inactive
+v_i = 0
+while v_i < v_num_rings then
+    v_active[v_i] = 0
+    v_i = v_i + 1
+endwhile
+
+# Main animation loop
+while true then
+    begin_frame
+    
+    # Increment frame counter
+    v_frame_count = v_frame_count + 1
+    v_cycle_count = v_cycle_count + 1
+    
+    # Color cycle every 200 frames (approximately 10 seconds)
+    if v_cycle_count >= 200 then
+        v_cycle_count = 0
+        v_color_cycle = v_color_cycle + 1
+        if v_color_cycle > 5 then
+            v_color_cycle = 0
+        endif
+    endif
+    
+    # Check if we should spawn a new ring
+    if v_frame_count >= v_spawn_rate then
+        # Reset frame counter
+        v_frame_count = 0
+        
+        # Find an inactive ring slot
+        v_i = 0
+        while v_i < v_num_rings then
+            if v_active[v_i] == 0 then
+                # Initialize new ring
+                v_x[v_i] = random(20, 43, 0)  # Random center position
+                v_y[v_i] = random(20, 43, 0)
+                v_radius[v_i] = 1             # Start with small radius
+                v_active[v_i] = 1             # Activate ring
+                v_color[v_i] = v_color_cycle  # Use current cycle color
+                v_speed[v_i] = random(1, 3, 1)  # Random expansion speed
+                v_i = v_num_rings  # Break the loop
+            endif
+            v_i = v_i + 1
+        endwhile
+    endif
+    
+    # Update and draw all active rings
+    v_i = 0
+    while v_i < v_num_rings then
+        if v_active[v_i] == 1 then
+            # Update radius
+            v_radius[v_i] = v_radius[v_i] + v_speed[v_i]
+            
+            # Calculate brightness based on radius
+            v_bright = 99 - (v_radius[v_i] * 2)
+            if v_bright < 1 then
+                v_bright = 1
+            endif
+
+            
+            # Draw the ring
+            draw_circle(v_x[v_i], v_y[v_i], v_radius[v_i], white:{v_bright}, false)
+            
+            # Deactivate ring if it gets too large
+            if v_radius[v_i] > 30 then
+                v_active[v_i] = 0
+            endif
+        endif
+        v_i = v_i + 1
+    endwhile
+    
+    end_frame
+    
+    rest(.01)
+endwhile

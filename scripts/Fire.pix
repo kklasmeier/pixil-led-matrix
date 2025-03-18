@@ -1,0 +1,117 @@
+# Create arrays for flame particles
+create_array(v_flame_x, 60)
+create_array(v_flame_y, 60)
+create_array(v_flame_life, 60)
+create_array(v_flame_type, 60)
+create_array(v_flame_size, 60)  # Add variation in particle size
+
+# Create arrays for smoke particles
+create_array(v_smoke_x, 30)     # Increased smoke particles
+create_array(v_smoke_y, 30)
+create_array(v_smoke_life, 30)
+create_array(v_smoke_size, 30)  # Add variation in smoke size
+
+# Initialize flame base
+for v_i in (0, 59, 1) then
+    v_flame_x[v_i] = 32 + random(-8, 8, 0)
+    v_flame_y[v_i] = 63
+    v_flame_life[v_i] = random(1, 20, 0)
+    v_flame_type[v_i] = random(0, 1, 0)
+    v_flame_size[v_i] = random(1, 3, 0)
+endfor v_i
+
+# Initialize smoke particles
+for v_i in (0, 29, 1) then
+    v_smoke_x[v_i] = 32 + random(-8, 8, 0)
+    v_smoke_y[v_i] = 45
+    v_smoke_life[v_i] = random(1, 25, 0)  # Longer smoke life
+    v_smoke_size[v_i] = random(1, 2, 0)
+endfor v_i
+
+v_frame_counter = 0
+v_time = 0  # For base fire animation
+
+while true then
+    begin_frame
+    
+    if v_frame_counter == 0 then
+        clear()
+    endif
+    
+    # Draw animated base fire using sine wave for organic movement
+    v_base_offset = sin(v_time * 10) * 2
+    draw_circle(32 + v_base_offset, 63, 9, red:90, true, 200)
+    draw_circle(32 + v_base_offset * 0.5, 63, 7, orange:85, true, 200)
+    draw_circle(32, 63, 5, yellow:80, true, 200)
+    
+    # Draw flame particles
+    for v_i in (0, 59, 1) then
+        v_intensity = 50 + v_flame_life[v_i] * 2
+        
+        if v_flame_type[v_i] == 0 then
+            # Base flames
+            if v_flame_life[v_i] > 15 then
+                draw_circle(v_flame_x[v_i], v_flame_y[v_i], v_flame_size[v_i], red:{v_intensity}, true, 200)
+            elseif v_flame_life[v_i] > 8 then
+                draw_circle(v_flame_x[v_i], v_flame_y[v_i], v_flame_size[v_i], orange:{v_intensity}, true, 200)
+            endif
+        else
+            # Embers
+            if v_flame_life[v_i] > 15 then
+                plot(v_flame_x[v_i], v_flame_y[v_i], red:{v_intensity}, 200)
+            elseif v_flame_life[v_i] > 8 then
+                plot(v_flame_x[v_i], v_flame_y[v_i], orange:{v_intensity}, 200)
+            else
+                plot(v_flame_x[v_i], v_flame_y[v_i], yellow:{v_intensity}, 200)
+            endif
+        endif
+        
+        # Update position with more organic movement
+        if v_frame_counter == 0 then
+            v_flame_x[v_i] = v_flame_x[v_i] + random(-1, 1, 0)
+            v_flame_y[v_i] = v_flame_y[v_i] - random(1, 2, 0)  # Faster upward movement
+            v_flame_life[v_i] = v_flame_life[v_i] - 1
+            
+            if v_flame_life[v_i] < 0 then
+                v_flame_x[v_i] = 32 + random(-8, 8, 0)
+                v_flame_y[v_i] = 63
+                v_flame_life[v_i] = random(1, 20, 0)
+                v_flame_type[v_i] = random(0, 1, 0)
+                v_flame_size[v_i] = random(1, 3, 0)
+            endif
+        endif
+    endfor v_i
+    
+    # Draw smoke particles
+    for v_i in (0, 29, 1) then
+        v_smoke_intensity = 10 + v_smoke_life[v_i]  # Dimmer smoke
+        
+        # Draw larger smoke particles
+        if v_smoke_size[v_i] > 1 then
+            draw_circle(v_smoke_x[v_i], v_smoke_y[v_i], v_smoke_size[v_i], gray:{v_smoke_intensity}, true, 200)
+        else
+            plot(v_smoke_x[v_i], v_smoke_y[v_i], gray:{v_smoke_intensity}, 200)
+        endif
+        
+        if v_frame_counter == 0 then
+            # Sinusoidal horizontal movement for smoke
+            v_smoke_x[v_i] = v_smoke_x[v_i] + sin(v_smoke_y[v_i] * 0.1) + random(-1, 1, 0)
+            v_smoke_y[v_i] = v_smoke_y[v_i] - 1
+            v_smoke_life[v_i] = v_smoke_life[v_i] - 1
+            
+            if v_smoke_life[v_i] < 0 or v_smoke_y[v_i] < 0 then
+                v_smoke_x[v_i] = 32 + random(-8, 8, 0)
+                v_smoke_y[v_i] = 45
+                v_smoke_life[v_i] = random(1, 25, 0)
+                v_smoke_size[v_i] = random(1, 2, 0)
+            endif
+        endif
+    endfor v_i
+    
+    end_frame
+    
+    v_frame_counter = 1 - v_frame_counter
+    v_time = v_time + 0.1  # Update time for base fire animation
+    
+    rest(0.02)
+endwhile

@@ -1,0 +1,249 @@
+# Spirograph Sequence Generator
+# Creates truly randomized spirograph patterns with alternating burnout effect
+# Runs burnout patterns 3 times and fixes centering issues
+
+# Configuration variables
+v_center_x = 32          # Center X of the display (64x64)
+v_center_y = 32          # Center Y of the display
+v_color_num = 1          # Starting color number
+v_intensity = 100        # Default intensity
+v_point_delay = 0.0005   # Reduced delay between points to improve speed
+v_max_points = 2000      # Safety limit to prevent infinite points
+v_regular_view_time = 3  # Fixed viewing time between patterns (seconds)
+v_pattern_count = 0      # Counter to track even/odd patterns for burnout effect
+v_step_factor = 2        # Skip points to increase drawing speed
+
+# Seed values for pseudo-random generation
+v_seed1 = 42
+v_seed2 = 17
+v_seed3 = 31
+
+# Create arrays for storing x,y coordinates
+create_array(v_x_coords, v_max_points)
+create_array(v_y_coords, v_max_points)
+
+# Generate a better pseudo-random value
+def better_random {
+    # Mix multiple values for improved randomness
+    v_seed1 = (v_seed1 * 75 + 13) % 100
+    v_seed2 = (v_seed2 * 69 + 23) % 100
+    v_seed3 = (v_seed3 * 61 + 39) % 100
+    
+    # Combine the seeds
+    v_random_val = (v_seed1 + v_seed2 + v_seed3) % 100
+}
+
+# Get random value in range min to max
+def random_in_range {
+    call better_random
+    v_range_size = v_max - v_min + 1
+    v_result = v_min + (v_random_val % v_range_size)
+}
+
+# Drawing function - optimized for speed while ensuring full completion
+def draw_spirograph {
+    # Draw the pattern point by point, but skip some points for speed
+    if v_pattern_count % 2 == 1 then
+        # Odd patterns - use burnout of 500ms
+        print("** Using 500ms burnout for this pattern **")
+        
+        # Draw with step factor to speed up (skip points)
+        # Ensure we go all the way to the end of the pattern by using v_points_needed - 1
+        v_last = v_points_needed - 1
+        for v_i in (v_step_factor, v_last, v_step_factor) then
+            v_x1 = v_x_coords[v_i - v_step_factor]
+            v_y1 = v_y_coords[v_i - v_step_factor]
+            v_x2 = v_x_coords[v_i]
+            v_y2 = v_y_coords[v_i]
+            
+            # With 500ms burnout
+            draw_line(v_x1, v_y1, v_x2, v_y2, v_color_num, v_intensity, 500)
+            rest(v_point_delay)
+        endfor v_i
+        
+        # Make sure we draw the final segment if we didn't land exactly on the last point
+        if (v_last % v_step_factor) != 0 then
+            v_i = v_last - (v_last % v_step_factor)
+            draw_line(v_x_coords[v_i], v_y_coords[v_i], v_x_coords[v_last], v_y_coords[v_last], v_color_num, v_intensity, 500)
+            rest(v_point_delay)
+        endif
+        
+        # DO NOT connect last point to first point
+    else
+        # Even patterns - no burnout
+        v_last = v_points_needed - 1
+        for v_i in (v_step_factor, v_last, v_step_factor) then
+            v_x1 = v_x_coords[v_i - v_step_factor]
+            v_y1 = v_y_coords[v_i - v_step_factor]
+            v_x2 = v_x_coords[v_i]
+            v_y2 = v_y_coords[v_i]
+            
+            # Without burnout
+            draw_line(v_x1, v_y1, v_x2, v_y2, v_color_num, v_intensity)
+            rest(v_point_delay)
+        endfor v_i
+        
+        # Make sure we draw the final segment if we didn't land exactly on the last point
+        if (v_last % v_step_factor) != 0 then
+            v_i = v_last - (v_last % v_step_factor)
+            draw_line(v_x_coords[v_i], v_y_coords[v_i], v_x_coords[v_last], v_y_coords[v_last], v_color_num, v_intensity)
+            rest(v_point_delay)
+        endif
+        
+        # DO NOT connect last point to first point
+    endif
+}
+
+# Function to create truly random patterns
+def change_pattern {
+    # Increment pattern counter
+    v_pattern_count = v_pattern_count + 1
+    
+    # Clear existing pattern
+    clear()
+    
+    # Randomize outer radius (25-31)
+    v_min = 25
+    v_max = 31
+    call random_in_range
+    v_outer_radius = v_result
+    
+    # Use prime number differences for inner radius to create more variation
+    v_min = 5
+    v_max = 23
+    call random_in_range
+    v_inner_radius = v_result
+    
+    # Make sure inner radius is never equal or too close to outer radius
+    if v_inner_radius >= v_outer_radius - 2 then
+        v_inner_radius = v_outer_radius - 5
+        if v_inner_radius < 5 then
+            v_inner_radius = 5
+        endif
+    endif
+    
+    # Randomize pen distance with wider range
+    v_min = 3
+    v_max = v_inner_radius - 1
+    if v_max < v_min then
+        v_max = v_min + 1
+    endif
+    call random_in_range
+    v_pen_distance = v_result
+    
+    # Randomize color with bigger jumps
+    v_min = 1
+    v_max = 99
+    call random_in_range
+    v_color_num = v_result
+    
+    # Fix centering issues - use exact center coordinates without offsets
+    v_center_x = 32
+    v_center_y = 32
+    
+    # Recalculate GCD and points - using co-prime ratios creates more interesting patterns
+    v_a = v_outer_radius
+    v_b = v_inner_radius
+    v_temp = 0
+    
+    # Euclidean algorithm for GCD
+    while v_b != 0 then
+        v_temp = v_b
+        v_b = v_a % v_b
+        v_a = v_temp
+    endwhile
+    
+    v_gcd = v_a
+    
+    # Handle case where GCD is 0
+    if v_gcd == 0 then
+        v_gcd = 1
+    endif
+    
+    # Calculate exact number of points needed for EXACTLY one complete cycle
+    v_lcm = (v_outer_radius * v_inner_radius) / v_gcd
+    v_num_rotations = v_inner_radius / v_gcd
+    
+    # Calculate points needed for a complete cycle
+    v_points_needed = v_lcm * 80  # Keep at 80 for good balance of speed and quality
+    
+    # Safety limit
+    if v_points_needed > v_max_points then
+        # If too many points, use a lower resolution that still gives a complete cycle
+        v_factor = floor(v_points_needed / v_max_points) + 1
+        v_points_needed = v_lcm * (80 / v_factor)
+        
+        # Ensure we still get a complete cycle
+        if v_points_needed > v_max_points then
+            v_points_needed = v_max_points
+            print("Warning: Could not create a complete cycle within point limit")
+        endif
+    endif
+    
+    # Calculate theta step - CRITICAL for complete cycles
+    v_theta_step = (2 * pi * v_num_rotations) / v_points_needed
+    
+    # Generate ALL points for EXACTLY one complete cycle
+    for v_i in (0, v_points_needed - 1, 1) then
+        v_theta = v_i * v_theta_step
+        
+        # Standard hypotrochoid equations
+        v_x = v_center_x + (v_outer_radius - v_inner_radius) * cos(v_theta) + v_pen_distance * cos((v_outer_radius - v_inner_radius) * v_theta / v_inner_radius)
+        v_y = v_center_y + (v_outer_radius - v_inner_radius) * sin(v_theta) - v_pen_distance * sin((v_outer_radius - v_inner_radius) * v_theta / v_inner_radius)
+        
+        v_x_coords[v_i] = v_x
+        v_y_coords[v_i] = v_y
+    endfor v_i
+    
+    # Draw reference circle WITHOUT burnout (always stays visible)
+    # Use exact 32,32 center for consistent positioning
+    draw_circle(32, 32, v_outer_radius, 50, 15, false)
+    
+    # Adjust step factor based on number of points for consistent speed
+    if v_points_needed > 1000 then
+        v_step_factor = 3
+    elseif v_points_needed > 500 then
+        v_step_factor = 2
+    else
+        v_step_factor = 1
+    endif
+    
+    # Display pattern information
+    print(f"Pattern #{v_pattern_count}: R={v_outer_radius}, r={v_inner_radius}, d={v_pen_distance}, color={v_color_num}")
+    print(f"Complete in {v_num_rotations} rotations with {v_points_needed} points (step={v_step_factor})")
+}
+
+# Initial clear
+clear()
+
+# Speed up the command processing, but not too much
+throttle(0.8)
+
+# Infinite loop to keep generating patterns
+while 1 == 1 then
+    # Generate new pattern
+    call change_pattern
+    
+    # Determine viewing time based on pattern type
+    if v_pattern_count % 2 == 1 then
+        # For burnout patterns, run 3 times in sequence
+        for v_xx in (1, 3, 1)
+            # Draw the pattern
+            call draw_spirograph
+        endfor v_xx
+    else
+        # For regular patterns, run just once
+        call draw_spirograph
+    endif
+    
+    # Ensure all drawing commands complete
+    sync_queue
+    
+    # Wait before next pattern
+    rest(v_regular_view_time)
+    
+    # Force seed change
+    v_seed1 = v_seed1 + 13
+    v_seed2 = v_seed2 + 7 
+    v_seed3 = v_seed3 + 23
+endwhile

@@ -1,0 +1,116 @@
+# Square animation showcase - Continuous pattern with random elements
+# Set initial values
+v_size = 63  # Maximum size for 64x64 panel (0-63)
+
+def check_color_shift {
+    v_pixel_count = v_pixel_count + 1
+    if v_pixel_count >= v_pixel_shift then
+        v_color = v_color + 1
+        if v_color > 99 then
+            v_color = 1
+        endif
+        v_pixel_count = 0
+    endif
+}
+
+# New procedure to handle burnout time calculation
+def get_burnout_time {
+    if v_dissolve_mode == 1 then
+        # Add random variation of ±1000ms
+        v_variation = random(-1000, 1000, 100)
+        v_current_burnout = v_burnout + v_variation
+    else
+        v_current_burnout = v_burnout
+    endif
+}
+
+while true then
+    # Randomize the delay speed
+    v_delay = random(0.00, 0.02, 2)
+    
+    # Base burnout time
+    v_burnout = random(10000, 50000, 10000)
+    
+    # Decide dissolve mode (40% chance - random 0-9, trigger on 0-3)
+    v_dissolve_mode = 0
+    v_roll = random(0, 9, 1)
+    if v_roll <= 3 then
+        v_dissolve_mode = 1
+    endif
+    
+    # Gradient mode (50/50)
+    v_gradient_mode = random(0, 1, 1)
+    
+    # Initial color and gradient settings
+    v_color = random(1, 99, 1)
+    v_pixel_count = 0
+    if v_gradient_mode == 1 then
+        v_pixel_shift = random(1, 4, 1)
+    endif
+    
+    # Reset variables for each iteration
+    v_x = 63
+    v_y = 0
+    v_offset = 0
+    v_correction = 0
+    v_current_size = v_size
+
+    while v_current_size >= 3 then
+        # Top edge (right to left)
+        v_x = 63 - v_offset + v_correction
+        v_y = v_offset
+        
+        while v_x >= v_offset then
+            call get_burnout_time
+            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_gradient_mode == 1 then
+                call check_color_shift
+            endif
+            v_x = v_x - 1
+            rest(v_delay)
+        endwhile
+
+        # Left edge (top to bottom)
+        v_x = v_offset
+        v_y = v_offset
+        while v_y <= 63 - v_offset then
+            call get_burnout_time
+            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_gradient_mode == 1 then
+                call check_color_shift
+            endif
+            v_y = v_y + 1
+            rest(v_delay)
+        endwhile
+
+        # Bottom edge (left to right)
+        v_x = v_offset
+        v_y = 63 - v_offset
+        while v_x <= 63 - v_offset then
+            call get_burnout_time
+            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_gradient_mode == 1 then
+                call check_color_shift
+            endif
+            v_x = v_x + 1
+            rest(v_delay)
+        endwhile
+
+        # Right edge (bottom to top)
+        v_x = 63 - v_offset
+        v_y = 63 - v_offset
+        while v_y >= v_offset + 3 then
+            call get_burnout_time
+            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_gradient_mode == 1 then
+                call check_color_shift
+            endif
+            v_y = v_y - 1
+            rest(v_delay)
+        endwhile
+
+        v_offset = v_offset + 2
+        v_correction = 2
+        v_current_size = v_current_size - 4
+    endwhile
+endwhile

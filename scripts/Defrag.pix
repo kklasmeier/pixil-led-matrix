@@ -1,0 +1,46 @@
+# Create initial fragmented disk state
+def create_initial_state {
+    # Use every other row (0, 2, 4, etc)
+    for v_row in (0, 64, 2) then
+        v_x = 0
+        
+        # Add fragments along the row
+        while v_x < 60 then
+            # Generate random length 3-6 pixels
+            v_length = random(3, 6, 0)
+            
+            # 70% chance to place a fragment
+            v_place = random(0, 100, 0)
+            
+            if v_place < 70 then
+                # Choose a color
+                v_color_pick = random(1, 4, 0)
+                
+                if v_color_pick == 1 then
+                    v_color = "red"
+                elseif v_color_pick == 2 then
+                    v_color = "blue"
+                else
+                    v_color = "green"
+                endif
+                
+                # Draw the fragment
+                draw_line(v_x, v_row, v_x + v_length, v_row, v_color)
+            endif
+            
+            # Move to next position with gap
+            v_x = v_x + v_length + 3
+        endwhile
+    endfor v_row
+    
+    rest(5)
+}
+
+# Main program
+clear()
+print("Creating initial disk state...")
+create_initial_state
+print("Initial state created.")
+rest(5)
+sync_queue
+clear()

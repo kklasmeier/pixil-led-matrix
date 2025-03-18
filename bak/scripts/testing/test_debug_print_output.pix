@@ -1,0 +1,30 @@
+# This is a sample Pixil script
+
+v_start = 10
+v_end = 50
+v_step = 10
+
+clear()
+
+def draw_square {
+    draw_rectangle(v_x, v_y, v_x + v_size, v_y + v_size, blue, true, 2)
+}
+
+for v_x in (v_start, v_end, v_step)
+    v_y = v_x
+    v_size = random(5, 15, 0)
+    print("Current position: ({v_x}, {v_y}), Size: {v_size}")
+    if v_size > 10 then
+        call draw_square
+        print("Drew a blue square")
+    else
+        draw_circle(v_x, v_y, v_size / 2, red, false, 2)
+        print("Drew a red circle")
+    endif
+    rest(0.5)
+endfor
+
+v_final = v_end + v_step
+print("Loop completed. Final values: x={v_x}, y={v_y}, final={v_final}")
+
+plot(0, 0, white, 5)

@@ -1,0 +1,122 @@
+# Plasma Ball Animation
+# Creates an organic plasma effect with flowing tendrils
+
+# Ball parameters
+v_num_tendrils = 6
+v_center_x = 32
+v_center_y = 32
+v_time = 0
+v_refresh_count = 0
+v_color_cycle = 0
+v_burnout = 4000
+v_intensity_cycle = 0  # New variable for intensity cycling
+v_intensity_dir = 1    # Direction of intensity change (1=decreasing, -1=increasing)
+v_intensity_step = 2   # How much to change intensity each frame
+
+# Create arrays for tendril properties
+create_array(v_angle, v_num_tendrils)
+create_array(v_length, v_num_tendrils)
+create_array(v_speed, v_num_tendrils)
+create_array(v_phase, v_num_tendrils)
+
+# Initialize variables
+v_i = 0
+v_x = 0
+v_y = 0
+v_bright = 0
+v_dist = 0
+v_temp_x = 0
+v_temp_y = 0
+v_angle_rad = 0
+v_intensity_base = 99  # Start at maximum intensity
+
+# Initialize tendrils
+v_i = 0
+while v_i < v_num_tendrils then
+    # Distribute angles evenly around circle
+    v_angle[v_i] = (v_i * 360 / v_num_tendrils)
+    v_length[v_i] = random(10, 50, 1)
+    v_speed[v_i] = random(5, 15, 1) / 100
+    v_phase[v_i] = random(0, 628, 2) / 100
+    v_i = v_i + 1
+endwhile
+
+while true then
+   
+    # Update intensity cycle
+    v_intensity_base = v_intensity_base - (v_intensity_step * v_intensity_dir)
+    
+    # Check intensity bounds and reverse direction if needed
+    if v_intensity_base <= 20 then
+        v_intensity_dir = -1  # Start increasing
+        v_intensity_base = 20
+    endif
+    if v_intensity_base >= 99 then
+        v_intensity_dir = 1   # Start decreasing
+        v_intensity_base = 99
+    endif
+    
+    # Check if we need to change colors
+    v_refresh_count = v_refresh_count + 1
+    if v_refresh_count >= 20 then
+        v_refresh_count = 0
+        v_color_cycle = v_color_cycle + 1
+        if v_color_cycle > 4 then
+            v_color_cycle = 0
+        endif
+    endif
+    
+    # Draw central core with current intensity
+    if v_color_cycle == 0 then
+        plot(v_center_x, v_center_y, white:{v_intensity_base}, v_burnout)
+    elseif v_color_cycle == 1 then
+        plot(v_center_x, v_center_y, blue:{v_intensity_base}, v_burnout)
+    elseif v_color_cycle == 2 then
+        plot(v_center_x, v_center_y, purple:{v_intensity_base}, v_burnout)
+    elseif v_color_cycle == 3 then
+        plot(v_center_x, v_center_y, cyan:{v_intensity_base}, v_burnout)
+    else
+        plot(v_center_x, v_center_y, magenta:{v_intensity_base}, v_burnout)
+    endif
+    
+    # Draw each tendril
+    v_i = 
+
+    while v_i < v_num_tendrils then
+        # Calculate base angle with oscillation
+        v_angle_rad = v_angle[v_i] + (sin(v_time + v_phase[v_i]) * 30)
+        
+        # Draw points along tendril
+        v_dist = 1
+        begin_frame(True)
+        while v_dist < v_length[v_i] then
+            # Calculate point position
+            v_temp_x = v_center_x + (cos(v_angle_rad * 0.0174533) * v_dist)
+            v_temp_y = v_center_y + (sin(v_angle_rad * 0.0174533) * v_dist)
+            
+            # Calculate brightness based on current intensity cycle
+            v_bright = v_intensity_base
+            
+            # Draw point with current color cycle
+            if v_color_cycle == 0 then
+                plot(v_temp_x, v_temp_y, blue:{v_bright}, v_burnout)
+            elseif v_color_cycle == 1 then
+                plot(v_temp_x, v_temp_y, purple:{v_bright}, v_burnout)
+            elseif v_color_cycle == 2 then
+                plot(v_temp_x, v_temp_y, cyan:{v_bright}, v_burnout)
+            elseif v_color_cycle == 3 then
+                plot(v_temp_x, v_temp_y, magenta:{v_bright}, v_burnout)
+            else
+                plot(v_temp_x, v_temp_y, white:{v_bright}, v_burnout)
+            endif
+            
+            v_dist = v_dist + 1
+        endwhile
+        end_frame       
+        v_i = v_i + 1
+    endwhile
+
+    # Update time
+    v_time = v_time + 0.1
+    
+endwhile

@@ -1,0 +1,10 @@
+for v_line in (0, 63, 1)
+    draw_line(0, v_line, 63, v_line, white, 1000)
+    rest(.01)
+endfor v_line
+rest(5)
+for v_line in (0, 63, 1)
+    draw_line(v_line, 0, v_line, 63, white, 1000)
+    rest(.01)
+endfor v_line
+rest(5)

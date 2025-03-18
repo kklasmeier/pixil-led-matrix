@@ -1,0 +1,277 @@
+# Prayer Display Script
+def setup_colors {
+    # Create array for available colors
+    create_array(v_colors, 15, string)
+    
+    # Initialize with a variety of colors
+    v_colors[0] = "white"
+    v_colors[1] = "sky_blue"
+    v_colors[2] = "gold"
+    v_colors[3] = "spring_green"
+    v_colors[4] = "violet"
+    v_colors[5] = "rose"
+    v_colors[6] = "azure"
+    v_colors[7] = "cyan"
+    v_colors[8] = "lavender"
+    v_colors[9] = "silver"
+    v_colors[10] = "peach"
+    v_colors[11] = "mint"
+    v_colors[12] = "coral"
+    v_colors[13] = "turquoise"
+    v_colors[14] = "light_gray"
+}
+
+# Helper procedure to get random color
+def get_random_color {
+    # Generate random index (0-14)
+    v_color_index = random(0, 14, 0)
+    v_color = v_colors[v_color_index]
+}
+
+# Word placement strategies
+def display_virtually_centered {
+    v_y = 32  # Exact center of 64-pixel display
+    
+    for v_i in (0, v_word_count - 1, 1) then
+        clear()
+        v_x = 1  # Left align
+        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+def display_random_vertical {
+    # Only need bottom margin to prevent text cutoff
+    v_bottom_margin = v_text_size
+    
+    for v_i in (0, v_word_count - 1, 1) then
+        clear()
+        v_x = 1  # Left align
+        # Random y position from top (0) to bottom margin
+        v_y = random(0, 59 - v_bottom_margin, 0)
+        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+def display_top_to_bottom {
+    v_step = 1  # Move down 1 pixel each time
+    v_bottom_margin = v_text_size  # Bottom margin for readability
+    v_y = 0  # Start at very top
+    
+    for v_i in (0, v_word_count - 1, 1) then
+        clear()
+        v_x = 1  # Left align
+        # Move down the screen
+        v_y = v_y + v_step
+        # Reset if we reach bottom
+        if v_y > 59 - v_bottom_margin then
+            v_y = 0
+        endif
+        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+def display_quarter_drops {
+    v_quarter = 16  # One quarter of screen height (64/4)
+    v_bottom_margin = v_text_size  # Bottom margin for readability
+    v_y = 0  # Start at very top
+    
+    for v_i in (0, v_word_count - 1, 1) then
+        clear()
+        v_x = 1  # Left align
+        # Move down by quarter screen
+        v_y = v_y + v_quarter
+        # Reset if we reach bottom
+        if v_y > 59 - v_bottom_margin then
+            v_y = 0
+        endif
+        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+# Helper to randomly select and execute display style
+def display_prayer {
+    # Get random display style (0-3)
+    v_style = random(0, 3, 0)
+    
+    # Get random color for this sequence
+    call get_random_color
+    
+    # Execute chosen display style
+    if v_style == 0 then
+        print("Using virtually centered display")
+        call display_virtually_centered
+    elseif v_style == 1 then
+        print("Using random vertical display")
+        call display_random_vertical
+    elseif v_style == 2 then
+        print("Using top to bottom display")
+        call display_top_to_bottom
+    else
+        print("Using quarter drops display")
+        call display_quarter_drops
+    endif
+}
+
+
+
+# ========================================================================================
+
+
+
+# Our Father prayer setup
+def setup_our_father {
+    v_word_count = 55
+    create_array(v_words, v_word_count, string)
+    create_array(v_delays, v_word_count, numeric)
+    v_text_size = 14
+
+    # Initialize arrays - words
+    v_words[0] = "Our"              # 0.3s
+    v_words[1] = "Father,"          # 0.5s
+    v_words[2] = "Who"              # 0.3s
+    v_words[3] = "art"              # 0.3s
+    v_words[4] = "in"               # 0.2s
+    v_words[5] = "heaven,"          # 0.5s
+    v_words[6] = "hallowed"         # 0.4s
+    v_words[7] = "be"               # 0.2s
+    v_words[8] = "Thy"              # 0.3s
+    v_words[9] = "name;"            # 0.6s
+    v_words[10] = "Thy"             # 0.3s
+    v_words[11] = "kingdom"         # 0.4s
+    v_words[12] = "come,"           # 0.5s
+    v_words[13] = "Thy"             # 0.3s
+    v_words[14] = "will"            # 0.3s
+    v_words[15] = "be"              # 0.2s
+    v_words[16] = "done"            # 0.3s
+    v_words[17] = "on"              # 0.2s
+    v_words[18] = "earth"           # 0.3s
+    v_words[19] = "as"              # 0.2s
+    v_words[20] = "it"              # 0.2s
+    v_words[21] = "is"              # 0.2s
+    v_words[22] = "in"              # 0.2s
+    v_words[23] = "heaven."         # 0.8s
+    v_words[24] = "Give"            # 0.3s
+    v_words[25] = "us"              # 0.2s
+    v_words[26] = "this"            # 0.3s
+    v_words[27] = "day"             # 0.3s
+    v_words[28] = "our"             # 0.3s
+    v_words[29] = "daily"           # 0.3s
+    v_words[30] = "bread,"          # 0.5s
+    v_words[31] = "and"             # 0.2s
+    v_words[32] = "forgive"         # 0.4s
+    v_words[33] = "us"              # 0.2s
+    v_words[34] = "our"             # 0.3s
+    v_words[35] = "trespasses"      # 0.5s
+    v_words[36] = "as"              # 0.2s
+    v_words[37] = "we"              # 0.2s
+    v_words[38] = "forgive"         # 0.4s
+    v_words[39] = "those"           # 0.3s
+    v_words[40] = "who"             # 0.3s
+    v_words[41] = "trespass"        # 0.4s
+    v_words[42] = "against"         # 0.4s
+    v_words[43] = "us;"             # 0.6s
+    v_words[44] = "and"             # 0.2s
+    v_words[45] = "lead"            # 0.3s
+    v_words[46] = "us"              # 0.2s
+    v_words[47] = "not"             # 0.3s
+    v_words[48] = "into"            # 0.3s
+    v_words[49] = "temptation,"     # 0.5s
+    v_words[50] = "but"             # 0.2s
+    v_words[51] = "deliver"         # 0.4s
+    v_words[52] = "us"              # 0.2s
+    v_words[53] = "from"            # 0.3s
+    v_words[54] = "evil."           # 0.8s
+    
+    # Initialize arrays - delays
+    v_delays[0] = 1.02     # Our
+    v_delays[1] = 0.73     # Father,
+    v_delays[2] = 0.19     # who
+    v_delays[3] = 0.25     # art
+    v_delays[4] = 0.29     # in
+    v_delays[5] = 0.93     # heaven,
+    v_delays[6] = 0.53     # hallowed
+    v_delays[7] = 0.21     # be
+    v_delays[8] = 0.32     # thy
+    v_delays[9] = 0.91     # name;
+    v_delays[10] = 0.45     # thy
+    v_delays[11] = 0.49     # kingdom
+    v_delays[12] = 0.67     # come,
+    v_delays[13] = 0.42     # thy
+    v_delays[14] = 0.25     # will
+    v_delays[15] = 0.23     # be
+    v_delays[16] = 0.73     # done
+    v_delays[17] = 0.36     # on
+    v_delays[18] = 0.46     # earth
+    v_delays[19] = 0.10     # as
+    v_delays[20] = 0.11     # it
+    v_delays[21] = 0.49     # is
+    v_delays[22] = 0.17     # in
+    v_delays[23] = 1.36     # heaven.
+    v_delays[24] = 0.27     # Give
+    v_delays[25] = 0.37     # us
+    v_delays[26] = 0.19     # this
+    v_delays[27] = 0.43     # day
+    v_delays[28] = 0.29     # our
+    v_delays[29] = 0.47     # daily
+    v_delays[30] = 0.64     # bread,
+    v_delays[31] = 0.25     # and
+    v_delays[32] = 0.44     # forgive
+    v_delays[33] = 0.16     # us
+    v_delays[34] = 0.33     # our
+    v_delays[35] = 0.94     # trespasses,
+    v_delays[36] = 0.18     # as
+    v_delays[37] = 0.34     # we
+    v_delays[38] = 0.43     # forgive
+    v_delays[39] = 0.49     # those
+    v_delays[40] = 0.16     # who
+    v_delays[41] = 0.62     # trespass
+    v_delays[42] = 0.43     # against
+    v_delays[43] = 1.07     # us;
+    v_delays[44] = 0.19     # and
+    v_delays[45] = 0.17     # lead
+    v_delays[46] = 0.23     # us
+    v_delays[47] = 0.40     # not
+    v_delays[48] = 0.41     # into
+    v_delays[49] = 1.09     # temptation,
+    v_delays[50] = 0.19     # but
+    v_delays[51] = 0.80     # deliver
+    v_delays[52] = 0.40     # us
+    v_delays[53] = 0.11     # from
+    v_delays[54] = 1.17     # evil.
+
+}
+
+
+
+
+
+
+# ====================================================================================
+
+
+# Procedure to display Our Father
+def our_father {
+    print("Displaying Our Father")
+    call setup_our_father
+    call display_prayer
+}
+
+
+
+# Main program
+# Main program
+clear()
+call setup_colors
+
+# Display each prayer
+call our_father
+rest(2)
+clear()

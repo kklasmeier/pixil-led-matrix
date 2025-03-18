@@ -1,0 +1,7 @@
+# Test script for procedures
+
+v_2 = 20
+for v_loop (10, 20, 2)
+    draw_rectangle(v_loop, v_loop, v_2, v_2, red, false, 2000)
+    rest(1)
+endfor v_loop

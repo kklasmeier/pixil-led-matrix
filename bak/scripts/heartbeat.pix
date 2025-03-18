@@ -1,0 +1,66 @@
+v_x = 0
+v_amplitude = 10  # Increased amplitude for more vertical space usage
+v_speed = 1
+v_cycle = 0
+v_base = 32
+v_last_y = v_base
+v_last_heart_beat = 0
+
+while true then
+    # Basic heartbeat pattern with increased amplitude
+    v_heart_beat = sin(v_cycle) * v_amplitude
+    
+    # Add occasional "noise" for muscle tremor simulation
+    v_noise = 0
+    if random(0, 100, 0) < 5 then  # 5% chance of noise
+        v_noise = random(-2, 2, 0)  # Slightly stronger noise for visibility
+    endif
+    
+    # Simulate a slight baseline wander for respiration
+    v_respiration = sin(v_cycle * 0.05) * 3  # Increased effect for more vertical usage
+
+    # Combine all effects
+    v_y = v_base + v_heart_beat + v_noise + v_respiration
+    
+if v_heart_beat > v_amplitude * 0.8 then  # High peak - Red
+    v_color = "red"
+endif
+
+if v_heart_beat <= v_amplitude * 0.8 then  # Start of mid peak check
+    if v_heart_beat > v_amplitude * 0.5 then  # Mid peak - Orange
+        v_color = "orange"
+    endif
+endif
+
+if v_heart_beat <= v_amplitude * 0.5 then  # Start of T wave check
+    if v_heart_beat > 0 then  # T wave - Yellow
+        v_color = "yellow"
+    endif
+endif
+
+if v_heart_beat <= 0 then  # Baseline - Blue
+    v_color = "blue"
+endif
+
+# Draw line with correct positioning for peaks
+draw_line(v_x - v_speed, v_base - v_heart_beat, v_x, v_base - v_last_heart_beat, v_color, 400)
+
+# Update v_last_heart_beat for the next iteration
+v_last_heart_beat = v_heart_beat
+
+    # Update v_last_heart_beat for the next iteration
+    v_last_heart_beat = v_heart_beat
+    
+    v_last_y = v_y
+    v_x = v_x + v_speed
+    
+    # Reset x position if we reach the right edge
+    if v_x >= 64 then
+        v_x = 0
+    endif
+    
+    # Increment cycle with slight variability for heart rate
+    v_cycle = v_cycle + 0.20 + (sin(v_cycle * 0.1) * 0.02)  # Small variability in speed
+    
+    # Removed rest() as per your request
+endwhile

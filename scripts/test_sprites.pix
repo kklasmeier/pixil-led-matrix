@@ -1,0 +1,22 @@
+# test_sprites.pix
+v_x = 10
+v_y = 20
+
+# Define sprite with varied intensities
+define_sprite(test_sprite, 20, 20)
+    draw_circle(5, 5, 3, red, 10, true)      # Bright red filled circle
+    draw_circle(15, 5, 3, blue, 10, false)   # Medium blue outline circle
+    draw_rectangle(5, 15, 10, 5, green, 10, true)  # Medium green filled rectangle
+endsprite
+rest(1)
+sync_queue
+
+# Show sprite
+show_sprite(test_sprite, v_x, v_y)
+rest(2)
+sync_queue
+
+# Regular draw for comparison
+draw_circle(v_x + 30, v_y + 5, 3, red, 99, true)  # Should be bright
+rest(2)
+sync_queue

@@ -1,0 +1,22 @@
+def square_zoom_out {
+    v_linesize = 64
+    for v_line in (0, 30, 2)
+        v_working_line = v_linesize - v_line - v_line
+        draw_rectangle(v_line, v_line, v_working_line, v_working_line, blue, 1000)
+        rest(.01)
+    endfor v_line
+    rest(5)
+}
+
+def square_zoom_in {
+    v_linesize = 64
+    for v_line in (30, 0, -2)
+        v_working_line = v_linesize - v_line - v_line
+        draw_rectangle(v_line, v_line, v_working_line, v_working_line, blue, 1000)
+        rest(.01)
+    endfor v_line
+    rest(5)
+}
+
+call square_zoom_out
+call square_zoom_in

@@ -1,0 +1,60 @@
+# Initialize variables
+v_angle = 0
+v_time = 0
+v_scale = 15
+v_speed = 0.05
+
+while true then
+    begin_frame
+    v_scale = 15 + sin(v_time * 0.1) * 5    # Size oscillation
+    v_color = (v_time * 2) % 100            # Color cycling
+    v_intensity = 50 + sin(v_time * 0.2) * 50  # Intensity pulse
+    v_speed = 0.05 + cos(v_time * 0.05) * 0.03  # Rotation speed variation
+    v_z_depth = 15 + sin(v_time * 0.15) * 2  # Dynamic perspective
+
+    # Morphing factor (slower: 0.005 instead of 0.05)
+    v_morph = abs(sin(v_time * 0.005))      # Slower morphing: ~12.56s cycle
+    v_top_scale = v_scale * v_morph         # Top square shrinks/grows
+
+    # Bottom square vertices (full size)
+    v_x0 = 32 + cos(v_angle) * v_scale
+    v_y0 = 32 + sin(v_angle) * v_scale
+    v_x1 = 32 + cos(v_angle + 90) * v_scale
+    v_y1 = 32 + sin(v_angle + 90) * v_scale
+    v_x2 = 32 + cos(v_angle + 180) * v_scale
+    v_y2 = 32 + sin(v_angle + 180) * v_scale
+    v_x3 = 32 + cos(v_angle + 270) * v_scale
+    v_y3 = 32 + sin(v_angle + 270) * v_scale
+
+    # Top square vertices (morphed size)
+    v_tx0 = 32 + cos(v_angle) * v_top_scale
+    v_ty0 = 32 + sin(v_angle) * v_top_scale
+    v_tx1 = 32 + cos(v_angle + 90) * v_top_scale
+    v_ty1 = 32 + sin(v_angle + 90) * v_top_scale
+    v_tx2 = 32 + cos(v_angle + 180) * v_top_scale
+    v_ty2 = 32 + sin(v_angle + 180) * v_top_scale
+    v_tx3 = 32 + cos(v_angle + 270) * v_top_scale
+    v_ty3 = 32 + sin(v_angle + 270) * v_top_scale
+
+    # Top square
+    draw_line(v_tx0, v_ty0 - v_z_depth, v_tx1, v_ty1 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_tx1, v_ty1 - v_z_depth, v_tx2, v_ty2 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_tx2, v_ty2 - v_z_depth, v_tx3, v_ty3 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_tx3, v_ty3 - v_z_depth, v_tx0, v_ty0 - v_z_depth, v_color, v_intensity, 200)
+
+    # Bottom square
+    draw_line(v_x0, v_y0 + v_z_depth, v_x1, v_y1 + v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x1, v_y1 + v_z_depth, v_x2, v_y2 + v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x2, v_y2 + v_z_depth, v_x3, v_y3 + v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x3, v_y3 + v_z_depth, v_x0, v_y0 + v_z_depth, v_color, v_intensity, 200)
+
+    # Connecting edges
+    draw_line(v_x0, v_y0 + v_z_depth, v_tx0, v_ty0 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x1, v_y1 + v_z_depth, v_tx1, v_ty1 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x2, v_y2 + v_z_depth, v_tx2, v_ty2 - v_z_depth, v_color, v_intensity, 200)
+    draw_line(v_x3, v_y3 + v_z_depth, v_tx3, v_ty3 - v_z_depth, v_color, v_intensity, 200)
+
+    end_frame
+    v_angle = v_angle + v_speed
+    v_time = v_time + 1
+endwhile

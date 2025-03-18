@@ -1,0 +1,163 @@
+throttle(0.8)
+# Initialize variables
+v_center_x = 31  # Center of display
+v_center_y = 31
+v_running = 1
+v_num_particles = 30
+v_max_radius = 35  # Maximum radius of the wormhole
+
+# Create lookup tables for trig values (0-360 degrees)
+create_array(v_sin_table, 361)  # Include 360 for easier lookup
+create_array(v_cos_table, 361)
+
+#ring pulse 
+v_min = 60       # Minimum value
+v_max = 90       # Maximum value
+v_count = v_min  # Start at minimum
+v_going_up = 1   # 1 means counting up, 0 means counting down
+v_running = 1
+
+# Initialize lookup tables
+for v_i in (0, 360, 1) then
+    v_angle_rad = v_i * pi / 180
+    v_sin_table[v_i] = sin(v_angle_rad)
+    v_cos_table[v_i] = cos(v_angle_rad)
+endfor v_i
+
+# Grouped particle arrays 
+# Group 1: Position data (accessed together for drawing)
+create_array(v_pos_x, v_num_particles)     # Current x position
+create_array(v_pos_y, v_num_particles)     # Current y position
+create_array(v_pos_r, v_num_particles)     # Current radius from center
+
+# Group 2: Motion data (used together for updates)
+create_array(v_motion_angle, v_num_particles)   # Current angle
+create_array(v_motion_speed, v_num_particles)   # Rotation speed
+create_array(v_motion_inward, v_num_particles)  # Inward speed
+
+# Group 3: Visual data
+create_array(v_visual_intensity, v_num_particles)  # Brightness
+
+# Time variables for effects
+v_time = 0
+v_pulse_time = 0
+
+def initialize_particle {
+    # Initialize position data
+    v_pos_r[v_i] = v_max_radius
+    
+    # Initialize motion data
+    v_motion_angle[v_i] = random(0, 360, 0)
+    v_motion_speed[v_i] = random(2, 5, 1)
+    v_motion_inward[v_i] = random(0.1, 0.3, 2)
+    
+    # Initialize visual data
+    v_visual_intensity[v_i] = 90
+    
+    # Calculate initial position
+    v_angle_index = int(v_motion_angle[v_i])
+    v_pos_x[v_i] = v_center_x + v_cos_table[v_angle_index] * v_pos_r[v_i]
+    v_pos_y[v_i] = v_center_y + v_sin_table[v_angle_index] * v_pos_r[v_i]
+}
+
+# Initialize all particles
+for v_i in (0, v_num_particles - 1, 1) then
+    call initialize_particle
+endfor v_i
+
+# Main animation loop
+while v_running == 1 then
+    begin_frame
+    
+    # Clear with very dim background for slight trail effect
+    draw_rectangle(0, 0, 64, 64, 43, 5, true)
+    
+    # Update time variables
+    v_time = v_time + 1
+    v_pulse_time = v_pulse_time + 0.1
+    v_pulse_index = int(v_pulse_time * 10)
+    if v_pulse_index >= 360 then
+        v_pulse_index = v_pulse_index - 360
+    endif
+    
+    # Draw outer ring that pulses
+    # Use (sin + 1) / 2 to get values from 0 to 1, then scale to desired range
+    if v_going_up == 1 then
+        # Increment counter
+        v_count = v_count + 1
+        # Check if we hit max
+        if v_count >= v_max then
+            v_going_up = 0  # Start counting down
+        endif
+    endif
+    
+    # If we're counting down
+    if v_going_up == 0 then
+        # Decrement counter
+        v_count = v_count - 1
+        # Check if we hit min
+        if v_count <= v_min then
+            v_going_up = 1  # Start counting up
+        endif
+    endif
+    draw_circle(v_center_x, v_center_y, v_max_radius, 45, v_count, false)
+
+    # Update and draw particles
+    for v_i in (0, v_num_particles - 1, 1) then
+        # Get current motion values
+        v_angle = v_motion_angle[v_i]
+        v_speed = v_motion_speed[v_i]
+        v_inward = v_motion_inward[v_i]
+        
+        # Update angle
+        v_angle = v_angle + v_speed
+        if v_angle >= 360 then
+            v_angle = v_angle - 360
+        endif
+        v_motion_angle[v_i] = v_angle
+        
+        # Update radius
+        v_radius = v_pos_r[v_i]
+        v_radius = v_radius - v_inward
+        v_pos_r[v_i] = v_radius
+        
+        # Adjust particle speed based on radius
+        v_radius_factor = v_radius / v_max_radius
+        v_motion_speed[v_i] = 2 + (1 - v_radius_factor) * 8
+        
+        # Get angle index and trig values (once per particle)
+        v_angle_index = int(v_angle)
+        v_sin_val = v_sin_table[v_angle_index]
+        v_cos_val = v_cos_table[v_angle_index]
+        
+        # Update position
+        v_pos_x[v_i] = v_center_x + v_cos_val * v_radius
+        v_pos_y[v_i] = v_center_y + v_sin_val * v_radius
+        
+        # Calculate trail
+        v_tail_len = v_speed / 2
+        v_tail_x = v_pos_x[v_i] - v_cos_val * v_tail_len
+        v_tail_y = v_pos_y[v_i] - v_sin_val * v_tail_len
+        
+        # Determine color based on radius
+        v_color = 45
+        if v_radius_factor < 0.3 then
+            v_color = 15
+        endif
+        
+        # Draw particle trail
+        draw_line(v_pos_x[v_i], v_pos_y[v_i], v_tail_x, v_tail_y, v_color, v_visual_intensity[v_i])
+        
+        # Reset particle if it reaches center
+        if v_radius < 2 then
+            call initialize_particle
+        endif
+    endfor v_i
+    
+    # Draw central glow using same pulse index
+    v_center_pulse = (v_sin_table[v_pulse_index] + 1) * 20 + 40
+    draw_circle(v_center_x, v_center_y, 3, white, v_center_pulse, true)
+    draw_circle(v_center_x, v_center_y, 2, white, 90, true)
+    
+    end_frame
+endwhile

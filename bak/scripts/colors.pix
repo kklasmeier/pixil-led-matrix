@@ -1,0 +1,5 @@
+for v_x in (1, 99, 1)
+    draw_rectangle(1, 1, 63, 63, v_x, true)
+    print(f"Color = {v_x}")
+    rest(.5)
+endloop v_x

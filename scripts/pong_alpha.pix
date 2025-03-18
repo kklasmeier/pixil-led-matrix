@@ -1,0 +1,114 @@
+# Initialize variables for ball position and direction
+v_ball_x = 31  # Start in middle of 64x64 display
+v_ball_y = 31
+v_ball_dx = 1  # Initial horizontal direction
+v_ball_dy = 1  # Initial vertical direction
+v_paddle_height = 10
+v_left_paddle_y = 27  # Center height of display minus half paddle height
+v_right_paddle_y = 27
+v_game_speed = 0.1  # Controls animation speed
+v_burnout = 0.2  # Burnout duration for ball
+
+# Draw initial paddles
+draw_rectangle(1, v_left_paddle_y, 2, v_paddle_height, blue, false)
+draw_rectangle(61, v_right_paddle_y, 2, v_paddle_height, red, false)
+
+# Game loop
+for v_time in (0, 1000, 1) {
+    # Update ball position
+    v_ball_x = v_ball_x + v_ball_dx
+    v_ball_y = v_ball_y + v_ball_dy
+    
+    # Ball collision with top and bottom
+    if v_ball_y <= 1 then
+        v_ball_dy = 1
+    endif
+    
+    if v_ball_y >= 62 then
+        v_ball_dy = -1
+    endif
+    
+    # Ball collision with paddles
+    # Left paddle collision
+    if v_ball_x <= 3 then
+        if v_ball_y >= v_left_paddle_y then
+            if v_ball_y <= v_left_paddle_y + v_paddle_height then
+                v_ball_dx = 1
+            endif
+        endif
+    endif
+    
+    # Right paddle collision
+    if v_ball_x >= 60 then
+        if v_ball_y >= v_right_paddle_y then
+            if v_ball_y <= v_right_paddle_y + v_paddle_height then
+                v_ball_dx = -1
+            endif
+        endif
+    endif
+    
+    # Reset ball if it goes past paddles
+    if v_ball_x <= 0 then
+        v_ball_x = 31
+        v_ball_y = 31
+    endif
+    
+    if v_ball_x >= 63 then
+        v_ball_x = 31
+        v_ball_y = 31
+    endif
+    
+    # Update left paddle position based on ball direction
+    if v_ball_dy > 0 then
+        # Ball moving down - add 4x4 at bottom, remove from top
+        draw_rectangle(0, v_left_paddle_y, 4, 4, black, true)
+        v_left_paddle_y = v_left_paddle_y + 2
+        draw_rectangle(0, v_left_paddle_y + v_paddle_height - 4, 4, 4, blue, true)
+    endif
+    
+    if v_ball_dy < 0 then
+        # Ball moving up - add 4x4 at top, remove from bottom
+        draw_rectangle(0, v_left_paddle_y + v_paddle_height - 4, 4, 4, black, true)
+        v_left_paddle_y = v_left_paddle_y - 2
+        draw_rectangle(0, v_left_paddle_y, 4, 4, blue, true)
+    endif
+    
+    # Update right paddle position based on ball direction
+    if v_ball_dy > 0 then
+        # Ball moving down - add 4x4 at bottom, remove from top
+        draw_rectangle(60, v_right_paddle_y, 4, 4, black, true)
+        v_right_paddle_y = v_right_paddle_y + 2
+        draw_rectangle(60, v_right_paddle_y + v_paddle_height - 4, 4, 4, red, true)
+    endif
+    
+    if v_ball_dy < 0 then
+        # Ball moving up - add 4x4 at top, remove from bottom
+        draw_rectangle(60, v_right_paddle_y + v_paddle_height - 4, 4, 4, black, true)
+        v_right_paddle_y = v_right_paddle_y - 2
+        draw_rectangle(60, v_right_paddle_y, 4, 4, red, true)
+    endif
+    
+    # Keep paddles in bounds
+    if v_left_paddle_y < 0 then
+        v_left_paddle_y = 0
+    endif
+    
+    if v_left_paddle_y > 53 then
+        v_left_paddle_y = 53
+    endif
+    
+    if v_right_paddle_y < 0 then
+        v_right_paddle_y = 0
+    endif
+    
+    if v_right_paddle_y > 53 then
+        v_right_paddle_y = 53
+    endif
+    
+    # Draw the ball with burnout
+    draw_rectangle(v_ball_x, v_ball_y, 2, 2, white, false, v_burnout)
+    
+    # Control animation speed
+    rest(v_game_speed)
+}
+endfor v_time

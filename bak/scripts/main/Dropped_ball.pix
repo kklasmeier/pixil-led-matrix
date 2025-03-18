@@ -1,0 +1,208 @@
+# Create ball sprites - First ball (cyan/blue)
+
+def create_ball_sprites {
+    define_sprite(ball0, 6, 6)  # 12 o'clock
+        draw_circle(3, 3, 2, cyan, true)
+        draw_line(3, 1, 3, 2, white)
+    endsprite
+
+    define_sprite(ball1, 6, 6)  # 3 o'clock
+        draw_circle(3, 3, 2, cyan, true)
+        draw_line(4, 3, 5, 3, white)
+    endsprite
+
+    define_sprite(ball2, 6, 6)  # 6 o'clock
+        draw_circle(3, 3, 2, cyan, true)
+        draw_line(3, 4, 3, 5, white)
+    endsprite
+
+    define_sprite(ball3, 6, 6)  # 9 o'clock
+        draw_circle(3, 3, 2, cyan, true)
+        draw_line(1, 3, 2, 3, white)
+    endsprite
+
+    # Second ball sprites (red/magenta)
+    define_sprite(ball4, 6, 6)  # 12 o'clock
+        draw_circle(3, 3, 2, red, true)
+        draw_line(3, 1, 3, 2, white)
+    endsprite
+
+    define_sprite(ball5, 6, 6)  # 3 o'clock
+        draw_circle(3, 3, 2, red, true)
+        draw_line(4, 3, 5, 3, white)
+    endsprite
+
+    define_sprite(ball6, 6, 6)  # 6 o'clock
+        draw_circle(3, 3, 2, red, true)
+        draw_line(3, 4, 3, 5, white)
+    endsprite
+
+    define_sprite(ball7, 6, 6)  # 9 o'clock
+        draw_circle(3, 3, 2, red, true)
+        draw_line(1, 3, 2, 3, white)
+    endsprite
+}
+
+# Initialize display
+def init_display {
+    clear()
+    draw_line(0, 63, 63, 63, white)   # Floor
+}
+
+# Main program
+call create_ball_sprites
+call init_display
+
+# Physics constants
+v_gravity = 0.2            # Gravity
+v_bounce = 0.85           # Energy loss on bounce
+v_friction = 0.995        # Air friction
+v_rolling_friction = 0.98  # Ground friction
+v_dt = 0.1                # Time step
+v_floor_threshold = 57     # Y position where we consider ball "on floor"
+v_spin_friction = 0.98     # Spin slowdown
+v_spin_transfer = 0.3      # How much horizontal motion converts to spin
+
+# Run 10 sequences
+for v_sequence in (1, 500, 1)
+    # Initialize ball positions for each sequence
+    # Ball 1
+    v_x1 = random(3, 60, 0)    # Random x position between 3 and 60
+    v_y1 = 5.0                 # Start near top of matrix
+    v_dx1 = random(-4, 4, 2)   # Random horizontal velocity
+    v_dy1 = random(1, 3, 2)    # Random downward velocity
+    v_spin1 = v_dx1 * 0.3      # Initial spin
+    
+    # Ball 2
+    v_x2 = random(3, 60, 0)    # Random x position for second ball
+    v_y2 = 5.0                 # Start near top
+    v_dx2 = random(-4, 4, 2)   # Random horizontal velocity
+    v_dy2 = random(1, 3, 2)    # Random downward velocity
+    v_spin2 = v_dx2 * 0.3      # Initial spin
+    
+    print(f"Sequence {v_sequence}")
+    print(f"Ball 1 - Position: ({v_x1}, {v_y1}) Velocities: dx={v_dx1}, dy={v_dy1}")
+    print(f"Ball 2 - Position: ({v_x2}, {v_y2}) Velocities: dx={v_dx2}, dy={v_dy2}")
+    
+    # Animation loop for this sequence
+    for v_t in (0, 25, v_dt)
+        # Update physics for Ball 1
+        v_dy1 = v_dy1 + v_gravity
+        v_dx1 = v_dx1 * v_friction
+        v_spin1 = v_spin1 * v_spin_friction
+        
+        if v_y1 >= v_floor_threshold then
+            v_dx1 = v_dx1 * v_rolling_friction
+        endif
+        
+        v_x1 = v_x1 + v_dx1
+        v_y1 = v_y1 + v_dy1
+        
+        # Update physics for Ball 2
+        v_dy2 = v_dy2 + v_gravity
+        v_dx2 = v_dx2 * v_friction
+        v_spin2 = v_spin2 * v_spin_friction
+        
+        if v_y2 >= v_floor_threshold then
+            v_dx2 = v_dx2 * v_rolling_friction
+        endif
+        
+        v_x2 = v_x2 + v_dx2
+        v_y2 = v_y2 + v_dy2
+        
+        # Handle collisions for Ball 1
+        if v_y1 > v_floor_threshold then
+            v_y1 = v_floor_threshold
+            v_dy1 = -v_dy1 * v_bounce
+            v_spin1 = v_spin1 + (v_dx1 * v_spin_transfer)
+        endif
+        
+        if v_x1 < -3 then
+            v_x1 = -3
+            v_dx1 = -v_dx1 * v_bounce
+            v_spin1 = -v_spin1 * v_bounce
+        endif
+        
+        if v_x1 > 63 then
+            v_x1 = 63
+            v_dx1 = -v_dx1 * v_bounce
+            v_spin1 = -v_spin1 * v_bounce
+        endif
+        
+        # Handle collisions for Ball 2
+        if v_y2 > v_floor_threshold then
+            v_y2 = v_floor_threshold
+            v_dy2 = -v_dy2 * v_bounce
+            v_spin2 = v_spin2 + (v_dx2 * v_spin_transfer)
+        endif
+        
+        if v_x2 < -3 then
+            v_x2 = -3
+            v_dx2 = -v_dx2 * v_bounce
+            v_spin2 = -v_spin2 * v_bounce
+        endif
+        
+        if v_x2 > 63 then
+            v_x2 = 63
+            v_dx2 = -v_dx2 * v_bounce
+            v_spin2 = -v_spin2 * v_bounce
+        endif
+        
+        # Update sprite display
+        # Hide all sprites
+        hide_sprite(ball0)
+        hide_sprite(ball1)
+        hide_sprite(ball2)
+        hide_sprite(ball3)
+        hide_sprite(ball4)
+        hide_sprite(ball5)
+        hide_sprite(ball6)
+        hide_sprite(ball7)
+        
+        # Show Ball 1 sprite based on spin
+        v_frame1 = abs(round(v_spin1)) % 4
+        if v_frame1 == 0 then
+            show_sprite(ball0, v_x1, v_y1)
+        endif
+        if v_frame1 == 1 then
+            show_sprite(ball1, v_x1, v_y1)
+        endif
+        if v_frame1 == 2 then
+            show_sprite(ball2, v_x1, v_y1)
+        endif
+        if v_frame1 == 3 then
+            show_sprite(ball3, v_x1, v_y1)
+        endif
+        
+        # Show Ball 2 sprite based on spin
+        v_frame2 = abs(round(v_spin2)) % 4
+        if v_frame2 == 0 then
+            show_sprite(ball4, v_x2, v_y2)
+        endif
+        if v_frame2 == 1 then
+            show_sprite(ball5, v_x2, v_y2)
+        endif
+        if v_frame2 == 2 then
+            show_sprite(ball6, v_x2, v_y2)
+        endif
+        if v_frame2 == 3 then
+            show_sprite(ball7, v_x2, v_y2)
+        endif
+        
+        rest(0.01)
+    endfor v_t
+    
+    # Pause between sequences
+    rest(0.5)
+endfor v_sequence
+
+# Clean up
+hide_sprite(ball0)
+hide_sprite(ball1)
+hide_sprite(ball2)
+hide_sprite(ball3)
+hide_sprite(ball4)
+hide_sprite(ball5)
+hide_sprite(ball6)
+hide_sprite(ball7)
+clear()

@@ -1,0 +1,148 @@
+# Configuration variables
+v_density = 20          # Number of particles (5-40 recommended)
+v_speed_base = 0.5      # Base throttle speed
+v_time = 0              # Animation timer (seconds)
+v_cycle_duration = 15   # 15s cycle: 7.5s chaos, 7.5s order
+v_mode = 0              # 0 = chaos, 1 = order
+v_pattern = 0           # 0 = circle, 1 = square, 2 = figure-8, 3 = random plot
+v_attract_x = 32        # Initial attractor position
+v_attract_y = 32
+
+# Create arrays for particle positions and velocities
+create_array(v_x, v_density)
+create_array(v_y, v_density)
+create_array(v_vx, v_density)
+create_array(v_vy, v_density)
+
+# Procedure to initialize particles
+def init_swarm {
+    v_max = v_density - 1
+    for v_i in (0, v_max, 1) then
+        v_x[v_i] = random(0, 63, 0)
+        v_y[v_i] = random(0, 63, 0)
+        v_vx[v_i] = random(-1, 1, 1)
+        v_vy[v_i] = random(-1, 1, 1)
+    endfor v_i
+}
+
+# Procedure to update swarm movement and draw particles
+def update_swarm {
+    v_cycle = v_time % v_cycle_duration
+    v_new_mode = v_mode
+    
+    if v_cycle < 7.5 then
+        v_new_mode = 0  # Chaos mode
+    endif
+    if v_cycle >= 7.5 then
+        v_new_mode = 1  # Order mode
+    endif
+    
+    if v_new_mode != v_mode then
+        if v_new_mode == 1 then
+            v_pattern = random(0, 3, 0)
+        endif
+    endif
+    v_mode = v_new_mode
+    
+    v_mood = sin(v_time * 0.1) + 1       # 0 to 2 (mellow to frantic)
+    v_speed_scale = 0.5 + (v_mood * 1.5) # 0.5 to 3.5
+    v_bright = 30 + (v_mood * 25)        # 30 to 80
+    
+    if v_mode == 1 then
+        if v_pattern == 0 then  # Circle
+            v_attract_x = 32 + (16 * cos(v_time * 0.4))
+            v_attract_y = 32 + (16 * sin(v_time * 0.4))
+        endif
+        if v_pattern == 1 then  # Square
+            v_phase = v_time % 4
+            if v_phase < 1 then
+                v_attract_x = 48
+                v_attract_y = 48
+            endif
+            if v_phase >= 1 then
+                if v_phase < 2 then
+                    v_attract_x = 48
+                    v_attract_y = 16
+                endif
+            endif
+            if v_phase >= 2 then
+                if v_phase < 3 then
+                    v_attract_x = 16
+                    v_attract_y = 16
+                endif
+            endif
+            if v_phase >= 3 then
+                v_attract_x = 16
+                v_attract_y = 48
+            endif
+        endif
+        if v_pattern == 2 then  # Figure-8
+            v_attract_x = 32 + (16 * sin(v_time * 0.4))
+            v_attract_y = 32 + (8 * sin(v_time * 0.8))
+        endif
+        if v_pattern == 3 then  # Random Plot
+            v_step = v_time % 0.5
+            if v_step < 0.05 then
+                v_attract_x = random(16, 48, 0)
+                v_attract_y = random(16, 48, 0)
+            endif
+        endif
+    endif
+    
+    v_max = v_density - 1
+    for v_i in (0, v_max, 1) then
+        if v_mode == 0 then  # Chaos mode
+            v_vx[v_i] = v_vx[v_i] + random(-0.2, 0.2, 1)
+            v_vy[v_i] = v_vy[v_i] + random(-0.2, 0.2, 1)
+        endif
+        if v_mode == 1 then  # Order mode
+            v_dx = v_attract_x - v_x[v_i]
+            v_dy = v_attract_y - v_y[v_i]
+            v_vx[v_i] = v_vx[v_i] + (v_dx * 0.05)
+            v_vy[v_i] = v_vy[v_i] + (v_dy * 0.05)
+            v_vx[v_i] = v_vx[v_i] + random(-0.3, 0.3, 1)
+            v_vy[v_i] = v_vy[v_i] + random(-0.3, 0.3, 1)
+        endif
+        
+        v_x[v_i] = v_x[v_i] + (v_vx[v_i] * v_speed_scale)
+        v_y[v_i] = v_y[v_i] + (v_vy[v_i] * v_speed_scale)
+        
+        if v_x[v_i] < 0 then
+            v_x[v_i] = 0
+            v_vx[v_i] = -v_vx[v_i]
+        endif
+        if v_x[v_i] > 63 then
+            v_x[v_i] = 63
+            v_vx[v_i] = -v_vx[v_i]
+        endif
+        if v_y[v_i] < 0 then
+            v_y[v_i] = 0
+            v_vy[v_i] = -v_vy[v_i]
+        endif
+        if v_y[v_i] > 63 then
+            v_y[v_i] = 63
+            v_vy[v_i] = -v_vy[v_i]
+        endif
+        
+        v_vx[v_i] = min(2, max(-2, v_vx[v_i]))
+        v_vy[v_i] = min(2, max(-2, v_vy[v_i]))
+        
+        plot(v_x[v_i], v_y[v_i], white, v_bright)
+    endfor v_i
+}
+
+# Set throttle
+throttle(v_speed_base)
+
+# Initialize
+call init_swarm
+
+# Main loop (infinite)
+while true then
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 20, true)
+        call update_swarm
+    end_frame
+    rest(0.05)
+    v_time = v_time + 0.05
+endwhile

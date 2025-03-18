@@ -1,0 +1,379 @@
+# Initialize variables for grid control
+v_size = 64
+v_spacing = 8
+v_speed = 0.05
+v_lines = 9
+v_radial_lines = 16
+v_intensity = 50    
+v_phase = 0         
+
+# Create arrays for line coordinates
+create_array(v_startx, v_radial_lines)
+create_array(v_starty, v_radial_lines)
+create_array(v_endx, v_radial_lines)
+create_array(v_endy, v_radial_lines)
+
+def do_the_cyan_grid_two_times {
+    v_cyan_angle = 0
+    while v_cyan_angle < 4 * pi then
+        v_phase = v_phase + 0.05
+        v_int2 = 50 + 30 * sin(v_phase + pi/2)   # 20-80 range for cyan
+        
+        begin_frame
+        # Draw static blue grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing
+            draw_line(0, v_pos, 64, v_pos, blue:{v_int1})
+            draw_line(v_pos, 0, v_pos, 64, blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating cyan grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing
+            v_startx[v_i] = 32 + (-33) * cos(v_cyan_angle) - (v_pos - 32) * sin(v_cyan_angle)
+            v_starty[v_i] = 32 + (-33) * sin(v_cyan_angle) + (v_pos - 32) * cos(v_cyan_angle)
+            v_endx[v_i] = 32 + 33 * cos(v_cyan_angle) - (v_pos - 32) * sin(v_cyan_angle)
+            v_endy[v_i] = 32 + 33 * sin(v_cyan_angle) + (v_pos - 32) * cos(v_cyan_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            
+            v_px1 = 32 + (v_pos - 32) * cos(v_cyan_angle)
+            v_py1 = 32 + (v_pos - 32) * sin(v_cyan_angle)
+            draw_line(v_px1 - 33 * sin(v_cyan_angle), v_py1 + 33 * cos(v_cyan_angle), v_px1 + 33 * sin(v_cyan_angle), v_py1 - 33 * cos(v_cyan_angle), cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_cyan_angle = v_cyan_angle + v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_blue_grid_two_times {
+    v_blue_angle = 0
+    while v_blue_angle > -4 * pi then
+        v_phase = v_phase + 0.05
+        v_int1 = 50 + 49 * sin(v_phase)          # Full range for blue
+        
+        begin_frame
+        # Draw static cyan grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing
+            draw_line(0, v_pos, 64, v_pos, cyan:{v_int2})
+            draw_line(v_pos, 0, v_pos, 64, cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating blue grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing
+            v_startx[v_i] = 32 + (-33) * cos(v_blue_angle) - (v_pos - 32) * sin(v_blue_angle)
+            v_starty[v_i] = 32 + (-33) * sin(v_blue_angle) + (v_pos - 32) * cos(v_blue_angle)
+            v_endx[v_i] = 32 + 33 * cos(v_blue_angle) - (v_pos - 32) * sin(v_blue_angle)
+            v_endy[v_i] = 32 + 33 * sin(v_blue_angle) + (v_pos - 32) * cos(v_blue_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            
+            v_px1 = 32 + (v_pos - 32) * cos(v_blue_angle)
+            v_py1 = 32 + (v_pos - 32) * sin(v_blue_angle)
+            draw_line(v_px1 - 33 * sin(v_blue_angle), v_py1 + 33 * cos(v_blue_angle), v_px1 + 33 * sin(v_blue_angle), v_py1 - 33 * cos(v_blue_angle), blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_blue_angle = v_blue_angle - v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_cyan_radial_two_times {
+    v_cyan_angle = 0
+    while v_cyan_angle < 4 * pi then
+        v_phase = v_phase + 0.05
+        v_int2 = 50 + 30 * sin(v_phase + pi/2)   # 20-80 range for cyan
+        
+        begin_frame
+        # Draw static blue radial
+        v_i = 0
+        while v_i < 16 then
+            v_angle_step = (2 * pi * v_i) / v_radial_lines
+            v_startx[v_i] = 32 + 8 * cos(v_angle_step)
+            v_starty[v_i] = 32 + 8 * sin(v_angle_step)
+            v_endx[v_i] = 32 + 45 * cos(v_angle_step)
+            v_endy[v_i] = 32 + 45 * sin(v_angle_step)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating cyan radial
+        v_i = 0
+        while v_i < 16 then
+            v_angle_step = (2 * pi * v_i) / v_radial_lines
+            v_line_angle = v_angle_step + v_cyan_angle
+            v_startx[v_i] = 32 + 8 * cos(v_line_angle)
+            v_starty[v_i] = 32 + 8 * sin(v_line_angle)
+            v_endx[v_i] = 32 + 45 * cos(v_line_angle)
+            v_endy[v_i] = 32 + 45 * sin(v_line_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_cyan_angle = v_cyan_angle + v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_blue_radial_two_times {
+    v_blue_angle = 0
+    while v_blue_angle > -4 * pi then
+        v_phase = v_phase + 0.05
+        v_int1 = 50 + 49 * sin(v_phase)          # Full range for blue
+        
+        begin_frame
+        # Draw static cyan radial
+        v_i = 0
+        while v_i < 16 then
+            v_angle_step = (2 * pi * v_i) / v_radial_lines
+            v_startx[v_i] = 32 + 8 * cos(v_angle_step)
+            v_starty[v_i] = 32 + 8 * sin(v_angle_step)
+            v_endx[v_i] = 32 + 45 * cos(v_angle_step)
+            v_endy[v_i] = 32 + 45 * sin(v_angle_step)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating blue radial
+        v_i = 0
+        while v_i < 16 then
+            v_angle_step = (2 * pi * v_i) / v_radial_lines
+            v_line_angle = v_angle_step + v_blue_angle
+            v_startx[v_i] = 32 + 8 * cos(v_line_angle)
+            v_starty[v_i] = 32 + 8 * sin(v_line_angle)
+            v_endx[v_i] = 32 + 45 * cos(v_line_angle)
+            v_endy[v_i] = 32 + 45 * sin(v_line_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_blue_angle = v_blue_angle - v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_cyan_diagonal_two_times {
+    v_cyan_angle = 0
+    while v_cyan_angle < 4 * pi then
+        v_phase = v_phase + 0.05
+        v_int2 = 50 + 30 * sin(v_phase + pi/2)   # 20-80 range for cyan
+        
+        begin_frame
+        # Draw static blue diagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            # Draw diagonal lines (45 degrees)
+            v_startx[v_i] = v_pos + 32 - 32
+            v_starty[v_i] = v_pos + 32 + 32
+            v_endx[v_i] = v_pos + 32 + 32
+            v_endy[v_i] = v_pos + 32 - 32
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            # Draw perpendicular diagonal lines (135 degrees)
+            v_startx[v_i] = v_pos + 32 - 32
+            v_starty[v_i] = v_pos + 32 - 32
+            v_endx[v_i] = v_pos + 32 + 32
+            v_endy[v_i] = v_pos + 32 + 32
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating cyan diagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            # Rotate the diagonal lines
+            v_line_angle = pi/4 + v_cyan_angle  # 45 degrees plus rotation
+            v_startx[v_i] = 32 + (-33) * cos(v_line_angle) - v_pos * sin(v_line_angle)
+            v_starty[v_i] = 32 + (-33) * sin(v_line_angle) + v_pos * cos(v_line_angle)
+            v_endx[v_i] = 32 + 33 * cos(v_line_angle) - v_pos * sin(v_line_angle)
+            v_endy[v_i] = 32 + 33 * sin(v_line_angle) + v_pos * cos(v_line_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            
+            # Draw perpendicular diagonal lines
+            v_line_angle = v_line_angle + pi/2  # Add 90 degrees
+            v_px1 = 32 + v_pos * cos(v_line_angle)
+            v_py1 = 32 + v_pos * sin(v_line_angle)
+            draw_line(v_px1 - 33 * sin(v_line_angle), v_py1 + 33 * cos(v_line_angle), v_px1 + 33 * sin(v_line_angle), v_py1 - 33 * cos(v_line_angle), cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_cyan_angle = v_cyan_angle + v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_blue_diagonal_two_times {
+    v_blue_angle = 0
+    while v_blue_angle > -4 * pi then
+        v_phase = v_phase + 0.05
+        v_int1 = 50 + 49 * sin(v_phase)          # Full range for blue
+        
+        begin_frame
+        # Draw static cyan diagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            # Draw diagonal lines (45 degrees)
+            v_startx[v_i] = v_pos + 32 - 32
+            v_starty[v_i] = v_pos + 32 + 32
+            v_endx[v_i] = v_pos + 32 + 32
+            v_endy[v_i] = v_pos + 32 - 32
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            # Draw perpendicular diagonal lines (135 degrees)
+            v_startx[v_i] = v_pos + 32 - 32
+            v_starty[v_i] = v_pos + 32 - 32
+            v_endx[v_i] = v_pos + 32 + 32
+            v_endy[v_i] = v_pos + 32 + 32
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating blue diagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            # Rotate the diagonal lines
+            v_line_angle = pi/4 + v_blue_angle  # 45 degrees plus rotation
+            v_startx[v_i] = 32 + (-33) * cos(v_line_angle) - v_pos * sin(v_line_angle)
+            v_starty[v_i] = 32 + (-33) * sin(v_line_angle) + v_pos * cos(v_line_angle)
+            v_endx[v_i] = 32 + 33 * cos(v_line_angle) - v_pos * sin(v_line_angle)
+            v_endy[v_i] = 32 + 33 * sin(v_line_angle) + v_pos * cos(v_line_angle)
+            draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            
+            # Draw perpendicular diagonal lines
+            v_line_angle = v_line_angle + pi/2  # Add 90 degrees
+            v_px1 = 32 + v_pos * cos(v_line_angle)
+            v_py1 = 32 + v_pos * sin(v_line_angle)
+            draw_line(v_px1 - 33 * sin(v_line_angle), v_py1 + 33 * cos(v_line_angle), v_px1 + 33 * sin(v_line_angle), v_py1 - 33 * cos(v_line_angle), blue:{v_int1})
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_blue_angle = v_blue_angle - v_speed
+        rest(0.05)
+    endwhile
+}
+
+
+def do_the_cyan_hexagonal_two_times {
+    v_cyan_angle = 0
+    while v_cyan_angle < 4 * pi then
+        v_phase = v_phase + 0.05
+        v_int2 = 50 + 30 * sin(v_phase + pi/2)   # 20-80 range for cyan
+        
+        begin_frame
+        # Draw static blue hexagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            # Draw lines at 0, 60, and 120 degrees
+            for v_hex_angle in (0, 6, 2) then
+                v_angle = v_hex_angle * pi/3    # Divides circle into 6 parts (60° each)
+                v_startx[v_i] = 32 + v_pos * cos(v_angle)
+                v_starty[v_i] = 32 + v_pos * sin(v_angle)
+                v_endx[v_i] = 32 + 45 * cos(v_angle)
+                v_endy[v_i] = 32 + 45 * sin(v_angle)
+                draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            endfor v_hex_angle
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating cyan hexagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            for v_hex_angle in (0, 6, 2) then
+                v_angle = v_hex_angle * pi/3 + v_cyan_angle
+                v_startx[v_i] = 32 + v_pos * cos(v_angle)
+                v_starty[v_i] = 32 + v_pos * sin(v_angle)
+                v_endx[v_i] = 32 + 45 * cos(v_angle)
+                v_endy[v_i] = 32 + 45 * sin(v_angle)
+                draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            endfor v_hex_angle
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_cyan_angle = v_cyan_angle + v_speed
+        rest(0.05)
+    endwhile
+}
+
+def do_the_blue_hexagonal_two_times {
+    v_blue_angle = 0
+    while v_blue_angle > -4 * pi then
+        v_phase = v_phase + 0.05
+        v_int1 = 50 + 49 * sin(v_phase)          # Full range for blue
+        
+        begin_frame
+        # Draw static cyan hexagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            for v_hex_angle in (0, 6, 2) then
+                v_angle = v_hex_angle * pi/3
+                v_startx[v_i] = 32 + v_pos * cos(v_angle)
+                v_starty[v_i] = 32 + v_pos * sin(v_angle)
+                v_endx[v_i] = 32 + 45 * cos(v_angle)
+                v_endy[v_i] = 32 + 45 * sin(v_angle)
+                draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], cyan:{v_int2})
+            endfor v_hex_angle
+            v_i = v_i + 1
+        endwhile
+        
+        # Draw rotating blue hexagonal grid
+        v_i = 0
+        while v_i < v_lines then
+            v_pos = v_i * v_spacing - 32
+            for v_hex_angle in (0, 6, 2) then
+                v_angle = v_hex_angle * pi/3 + v_blue_angle
+                v_startx[v_i] = 32 + v_pos * cos(v_angle)
+                v_starty[v_i] = 32 + v_pos * sin(v_angle)
+                v_endx[v_i] = 32 + 45 * cos(v_angle)
+                v_endy[v_i] = 32 + 45 * sin(v_angle)
+                draw_line(v_startx[v_i], v_starty[v_i], v_endx[v_i], v_endy[v_i], blue:{v_int1})
+            endfor v_hex_angle
+            v_i = v_i + 1
+        endwhile
+        end_frame
+        
+        v_blue_angle = v_blue_angle - v_speed
+        rest(0.05)
+    endwhile
+}
+
+
+# Main animation loop
+while 1 then
+    # Calculate intensities once for all procedures
+    v_phase = v_phase + 0.05
+    v_int1 = 50 + 49 * sin(v_phase)          # Full range for blue
+    v_int2 = 50 + 30 * sin(v_phase + pi/2)   # 20-80 range for cyan
+    
+    # Now call procedures
+    call do_the_cyan_grid_two_times
+    call do_the_blue_grid_two_times
+    call do_the_cyan_radial_two_times
+    call do_the_blue_radial_two_times
+    call do_the_cyan_diagonal_two_times
+    call do_the_blue_diagonal_two_times
+    call do_the_cyan_hexagonal_two_times
+    call do_the_blue_hexagonal_two_times    
+    call do_the_cyan_triangle_two_times
+    call do_the_blue_triangle_two_times    
+endwhile

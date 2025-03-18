@@ -1,0 +1,382 @@
+#Snake with Multiple Modes
+# Mode 1: Classic wrapping snake
+# Mode 2: Snake stays on matrix (bounded by walls)
+# Mode 3: Snake cannot touch itself (game over if collision)
+
+# Initial settings
+v_mode = 2           # Start with mode 1 (1, 2, or 3)
+v_x = 32             # Current x position
+v_y = 32             # Current y position
+v_prev_x = 32        # Previous x position
+v_prev_y = 32        # Previous y position
+# Initialize the snake with a direction
+v_direction = 2  # Start moving right      # Current direction
+v_prev_direction = 0 # Previous direction
+v_cnt = 0            # Counter for changing burnout
+v_burnout = 900      # Trail burnout duration
+v_game_over = 0  # Game over flag for mode 3 (0=false, 1=true)
+v_speed = 0.009      # Movement speed
+
+# Border settings
+v_border_left = 0    # Left border position
+v_border_right = 63  # Right border position
+v_border_top = 0     # Top border position
+v_border_bottom = 63 # Bottom border position
+
+# Initialize arrays for tracking snake body (for collision detection in mode 3)
+create_array(v_body_x, 500)  # X positions of snake body segments
+create_array(v_body_y, 500)  # Y positions of snake body segments
+v_body_length = 0            # Current length of tracked body
+
+# Define colors based on mode
+def set_colors {
+    if v_mode == 1 then
+        v_snake_color = "white"  # Mode 1: White snake
+        v_head_color = "red"
+        v_border_color = "white"
+    elseif v_mode == 2 then
+        v_snake_color = "green"  # Mode 2: Green snake
+        v_head_color = "red"
+        v_border_color = "dark_green"
+    else
+        v_snake_color = "purple" # Mode 3: Purple snake
+        v_head_color = "red"
+        v_border_color = "dark_purple"
+    endif
+}
+
+# Draw the border for modes 2 and 3
+def draw_border {
+    if v_mode > 1 then
+        # Draw horizontal lines
+        draw_line(v_border_left, v_border_top, v_border_right, v_border_top, v_border_color, 70)
+        draw_line(v_border_left, v_border_bottom, v_border_right, v_border_bottom, v_border_color, 70)
+        
+        # Draw vertical lines
+        draw_line(v_border_left, v_border_top, v_border_left, v_border_bottom, v_border_color, 70)
+        draw_line(v_border_right, v_border_top, v_border_right, v_border_bottom, v_border_color, 70)
+    endif
+}
+
+# Check if position is valid (for mode 3 collision detection)
+def check_collision {
+    v_collision = 0
+    
+    if v_mode == 3 then
+        # Don't check for collisions if we're at a wall
+        # This gives the wall turning logic priority
+        v_at_wall = 0
+        if v_x <= v_border_left + 1 or v_x >= v_border_right - 1 then
+            v_at_wall = 1
+        endif
+        if v_y <= v_border_top + 1 or v_y >= v_border_bottom - 1 then
+            v_at_wall = 1
+        endif
+        
+        # Only check for body collisions if not at a wall
+        if v_at_wall == 0 then
+            # Check if snake has collided with its body
+            for v_i in (0, v_body_length - 2, 1) then
+                if v_x == v_body_x[v_i] and v_y == v_body_y[v_i] then
+                    v_collision = 1
+                endif
+            endfor v_i
+        endif
+    endif
+    
+    # Return collision status
+    if v_collision == 1 then
+        v_game_over = 1
+    endif
+}
+
+# Reset the game after collision (mode 3)
+def reset_game {
+    v_x = 32
+    v_y = 32
+    v_prev_x = 32
+    v_prev_y = 32
+    v_direction = random(1, 4, 0)  # Start with a random direction
+    v_prev_direction = v_direction
+    v_game_over = 0
+    v_body_length = 0
+    
+    # Clear the display
+    clear()
+    
+    # Redraw the border
+    call draw_border
+    
+    # Short pause before restarting
+    rest(1)
+}
+
+# Add current position to the body tracking arrays
+def track_body {
+    # Only track the body in mode 3
+    if v_mode == 3 then
+        # Don't track positions that are at the walls
+        # This prevents false collision detection when turning at walls
+        v_at_wall = 0
+        if v_x <= v_border_left + 1 or v_x >= v_border_right - 1 then
+            v_at_wall = 1
+        endif
+        if v_y <= v_border_top + 1 or v_y >= v_border_bottom - 1 then
+            v_at_wall = 1
+        endif
+        
+        # Only track if not at a wall
+        if v_at_wall == 0 then
+            # Store current position in body arrays
+            v_body_x[v_body_length] = v_x
+            v_body_y[v_body_length] = v_y
+            v_body_length = v_body_length + 1
+            
+            # Keep array size manageable
+            if v_body_length > 490 then
+                v_body_length = 0
+            endif
+        endif
+    endif
+}
+
+# Choose a new direction based on current constraints
+def choose_direction {
+    # Store old direction for reference
+    v_old_direction = v_direction
+    
+    # Get a random value to decide turning
+    v_turn = random(0, 2, 0)  # 0 = straight, 1 = left, 2 = right
+    
+    # Apply the turn based on current direction
+    # Direction reference: 1=North, 2=East, 3=South, 4=West
+    
+    if v_turn == 0 then
+        # Continue straight (no change)
+        v_new_direction = v_direction
+    elseif v_turn == 1 then
+        # Turn left (90 degrees counter-clockwise)
+        if v_direction == 1 then      # North → West
+            v_new_direction = 4
+        elseif v_direction == 2 then  # East → North
+            v_new_direction = 1
+        elseif v_direction == 3 then  # South → East
+            v_new_direction = 2
+        else                          # West → South
+            v_new_direction = 3
+        endif
+    else
+        # Turn right (90 degrees clockwise)
+        if v_direction == 1 then      # North → East
+            v_new_direction = 2
+        elseif v_direction == 2 then  # East → South
+            v_new_direction = 3
+        elseif v_direction == 3 then  # South → West
+            v_new_direction = 4
+        else                          # West → North
+            v_new_direction = 1
+        endif
+    endif
+    
+    # For modes 2 and 3, check if new direction would hit a wall
+    if v_mode > 1 then
+        v_valid_direction = 1
+        
+        # Check if next move would hit wall
+        if v_new_direction == 1 and v_y - 1 <= v_border_top then
+            v_valid_direction = 0  # Can't go North into top wall
+        endif
+        if v_new_direction == 2 and v_x + 1 >= v_border_right then
+            v_valid_direction = 0  # Can't go East into right wall
+        endif
+        if v_new_direction == 3 and v_y + 1 >= v_border_bottom then
+            v_valid_direction = 0  # Can't go South into bottom wall
+        endif
+        if v_new_direction == 4 and v_x - 1 <= v_border_left then
+            v_valid_direction = 0  # Can't go West into left wall
+        endif
+        
+        # If invalid direction (would hit wall), keep current direction
+        if v_valid_direction == 0 then
+            v_new_direction = v_direction
+        endif
+    endif
+    
+    v_direction = v_new_direction
+    v_prev_direction = v_direction
+}
+
+# Main travel procedure
+def travel {
+    # Choose new direction
+    call choose_direction
+    
+    # Determine travel distance
+    v_distance = random(1, 20, 0)
+    
+    # Move the snake
+    for v_travel in (1, v_distance, 1) then
+        # Don't move if game over
+        if v_game_over == 0 then
+            v_cnt = v_cnt + 1
+            
+            # Store previous position
+            v_prev_x = v_x
+            v_prev_y = v_y
+            
+            # Update position based on direction
+            if v_direction == 1 then #North
+                v_y = v_y - 1
+            endif
+            if v_direction == 2 then #East
+                v_x = v_x + 1
+            endif
+            if v_direction == 3 then #South
+                v_y = v_y + 1
+            endif
+            if v_direction == 4 then #West
+                v_x = v_x - 1
+            endif
+            
+            # Mode 1: Wrap around screen edges
+            if v_mode == 1 then
+                if v_y < 0 then
+                    v_y = 63
+                endif
+                if v_x > 63 then
+                    v_x = 0
+                endif
+                if v_y > 63 then
+                    v_y = 0
+                endif
+                if v_x < 0 then
+                    v_x = 63
+                endif
+            endif
+            
+            # For modes 2 & 3, check if we've hit a wall and need to change direction
+            if v_mode > 1 then
+                v_direction_changed = 0
+                
+                # Check boundaries and change direction if needed
+                if v_y <= v_border_top then
+                    v_y = v_border_top + 1
+                    # Choose between East and West
+                    v_r = random(0, 1, 0)
+                    if v_r == 0 then
+                        v_direction = 2  # East
+                    else
+                        v_direction = 4  # West
+                    endif
+                    v_prev_direction = v_direction
+                    v_direction_changed = 1
+                endif
+                
+                if v_y >= v_border_bottom then
+                    v_y = v_border_bottom - 1
+                    # Choose between East and West
+                    v_r = random(0, 1, 0)
+                    if v_r == 0 then
+                        v_direction = 2  # East
+                    else
+                        v_direction = 4  # West
+                    endif
+                    v_prev_direction = v_direction
+                    v_direction_changed = true
+                endif
+                
+                if v_x <= v_border_left then
+                    v_x = v_border_left + 1
+                    # Choose between North and South
+                    v_r = random(0, 1, 0)
+                    if v_r == 0 then
+                        v_direction = 1  # North
+                    else
+                        v_direction = 3  # South
+                    endif
+                    v_prev_direction = v_direction
+                    v_direction_changed = true
+                endif
+                
+                if v_x >= v_border_right then
+                    v_x = v_border_right - 1
+                    # Choose between North and South
+                    v_r = random(0, 1, 0)
+                    if v_r == 0 then
+                        v_direction = 1  # North
+                    else
+                        v_direction = 3  # South
+                    endif
+                    v_prev_direction = v_direction
+                    v_direction_changed = true
+                endif
+                
+                # For mode 3, track the snake's body and check for collisions
+                if v_mode == 3 then
+                    call track_body
+                    call check_collision
+                endif
+            endif
+            
+            # Draw the snake trail
+            plot(v_prev_x, v_prev_y, v_snake_color, 99, v_burnout)
+            
+            # Draw current position
+            plot(v_x, v_y, v_head_color, 99)
+            
+            # Pause between movements
+            rest(v_speed)
+            
+            # If we hit a wall and changed direction, stop this travel segment
+            if v_mode > 1 and v_direction_changed == 1 then
+                v_travel = v_distance  # End the travel loop
+            endif
+            
+            # If game over in mode 3, stop and reset
+            if v_game_over == 1 then
+                v_travel = v_distance  # End the travel loop
+                
+                # Flash the collision point
+                for v_flash in (1, 5, 1) then
+                    plot(v_x, v_y, "red", 99)
+                    rest(0.2)
+                    plot(v_x, v_y, "white", 99)
+                    rest(0.2)
+                endfor v_flash
+                
+                # Reset the game
+                call reset_game
+            endif
+        endif
+    endfor v_travel
+}
+
+# Main program loop
+
+# Set initial colors based on mode
+call set_colors
+
+# Draw initial border
+call draw_border
+
+while true then
+    # Travel in the current direction
+    call travel
+    
+    # Periodically change the burnout duration
+    if v_cnt > 125 then
+        v_burnout = random(500, 2000, 0)
+        v_cnt = 0
+    endif
+    
+    # Change modes every 60 seconds (uncomment to enable automatic mode changing)
+    if v_cnt % 100 == 0 and v_cnt > 0 then
+        v_mode = v_mode + 1
+        if v_mode > 3 then
+            v_mode = 1
+        endif
+        call set_colors
+        clear()
+        call draw_border
+    endif
+endwhile

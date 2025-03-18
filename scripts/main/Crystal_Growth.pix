@@ -1,0 +1,153 @@
+throttle(3)
+
+# Crystal Growth Effect with Full Color Spectrum and Sparkle
+# Growth settings
+v_delay = 0.02       # Animation speed
+v_max_points = 150   # Maximum points per cycle
+
+# Create arrays for tracking current crystal points for sparkle effect
+create_array(v_sparkle_x, v_max_points)
+create_array(v_sparkle_y, v_max_points)
+create_array(v_sparkle_c, v_max_points)
+
+# Clean display initially
+clear()
+
+while true then
+    # Create arrays for new growth cycle
+    create_array(v_growth_x, v_max_points)
+    create_array(v_growth_y, v_max_points)
+    create_array(v_growth_c, v_max_points)
+    create_array(v_growth_power, v_max_points)
+    create_array(v_growth_burnout, v_max_points)
+    v_points = 0
+    v_sparkle_count = 0  # Track number of points available for sparkle
+
+    # Create random seed points (2-4 crystals)
+    v_num_seeds = random(2, 4, 0)
+    v_i = 0
+    while v_i < v_num_seeds then
+        v_x = random(5, 58, 0)
+        v_y = random(5, 58, 0)
+        v_color = random(1, 99, 1)
+        v_power = random(20, 80, 0)
+        v_crystal_burnout = random(4000, 10000, 1000)
+        
+        # Add seed point
+        v_growth_x[v_points] = v_x
+        v_growth_y[v_points] = v_y
+        v_growth_c[v_points] = v_color
+        v_growth_power[v_points] = v_power
+        v_growth_burnout[v_points] = v_crystal_burnout
+        
+        # Add to sparkle tracking
+        v_sparkle_x[v_sparkle_count] = v_x
+        v_sparkle_y[v_sparkle_count] = v_y
+        v_sparkle_c[v_sparkle_count] = v_color
+        v_sparkle_count = v_sparkle_count + 1
+        
+        plot(v_x, v_y, v_color, 90, v_crystal_burnout)
+        v_points = v_points + 1
+        v_i = v_i + 1
+    endwhile
+
+    # Growth loop for this cycle
+    v_growing = 1
+    while v_growing == 1 then
+        v_current = 0
+        v_new_points = 0
+        
+        # Add random sparkles
+        if v_sparkle_count > 0 then
+            # 20% chance to add sparkles each growth cycle
+            v_do_sparkle = random(1, 100, 0)
+            if v_do_sparkle <= 20 then
+                # Add 1-3 sparkles
+                v_num_sparkles = random(1, 3, 1)
+                v_s = 0
+                while v_s < v_num_sparkles then
+                    # Pick random existing point
+                    v_sparkle_idx = random(0, v_sparkle_count - 1, 1)
+                    v_sx = v_sparkle_x[v_sparkle_idx]
+                    v_sy = v_sparkle_y[v_sparkle_idx]
+                    v_sc = v_sparkle_c[v_sparkle_idx]
+                    # Create brief, bright sparkle
+                    plot(v_sx, v_sy, v_sc, 99, 200)  # Very bright, very brief
+                    v_s = v_s + 1
+                endwhile
+            endif
+        endif
+        
+        while v_current < v_points then
+            v_x = v_growth_x[v_current]
+            v_y = v_growth_y[v_current]
+            v_color = v_growth_c[v_current]
+            v_power = v_growth_power[v_current]
+            v_crystal_burnout = v_growth_burnout[v_current]
+            
+            v_dir = 0
+            while v_dir < 4 then
+                v_grow = random(1, 100, 0)
+                
+                if v_grow <= v_power then
+                    v_new_x = v_x
+                    v_new_y = v_y
+                    
+                    if v_dir == 0 then
+                        v_new_y = v_y - 1
+                    elseif v_dir == 1 then
+                        v_new_x = v_x + 1
+                    elseif v_dir == 2 then
+                        v_new_y = v_y + 1
+                    else
+                        v_new_x = v_x - 1
+                    endif
+                    
+                    # Compound condition for bounds and capacity
+                    if v_new_x >= 0 and v_new_x < 64 and v_new_y >= 0 and v_new_y < 64 and v_points < v_max_points - 1 then
+                        v_growth_x[v_points] = v_new_x
+                        v_growth_y[v_points] = v_new_y
+                        
+                        v_color_shift = random(-3, 3, 1)
+                        v_new_color = v_color + v_color_shift
+                        if v_new_color < 1 then
+                            v_new_color = 1
+                        endif
+                        if v_new_color > 99 then
+                            v_new_color = 99
+                        endif
+                        v_growth_c[v_points] = v_new_color
+                        
+                        # Add to sparkle tracking with capacity check
+                        if v_sparkle_count < v_max_points then
+                            v_sparkle_x[v_sparkle_count] = v_new_x
+                            v_sparkle_y[v_sparkle_count] = v_new_y
+                            v_sparkle_c[v_sparkle_count] = v_new_color
+                            v_sparkle_count = v_sparkle_count + 1
+                        endif
+                        
+                        v_growth_power[v_points] = v_power
+                        v_growth_burnout[v_points] = v_crystal_burnout
+                        v_points = v_points + 1
+                        v_new_points = 1
+                        
+                        v_intensity = random(60, 90, 1)
+                        plot(v_new_x, v_new_y, v_new_color, v_intensity, v_crystal_burnout)
+                    endif
+                endif
+                
+                v_dir = v_dir + 1
+            endwhile
+            
+            v_current = v_current + 1
+        endwhile
+        
+        # Compound condition to stop growth
+        if v_new_points == 0 or v_points >= v_max_points - 5 then
+            v_growing = 0
+        endif
+        
+        #rest(v_delay)
+    endwhile
+
+endwhile

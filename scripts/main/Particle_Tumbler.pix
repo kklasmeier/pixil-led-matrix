@@ -1,0 +1,272 @@
+# Rock Tumbler Script (Authentic Physics)
+
+# Configuration
+v_num_rocks = 18         # Number of rocks
+v_radius = 30            # Tumbler radius
+v_center_x = 32          # Center of tumbler
+v_center_y = 32          # Center of tumbler
+v_max_rotation_speed = 0.12  # Maximum angular speed (radians/frame)
+v_rotation_speed = 0.12  # Current angular speed (radians/frame)
+v_g = 2.0                # Base gravity (pixels/frame²)
+v_trace_mode = 0         # Enable motion tracing (1 = on, 0 = off)
+v_debug = 0              # Debug mode (1 = on, 0 = off)
+v_drop_limit = 3         # Limit how many rocks can be falling at once
+v_direction = 1          # Rotation direction (1 = clockwise, -1 = counter-clockwise)
+v_direction_change_time = 150  # Frames before direction change starts
+v_direction_change_duration = 80  # Frames to slow down/speed up
+
+# Initialize variables
+v_angle = 0              # Tumbler rotation angle
+v_frame = 0              # Frame counter
+v_cycle_frame = 0        # Frame counter for direction cycle
+
+# Arrays
+create_array(v_rock_angle, v_num_rocks + 1)     # Angular position
+create_array(v_rock_radius, v_num_rocks + 1)    # Distance from center
+create_array(v_rock_x, v_num_rocks + 1)         # X position
+create_array(v_rock_y, v_num_rocks + 1)         # Y position
+create_array(v_rock_vx, v_num_rocks + 1)        # X velocity
+create_array(v_rock_vy, v_num_rocks + 1)        # Y velocity
+create_array(v_rock_mass, v_num_rocks + 1)      # Mass factor (1.0–2.0)
+create_array(v_rock_color, v_num_rocks + 1)  # Colors (numeric)
+create_array(v_rock_attached, v_num_rocks + 1)  # 1 = attached, 0 = falling
+create_array(v_prev_x, v_num_rocks + 1)         # Previous x position for traces
+create_array(v_prev_y, v_num_rocks + 1)         # Previous y position for traces
+
+# Initialize rocks
+def init_rocks {
+    for v_i in (0, v_num_rocks, 1) then
+        v_rock_angle[v_i] = random(0, 2 * pi, 2)
+        v_rock_radius[v_i] = v_radius - 2
+        v_rock_x[v_i] = v_center_x + v_rock_radius[v_i] * cos(v_rock_angle[v_i])
+        v_rock_y[v_i] = v_center_y + v_rock_radius[v_i] * sin(v_rock_angle[v_i])
+        v_prev_x[v_i] = v_rock_x[v_i]
+        v_prev_y[v_i] = v_rock_y[v_i]
+        v_rock_vx[v_i] = 0
+        v_rock_vy[v_i] = 0
+        v_rock_mass[v_i] = 1.0 + random(0, 1, 1)
+        
+        # Assign random colors to rocks
+        v_rock_color[v_i] = random(20, 80, 0)
+        
+        v_rock_attached[v_i] = 1
+
+    endfor v_i
+}
+
+# Count falling rocks
+def count_falling {
+    v_falling_count = 0
+    for v_i in (0, v_num_rocks, 1) then
+        if v_rock_attached[v_i] == 0 then
+            v_falling_count = v_falling_count + 1
+        endif
+    endfor v_i
+    return v_falling_count
+}
+
+# Update rock positions
+def update_rocks {
+    # Count falling rocks
+    v_falling_count = count_falling()
+    
+    for v_i in (0, v_num_rocks, 1) then
+        # Store previous position for tracing
+        v_prev_x[v_i] = v_rock_x[v_i]
+        v_prev_y[v_i] = v_rock_y[v_i]
+        
+        # Handle attached rocks
+        if v_rock_attached[v_i] == 1 then
+            # Rotate with the tumbler (using current direction and speed)
+            v_rock_angle[v_i] = v_rock_angle[v_i] + v_rotation_speed * v_direction
+            v_rock_radius[v_i] = v_radius - 2 + random(-1, 1, 0)
+            
+            # Calculate new position
+            v_rock_x[v_i] = v_center_x + v_rock_radius[v_i] * cos(v_rock_angle[v_i])
+            v_rock_y[v_i] = v_center_y + v_rock_radius[v_i] * sin(v_rock_angle[v_i])
+            
+            # Only check for detachment if we're not at the limit of falling rocks
+            if v_falling_count < v_drop_limit then
+                # Check if rock is in the right zone for detachment (top of circle)
+                v_rel_angle = v_rock_angle[v_i] % (2 * pi)
+                v_top_angle = 3 * pi / 2  # Top is at 270 degrees (3π/2)
+                
+                # Only consider detachment in a specific zone near the top
+                # This represents where centripetal force is fighting gravity
+                # Lighter rocks have a narrower detachment zone
+                v_detach_zone_width = pi / 6 + (v_rock_mass[v_i] - 1.0) * pi / 12
+                
+                # Check if rock is in detachment zone
+                v_angle_diff = abs(v_rel_angle - v_top_angle)
+                
+                if v_angle_diff < v_detach_zone_width then
+                    # Calculate detachment probability - heavier rocks detach more easily
+                    v_detach_prob = 95 - (90 / v_rock_mass[v_i])
+                    v_random_check = random(1, 100, 0)
+                    
+                    if v_random_check > v_detach_prob then
+                        # Detach rock
+                        v_rock_attached[v_i] = 0
+                        
+                        # Calculate velocity at point of release
+                        # Tangential velocity (perpendicular to radius)
+                        v_tangent_speed = v_rock_radius[v_i] * v_rotation_speed
+                        
+                        # When rock detaches, it maintains its momentum
+                        # Direction of tangential velocity depends on tumbler rotation direction
+                        # π/2 ahead of radial direction for clockwise, -π/2 for counter-clockwise
+                        v_tangent_angle = v_rock_angle[v_i] + (pi/2 * v_direction)
+                        
+                        # Set initial velocity as tangential velocity at point of release
+                        v_rock_vx[v_i] = v_tangent_speed * cos(v_tangent_angle)
+                        v_rock_vy[v_i] = v_tangent_speed * sin(v_tangent_angle)
+                        
+                    endif
+                endif
+            endif
+        # Handle falling rocks
+        else
+            # Apply gravity to vertical velocity
+            # Heavier rocks accelerate faster
+            v_rock_vy[v_i] = v_rock_vy[v_i] + v_g * v_rock_mass[v_i]
+            
+            # Update position
+            v_rock_x[v_i] = v_rock_x[v_i] + v_rock_vx[v_i]
+            v_rock_y[v_i] = v_rock_y[v_i] + v_rock_vy[v_i]
+            
+            # Check for collision with tumbler wall
+            v_dist = sqrt(pow(v_rock_x[v_i] - v_center_x, 2) + pow(v_rock_y[v_i] - v_center_y, 2))
+            
+            # Check if outside bounds of display
+            v_out_of_bounds = 0
+            if v_rock_x[v_i] < 0 or v_rock_x[v_i] > 63 or v_rock_y[v_i] < 0 or v_rock_y[v_i] > 63 then
+                v_out_of_bounds = 1
+            endif
+            
+            # Handle collision with tumbler wall
+            if v_dist > v_radius - 2 then
+                # Calculate collision point angle around the tumbler
+                v_collision_angle = atan2(v_rock_y[v_i] - v_center_y, v_rock_x[v_i] - v_center_x)
+                
+                # Reattach rock to tumbler at the collision point
+                v_rock_attached[v_i] = 1
+                v_rock_angle[v_i] = v_collision_angle
+                v_rock_radius[v_i] = v_radius - 2
+                v_rock_x[v_i] = v_center_x + v_rock_radius[v_i] * cos(v_rock_angle[v_i])
+                v_rock_y[v_i] = v_center_y + v_rock_radius[v_i] * sin(v_rock_angle[v_i])
+                v_rock_vx[v_i] = 0
+                v_rock_vy[v_i] = 0
+                
+                # Update trace position to avoid drawing lines on reattachment
+                v_prev_x[v_i] = v_rock_x[v_i]
+                v_prev_y[v_i] = v_rock_y[v_i]
+                
+            # Handle rocks that have gone out of bounds
+            elseif v_out_of_bounds == 1 then
+                # Place rock at a random position on the tumbler wall
+                v_rock_attached[v_i] = 1
+                v_rock_angle[v_i] = random(0, 2 * pi, 2)
+                v_rock_radius[v_i] = v_radius - 2
+                v_rock_x[v_i] = v_center_x + v_rock_radius[v_i] * cos(v_rock_angle[v_i])
+                v_rock_y[v_i] = v_center_y + v_rock_radius[v_i] * sin(v_rock_angle[v_i])
+                v_rock_vx[v_i] = 0
+                v_rock_vy[v_i] = 0
+                
+                # Update trace position
+                v_prev_x[v_i] = v_rock_x[v_i]
+                v_prev_y[v_i] = v_rock_y[v_i]
+                
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw the scene
+def draw_scene {
+    begin_frame
+        # Draw tumbler outline
+        draw_rectangle(0, 0, 63, 63, cyan, 20, true)
+        draw_circle(v_center_x, v_center_y, v_radius, black, 20, true)
+        draw_circle(v_center_x, v_center_y, v_radius, gray, 100, false)
+        
+        # Draw tumbler markers to show rotation
+        v_plot1_x = v_center_x + v_radius * cos(v_angle)
+        v_plot1_y = v_center_y + v_radius * sin(v_angle)
+        v_plot2_x = v_center_x + v_radius * cos(v_angle + pi)
+        v_plot2_y = v_center_y + v_radius * sin(v_angle + pi)
+        v_plot3_x = v_center_x + v_radius * cos(v_angle + pi / 2)
+        v_plot3_y = v_center_y + v_radius * sin(v_angle + pi / 2)
+        v_plot4_x = v_center_x + v_radius * cos(v_angle + 3 * pi / 2)
+        v_plot4_y = v_center_y + v_radius * sin(v_angle + 3 * pi / 2)
+        
+        draw_circle(v_plot1_x, v_plot1_y, 1, red, 70, true)
+        draw_circle(v_plot2_x, v_plot2_y, 1, red, 70, true)
+        draw_circle(v_plot3_x, v_plot3_y, 1, red, 70, true) 
+        draw_circle(v_plot4_x, v_plot4_y, 1, red, 70, true)
+        
+        # Draw motion traces for falling rocks
+        if v_trace_mode == 1 then
+            for v_i in (0, v_num_rocks, 1) then
+                if v_rock_attached[v_i] == 0 then
+                    # Only draw traces for significant movement
+                    v_dist_moved = sqrt(pow(v_rock_x[v_i] - v_prev_x[v_i], 2) + pow(v_rock_y[v_i] - v_prev_y[v_i], 2))
+                    if v_dist_moved > 1 and v_dist_moved < 15 then
+                        draw_line(v_prev_x[v_i], v_prev_y[v_i], v_rock_x[v_i], v_rock_y[v_i], white, 30, 200)
+                    endif
+                endif
+            endfor v_i
+        endif
+        
+        # Draw rocks
+        for v_i in (0, v_num_rocks, 1) then
+            plot(v_rock_x[v_i], v_rock_y[v_i], v_rock_color[v_i], 100)
+        endfor v_i
+    end_frame
+}
+
+# Update rotation direction and speed
+def update_rotation {
+    # Direction change logic
+    if v_cycle_frame == v_direction_change_time then
+        # Start slowing down
+    endif
+    
+    # Slow down phase
+    if v_cycle_frame >= v_direction_change_time and v_cycle_frame < v_direction_change_time + v_direction_change_duration / 2 then
+        # Gradually slow down to zero
+        v_slow_factor = 1.0 - (v_cycle_frame - v_direction_change_time) / (v_direction_change_duration / 2)
+        v_rotation_speed = v_max_rotation_speed * v_slow_factor
+    
+    # Direction change and speed up phase
+    elseif v_cycle_frame >= v_direction_change_time + v_direction_change_duration / 2 and v_cycle_frame < v_direction_change_time + v_direction_change_duration then
+        # Change direction if we've come to a stop
+        if v_cycle_frame == v_direction_change_time + v_direction_change_duration / 2 then
+            v_direction = v_direction * -1
+        endif
+        
+        # Gradually speed up in new direction
+        v_speed_factor = (v_cycle_frame - (v_direction_change_time + v_direction_change_duration / 2)) / (v_direction_change_duration / 2)
+        v_rotation_speed = v_max_rotation_speed * v_speed_factor
+    
+    # Normal running speed
+    else
+        v_rotation_speed = v_max_rotation_speed
+    endif
+    
+    # Increment or reset cycle frame counter
+    v_cycle_frame = v_cycle_frame + 1
+    if v_cycle_frame >= v_direction_change_time + v_direction_change_duration then
+        v_cycle_frame = 0
+    endif
+}
+
+# Main loop
+call init_rocks
+while true then
+    call update_rotation
+    call update_rocks
+    call draw_scene
+    v_angle = v_angle + v_rotation_speed * v_direction
+    v_frame = v_frame + 1
+endwhile
+clear()

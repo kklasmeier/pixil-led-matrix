@@ -1,0 +1,93 @@
+# Geometric Kaleidoscope
+# Creates symmetrical patterns with rotating geometric shapes
+
+# Initialize parameters
+v_center_x = 32
+v_center_y = 32
+v_max_radius = 30
+v_num_sides = 6
+v_rotation = 0
+v_rotation_speed = 2
+v_color_shift = 0
+v_scale = 1.0
+v_scale_dir = 0.02
+
+# Color array
+create_array(v_colors, 7, string)
+v_colors[0] = "red"
+v_colors[1] = "orange"
+v_colors[2] = "yellow"
+v_colors[3] = "green"
+v_colors[4] = "cyan"
+v_colors[5] = "blue"
+v_colors[6] = "purple"
+
+# Animation loop
+v_running = 1
+v_frame = 0
+
+# Create trail effect with partial clearing
+def clear_with_fade {
+    begin_frame(true)
+    draw_rectangle(0, 0, 64, 64, black, 20, true)
+    end_frame
+}
+
+while v_running == 1 then
+    # Apply trail effect
+    clear_with_fade
+    
+    # Calculate polygon parameters
+    v_current_radius = abs(sin(v_frame * 0.02) * v_max_radius)
+    v_sides = v_num_sides + floor(sin(v_frame * 0.01) * 2)
+    
+    # Draw main polygon
+    for v_i in (0, 3, 1) then
+        v_color_index = (v_color_shift + v_i) % 7
+        v_size = v_current_radius * (1 - v_i * 0.2)
+        v_rot_offset = v_rotation + v_i * 15
+        
+        begin_frame(true)
+        draw_polygon(v_center_x, v_center_y, v_size, v_sides, v_colors[v_color_index], 90, v_rot_offset, false)
+        end_frame
+    endfor v_i
+    
+    # Draw mirrored polygons
+    v_mirror_count = 4
+    for v_m in (0, v_mirror_count - 1, 1) then
+        v_angle = v_m * (360 / v_mirror_count) + v_rotation
+        v_mirror_x = v_center_x + cos(radians(v_angle)) * v_current_radius * 0.7
+        v_mirror_y = v_center_y + sin(radians(v_angle)) * v_current_radius * 0.7
+        v_mirror_size = v_current_radius * 0.4
+        
+        v_color_index = (v_color_shift + v_m + 2) % 7
+        
+        begin_frame(true)
+        draw_polygon(v_mirror_x, v_mirror_y, v_mirror_size, v_sides, v_colors[v_color_index], 90, v_rotation * -1, false)
+        end_frame
+    endfor v_m
+    
+    # Update parameters
+    v_rotation = v_rotation + v_rotation_speed
+    if v_rotation >= 360 then
+        v_rotation = v_rotation - 360
+    endif
+    
+    v_color_shift = (v_frame / 10) % 7
+    
+    # Scale animation
+    v_scale = v_scale + v_scale_dir
+    if v_scale > 1.3 then
+        v_scale_dir = -0.02
+    elseif v_scale < 0.7 then
+        v_scale_dir = 0.02
+    endif
+    
+    # Animation control
+    v_frame = v_frame + 1
+    
+    # Speed control
+    rest(0.05)
+endwhile
+
+clear()

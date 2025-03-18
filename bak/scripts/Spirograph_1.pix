@@ -1,0 +1,34 @@
+# Animation settings
+v_speed = 0.02
+v_center_x = 32
+v_center_y = 32
+
+# Pattern parameters
+v_outer_radius = 20    # Size of outer circle
+v_inner_radius = 12    # Size of inner circle
+v_pen_distance = 5     # Distance of pen from center of inner circle
+v_multiplier = 7       # Controls pattern complexity
+
+# Draw one complete pattern
+for v_angle in (0, 720, 1)  # Go around twice to complete pattern
+    # Outer circle position
+    v_outer_x = v_outer_radius * cos(v_angle)
+    v_outer_y = v_outer_radius * sin(v_angle)
+    
+    # Add inner circle rotation
+    v_inner_x = v_pen_distance * cos(v_angle * v_multiplier)
+    v_inner_y = v_pen_distance * sin(v_angle * v_multiplier)
+    
+    # Calculate pen position
+    v_calc_x = v_center_x + v_outer_x + v_inner_x
+    v_calc_y = v_center_y + v_outer_y + v_inner_y
+    
+    # Round for plotting
+    v_x = round(v_calc_x)
+    v_y = round(v_calc_y)
+    
+    # Plot single point
+    plot(v_x, v_y, cyan)
+    
+    rest(v_speed)
+endfor v_angle

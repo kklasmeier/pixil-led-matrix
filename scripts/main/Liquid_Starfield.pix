@@ -1,0 +1,139 @@
+# Fixed Liquid Starfield Animation
+# Fixed version that ensures stars move properly
+# Adjust throttle rate - try different values
+throttle(1)
+# Parameters
+v_width = 64
+v_height = 64
+v_num_stars = 18  # Reduced star count for better performance
+v_time = 0
+v_time_step = 0.05
+v_border_buffer = 6  # How far stars go off-screen before reappearing
+
+# Create expanded boundaries
+v_x_min = 0 - v_border_buffer
+v_x_max = v_width + v_border_buffer
+v_y_min = 0 - v_border_buffer
+v_y_max = v_height + v_border_buffer
+v_total_width = v_width + (v_border_buffer * 2)
+v_total_height = v_height + (v_border_buffer * 2)
+
+# Create star arrays
+create_array(v_star_x, v_num_stars)
+create_array(v_star_y, v_num_stars)
+create_array(v_star_z, v_num_stars)  # Depth value
+create_array(v_star_color, v_num_stars)
+create_array(v_star_brightness, v_num_stars)
+
+# Initialize stars across the expanded area
+for v_i in (0, v_num_stars - 1, 1) then
+    v_star_x[v_i] = random(v_x_min, v_x_max - 1, 0)
+    v_star_y[v_i] = random(v_y_min, v_y_max - 1, 0)
+    v_star_z[v_i] = random(1, 10, 1)
+    v_star_color[v_i] = random(0, 3, 0)
+    v_star_brightness[v_i] = random(60, 90, 0)
+endfor v_i
+
+# Print debug info to confirm stars initialization
+print("Stars initialized")
+
+# Main animation loop
+v_running = 1
+v_frame = 0
+
+while v_running == 1 then
+   
+    begin_frame
+    
+    # Update and draw each star
+    for v_i in (0, v_num_stars - 1, 1) then
+        # Get star position
+        v_rel_x = v_star_x[v_i]
+        v_rel_y = v_star_y[v_i]
+        
+        # Calculate flow 
+        v_flow_x = sin(v_time * 0.7 + v_rel_x * 0.05 + v_rel_y * 0.03) * 0.8
+        v_flow_y = cos(v_time * 0.6 + v_rel_x * 0.04 + v_rel_y * 0.02) * 0.7
+        
+        # Move star - calculate speed based on depth
+        v_speed = 0.5 + (10 - v_star_z[v_i]) * 0.1
+        
+        # Apply movement
+        v_rel_x = v_rel_x + v_flow_x * v_speed
+        v_rel_y = v_rel_y + v_flow_y * v_speed
+        
+        # Handle wrapping
+        if v_rel_x < v_x_min then
+            v_rel_x = v_rel_x + v_total_width
+        endif
+        
+        if v_rel_x >= v_x_max then
+            v_rel_x = v_rel_x - v_total_width
+        endif
+        
+        if v_rel_y < v_y_min then
+            v_rel_y = v_rel_y + v_total_height
+        endif
+        
+        if v_rel_y >= v_y_max then
+            v_rel_y = v_rel_y - v_total_height
+        endif
+        
+        # Update star position
+        v_star_x[v_i] = v_rel_x
+        v_star_y[v_i] = v_rel_y
+        
+        # Only draw if star is actually on screen using compound condition
+        if v_rel_x >= 0 and v_rel_x < v_width and v_rel_y >= 0 and v_rel_y < v_height then
+            # Set color based on index
+            if v_star_color[v_i] == 0 then
+                v_color = "white"
+            endif
+            
+            if v_star_color[v_i] == 1 then
+                v_color = "cyan"
+            endif
+            
+            if v_star_color[v_i] == 2 then
+                v_color = "blue"
+            endif
+            
+            if v_star_color[v_i] == 3 then
+                v_color = "purple"
+            endif
+            
+            # Determine size based on depth
+            v_size = (10 - v_star_z[v_i]) * 0.2
+            if v_size < 1 then
+                v_size = 1
+            endif
+            
+            # Simple pulse effect
+            v_pulse = sin(v_time * 2 + v_i * 0.1) * 10
+            v_brightness = v_star_brightness[v_i] + v_pulse
+            
+            # Draw the star
+            v_draw_x = floor(v_rel_x)
+            v_draw_y = floor(v_rel_y)
+            
+            if v_size <= 1 then
+                plot(v_draw_x, v_draw_y, v_color, v_brightness)
+            else
+                draw_circle(v_draw_x, v_draw_y, v_size, v_color, v_brightness, true)
+            endif
+        endif
+    endfor v_i
+      
+    end_frame
+    
+    # Update time - VERY IMPORTANT FOR ANIMATION
+    v_time = v_time + v_time_step
+    
+    # Animation control
+    v_frame = v_frame + 1
+endwhile
+
+# Final confirmation
+print("Animation complete")
+sync_queue
+clear()

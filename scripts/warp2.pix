@@ -1,0 +1,50 @@
+# Space Starfield Effect Script
+
+# Initialize center coordinates
+v_center_x = 32
+v_center_y = 32
+
+# Single star movement along a specific lane
+def move_star_in_lane {
+    # Parameters for this lane
+    v_slot = v_param1     # Lane number passed as parameter
+    v_angle = v_slot * 30 # 12 evenly spaced lanes (360/12 = 30)
+    
+    # Move single star outward in this lane
+    for v_dist in (2, 35, 2) then
+        v_x = v_center_x + cos(v_angle) * v_dist
+        v_y = v_center_y + sin(v_angle) * v_dist
+        
+        # Brightness increases with distance
+        v_brightness = 50 + v_dist
+        if v_brightness > 99 then
+            v_brightness = 99
+        endif
+        
+        plot(v_x, v_y, white:{v_brightness}, 500)
+    endfor v_dist
+}
+
+# Main effect loop - handles all lanes simultaneously
+while true then
+    
+    # Launch stars in all 12 lanes at once
+    for v_lane in (0, 11, 1) then
+        v_param1 = v_lane  # Set lane number as parameter
+        call move_star_in_lane
+    endfor v_lane
+    
+    rest(0.15)  # Control overall speed
+    
+    # Optional: Add occasional blue stars for variety
+    if random(1, 10, 1) == 1 then
+        begin_frame
+        v_special_lane = random(0, 11, 1)
+        v_special_angle = v_special_lane * 30
+        v_special_dist = random(5, 30, 1)
+        v_x = v_center_x + cos(v_special_angle) * v_special_dist
+        v_y = v_center_y + sin(v_special_angle) * v_special_dist
+        plot(v_x, v_y, blue:90, 150)
+        end_frame
+    endif
+endwhile

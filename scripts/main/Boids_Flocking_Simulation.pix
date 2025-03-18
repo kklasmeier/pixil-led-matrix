@@ -1,0 +1,493 @@
+# Boids Flocking Simulation for Pixil
+# Simulates bird flocking behavior using Craig Reynolds' algorithm
+
+# Initialize constants
+v_num_boids = 5        # Number of boids
+v_max_speed = 2.5        # Maximum speed
+v_min_speed = 0.5        # Minimum speed
+v_max_force = 0.3        # Maximum steering force
+v_separation_dist = 7    # Separation distance
+v_neighbor_dist = 15     # Neighbor detection radius
+v_separation_weight = 1.5 # Separation weight
+v_alignment_weight = 1.0  # Alignment weight
+v_cohesion_weight = 1.0   # Cohesion weight
+v_boundary_margin = 5     # Boundary margin for bounce mode
+v_wraparound = 1          # 1 = wraparound, 0 = bounce
+v_tail_length = 3         # Length of trail behind each boid
+v_frame_delay = 0.05      # Delay between frames
+v_dist = 0
+
+# Dynamic behavior parameters
+v_wander_strength = 0.2   # Strength of random wandering behavior
+v_scatter_chance = 0.005  # Chance of scatter event each frame (0.5%)
+v_scatter_duration = 60   # Duration of scatter event in frames
+v_scatter_active = 0      # Whether scatter event is active
+v_scatter_timer = 0       # Timer for scatter events
+v_target_active = 0       # Whether target attraction is active
+v_target_timer = 0        # Timer for target attraction
+v_target_x = 32           # Target attraction X position
+v_target_y = 32           # Target attraction Y position
+v_target_duration = 100   # How long target stays active
+v_target_chance = 0.003   # Chance of new target each frame (0.3%)
+v_target_strength = 0.8   # Strength of target attraction
+
+# Create arrays for boid properties
+create_array(v_pos_x, v_num_boids)        # X positions
+create_array(v_pos_y, v_num_boids)        # Y positions
+create_array(v_vel_x, v_num_boids)        # X velocities
+create_array(v_vel_y, v_num_boids)        # Y velocities
+create_array(v_acc_x, v_num_boids)        # X accelerations
+create_array(v_acc_y, v_num_boids)        # Y accelerations
+create_array(v_colors, v_num_boids)       # Color index for each boid
+create_array(v_prev_x, v_num_boids * v_tail_length)  # Previous X positions for trail
+create_array(v_prev_y, v_num_boids * v_tail_length)  # Previous Y positions for trail
+
+# Initialize boids with random positions, velocities, and colors
+for v_i in (0, v_num_boids - 1, 1) then
+    # Random position within display bounds
+    v_pos_x[v_i] = random(5, 59, 0)
+    v_pos_y[v_i] = random(5, 59, 0)
+    
+    # Random initial velocity
+    v_angle = random(0, 360, 0)
+    v_speed = random(v_min_speed, v_max_speed, 1)
+    v_vel_x[v_i] = cos(radians(v_angle)) * v_speed
+    v_vel_y[v_i] = sin(radians(v_angle)) * v_speed
+    
+    # Initialize acceleration to zero
+    v_acc_x[v_i] = 0
+    v_acc_y[v_i] = 0
+    
+    # Random color (using color indices from 5 to 80 to get nice colors)
+    v_colors[v_i] = random(5, 80, 0)
+    
+    # Initialize previous positions for trails
+    for v_j in (0, v_tail_length - 1, 1) then
+        v_idx = v_i * v_tail_length + v_j
+        v_prev_x[v_idx] = v_pos_x[v_i]
+        v_prev_y[v_idx] = v_pos_y[v_i]
+    endfor v_j
+endfor v_i
+
+# Calculate distance between two boids
+def calculate_distance {
+    # Initialize distance variables
+    v_dx = 0
+    v_dy = 0
+    v_dist = 0
+    v_dist_squared = 0
+    
+    # Uses global v_i, v_j, v_dx, v_dy, v_dist variables
+    v_dx = v_pos_x[v_j] - v_pos_x[v_i]
+    v_dy = v_pos_y[v_j] - v_pos_y[v_i]
+    
+    # If wraparound is enabled, find shortest distance across boundaries
+    if v_wraparound == 1 then
+        # Check X axis wraparound
+        if abs(v_dx) > 32 then
+            v_sign_dx = 1
+            if v_dx < 0 then
+                v_sign_dx = -1
+            endif
+            v_dx = v_sign_dx * (64 - abs(v_dx))
+        endif
+        
+        # Check Y axis wraparound
+        if abs(v_dy) > 32 then
+            v_sign_dy = 1
+            if v_dy < 0 then
+                v_sign_dy = -1
+            endif
+            v_dy = v_sign_dy * (64 - abs(v_dy))
+        endif
+    endif
+    
+    # Calculate squared distance
+    v_dist_squared = v_dx * v_dx + v_dy * v_dy
+    v_dist = sqrt(v_dist_squared)
+}
+
+# Update dynamic behaviors (scatter events and targets)
+def update_dynamics {
+    # Initialize all needed variables
+    v_rand = 0
+    
+    # Check if we should start a scatter event
+    if v_scatter_active == 0 then
+        v_rand = random(0, 1, 3)
+        if v_rand < v_scatter_chance then
+            v_scatter_active = 1
+            v_scatter_timer = v_scatter_duration
+            print("Scatter event activated!")
+        endif
+    else
+        # Update scatter timer
+        v_scatter_timer = v_scatter_timer - 1
+        if v_scatter_timer <= 0 then
+            v_scatter_active = 0
+            print("Scatter event ended")
+        endif
+    endif
+    
+    # Check if we should create a new target
+    if v_target_active == 0 then
+        v_rand = random(0, 1, 3)
+        if v_rand < v_target_chance then
+            v_target_active = 1
+            v_target_timer = v_target_duration
+            # Random target position
+            v_target_x = random(10, 54, 0)
+            v_target_y = random(10, 54, 0)
+            print(f"New target at ({v_target_x}, {v_target_y})")
+            
+            # Visualize the target briefly
+            draw_circle(v_target_x, v_target_y, 3, yellow, 100, 1, 1000)
+        endif
+    else
+        # Update target timer
+        v_target_timer = v_target_timer - 1
+        if v_target_timer <= 0 then
+            v_target_active = 0
+            print("Target disappeared")
+        endif
+    endif
+}
+
+# Apply flocking rules to update accelerations
+def apply_flocking_rules {
+    # Initialize variables
+    v_sep_x = 0
+    v_sep_y = 0
+    v_ali_x = 0
+    v_ali_y = 0
+    v_coh_x = 0
+    v_coh_y = 0
+    v_sep_count = 0
+    v_ali_count = 0
+    v_coh_count = 0
+    v_tar_x = 0
+    v_tar_y = 0
+    v_tar_mag = 0
+    v_wander_x = 0
+    v_wander_y = 0
+    v_sep_mag = 0
+    v_ali_mag = 0
+    v_coh_mag = 0
+    
+    for v_i in (0, v_num_boids - 1, 1) then
+        # Reset steering forces
+        v_sep_x = 0
+        v_sep_y = 0
+        v_ali_x = 0
+        v_ali_y = 0
+        v_coh_x = 0
+        v_coh_y = 0
+        
+        v_sep_count = 0
+        v_ali_count = 0
+        v_coh_count = 0
+        
+        # Check interaction with all other boids
+        for v_j in (0, v_num_boids - 1, 1) then
+            if v_i != v_j then
+                # Calculate distance to neighbor
+                calculate_distance
+                
+                # SEPARATION: Avoid crowding neighbors (short range)
+                if v_dist < v_separation_dist and v_dist > 0 then
+                    # Calculate vector pointing away from neighbor
+                    v_sep_factor = 1.0 / v_dist  # Closer boids have stronger effect
+                    v_sep_x = v_sep_x - v_dx * v_sep_factor
+                    v_sep_y = v_sep_y - v_dy * v_sep_factor
+                    v_sep_count = v_sep_count + 1
+                endif
+                
+                # During scatter events, ignore alignment and cohesion
+                if v_scatter_active == 0 then
+                    # ALIGNMENT & COHESION: Align with neighbors' direction and move toward their center
+                    if v_dist < v_neighbor_dist then
+                        # ALIGNMENT: Add in this neighbor's velocity for alignment
+                        v_ali_x = v_ali_x + v_vel_x[v_j]
+                        v_ali_y = v_ali_y + v_vel_y[v_j]
+                        v_ali_count = v_ali_count + 1
+                        
+                        # COHESION: Add in this neighbor's position for cohesion
+                        v_coh_x = v_coh_x + v_pos_x[v_j]
+                        v_coh_y = v_coh_y + v_pos_y[v_j]
+                        v_coh_count = v_coh_count + 1
+                    endif
+                endif
+            endif
+        endfor v_j
+        
+        # Calculate average forces
+        
+        # Separation: Average and scale
+        if v_sep_count > 0 then
+            v_sep_x = v_sep_x / v_sep_count
+            v_sep_y = v_sep_y / v_sep_count
+            
+            # Normalize and scale
+            v_sep_mag = sqrt(v_sep_x * v_sep_x + v_sep_y * v_sep_y)
+            if v_sep_mag > 0 then
+                v_sep_x = (v_sep_x / v_sep_mag) * v_max_speed
+                v_sep_y = (v_sep_y / v_sep_mag) * v_max_speed
+                
+                # Calculate steering force = desired - current
+                v_sep_x = v_sep_x - v_vel_x[v_i]
+                v_sep_y = v_sep_y - v_vel_y[v_i]
+                
+                # Limit force
+                v_sep_mag = sqrt(v_sep_x * v_sep_x + v_sep_y * v_sep_y)
+                if v_sep_mag > v_max_force then
+                    v_sep_x = (v_sep_x / v_sep_mag) * v_max_force
+                    v_sep_y = (v_sep_y / v_sep_mag) * v_max_force
+                endif
+            endif
+        endif
+        
+        # During scatter events, make separation stronger
+        if v_scatter_active == 1 then
+            v_sep_x = v_sep_x * 3
+            v_sep_y = v_sep_y * 3
+        endif
+        
+        # Alignment: Average and scale
+        if v_ali_count > 0 then
+            v_ali_x = v_ali_x / v_ali_count
+            v_ali_y = v_ali_y / v_ali_count
+            
+            # Normalize and scale
+            v_ali_mag = sqrt(v_ali_x * v_ali_x + v_ali_y * v_ali_y)
+            if v_ali_mag > 0 then
+                v_ali_x = (v_ali_x / v_ali_mag) * v_max_speed
+                v_ali_y = (v_ali_y / v_ali_mag) * v_max_speed
+                
+                # Calculate steering force = desired - current
+                v_ali_x = v_ali_x - v_vel_x[v_i]
+                v_ali_y = v_ali_y - v_vel_y[v_i]
+                
+                # Limit force
+                v_ali_mag = sqrt(v_ali_x * v_ali_x + v_ali_y * v_ali_y)
+                if v_ali_mag > v_max_force then
+                    v_ali_x = (v_ali_x / v_ali_mag) * v_max_force
+                    v_ali_y = (v_ali_y / v_ali_mag) * v_max_force
+                endif
+            endif
+        endif
+        
+        # Cohesion: Average and calculate steering toward center
+        if v_coh_count > 0 then
+            v_coh_x = v_coh_x / v_coh_count
+            v_coh_y = v_coh_y / v_coh_count
+            
+            # Calculate desired velocity toward center
+            v_coh_x = v_coh_x - v_pos_x[v_i]
+            v_coh_y = v_coh_y - v_pos_y[v_i]
+            
+            # Normalize and scale
+            v_coh_mag = sqrt(v_coh_x * v_coh_x + v_coh_y * v_coh_y)
+            if v_coh_mag > 0 then
+                v_coh_x = (v_coh_x / v_coh_mag) * v_max_speed
+                v_coh_y = (v_coh_y / v_coh_mag) * v_max_speed
+                
+                # Calculate steering force = desired - current
+                v_coh_x = v_coh_x - v_vel_x[v_i]
+                v_coh_y = v_coh_y - v_vel_y[v_i]
+                
+                # Limit force
+                v_coh_mag = sqrt(v_coh_x * v_coh_x + v_coh_y * v_coh_y)
+                if v_coh_mag > v_max_force then
+                    v_coh_x = (v_coh_x / v_coh_mag) * v_max_force
+                    v_coh_y = (v_coh_y / v_coh_mag) * v_max_force
+                endif
+            endif
+        endif
+        
+        # Add random wander behavior to create more dynamic movement
+        v_wander_x = random(-1, 1, 2) * v_wander_strength
+        v_wander_y = random(-1, 1, 2) * v_wander_strength
+        
+        # Add target attraction if active
+        v_tar_x = 0
+        v_tar_y = 0
+        if v_target_active == 1 then
+            # Vector toward target
+            v_tar_x = v_target_x - v_pos_x[v_i]
+            v_tar_y = v_target_y - v_pos_y[v_i]
+            
+            # Normalize and scale
+            v_tar_mag = sqrt(v_tar_x * v_tar_x + v_tar_y * v_tar_y)
+            if v_tar_mag > 0 then
+                v_tar_x = (v_tar_x / v_tar_mag) * v_max_speed * v_target_strength
+                v_tar_y = (v_tar_y / v_tar_mag) * v_max_speed * v_target_strength
+                
+                # Calculate steering force = desired - current
+                v_tar_x = v_tar_x - v_vel_x[v_i]
+                v_tar_y = v_tar_y - v_vel_y[v_i]
+                
+                # Limit force
+                v_tar_mag = sqrt(v_tar_x * v_tar_x + v_tar_y * v_tar_y)
+                if v_tar_mag > v_max_force then
+                    v_tar_x = (v_tar_x / v_tar_mag) * v_max_force
+                    v_tar_y = (v_tar_y / v_tar_mag) * v_max_force
+                endif
+            endif
+        endif
+        
+        # Apply all forces with weights
+        v_acc_x[v_i] = v_sep_x * v_separation_weight + v_ali_x * v_alignment_weight +  v_coh_x * v_cohesion_weight + v_wander_x + v_tar_x
+        v_acc_y[v_i] = v_sep_y * v_separation_weight + v_ali_y * v_alignment_weight +  v_coh_y * v_cohesion_weight + v_wander_y + v_tar_y
+    endfor v_i
+}
+
+# Update boid positions and velocities
+def update_boids {
+    for v_i in (0, v_num_boids - 1, 1) then
+        # Update velocities with acceleration
+        v_vel_x[v_i] = v_vel_x[v_i] + v_acc_x[v_i]
+        v_vel_y[v_i] = v_vel_y[v_i] + v_acc_y[v_i]
+        
+        # Limit velocity (speed)
+        v_speed = sqrt(v_vel_x[v_i] * v_vel_x[v_i] + v_vel_y[v_i] * v_vel_y[v_i])
+        if v_speed > v_max_speed then
+            v_vel_x[v_i] = (v_vel_x[v_i] / v_speed) * v_max_speed
+            v_vel_y[v_i] = (v_vel_y[v_i] / v_speed) * v_max_speed
+        endif
+        
+        if v_speed < v_min_speed then
+            v_vel_x[v_i] = (v_vel_x[v_i] / v_speed) * v_min_speed
+            v_vel_y[v_i] = (v_vel_y[v_i] / v_speed) * v_min_speed
+        endif
+        
+        # Update trail positions (shift old positions)
+        for v_j in (v_tail_length - 1, 1, -1) then
+            v_idx = v_i * v_tail_length + v_j
+            v_prev_idx = v_i * v_tail_length + v_j - 1
+            v_prev_x[v_idx] = v_prev_x[v_prev_idx]
+            v_prev_y[v_idx] = v_prev_y[v_prev_idx]
+        endfor v_j
+        
+        # Store current position as head of trail
+        v_prev_x[v_i * v_tail_length] = v_pos_x[v_i]
+        v_prev_y[v_i * v_tail_length] = v_pos_y[v_i]
+        
+        # Update positions
+        v_pos_x[v_i] = v_pos_x[v_i] + v_vel_x[v_i]
+        v_pos_y[v_i] = v_pos_y[v_i] + v_vel_y[v_i]
+        
+        # Handle boundaries
+        if v_wraparound == 1 then
+            # Wrap positions around boundaries
+            if v_pos_x[v_i] < 0 then
+                v_pos_x[v_i] = v_pos_x[v_i] + 64
+            endif
+            
+            if v_pos_x[v_i] >= 64 then
+                v_pos_x[v_i] = v_pos_x[v_i] - 64
+            endif
+            
+            if v_pos_y[v_i] < 0 then
+                v_pos_y[v_i] = v_pos_y[v_i] + 64
+            endif
+            
+            if v_pos_y[v_i] >= 64 then
+                v_pos_y[v_i] = v_pos_y[v_i] - 64
+            endif
+        else
+            # Bounce off boundaries
+            if v_pos_x[v_i] < v_boundary_margin then
+                v_pos_x[v_i] = v_boundary_margin
+                v_vel_x[v_i] = abs(v_vel_x[v_i])  # Reverse direction
+            endif
+            
+            if v_pos_x[v_i] > (64 - v_boundary_margin) then
+                v_pos_x[v_i] = 64 - v_boundary_margin
+                v_vel_x[v_i] = -abs(v_vel_x[v_i])  # Reverse direction
+            endif
+            
+            if v_pos_y[v_i] < v_boundary_margin then
+                v_pos_y[v_i] = v_boundary_margin
+                v_vel_y[v_i] = abs(v_vel_y[v_i])  # Reverse direction
+            endif
+            
+            if v_pos_y[v_i] > (64 - v_boundary_margin) then
+                v_pos_y[v_i] = 64 - v_boundary_margin
+                v_vel_y[v_i] = -abs(v_vel_y[v_i])  # Reverse direction
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw boids and their trails
+def draw_boids {
+    begin_frame
+    
+    # Draw target if active
+    if v_target_active == 1 then
+        if v_target_timer % 10 < 5 then  # Blinking effect
+            draw_circle(v_target_x, v_target_y, 2, yellow, 40, 0)
+        endif
+    endif
+    
+    # Draw trails first (so boids appear on top)
+    for v_i in (0, v_num_boids - 1, 1) then
+        v_color = v_colors[v_i]
+        
+        # Draw trails with diminishing intensity
+        for v_j in (1, v_tail_length - 1, 1) then
+            v_idx = v_i * v_tail_length + v_j
+            v_intensity = 100 - (v_j * (80 / v_tail_length))  # Fade out
+            
+            # Only draw trail segments if they have moved
+            if v_prev_x[v_idx] != v_prev_x[v_idx - 1] or v_prev_y[v_idx] != v_prev_y[v_idx - 1] then
+                v_trail_x = round(v_prev_x[v_idx])
+                v_trail_y = round(v_prev_y[v_idx])
+                plot(v_trail_x, v_trail_y, v_color, v_intensity)
+            endif
+        endfor v_j
+        
+        # Draw boid (head)
+        v_draw_x = round(v_pos_x[v_i])
+        v_draw_y = round(v_pos_y[v_i])
+        
+        # Calculate direction to draw boid triangle
+        v_heading = atan2(v_vel_y[v_i], v_vel_x[v_i])
+        v_heading_deg = degrees(v_heading)
+        
+        # Draw boid as a small circle
+        plot(v_draw_x, v_draw_y, v_color, 100)
+        
+        # Draw small line indicating direction
+        v_nose_x = v_draw_x + cos(v_heading) * 2
+        v_nose_y = v_draw_y + sin(v_heading) * 2
+        draw_line(v_draw_x, v_draw_y, round(v_nose_x), round(v_nose_y), v_color, 100)
+    endfor v_i
+   
+    end_frame
+}
+
+# Main loop
+print("Starting Boids Flocking Simulation")
+print(f"Number of boids: {v_num_boids}")
+print(f"Wraparound mode: {v_wraparound}")
+
+throttle(0.8)  # Speed up execution slightly
+
+# Simulation loop
+while 1 then
+    # Update random events (scatter & targets)
+    call update_dynamics
+    
+    # Apply flocking rules
+    call apply_flocking_rules
+    
+    # Update boid positions and velocities
+    call update_boids
+    
+    # Draw boids and trails
+    call draw_boids
+    
+    # Small delay between frames
+    #rest(v_frame_delay)
+endwhile

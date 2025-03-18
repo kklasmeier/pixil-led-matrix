@@ -1,0 +1,11 @@
+# Test script for loop permutations
+# Set up some variables
+v_start = 1
+v_mid = 5
+v_end = 10
+v_step = 2
+# Test 4: Variable step
+clear()
+for v_i in (1, 10, v_step)
+    plot(v_i, 4, yellow)
+endfor v_i

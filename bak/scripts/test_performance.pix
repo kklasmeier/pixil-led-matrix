@@ -1,0 +1,70 @@
+# LED Matrix Performance Test
+# Moving square around panel perimeter
+
+# Configuration settings
+v_size = 20        # Size of the square (width and height)
+
+# Initialize starting position and direction
+v_x = 0
+v_y = 0
+v_color = 0
+v_moving_right = 1
+v_moving_down = 0
+v_moving_left = 0
+v_moving_up = 0
+
+# Calculate boundary (64 - size)
+v_boundary = 64 - v_size
+
+# Main animation loop - runs indefinitely
+while 1 then
+    begin_frame
+    clear()
+
+    # Draw square at current position using size setting
+    draw_rectangle(v_x, v_y, v_size, v_size, v_color, true)
+
+    # Update color (0-99)
+    v_color = v_color + 1
+    if v_color > 99 then
+        v_color = 0
+    endif
+
+    # Movement logic - using calculated boundary
+    if v_moving_right == 1 then
+        v_x = v_x + 1
+        if v_x >= v_boundary then
+            v_moving_right = 0
+            v_moving_down = 1
+        endif
+    endif
+
+    if v_moving_down == 1 then
+        v_y = v_y + 1
+        if v_y >= v_boundary then
+            v_moving_down = 0
+            v_moving_left = 1
+        endif
+    endif
+
+    if v_moving_left == 1 then
+        v_x = v_x - 1
+        if v_x <= 0 then
+            v_moving_left = 0
+            v_moving_up = 1
+        endif
+    endif
+
+    if v_moving_up == 1 then
+        v_y = v_y - 1
+        if v_y <= 0 then
+            v_moving_up = 0
+            v_moving_right = 1
+        endif
+    endif
+
+    end_frame
+    rest(0.0001)
+endwhile
+
+clear()

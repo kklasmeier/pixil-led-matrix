@@ -1,0 +1,134 @@
+# Initialize variables
+v_radius = 25
+v_center_x = 32
+v_center_y = 32
+v_phase = 0
+v_phase_step = 0.02
+
+# Pattern frequency arrays
+create_array(v_freq_x_patterns, 11)
+create_array(v_freq_y_patterns, 11)
+create_array(v_phase_offset_patterns, 11)
+
+# Define patterns
+v_freq_x_patterns[0] = 3  # Classic figure-8
+v_freq_y_patterns[0] = 2
+v_phase_offset_patterns[0] = 0
+
+v_freq_x_patterns[1] = 5  # Complex knot
+v_freq_y_patterns[1] = 4
+v_phase_offset_patterns[1] = 1.571
+
+v_freq_x_patterns[2] = 3  # Triple loop
+v_freq_y_patterns[2] = 1
+v_phase_offset_patterns[2] = 0.785
+
+v_freq_x_patterns[3] = 4  # Square variation
+v_freq_y_patterns[3] = 3
+v_phase_offset_patterns[3] = 2.356
+
+v_freq_x_patterns[4] = 5  # Star pattern
+v_freq_y_patterns[4] = 2
+v_phase_offset_patterns[4] = 1.178
+
+v_freq_x_patterns[5] = 2  # Inverted figure-8
+v_freq_y_patterns[5] = 3
+v_phase_offset_patterns[5] = 3.142
+
+v_freq_x_patterns[6] = 4  # Infinity Loop
+v_freq_y_patterns[6] = 2
+v_phase_offset_patterns[6] = 0.392  # About π/8
+
+v_freq_x_patterns[7] = 7  # Celtic knot
+v_freq_y_patterns[7] = 5
+v_phase_offset_patterns[7] = 1.178  # About π/2.67
+
+v_freq_x_patterns[8] = 6  # Butterfly
+v_freq_y_patterns[8] = 4
+v_phase_offset_patterns[8] = 0.785  # About π/4
+
+v_freq_x_patterns[9] = 3  # Diamond Ring
+v_freq_y_patterns[9] = 4
+v_phase_offset_patterns[9] = 1.963  # About 5π/8
+
+v_freq_x_patterns[10] = 5 #Flower Petals
+v_freq_y_patterns[10] = 3
+v_phase_offset_patterns[10] = 0.524  # About π/6
+
+# Current pattern tracking
+v_pattern_index = random(0, 10, 0)
+v_freq_x = v_freq_x_patterns[0]
+v_freq_y = v_freq_y_patterns[0]
+v_phase_offset = v_phase_offset_patterns[0]
+
+# Color cycling variables
+v_color_base = 0
+v_cycles_in_color = 0    # Track how many times we've cycled within one color
+v_color_delay = 0
+v_cycles_per_color = 15  # Number of cycles before changing color
+
+# Define color ranges - using 20 colors per range
+create_array(v_color_starts, 5)
+v_color_starts[0] = 0    # Blues
+v_color_starts[1] = 20   # Greens
+v_color_starts[2] = 40   # Yellows
+v_color_starts[3] = 60   # Reds
+v_color_starts[4] = 80   # Purples
+
+v_range_index = 0
+v_current_color = v_color_starts[0]
+
+v_burnout = random(0, 1, 0)
+
+#print("Starting animation")
+#print(f"Initial pattern: {v_pattern_index}")
+
+while 1 then
+    # Calculate position using current pattern parameters
+    v_x = v_center_x + v_radius * sin(v_freq_x * v_phase)
+    v_y = v_center_y + v_radius * sin(v_freq_y * v_phase + v_phase_offset)
+    
+    # Draw point
+    if v_burnout == 1 then
+        plot(v_x, v_y, v_current_color:90, 2000)
+    else
+        plot(v_x, v_y, v_current_color:90)
+    endif
+
+    # Update phase
+    v_phase = v_phase + v_phase_step
+    
+    # Update cycle count
+    v_cycles_in_color = v_cycles_in_color + 1
+    
+    # Check if it's time to change color
+    if v_cycles_in_color >= v_cycles_per_color then
+        v_cycles_in_color = 0
+        
+        # Move to next color in current range
+        v_current_color = v_current_color + 1
+        
+        # If we've reached the end of the current range
+        if v_current_color >= (v_color_starts[v_range_index] + 20) then
+            # Move to next range
+            v_range_index = v_range_index + 1
+            # If we've completed all ranges
+            if v_range_index >= 5 then
+                v_range_index = 0
+                # Change pattern
+                v_pattern_index = random(0, 10, 0)
+                v_freq_x = v_freq_x_patterns[v_pattern_index]
+                v_freq_y = v_freq_y_patterns[v_pattern_index]
+                v_phase_offset = v_phase_offset_patterns[v_pattern_index]
+                v_phase = 0
+                #print(f"New pattern: {v_pattern_index} - Freq X: {v_freq_x}, Freq Y: {v_freq_y}")
+                v_burnout = random(0, 1, 0)
+                clear()
+            endif
+            
+            # Start at beginning of new range
+            v_current_color = v_color_starts[v_range_index]
+        endif
+    endif
+    
+endwhile

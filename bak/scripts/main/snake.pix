@@ -1,0 +1,66 @@
+#Snake
+v_x = 32
+v_y = 32
+v_prev_x = 32
+v_prev_y = 32
+v_direction = 0
+v_prev_direction = 0
+
+def travel {
+    v_new_direction = random(1, 4, 0)
+    
+    # Check if new direction is reverse of previous direction
+    v_diff = v_new_direction - v_prev_direction
+    if v_diff < 0 then
+        v_diff = v_diff * -1
+    endif
+    
+    if v_diff == 2 then
+        v_new_direction = v_new_direction + 1
+        if v_new_direction > 4 then
+            v_new_direction = 1
+        endif
+    endif
+    
+    v_direction = v_new_direction
+    v_prev_direction = v_direction
+    
+    v_distance = random(1, 20, 0)
+    for v_travel in (1, v_distance, 1)
+        if v_direction == 1 then #North
+            v_y = v_y - 1
+            if v_y == -1 then
+                v_y = 63
+            endif
+        endif
+        if v_direction == 2 then #East
+            v_x = v_x + 1
+            if v_x == 64 then
+                v_x = 0
+            endif
+        endif
+        if v_direction == 3 then #South
+            v_y = v_y + 1
+            if v_y == 64 then
+                v_y = 0
+            endif
+        endif
+        if v_direction == 4 then #West
+            v_x = v_x - 1
+            if v_x == -1 then
+                v_x = 63
+            endif
+       endif
+        plot(v_prev_x, v_prev_y, white, 99, 900)
+        plot(v_prev_x, v_prev_y, white)
+        plot(v_x, v_y, red)
+        v_prev_x = v_x
+        v_prev_y = v_y
+        rest(0.009)
+        #sync_queue()
+    endfor v_travel
+}
+
+for v_iterate in (1, 10000, 1)
+    call travel
+endfor v_iterate

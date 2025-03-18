@@ -1,0 +1,18 @@
+# Test script for procedures
+
+def draw_square {
+    draw_rectangle(10, 10, 20, 20, red, true, 5)
+    draw_rectangle(15, 15, 10, 10, blue, false, 3)
+}
+
+def draw_circle {
+    draw_circle(50, 50, 15, yellow, false, 4)
+}
+
+call draw_square
+call draw_circle
+
+# Example with a loop calling a procedure
+for v_i in (1, 5, 1)
+    call draw_square
+endfor v_i

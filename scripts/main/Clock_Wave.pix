@@ -1,0 +1,140 @@
+# Clock Wave Animation
+# A clock with pulse waves for seconds
+throttle(0.7)
+# Center and radius
+v_center_x = 32
+v_center_y = 32
+v_clock_radius = 25
+v_hour_hand = 15
+v_minute_hand = 20
+v_wave_count = 14  # Number of waves to emit each minute
+
+# Create arrays for wave animation
+create_array(v_wave_radius, v_wave_count)
+create_array(v_wave_active, v_wave_count)
+create_array(v_wave_intensity, v_wave_count)
+
+# Initialize waves
+for v_i in (0, v_wave_count - 1, 1) then
+    v_wave_radius[v_i] = 0
+    v_wave_active[v_i] = 0
+    v_wave_intensity[v_i] = 0
+endfor v_i
+
+# Animation variables
+v_frame = 0
+v_second = 0
+v_minute = 0
+v_hour = 0
+v_running = 1
+v_next_wave = 0
+
+# Draw clock face
+def draw_clock_face {
+    # Draw outer circle
+    draw_circle(v_center_x, v_center_y, v_clock_radius, cyan, 60, false)
+    
+    # Draw hour markers
+    for v_i in (0, 11, 1) then
+        v_angle = v_i * 30
+        v_rad_angle = radians(v_angle)
+        
+        v_marker_x = v_center_x + cos(v_rad_angle) * v_clock_radius * 0.8
+        v_marker_y = v_center_y + sin(v_rad_angle) * v_clock_radius * 0.8
+        
+        v_outer_x = v_center_x + cos(v_rad_angle) * v_clock_radius * 0.9
+        v_outer_y = v_center_y + sin(v_rad_angle) * v_clock_radius * 0.9
+        
+        draw_line(v_marker_x, v_marker_y, v_outer_x, v_outer_y, white, 80)
+    endfor v_i
+}
+
+# Draw clock hands
+def draw_hands {
+    # Calculate angles (standard clock angles, adjusted for trigonometry)
+    v_second_angle = v_second * 6 - 90
+    v_minute_angle = v_minute * 6 + v_second * 0.1 - 90
+    v_hour_angle = v_hour * 30 + v_minute * 0.5 - 90
+    
+    # Convert to radians
+    v_second_rad = radians(v_second_angle)
+    v_minute_rad = radians(v_minute_angle)
+    v_hour_rad = radians(v_hour_angle)
+    
+    # Calculate hand endpoints
+    v_second_x = v_center_x + cos(v_second_rad) * v_clock_radius * 0.7
+    v_second_y = v_center_y + sin(v_second_rad) * v_clock_radius * 0.7
+    
+    v_minute_x = v_center_x + cos(v_minute_rad) * v_minute_hand
+    v_minute_y = v_center_y + sin(v_minute_rad) * v_minute_hand
+    
+    v_hour_x = v_center_x + cos(v_hour_rad) * v_hour_hand
+    v_hour_y = v_center_y + sin(v_hour_rad) * v_hour_hand
+    
+    # Draw hands
+    draw_line(v_center_x, v_center_y, v_hour_x, v_hour_y, cyan, 100)
+    draw_line(v_center_x, v_center_y, v_minute_x, v_minute_y, blue, 100)
+    
+    # Second hand is just a dot that moves
+    plot(v_second_x, v_second_y, magenta, 100)
+    
+    # Center dot
+    draw_circle(v_center_x, v_center_y, 2, white, 100, true)
+}
+
+# Draw wave rings
+def draw_waves {
+    for v_i in (0, v_wave_count - 1, 1) then
+        if v_wave_active[v_i] == 1 then
+            # Draw wave ring
+            draw_circle(v_center_x, v_center_y, v_wave_radius[v_i], purple, v_wave_intensity[v_i], false)
+            
+            # Update wave
+            v_wave_radius[v_i] = v_wave_radius[v_i] + 0.5
+            v_wave_intensity[v_i] = v_wave_intensity[v_i] - 1
+            
+            # Deactivate if faded out
+            if v_wave_intensity[v_i] <= 0 then
+                v_wave_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+}
+
+# Main animation loop
+while v_running == 1 then
+    begin_frame
+    
+    # Calculate time values (simulated time for the animation)
+    v_second = v_frame % 60
+    v_minute = (v_frame / 60) % 60
+    v_hour = ((v_frame / 60) / 60) % 12
+    
+    # Clear with fade effect
+    draw_rectangle(0, 0, 64, 64, black, 20, true)
+    
+    # Create new wave on each "second" (5 frames)
+    if v_frame % 5 == 0 then
+        v_wave_active[v_next_wave] = 1
+        v_wave_radius[v_next_wave] = 3
+        v_wave_intensity[v_next_wave] = 70
+        
+        v_next_wave = v_next_wave + 1
+        if v_next_wave >= v_wave_count then
+            v_next_wave = 0
+        endif
+    endif
+    
+    # Draw clock elements
+    call draw_waves
+    call draw_clock_face
+    call draw_hands
+    
+    end_frame
+    
+    # Animation control
+    v_frame = v_frame + 1
+    
+endwhile
+
+clear()

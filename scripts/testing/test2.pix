@@ -1,0 +1,37 @@
+def edge_quarter_circles {
+    for v_x in (0, 65, 1)
+        draw_circle(0, 0, v_x, white)
+        draw_circle(63, 0, v_x, white)
+        draw_circle(0, 63, v_x, white)
+        draw_circle(63, 63, v_x, white)
+        rest(.01)
+    endfor v_x
+}
+
+def disolve_in {
+    for v_x in (1, 600, 1)
+        v_plotx = random(0, 63, 0)
+        v_ploty = random(0, 63, 0)
+        plot(v_plotx, v_ploty, white, 30000)
+    endfor v_x
+}
+
+def disolve_out {
+    for v_x in (1, 300, 1)
+        v_plotx = random(0, 63, 0)
+        v_ploty = random(0, 63, 0)
+        plot(v_plotx, v_ploty, black)
+    endfor v_x
+}
+
+for v_iterate in (0, 0, 1)
+#    edge_quarter_circles
+#    rest(1)
+#    clear()
+    call disolve_in
+    rest(60)
+#    call disolve_out
+#    rest(5)
+    
+endfor v_iterate
+rest(5)

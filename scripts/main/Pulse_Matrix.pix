@@ -1,0 +1,29 @@
+v_size = 8  # 8x8 grid on 64x64 display (8 pixels per cell)
+create_array(v_pulse, 64)  # 8x8 = 64 cells
+v_color = 0
+v_pulse_count = 3  # Number of new pulses per frame
+
+# Initial clear outside of frame
+clear()
+
+# Main loop (runs forever)
+while true then
+    begin_frame(true)  # Preserve mode to layer pulses
+    # Add multiple new pulses
+    for v_p in (0, v_pulse_count - 1, 1)
+        v_origin = random(0, 63, 0)
+        v_pulse[v_origin] = 10  # Start pulse at full strength
+    endfor v_p
+    # Update and draw grid
+    for v_i in (0, 63, 1)
+        if v_pulse[v_i] > 0 then
+            v_x = (v_i % v_size) * 8  # X: 0, 8, 16, ..., 56
+            v_y = floor(v_i / v_size) * 8  # Y: 0, 8, 16, ..., 56
+            draw_rectangle(v_x, v_y, 8, 8, min(abs(remainder(v_color, 100)), 99), min(v_pulse[v_i] * 10, 100), true)
+            v_pulse[v_i] = v_pulse[v_i] - 1  # Decay pulse
+        endif
+    endfor v_i
+    end_frame
+    v_color = v_color + 1  # Smoother color step (was +10)
+    rest(0.2)
+endwhile

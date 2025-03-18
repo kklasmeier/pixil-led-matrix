@@ -1,0 +1,281 @@
+# Lantern Festival
+clear()
+
+# Draw night sky background
+begin_frame
+    # Fill with very dark blue for night sky
+    draw_rectangle(0, 0, 64, 64, navy, 10, true)
+    
+    # Add stars
+    for v_i in (0, 25, 1) then
+        v_star_x = random(0, 63, 0)
+        v_star_y = random(0, 50, 0)
+        v_brightness = random(10, 30, 0)
+        plot(v_star_x, v_star_y, white, v_brightness)
+    endfor v_i
+    
+    # Add moon
+    draw_circle(50, 12, 6, silver, 25, true)
+    draw_circle(52, 10, 2, silver, 15, true)
+    
+    # Ground silhouette - mountains in distance
+    draw_polygon(0, 64, 20, 3, black, 50, 180, true)
+    draw_polygon(32, 64, 25, 3, black, 50, 180, true)
+    draw_polygon(60, 64, 15, 3, black, 50, 180, true)
+end_frame
+
+# Define lantern sprites of different colors
+define_sprite(lantern_red, 7, 9)
+    # Lantern body
+    draw_rectangle(1, 2, 5, 5, red, 50, true)
+    # Lantern top
+    draw_line(2, 2, 1, 0, orange, 30)
+    draw_line(4, 2, 5, 0, orange, 30)
+    # Lantern bottom
+    draw_line(3, 7, 3, 8, yellow, 40)
+    # Lantern glow
+    draw_circle(3, 4, 2, yellow, 20, true)
+endsprite
+
+define_sprite(lantern_yellow, 7, 9)
+    # Lantern body
+    draw_rectangle(1, 2, 5, 5, yellow, 50, true)
+    # Lantern top
+    draw_line(2, 2, 1, 0, orange, 30)
+    draw_line(4, 2, 5, 0, orange, 30)
+    # Lantern bottom
+    draw_line(3, 7, 3, 8, orange, 40)
+    # Lantern glow
+    draw_circle(3, 4, 2, white, 20, true)
+endsprite
+
+define_sprite(lantern_orange, 7, 9)
+    # Lantern body
+    draw_rectangle(1, 2, 5, 5, orange, 50, true)
+    # Lantern top
+    draw_line(2, 2, 1, 0, red, 30)
+    draw_line(4, 2, 5, 0, red, 30)
+    # Lantern bottom
+    draw_line(3, 7, 3, 8, yellow, 40)
+    # Lantern glow
+    draw_circle(3, 4, 2, yellow, 20, true)
+endsprite
+
+define_sprite(lantern_blue, 7, 9)
+    # Lantern body
+    draw_rectangle(1, 2, 5, 5, azure, 50, true)
+    # Lantern top
+    draw_line(2, 2, 1, 0, blue, 30)
+    draw_line(4, 2, 5, 0, blue, 30)
+    # Lantern bottom
+    draw_line(3, 7, 3, 8, white, 40)
+    # Lantern glow
+    draw_circle(3, 4, 2, white, 20, true)
+endsprite
+
+define_sprite(lantern_green, 7, 9)
+    # Lantern body
+    draw_rectangle(1, 2, 5, 5, lime, 50, true)
+    # Lantern top
+    draw_line(2, 2, 1, 0, green, 30)
+    draw_line(4, 2, 5, 0, green, 30)
+    # Lantern bottom
+    draw_line(3, 7, 3, 8, yellow, 40)
+    # Lantern glow
+    draw_circle(3, 4, 2, white, 20, true)
+endsprite
+
+# Define subtle glow effect for lanterns
+define_sprite(glow, 9, 9)
+    draw_circle(4, 4, 4, yellow, 10, true)
+endsprite
+
+# Define constants
+v_num_lanterns = 6
+v_ground_level = 63
+
+# Create arrays for lantern properties
+create_array(v_lantern_x, v_num_lanterns)
+create_array(v_lantern_y, v_num_lanterns)
+create_array(v_lantern_type, v_num_lanterns)
+create_array(v_lantern_speed, v_num_lanterns)
+create_array(v_lantern_active, v_num_lanterns)
+create_array(v_lantern_wobble, v_num_lanterns)
+create_array(v_lantern_wobble_dir, v_num_lanterns)
+create_array(v_lantern_wobble_speed, v_num_lanterns)
+create_array(v_lantern_launch_time, v_num_lanterns)
+create_array(v_glow_id, v_num_lanterns)
+
+# Initialize lanterns
+v_next_launch = 0
+
+for v_i in (0, v_num_lanterns - 1, 1) then
+    # Set initial launch delay for each lantern
+    v_lantern_launch_time[v_i] = v_next_launch
+    v_next_launch = v_next_launch + random(10, 40, 0)
+    
+    # Set initial position (at ground level but off-screen)
+    v_lantern_x[v_i] = random(5, 58, 0)
+    v_lantern_y[v_i] = v_ground_level + 10
+    
+    # Randomly assign lantern type (0-4)
+    v_lantern_type[v_i] = floor(random(0, 5, 0))
+    
+    # Set rising speed (slow)
+    v_lantern_speed[v_i] = random(0.2, 0.5, 1)
+    
+    # Initialize wobble properties
+    v_lantern_wobble[v_i] = 0
+    v_lantern_wobble_dir[v_i] = random(0, 1, 0) * 2 - 1  # -1 or 1
+    v_lantern_wobble_speed[v_i] = random(0.02, 0.08, 2)
+    
+    # Set as inactive initially
+    v_lantern_active[v_i] = 0
+    
+    # Assign a unique glow ID
+    v_glow_id[v_i] = v_i + 100
+endfor v_i
+
+# Main animation loop
+v_time = 0
+v_launch_timer = 0
+v_next_lantern = 0
+v_total_launched = 0
+v_group_launch_counter = 0
+
+while true then
+    v_time = v_time + 1
+    begin_frame(true)
+    
+    # Periodically launch new lanterns
+    if v_total_launched < v_num_lanterns then
+        if v_time >= v_lantern_launch_time[v_next_lantern] then
+            # Activate the next lantern
+            v_lantern_active[v_next_lantern] = 1
+            
+            # Show appropriate lantern sprite based on type
+            if v_lantern_type[v_next_lantern] == 0 then
+                show_sprite(lantern_red, v_lantern_x[v_next_lantern], v_lantern_y[v_next_lantern], v_next_lantern)
+                show_sprite(glow, v_lantern_x[v_next_lantern] - 1, v_lantern_y[v_next_lantern] - 1, v_glow_id[v_next_lantern])
+            elseif v_lantern_type[v_next_lantern] == 1 then
+                show_sprite(lantern_yellow, v_lantern_x[v_next_lantern], v_lantern_y[v_next_lantern], v_next_lantern)
+                show_sprite(glow, v_lantern_x[v_next_lantern] - 1, v_lantern_y[v_next_lantern] - 1, v_glow_id[v_next_lantern])
+            elseif v_lantern_type[v_next_lantern] == 2 then
+                show_sprite(lantern_orange, v_lantern_x[v_next_lantern], v_lantern_y[v_next_lantern], v_next_lantern)
+                show_sprite(glow, v_lantern_x[v_next_lantern] - 1, v_lantern_y[v_next_lantern] - 1, v_glow_id[v_next_lantern])
+            elseif v_lantern_type[v_next_lantern] == 3 then
+                show_sprite(lantern_blue, v_lantern_x[v_next_lantern], v_lantern_y[v_next_lantern], v_next_lantern)
+                show_sprite(glow, v_lantern_x[v_next_lantern] - 1, v_lantern_y[v_next_lantern] - 1, v_glow_id[v_next_lantern])
+            else
+                show_sprite(lantern_green, v_lantern_x[v_next_lantern], v_lantern_y[v_next_lantern], v_next_lantern)
+                show_sprite(glow, v_lantern_x[v_next_lantern] - 1, v_lantern_y[v_next_lantern] - 1, v_glow_id[v_next_lantern])
+            endif
+            
+            v_next_lantern = v_next_lantern + 1
+            v_total_launched = v_total_launched + 1
+            
+            # Occasionally launch lanterns in groups
+            v_group_launch_counter = v_group_launch_counter + 1
+            if v_group_launch_counter >= 3 and v_next_lantern < v_num_lanterns and random(0, 100, 0) < 40 then
+                v_lantern_launch_time[v_next_lantern] = v_time + random(3, 8, 0)
+                v_group_launch_counter = 0
+            endif
+        endif
+    endif
+    
+    # Update all active lanterns
+    for v_i in (0, v_num_lanterns - 1, 1) then
+        if v_lantern_active[v_i] == 1 then
+            # Update wobble
+            v_lantern_wobble[v_i] = v_lantern_wobble[v_i] + v_lantern_wobble_speed[v_i] * v_lantern_wobble_dir[v_i]
+            
+            # Change wobble direction if it gets too large
+            if v_lantern_wobble[v_i] > 1.5 then
+                v_lantern_wobble_dir[v_i] = -1
+            elseif v_lantern_wobble[v_i] < -1.5 then
+                v_lantern_wobble_dir[v_i] = 1
+            endif
+            
+            # Randomly change wobble direction occasionally
+            if random(0, 100, 0) < 2 then
+                v_lantern_wobble_dir[v_i] = v_lantern_wobble_dir[v_i] * -1
+            endif
+            
+            # Calculate new position with wobble
+            v_lantern_y[v_i] = v_lantern_y[v_i] - v_lantern_speed[v_i]
+            v_lantern_x_wobble = v_lantern_x[v_i] + v_lantern_wobble[v_i]
+            
+            # Move the appropriate lantern sprite
+            if v_lantern_type[v_i] == 0 then
+                move_sprite(lantern_red, v_lantern_x_wobble, v_lantern_y[v_i], v_i)
+                move_sprite(glow, v_lantern_x_wobble - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+            elseif v_lantern_type[v_i] == 1 then
+                move_sprite(lantern_yellow, v_lantern_x_wobble, v_lantern_y[v_i], v_i)
+                move_sprite(glow, v_lantern_x_wobble - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+            elseif v_lantern_type[v_i] == 2 then
+                move_sprite(lantern_orange, v_lantern_x_wobble, v_lantern_y[v_i], v_i)
+                move_sprite(glow, v_lantern_x_wobble - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+            elseif v_lantern_type[v_i] == 3 then
+                move_sprite(lantern_blue, v_lantern_x_wobble, v_lantern_y[v_i], v_i)
+                move_sprite(glow, v_lantern_x_wobble - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+            else
+                move_sprite(lantern_green, v_lantern_x_wobble, v_lantern_y[v_i], v_i)
+                move_sprite(glow, v_lantern_x_wobble - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+            endif
+            
+            # Reset lantern if it goes off the top of the screen
+            if v_lantern_y[v_i] < -10 then
+                # Hide current lantern
+                if v_lantern_type[v_i] == 0 then
+                    hide_sprite(lantern_red, v_i)
+                elseif v_lantern_type[v_i] == 1 then
+                    hide_sprite(lantern_yellow, v_i)
+                elseif v_lantern_type[v_i] == 2 then
+                    hide_sprite(lantern_orange, v_i)
+                elseif v_lantern_type[v_i] == 3 then
+                    hide_sprite(lantern_blue, v_i)
+                else
+                    hide_sprite(lantern_green, v_i)
+                endif
+                
+                # Hide glow
+                hide_sprite(glow, v_glow_id[v_i])
+                
+                # Reset position
+                v_lantern_x[v_i] = random(5, 58, 0)
+                v_lantern_y[v_i] = v_ground_level + 10
+                
+                # Potentially change lantern type
+                if random(0, 100, 0) < 30 then
+                    v_lantern_type[v_i] = floor(random(0, 5, 0))
+                endif
+                
+                # Adjust speed slightly
+                v_lantern_speed[v_i] = random(0.2, 0.5, 1)
+                
+                # Reset wobble
+                v_lantern_wobble[v_i] = 0
+                
+                # Show new lantern
+                if v_lantern_type[v_i] == 0 then
+                    show_sprite(lantern_red, v_lantern_x[v_i], v_lantern_y[v_i], v_i)
+                    show_sprite(glow, v_lantern_x[v_i] - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+                elseif v_lantern_type[v_i] == 1 then
+                    show_sprite(lantern_yellow, v_lantern_x[v_i], v_lantern_y[v_i], v_i)
+                    show_sprite(glow, v_lantern_x[v_i] - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+                elseif v_lantern_type[v_i] == 2 then
+                    show_sprite(lantern_orange, v_lantern_x[v_i], v_lantern_y[v_i], v_i)
+                    show_sprite(glow, v_lantern_x[v_i] - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+                elseif v_lantern_type[v_i] == 3 then
+                    show_sprite(lantern_blue, v_lantern_x[v_i], v_lantern_y[v_i], v_i)
+                    show_sprite(glow, v_lantern_x[v_i] - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+                else
+                    show_sprite(lantern_green, v_lantern_x[v_i], v_lantern_y[v_i], v_i)
+                    show_sprite(glow, v_lantern_x[v_i] - 1, v_lantern_y[v_i] - 1, v_glow_id[v_i])
+                endif
+            endif
+        endif
+    endfor v_i
+    
+    end_frame
+endwhile

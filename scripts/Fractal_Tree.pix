@@ -1,0 +1,170 @@
+# Fractal Tree Animation
+# A color-cycling recursive tree with animated wind effects
+
+# Parameters
+v_origin_x = 32
+v_origin_y = 63
+v_time = 0
+v_wind_strength = 0
+v_wind_dir = 1
+v_max_depth = 7  # Maximum recursion depth
+
+# Color cycle array
+create_array(v_colors, 7, string)
+v_colors[0] = "green"
+v_colors[1] = "lime"
+v_colors[2] = "spring_green"
+v_colors[3] = "turquoise"
+v_colors[4] = "cyan"
+v_colors[5] = "azure"
+v_colors[6] = "blue"
+
+# Store positions for branch ends to optionally add effects later
+create_array(v_end_x, 100)
+create_array(v_end_y, 100)
+v_end_count = 0
+
+# Draw branch procedure
+def draw_branch {
+    # Takes: x1, y1, angle, length, depth
+    # Current parameters in variables:
+    # v_x1, v_y1, v_angle, v_length, v_depth
+    
+    # Calculate end point
+    v_rad_angle = radians(v_angle)
+    v_x2 = v_x1 + cos(v_rad_angle) * v_length
+    v_y2 = v_y1 + sin(v_rad_angle) * v_length
+    
+    # Determine color based on depth
+    v_color_index = v_depth % 7
+    v_color = v_colors[v_color_index]
+    
+    # Calculate thickness based on depth (thinner as we go deeper)
+    v_thickness = (v_max_depth - v_depth) * 0.5
+    if v_thickness < 1 then
+        v_thickness = 1
+    endif
+    
+    # Draw line for this branch
+    if v_thickness <= 1 then
+        draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
+    else
+        # For thicker branches, draw multiple lines
+        for v_t in (0, v_thickness - 1, 1) then
+            v_offset = v_t - (v_thickness / 2)
+            v_perp_angle = v_angle + 90
+            v_perp_rad = radians(v_perp_angle)
+            
+            v_offset_x = cos(v_perp_rad) * v_offset
+            v_offset_y = sin(v_perp_rad) * v_offset
+            
+            draw_line(v_x1 + v_offset_x, v_y1 + v_offset_y, 
+                     v_x2 + v_offset_x, v_y2 + v_offset_y, 
+                     v_color, 100)
+        endfor v_t
+    endif
+    
+    # Store end points if this is a leaf (maximum depth)
+    if v_depth == v_max_depth then
+        v_end_x[v_end_count] = v_x2
+        v_end_y[v_end_count] = v_y2
+        v_end_count = v_end_count + 1
+        
+        # Reset counter if we reach array limit
+        if v_end_count >= 100 then
+            v_end_count = 0
+        endif
+    endif
+    
+    # Recursively draw branches if not at max depth
+    if v_depth < v_max_depth then
+        # Save current parameters
+        v_old_x1 = v_x1
+        v_old_y1 = v_y1
+        v_old_angle = v_angle
+        v_old_length = v_length
+        v_old_depth = v_depth
+        
+        # Update parameters for left branch
+        v_x1 = v_x2
+        v_y1 = v_y2
+        v_angle = v_angle - (30 + v_wind_strength)
+        v_length = v_length * 0.75
+        v_depth = v_depth + 1
+        
+        # Draw left branch
+        call draw_branch
+        
+        # Update parameters for right branch
+        v_x1 = v_old_x1
+        v_y1 = v_old_y1
+        v_x1 = v_x2
+        v_y1 = v_y2
+        v_angle = v_old_angle + (30 - v_wind_strength)
+        v_length = v_length * 0.75
+        
+        # Draw right branch
+        call draw_branch
+        
+        # Restore original parameters
+        v_x1 = v_old_x1
+        v_y1 = v_old_y1
+        v_angle = v_old_angle
+        v_length = v_old_length
+        v_depth = v_old_depth
+    endif
+}
+
+# Main animation loop
+v_running = 1
+v_frame = 0
+
+while v_running == 1 then
+    begin_frame
+    
+    # Clear screen
+    clear()
+    
+    # Update wind parameters
+    v_wind_strength = sin(v_time * 0.3) * 10
+    
+    # Draw ground
+    draw_line(0, 63, 63, 63, brown, 100)
+    
+    # Start the recursive tree drawing
+    v_x1 = v_origin_x
+    v_y1 = v_origin_y
+    v_angle = -90  # Straight up
+    v_length = 18
+    v_depth = 0
+    v_end_count = 0
+    
+    call draw_branch
+    
+    # Add some particle effects at leaf ends
+    for v_i in (0, v_end_count - 1, 1) then
+        if random(0, 100, 0) < 30 then
+            v_particle_color = v_colors[random(0, 6, 0)]
+            v_particle_size = random(1, 2, 0)
+            v_particle_intensity = random(50, 90, 0)
+            
+            draw_circle(v_end_x[v_i], v_end_y[v_i], v_particle_size, 
+                       v_particle_color, v_particle_intensity, true, 500)
+        endif
+    endfor v_i
+    
+    end_frame
+    
+    # Update time
+    v_time = v_time + 0.05
+    
+    # Animation control
+    v_frame = v_frame + 1
+    if v_frame > 1000 then
+        v_running = 0
+    endif
+    
+    throttle(0.8)
+endwhile
+
+clear()

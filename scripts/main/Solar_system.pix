@@ -1,0 +1,201 @@
+# Solar System Animation with Multiple Views
+# Uses Mercury's revolutions to time state changes
+
+# Revolution settings for each state
+v_revolutions_state0 = 2000  # How many Mercury orbits for top view
+v_revolutions_state1 = 1200  # How many for perspective with rings
+v_revolutions_state2 = 3500  # How many for perspective without rings
+
+# Revolution tracking
+v_mercury_revolutions = 0
+v_last_angle = 0
+
+# Initialize variables for sun
+v_sun_x = 32
+v_sun_y = 32
+v_sun_pulse = 50
+v_sun_pulse_dir = 1
+
+# View angle control
+v_view_angle = 0
+v_angle_direction = 1
+v_angle_speed = 0.02
+
+# Current state (0 = top view, 1 = perspective with rings, 2 = perspective without rings)
+v_current_state = 0
+
+# Create arrays for planet properties
+create_array(v_planet_x, 4)
+create_array(v_planet_y, 4)
+create_array(v_orbit_radius, 4)
+create_array(v_speed, 4)
+create_array(v_angle, 4)
+create_array(v_size, 4)
+create_array(v_colors, 4, string)
+create_array(v_brightness, 4)
+
+# Set up planet properties
+# Mercury
+v_orbit_radius[0] = 10
+v_speed[0] = 0.105
+v_size[0] = 1
+v_colors[0] = "gray"
+v_angle[0] = 0
+
+# Venus
+v_orbit_radius[1] = 15
+v_speed[1] = 0.077
+v_size[1] = 2
+v_colors[1] = "yellow"
+v_angle[1] = 45
+
+# Earth
+v_orbit_radius[2] = 21
+v_speed[2] = 0.056
+v_size[2] = 2
+v_colors[2] = "blue"
+v_angle[2] = 90
+
+# Mars
+v_orbit_radius[3] = 27
+v_speed[3] = 0.035
+v_size[3] = 1
+v_colors[3] = "red"
+v_angle[3] = 135
+
+# Define procedure for drawing orbits in top view (State 0)
+def draw_top_orbits {
+    for v_i in (0, 3, 1) then
+        draw_circle(v_sun_x, v_sun_y, v_orbit_radius[v_i], white, 8, false)
+    endfor v_i
+}
+
+# Define procedure for drawing perspective orbits with plots (State 1)
+def draw_perspective_orbits_with_plots {
+    for v_i in (0, 3, 1) then
+        v_orbit_y_radius = v_orbit_radius[v_i] * v_perspective
+        
+        for v_orbit_angle in (0, 359, 10) then
+            v_orbit_x = v_sun_x + (cos(v_orbit_angle) * v_orbit_radius[v_i])
+            v_orbit_y = v_sun_y + (sin(v_orbit_angle) * v_orbit_y_radius)
+            plot(v_orbit_x, v_orbit_y, white, 8)
+        endfor v_orbit_angle
+    endfor v_i
+}
+
+# Define procedure for drawing planets
+def draw_planets {
+    for v_i in (0, 3, 1) then
+        # Store previous angle for Mercury
+        if v_i == 0 then
+            v_prev_angle = v_angle[0]
+        endif
+        
+        # Update orbital position
+        v_angle[v_i] = v_angle[v_i] + v_speed[v_i]
+        if v_angle[v_i] >= 360 then
+            v_angle[v_i] = v_angle[v_i] - 360
+        endif
+        
+        # Check for Mercury crossing 0 degrees (completing a revolution)
+        # OPTIMIZED: Using compound condition instead of nested if
+        if v_i == 0 and v_prev_angle > 270 and v_angle[0] < 90 then
+            v_mercury_revolutions = v_mercury_revolutions + 1
+            #print(f"Mercury completed revolution {v_mercury_revolutions}")
+        endif
+        
+        if v_current_state == 0 then
+            # Top view
+            v_planet_x[v_i] = v_sun_x + (cos(v_angle[v_i]) * v_orbit_radius[v_i])
+            v_planet_y[v_i] = v_sun_y + (sin(v_angle[v_i]) * v_orbit_radius[v_i])
+            v_brightness[v_i] = 80
+        else
+            # Perspective views (States 1 and 2)
+            v_orbit_y_radius = v_orbit_radius[v_i] * v_perspective
+            v_planet_x[v_i] = v_sun_x + (cos(v_angle[v_i]) * v_orbit_radius[v_i])
+            v_planet_y[v_i] = v_sun_y + (sin(v_angle[v_i]) * v_orbit_y_radius)
+            
+            # Calculate brightness based on position in orbit
+            v_depth = sin(v_angle[v_i])
+            v_brightness[v_i] = 50 + (v_depth * 30)
+        endif
+        
+        draw_circle(v_planet_x[v_i], v_planet_y[v_i], v_size[v_i], v_colors[v_i], v_brightness[v_i], true)
+    endfor v_i
+}
+
+# Define procedure for drawing a frame
+def draw_system {
+    begin_frame
+    
+    # Check for state changes based on Mercury revolutions
+    # OPTIMIZED: Using compound conditions for state changes
+    if v_current_state == 0 and v_mercury_revolutions >= v_revolutions_state0 then
+        v_current_state = 1
+        v_mercury_revolutions = 0
+        print("Switching to perspective with rings")
+    elseif v_current_state == 1 and v_mercury_revolutions >= v_revolutions_state1 then
+        v_current_state = 2
+        v_mercury_revolutions = 0
+        print("Switching to perspective without rings")
+    elseif v_current_state == 2 and v_mercury_revolutions >= v_revolutions_state2 then
+        v_current_state = 0
+        v_mercury_revolutions = 0
+        print("Switching to top view")
+    endif
+    
+    # Update perspective for states 1 and 2
+    if v_current_state > 0 then
+        v_view_angle = v_view_angle + (v_angle_direction * v_angle_speed)
+        
+        # OPTIMIZED: Using compound conditions for angle control
+        if v_view_angle > 80 and v_angle_direction == 1 then
+            v_view_angle = 80
+            v_angle_direction = -1
+        endif
+        
+        if v_view_angle < 0 and v_angle_direction == -1 then
+            v_view_angle = 0
+            v_angle_direction = 1
+        endif
+        
+        v_perspective = cos(v_view_angle)
+    endif
+    
+    # Draw sun with pulsing effect
+    v_sun_pulse = v_sun_pulse + (v_sun_pulse_dir * 0.14)
+    
+    # OPTIMIZED: Using compound conditions for pulse control
+    if v_sun_pulse > 95 and v_sun_pulse_dir == 1 then
+        v_sun_pulse = 95
+        v_sun_pulse_dir = -1
+    endif
+    
+    if v_sun_pulse < 40 and v_sun_pulse_dir == -1 then
+        v_sun_pulse = 40
+        v_sun_pulse_dir = 1
+    endif
+    
+    draw_circle(v_sun_x, v_sun_y, 4, yellow, v_sun_pulse, true)
+    
+    # Draw orbits based on current state
+    if v_current_state == 0 then
+        call draw_top_orbits
+    elseif v_current_state == 1 then
+        call draw_perspective_orbits_with_plots
+    endif
+    
+    # Draw planets
+    call draw_planets
+    
+    end_frame
+}
+
+# Set animation speed
+throttle(1.0)
+
+# Main animation loop
+while 1 then
+    call draw_system
+    rest(0.01)
+endwhile

@@ -1,0 +1,270 @@
+throttle(1)
+
+# Common variables
+v_start_x = 32
+v_start_y = 63
+v_wind = 0
+v_wind_step = 0.1  # Increased wind speed
+v_time = 0        # For animation effects
+
+# Color definitions
+v_trunk_brown = "dark_brown"
+v_dark_green = "dark_brown"  # Note: This seems like a typo; should it be "dark_green"?
+v_light_green = "green"
+v_leaf_green = "lime"
+v_cherry_pink = "pink"
+v_pine_green = "forest_green"
+
+# Tree timing control
+v_tree_cycles = 30
+v_current_cycles = 0
+v_current_tree = 0
+v_num_trees = 6
+
+def draw_fractal_tree {
+    v_length = 20
+    v_length_factor = 0.68
+    v_angle_spread = 18 + sin(v_time) * 5
+    
+    # Draw trunk with sway
+    v_trunk_sway = cos(v_time * 2) * 2
+    draw_line(v_start_x, v_start_y, v_start_x + v_trunk_sway, v_start_y - 20, v_trunk_brown, 95)  # Updated
+    v_trunk_top_y = v_start_y - 20
+    
+    # Level 1 branches
+    v_wind_effect = sin(v_time * 3) * 4
+    v_left_x = v_start_x - 10 + v_wind_effect
+    v_right_x = v_start_x + 10 + v_wind_effect
+    
+    draw_line(v_start_x + v_trunk_sway, v_trunk_top_y, v_left_x, v_trunk_top_y - 10, v_dark_green, 90)  # Updated
+    draw_line(v_start_x + v_trunk_sway, v_trunk_top_y, v_right_x, v_trunk_top_y - 10, v_dark_green, 90)  # Updated
+    
+    # Level 2 branches
+    v_wind_effect2 = sin(v_time * 4) * 6
+    draw_line(v_left_x, v_trunk_top_y - 10, v_left_x - 5 + v_wind_effect2, v_trunk_top_y - 18, v_light_green, 90)  # Updated
+    draw_line(v_left_x, v_trunk_top_y - 10, v_left_x + 5 + v_wind_effect2, v_trunk_top_y - 18, v_light_green, 90)  # Updated
+    draw_line(v_right_x, v_trunk_top_y - 10, v_right_x - 5 + v_wind_effect2, v_trunk_top_y - 18, v_light_green, 90)  # Updated
+    draw_line(v_right_x, v_trunk_top_y - 10, v_right_x + 5 + v_wind_effect2, v_trunk_top_y - 18, v_light_green, 90)  # Updated
+    
+    # Animated leaves
+    v_leaf_intensity = 80 + sin(v_time * 5) * 15
+    plot(v_left_x - 5 + v_wind_effect2, v_trunk_top_y - 18, v_leaf_green, v_leaf_intensity)  # Updated
+    plot(v_left_x + 5 + v_wind_effect2, v_trunk_top_y - 18, v_leaf_green, v_leaf_intensity)  # Updated
+    plot(v_right_x - 5 + v_wind_effect2, v_trunk_top_y - 18, v_leaf_green, v_leaf_intensity)  # Updated
+    plot(v_right_x + 5 + v_wind_effect2, v_trunk_top_y - 18, v_leaf_green, v_leaf_intensity)  # Updated
+}
+
+def draw_willow_tree {
+    v_trunk_height = 30
+    v_trunk_sway = cos(v_time * 2) * 2
+    
+    draw_line(v_start_x, v_start_y, v_start_x + v_trunk_sway, v_start_y - v_trunk_height, v_trunk_brown, 95)  # Updated
+    
+    for v_branch in (0, 8, 1) then
+        v_branch_sway = sin(v_time * 3 + v_branch) * 3
+        v_branch_start_x = v_start_x + v_trunk_sway + (v_branch - 4) * 2
+        v_branch_start_y = v_start_y - v_trunk_height + (v_branch * 2)
+        
+        for v_droop in (0, 12, 1) then
+            v_droop_sway = cos(v_time * 3 + v_droop) * 2
+            v_droop_x = v_branch_start_x + v_branch_sway + (v_droop * 2 * (v_branch - 4) / 4) + v_droop_sway
+            v_droop_y = v_branch_start_y + (v_droop * v_droop / 4)
+            if v_droop_y < v_start_y then
+                v_intensity = 85 + sin(v_time * 4 + v_droop) * 10
+                plot(v_droop_x, v_droop_y, v_light_green, v_intensity)  # Updated
+            endif
+        endfor v_droop
+    endfor v_branch
+}
+
+def draw_pine_tree {
+    v_height = 35
+    v_width = 15
+    
+    v_trunk_sway = cos(v_time * 2) * 2
+    draw_line(v_start_x, v_start_y, v_start_x + v_trunk_sway, v_start_y - v_height, v_trunk_brown, 95)  # Updated
+    
+    for v_row in (0, v_height, 2) then
+        v_row_sway = sin(v_time * 3 + v_row/10) * (v_height - v_row)/5
+        v_width_at_row = (v_width * (v_height - v_row)) / v_height
+        v_y_pos = v_start_y - v_row
+        v_intensity = 85 + cos(v_time * 4 + v_row/5) * 10
+        draw_line(v_start_x + v_trunk_sway + v_row_sway - v_width_at_row, v_y_pos, v_start_x + v_trunk_sway + v_row_sway + v_width_at_row, v_y_pos, v_pine_green, v_intensity)  # Updated
+    endfor v_row
+}
+
+def draw_palm_tree {
+    v_trunk_height = 35
+    
+    for v_h in (0, v_trunk_height, 1) then
+        v_trunk_sway = sin(v_time * 2) * (v_h/v_trunk_height) * 4
+        v_curve = sin(v_h / 10) * 3 + v_trunk_sway
+        plot(v_start_x + v_curve, v_start_y - v_h, v_trunk_brown, 95)  # Updated
+    endfor v_h
+    
+    v_leaf_angle_offset = sin(v_time * 3) * 30
+    for v_angle in (0, 360, 30) then
+        v_rad = (v_angle + v_leaf_angle_offset) * pi / 180
+        for v_len in (0, 12, 1) then
+            v_leaf_sway = cos(v_time * 4 + v_angle/30) * (v_len/4)
+            v_leaf_x = v_start_x + sin(v_trunk_height / 10) * 3 + cos(v_rad) * v_len + v_leaf_sway
+            v_leaf_y = v_start_y - v_trunk_height - sin(abs(v_rad - pi)) * v_len
+            v_intensity = 85 + sin(v_time * 5 + v_len/2) * 10
+            plot(v_leaf_x, v_leaf_y, v_leaf_green, v_intensity)  # Updated
+        endfor v_len
+    endfor v_angle
+}
+
+def draw_cherry_tree {
+    v_trunk_height = 25
+    v_trunk_sway = cos(v_time * 2) * 2
+    
+    draw_line(v_start_x, v_start_y, v_start_x + v_trunk_sway, v_start_y - v_trunk_height, v_trunk_brown, 95)  # Updated
+    
+    for v_branch in (0, 6, 1) then
+        v_branch_sway = sin(v_time * 3 + v_branch) * 3
+        v_angle = (v_branch * 60 - 150) * pi / 180
+        v_length = 12
+        
+        v_end_x = v_start_x + v_trunk_sway + cos(v_angle) * v_length + v_branch_sway
+        v_end_y = v_start_y - v_trunk_height + sin(v_angle) * v_length
+        
+        if v_end_y < v_start_y then
+            draw_line(v_start_x + v_trunk_sway, v_start_y - v_trunk_height, v_end_x, v_end_y, v_trunk_brown, 90)  # Updated
+            
+            for v_cluster in (0, 5, 1) then
+                v_blossom_sway = cos(v_time * 4 + v_cluster) * 2
+                v_blossom_x = v_end_x + random(-3, 3, 0) + v_blossom_sway
+                v_blossom_y = v_end_y + random(-3, 3, 0)
+                if v_blossom_y < v_start_y then
+                    v_intensity = 85 + sin(v_time * 5 + v_cluster) * 10
+                    plot(v_blossom_x, v_blossom_y, v_cherry_pink, v_intensity)  # Updated
+                endif
+            endfor v_cluster
+        endif
+    endfor v_branch
+}
+
+def draw_maple_tree {
+    # Taller trunk
+    v_trunk_height = 25
+    v_trunk_sway = cos(v_time * 2) * 2
+    
+    # Main trunk
+    draw_line(v_start_x, v_start_y, v_start_x + v_trunk_sway, v_start_y - v_trunk_height, v_trunk_brown, 95)  # Updated
+    
+    # Draw main branches (fewer, more natural angles)
+    for v_branch in (0, 4, 1) then
+        v_branch_sway = sin(v_time * 2 + v_branch) * 2
+        
+        # Vary angles for main branches
+        if v_branch == 0 then
+            v_angle = -135 * pi / 180  # Left branch
+        elseif v_branch == 1 then
+            v_angle = -45 * pi / 180   # Right branch
+        elseif v_branch == 2 then
+            v_angle = -100 * pi / 180  # Left-middle
+        else
+            v_angle = -80 * pi / 180   # Right-middle
+        endif
+        
+        v_length = 15  # Longer main branches
+        
+        # Main branch endpoints
+        v_end_x = v_start_x + v_trunk_sway + cos(v_angle) * v_length + v_branch_sway
+        v_end_y = v_start_y - v_trunk_height + sin(v_angle) * v_length
+        
+        if v_end_y < v_start_y then
+            # Draw main branch
+            draw_line(v_start_x + v_trunk_sway, v_start_y - v_trunk_height, v_end_x, v_end_y, v_trunk_brown, 90)  # Updated
+            
+            # Secondary branches from each main branch
+            for v_sub_branch in (0, 3, 1) then
+                v_sub_angle = v_angle + (v_sub_branch - 1) * pi / 6 + random(-20, 20, 0) * pi / 180
+                v_sub_length = 8 + random(-2, 2, 0)
+                v_sub_sway = sin(v_time * 2.5 + v_sub_branch) * 1.5
+                
+                v_sub_x = v_end_x + cos(v_sub_angle) * v_sub_length + v_sub_sway
+                v_sub_y = v_end_y + sin(v_sub_angle) * v_sub_length
+                
+                if v_sub_y < v_start_y then
+                    # Draw secondary branch
+                    draw_line(v_end_x, v_end_y, v_sub_x, v_sub_y, v_trunk_brown, 85)  # Updated
+                    
+                    # Leaf clusters on secondary branches
+                    for v_leaf in (0, 8, 1) then
+                        v_leaf_sway = cos(v_time * 3 + v_leaf) * 1.5
+                        v_leaf_spread = random(-40, 40, 0) * pi / 180
+                        v_leaf_dist = random(2, 4, 0)
+                        
+                        v_leaf_x = v_sub_x + cos(v_sub_angle + v_leaf_spread) * v_leaf_dist + v_leaf_sway
+                        v_leaf_y = v_sub_y + sin(v_sub_angle + v_leaf_spread) * v_leaf_dist
+                        
+                        if v_leaf_y < v_start_y then
+                            v_intensity = 85 + sin(v_time * 4 + v_leaf) * 10
+                            plot(v_leaf_x, v_leaf_y, v_leaf_green, v_intensity)  # Updated
+                        endif
+                    endfor v_leaf
+                endif
+            endfor v_sub_branch
+        endif
+    endfor v_branch
+}
+
+# Main loop
+while 1 then
+    if v_current_cycles == 0 then
+        if v_current_tree == 0 then
+            print("Drawing Fractal Tree for 30 seconds")
+        elseif v_current_tree == 1 then
+            print("Drawing Weeping Willow for 30 seconds")
+        elseif v_current_tree == 2 then
+            print("Drawing Pine Tree for 30 seconds")
+        elseif v_current_tree == 3 then
+            print("Drawing Palm Tree for 30 seconds")
+        elseif v_current_tree == 4 then
+            print("Drawing Cherry Tree for 30 seconds")
+        else
+            print("Drawing Maple Tree for 30 seconds")
+        endif
+    endif
+
+    begin_frame
+    
+    if v_current_tree == 0 then
+        call draw_fractal_tree
+    elseif v_current_tree == 1 then
+        call draw_willow_tree
+    elseif v_current_tree == 2 then
+        call draw_pine_tree
+    elseif v_current_tree == 3 then
+        call draw_palm_tree
+    elseif v_current_tree == 4 then
+        call draw_cherry_tree
+    else
+        call draw_maple_tree
+    endif
+    
+    # Update animation time
+    v_time = v_time + 0.1
+    
+    # Update wind
+    v_wind = v_wind + v_wind_step
+    if v_wind > 8 then
+        v_wind_step = -0.1
+    endif
+    if v_wind < -8 then
+        v_wind_step = 0.1
+    endif
+    
+    end_frame
+    
+    v_current_cycles = v_current_cycles + 1
+    if v_current_cycles >= v_tree_cycles then
+        v_current_cycles = 0
+        v_current_tree = v_current_tree + 1
+        if v_current_tree >= v_num_trees then
+            v_current_tree = 0
+        endif
+    endif
+endwhile

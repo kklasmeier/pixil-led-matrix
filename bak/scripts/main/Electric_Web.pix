@@ -1,0 +1,144 @@
+# Electric Web with periodic screen refresh
+# Node count configuration
+v_max_nodes = 6
+v_array_size = v_max_nodes
+v_last_index = v_max_nodes - 1
+
+# Timing and frequency controls
+v_spawn_chance = 20    # Chance (0-100) of spawning new node each cycle
+v_life_min = 10       # Minimum node lifetime
+v_life_max = 40       # Maximum node lifetime
+v_pulse_interval = 80 # Pulse every N iterations
+v_cleanup_interval = 4  # How often to refresh screen (higher = less frequent cleanup)
+v_iteration = 0       # Counter for tracking iterations
+v_last_pulse = 0      # Track when we last pulsed
+
+# Initialize arrays for node tracking
+create_array(v_node_x, v_array_size)
+create_array(v_node_y, v_array_size)
+create_array(v_node_active, v_array_size)
+create_array(v_node_life, v_array_size)
+
+# Color settings
+v_base_color = 45  # Blue base
+v_pulse_color = 51  # Brighter blue for pulses
+v_spark_color = "white"  # Bright white for new nodes
+v_connector_color = "red"  # Red for connection points
+
+# Initialize variables
+v_min_distance = 15
+v_max_distance = 50
+v_connector_radius = 2
+
+# Initialize all nodes as inactive
+for v_i in (0, v_last_index, 1) then
+    v_node_active[v_i] = 0
+    v_node_life[v_i] = 0
+endfor v_i
+
+# Main animation loop
+while true then
+    # Update iteration counter
+    v_iteration = v_iteration + 1
+    
+    # Calculate time for pulse
+    v_should_pulse = 0
+    if v_iteration >= v_last_pulse + v_pulse_interval then
+        v_should_pulse = 1
+        v_last_pulse = v_iteration
+    endif
+    
+    # Check if we need to do a screen refresh
+    if v_iteration % v_cleanup_interval == 0 then
+        clear()
+    endif
+    
+    # Reset counter if it gets too large
+    if v_iteration >= 1000000 then
+        v_iteration = 0
+        v_last_pulse = 0
+    endif
+    
+    # Draw connections between active nodes
+    begin_frame
+    
+    # First, handle nodes that are dying
+    for v_i in (0, v_last_index, 1) then
+        if v_node_active[v_i] == 1 then
+            v_node_life[v_i] = v_node_life[v_i] - 1
+            if v_node_life[v_i] <= 0 then
+                # Erase all connections for this dying node
+                for v_j in (0, v_last_index, 1) then
+                    if v_node_active[v_j] == 1 then
+                        if v_i != v_j then
+                            v_dx = v_node_x[v_i] - v_node_x[v_j]
+                            v_dy = v_node_y[v_i] - v_node_y[v_j]
+                            v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                            if v_dist < v_max_distance then
+                                if v_dist > v_min_distance then
+                                    # Erase old connection
+                                    draw_line(v_node_x[v_i], v_node_y[v_i], v_node_x[v_j], v_node_y[v_j], 0:0)
+                                    # Erase connector circles
+                                    draw_circle(v_node_x[v_i], v_node_y[v_i], v_connector_radius, 0:0, true)
+                                    draw_circle(v_node_x[v_j], v_node_y[v_j], v_connector_radius, 0:0, true)
+                                endif
+                            endif
+                        endif
+                    endif
+                endfor v_j
+                v_node_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    
+    # Add new nodes
+    for v_i in (0, v_last_index, 1) then
+        if v_node_active[v_i] == 0 then
+            v_random = random(0, 100, 0)
+            if v_random < v_spawn_chance then
+                v_node_active[v_i] = 1
+                v_node_x[v_i] = random(5, 58, 0)
+                v_node_y[v_i] = random(5, 58, 0)
+                v_node_life[v_i] = random(v_life_min, v_life_max, 0)
+                plot(v_node_x[v_i], v_node_y[v_i], v_spark_color, 200)
+            endif
+        endif
+    endfor v_i
+    
+    # Draw/update all active connections
+    for v_i in (0, v_last_index, 1) then
+        if v_node_active[v_i] == 1 then
+            for v_j in (0, v_last_index, 1) then
+                if v_node_active[v_j] == 1 then
+                    if v_i != v_j then
+                        v_dx = v_node_x[v_i] - v_node_x[v_j]
+                        v_dy = v_node_y[v_i] - v_node_y[v_j]
+                        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        
+                        if v_dist < v_max_distance then
+                            if v_dist > v_min_distance then
+                                # Draw base connection (no burnout)
+                                v_intensity = random(40, 80, 0)
+                                draw_line(v_node_x[v_i], v_node_y[v_i], v_node_x[v_j], v_node_y[v_j], {v_base_color}:{v_intensity})
+                                draw_circle(v_node_x[v_i], v_node_y[v_i], v_connector_radius, v_connector_color, true)
+                                draw_circle(v_node_x[v_j], v_node_y[v_j], v_connector_radius, v_connector_color, true)
+                                
+                                # Add pulse effect with burnout
+                                if v_should_pulse == 1 then
+                                    draw_line(v_node_x[v_i], v_node_y[v_i], v_node_x[v_j], v_node_y[v_j], {v_pulse_color}:90, 75)
+                                endif
+                            endif
+                        endif
+                    endif
+                endif
+            endfor v_j
+            
+            # Draw active node
+            v_intensity = random(60, 90, 0)
+            plot(v_node_x[v_i], v_node_y[v_i], {v_base_color}:{v_intensity})
+        endif
+    endfor v_i
+    end_frame
+endwhile
+
+clear()

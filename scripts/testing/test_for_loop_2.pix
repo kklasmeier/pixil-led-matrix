@@ -1,0 +1,38 @@
+def draw_loop {
+    # Test script for loop permutations
+    # Set up some variables
+    v_start = 1
+    v_mid = 5
+    v_end = 10
+    v_step = 2
+    
+    print("This is a regular string!")
+    print("This has variables. v_start = {v_start} v_mid={v_mid} v_end={v_end} v_step = {v_step}.")
+    # Test 1: All literals
+    clear()
+    for v_i in (1, 10, 1)
+        plot(v_i, 1, red)
+        rest(.2)
+    endfor v_i
+    rest(1)
+    # Test 2: Variable start
+    clear()
+    for v_i in (v_start, 10, 1)
+        plot(v_i, 2, green)
+    endfor v_i
+    rest(1)
+    # Test 3: Variable end
+    clear()
+    for v_i in (1, v_end, 1)
+        plot(v_i, 3, blue)
+    endfor v_i
+    rest(1)
+    # Test 4: Variable step
+    clear()
+    for v_i in (1, 10, v_step)
+        plot(v_i, 4, yellow)
+    endfor v_i
+    rest(1)
+}
+
+call draw_loop

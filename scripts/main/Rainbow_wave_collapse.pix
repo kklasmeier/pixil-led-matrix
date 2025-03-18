@@ -1,0 +1,83 @@
+# Define constants and array for rainbow colors
+v_size = 8                # Size of each square (8x8 fits 64x64 grid)
+v_colors = 6              # Number of rainbow colors
+v_i = 0
+create_array(v_color_list, v_colors, string)  # Array to store colors
+v_color_list[0] = "red"
+v_color_list[1] = "orange"
+v_color_list[2] = "yellow"
+v_color_list[3] = "green"
+v_color_list[4] = "blue"
+v_color_list[5] = "purple"
+
+# Initial target point for collapse
+v_target_x = 32           # Start at center, will randomize later
+v_target_y = 32
+
+# Procedure to draw the grid
+def draw_grid {
+    v_min_x = v_target_x - (32 - v_step)
+    v_max_x = v_target_x + (32 - v_step)
+    v_min_y = v_target_y - (32 - v_step)
+    v_max_y = v_target_y + (32 - v_step)
+    
+    v_min_x = max(0, v_min_x)
+    v_max_x = min(63, v_max_x)
+    v_min_y = max(0, v_min_y)
+    v_max_y = min(63, v_max_y)
+    
+    for v_x in (v_min_x, v_max_x, v_size) then
+        for v_y in (v_min_y, v_max_y, v_size) then
+            v_color_idx = (v_step + v_x + v_y) % v_colors
+            draw_rectangle(v_x, v_y, v_size, v_size, v_color_list[v_color_idx], 75, true)  # No burnout
+        endfor v_y
+    endfor v_x
+}
+
+# Procedure to rotate colors (fixed with explicit steps)
+def rotate_colors {
+    # Store all values in temp variables first
+    v_temp0 = v_color_list[0]
+    v_temp1 = v_color_list[1]
+    v_temp2 = v_color_list[2]
+    v_temp3 = v_color_list[3]
+    v_temp4 = v_color_list[4]
+    v_temp5 = v_color_list[5]
+    
+    # Reassign explicitly
+    v_color_list[0] = v_temp1
+    v_color_list[1] = v_temp2
+    v_color_list[2] = v_temp3
+    v_color_list[3] = v_temp4
+    v_color_list[4] = v_temp5
+    v_color_list[5] = v_temp0
+}
+
+# Infinite loop for collapse and expand with color shift
+v_step = 0                # Starting step
+v_direction = 1           # 1 for collapse, -1 for expand
+while true then
+    begin_frame           # Fresh frame each iteration
+        call draw_grid    # Draw the current grid state
+    end_frame             # Display it
+    rest(0.05)            # Animation speed (20 FPS)
+
+    # Update step and direction
+    v_step = v_step + v_direction
+    
+    # Debug: Check array state before rotation
+    if v_step % 3 == 0 then
+        #print(f"Before rotate: {v_color_list[1]}")
+        call rotate_colors
+        #print(f"After rotate: {v_color_list[1]}")
+    endif
+    
+    if v_step >= 32 then  # Reached collapse point, switch to expand
+        v_direction = -1
+    endif
+    if v_step <= 0 then   # Reached edges, switch to collapse and pick new target
+        v_direction = 1
+        v_target_x = random(16, 48, 0)  # New random x target
+        v_target_y = random(16, 48, 0)  # New random y target
+    endif
+endwhile

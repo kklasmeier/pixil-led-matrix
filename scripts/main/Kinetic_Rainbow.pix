@@ -1,0 +1,17 @@
+throttle(.01)
+# Initialize variables
+v_offset = 0
+v_time = 0
+
+while true then
+    begin_frame
+    # Amplitude oscillates between 0 (flat) and 20 (full wave)
+    v_amplitude = 20 * abs(sin(v_time * 0.01))
+    for v_x in (0, 64, 1)
+        v_y = 32 + sin(v_x * 0.1 + v_offset) * v_amplitude
+        draw_line(v_x, v_y - 5, v_x, v_y + 5, v_x % 100, 100)
+    endfor v_x
+    end_frame
+    v_offset = v_offset + 0.1  # Wave movement
+    v_time = v_time + 1        # Time counter for amplitude
+endwhile

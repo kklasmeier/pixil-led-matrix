@@ -1,0 +1,218 @@
+print("==================================================")
+print("Test RGB Matrix Color Parameter Regression Test")
+print("Test 28: Tests all valid color parameter scenarios with all shape types")
+print("#1 - Direct color:           plot(3, 40, red)")
+print("#2 - Direct number:          plot(3, 40, 45)")
+print("#3 - Variable:               plot(3, 40, v_color)")
+print("#4 - Direct color:intensity: plot(3, 40, red:50)")
+print("#5 - Direct number:number:   plot(3, 40, 45:50)")
+print("#6 - Variable:Variable:      plot(3, 40, {v_color}:{v_intensity})")
+print("#7 - Expression:Number:      plot(3, 40, {v_color + 10}:45)")
+print("#8 - Color:Variable:         plot(3, 40, red:{v_intensity})")
+print("#9 - Expression:Expression:  plot(3, 40, {v_base * 2}:{v_base_i / 2})")
+
+# Constants for the test
+v_delay = 2       # Delay between scenarios
+v_intensity = 75  # Base intensity for variable tests
+v_color_1 = "red"    # Base color for red tests
+v_color_2 = "blue"   # Base color for blue tests
+v_color_3 = "green"  # Base color for green tests
+v_color_4 = "yellow" # Base color for yellow tests
+v_base = 45      # Base number for calculations
+v_base_i = 75    # Base intensity for calculations
+
+# Initialize numeric color variables (at the top with other variables)
+v_red = 10      # Number for red
+v_blue = 90     # Number for blue
+v_green = 70    # Number for green
+v_yellow = 50   # Number for yellow
+
+
+# Grid positions for direct shapes (2x2 grid in top area)
+# Top left quadrant (plot)
+v_plot_x = 10       
+v_plot_y = 10
+
+# Top right quadrant (line)
+v_line_x = 40       
+v_line_y = 10
+
+# Bottom left quadrant (rectangle)
+v_rect_x = 10      
+v_rect_y = 30
+
+# Bottom right quadrant (circle)
+v_circle_x = 40     
+v_circle_y = 30
+
+# Position for sprite display at bottom
+v_sprite_x = 12     
+v_sprite_y = 50     
+
+# Test 1: Direct color name
+print("Test 1: Direct color name")
+clear()
+define_sprite(test_sprite1, 40, 10)
+   plot(3, 5, red, 100)
+   draw_line(13, 2, 13, 8, blue, 100)
+   draw_rectangle(23, 2, 4, 6, green, true, 100)
+   draw_circle(35, 5, 3, yellow, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow, false)
+show_sprite(test_sprite1, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 2: Direct number
+# Test 2: Direct number
+print("Test 2: Direct number")
+clear()
+define_sprite(test_sprite2, 40, 10)
+    plot(3, 5, 10, 100)          # red
+    draw_line(13, 2, 13, 8, 90, 100)     # blue
+    draw_rectangle(23, 2, 4, 6, 70, true, 100)    # green
+    draw_circle(35, 5, 3, 50, false, 100)    # yellow
+endsprite
+
+plot(5, 5, 10)         # red
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, 90)    # blue
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, 70, true)    # green
+draw_circle(v_circle_x, v_circle_y, 5, 50, false)   # yellow
+show_sprite(test_sprite2, v_sprite_x, v_sprite_y)
+rest(30)
+sync_queue()
+
+# Test 3: Variable color
+print("Test 3: Variable color")
+clear()
+define_sprite(test_sprite3, 40, 10)
+   plot(3, 5, v_color_1, 100)
+   draw_line(13, 2, 13, 8, v_color_2, 100)
+   draw_rectangle(23, 2, 4, 6, v_color_3, true, 100)
+   draw_circle(35, 5, 3, v_color_4, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, v_color_1)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, v_color_2)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, v_color_3, true)
+draw_circle(v_circle_x, v_circle_y, 5, v_color_4, false)
+show_sprite(test_sprite3, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 4: Direct color:intensity
+print("Test 4: Direct color:intensity")
+clear()
+define_sprite(test_sprite4, 40, 10)
+   plot(3, 5, red:75, 100)
+   draw_line(13, 2, 13, 8, blue:75, 100)
+   draw_rectangle(23, 2, 4, 6, green:75, true, 100)
+   draw_circle(35, 5, 3, yellow:75, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red:75)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue:75)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green:75, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow:75, false)
+show_sprite(test_sprite4, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 5: Direct number:number
+print("Test 5: Direct number:number")
+clear()
+define_sprite(test_sprite5, 40, 10)
+    plot(3, 5, 10:75, 100)         # red:75
+    draw_line(13, 2, 13, 8, 90:75, 100)    # blue:75
+    draw_rectangle(23, 2, 4, 6, 70:75, true, 100)   # green:75
+    draw_circle(35, 5, 3, 50:75, false, 100)   # yellow:75
+endsprite
+
+plot(v_plot_x, v_plot_y, 10:75)        # red:75
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, 90:75)   # blue:75
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, 70:75, true)   # green:75
+draw_circle(v_circle_x, v_circle_y, 5, 50:75, false)  # yellow:75
+show_sprite(test_sprite5, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+
+# Test 6: Variable:Variable
+print("Test 6: Variable:Variable")
+clear()
+define_sprite(test_sprite6, 40, 10)
+    plot(3, 5, {v_red}:{v_intensity}, 100)          # red:75
+    draw_line(13, 2, 13, 8, {v_blue}:{v_intensity}, 100)     # blue:75
+    draw_rectangle(23, 2, 4, 6, {v_green}:{v_intensity}, true, 100)    # green:75
+    draw_circle(35, 5, 3, {v_yellow}:{v_intensity}, false, 100)    # yellow:75
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red}:{v_intensity})         # red:75
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue}:{v_intensity})    # blue:75
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green}:{v_intensity}, true)    # green:75
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow}:{v_intensity}, false)   # yellow:75
+show_sprite(test_sprite6, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 7: Expression:Number
+print("Test 7: Expression:Number")
+clear()
+define_sprite(test_sprite7, 40, 10)
+    plot(3, 5, {v_red + 0}:75, 100)          # red
+    draw_line(13, 2, 13, 8, {v_blue + 0}:75, 100)     # blue
+    draw_rectangle(23, 2, 4, 6, {v_green + 0}:75, true, 100)    # green
+    draw_circle(35, 5, 3, {v_yellow + 0}:75, false, 100)    # yellow
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red + 0}:75)         # red
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue + 0}:75)    # blue
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green + 0}:75, true)    # green
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow + 0}:75, false)   # yellow
+show_sprite(test_sprite7, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+
+# Test 8: Color:Variable
+print("Test 8: Color:Variable")
+clear()
+define_sprite(test_sprite8, 40, 10)
+   plot(3, 5, red:{v_intensity}, 100)
+   draw_line(13, 2, 13, 8, blue:{v_intensity}, 100)
+   draw_rectangle(23, 2, 4, 6, green:{v_intensity}, true, 100)
+   draw_circle(35, 5, 3, yellow:{v_intensity}, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red:{v_intensity})
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue:{v_intensity})
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green:{v_intensity}, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow:{v_intensity}, false)
+show_sprite(test_sprite8, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 9: Expression:Expression
+print("Test 9: Expression:Expression")
+clear()
+define_sprite(test_sprite9, 40, 10)
+    plot(3, 5, {v_red + 0}:{v_intensity - 10}, 100)          # red with adjusted intensity
+    draw_line(13, 2, 13, 8, {v_blue + 0}:{v_intensity - 10}, 100)     # blue with adjusted intensity
+    draw_rectangle(23, 2, 4, 6, {v_green + 0}:{v_intensity - 10}, true, 100)    # green with adjusted intensity
+    draw_circle(35, 5, 3, {v_yellow + 0}:{v_intensity - 10}, false, 100)    # yellow with adjusted intensity
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red + 0}:{v_intensity - 10})         # red with adjusted intensity
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue + 0}:{v_intensity - 10})    # blue with adjusted intensity
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green + 0}:{v_intensity - 10}, true)    # green with adjusted intensity
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow + 0}:{v_intensity - 10}, false)   # yellow with adjusted intensity
+show_sprite(test_sprite9, v_sprite_x, v_sprite_y)
+rest(v_delay)
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()

@@ -1,0 +1,58 @@
+# Math Expression Test Script with Rounding (64x64 Grid Constrained)
+def test_math {
+    clear()
+    v_a = 10.7
+    v_b = 5.3
+    v_sum = (v_a + v_b) % 64
+    v_diff = (v_a - v_b + 64) % 64
+    v_product = ((v_a * v_b) % 64) / 4
+    v_quotient = (v_a / v_b) % 64
+    v_int_quotient = (v_a // v_b) % 64
+    v_remainder = v_a % v_b
+    v_power = (v_a ** 2) % 64
+
+    print(f"variables: v_a {v_a}, v_b {v_b}")
+    # Compound expressions
+    v_compound1 = ((v_a + v_b) * 2) % 64
+    v_compound2 = (v_a * v_b + v_a / v_b) % 64
+
+    # Variable updates
+    v_c = 30.2
+    v_c = (v_c + 10.5) % 64
+    v_c = (v_c * 2) % 64
+
+    # Nested expressions
+    v_nested = (((v_a + v_b) * (v_c - v_a)) / (v_b ** 2)) % 64
+
+    v_duration = 3.75
+
+    clear
+    # Circle
+    draw_circle(32, 32, v_product, red, true, v_duration)
+
+    # Line
+    draw_line(0, 0, v_compound1, v_compound2, blue, v_quotient)
+
+    # Rectangle
+    draw_rectangle(v_a, v_b, v_c, v_nested, green, false, v_int_quotient)
+
+    # Plots for verification
+    plot(v_a, 0, white, 0.1)
+    plot(v_b, 1, white, 0.1)
+    plot(v_sum, 2, white, 0.1)
+    plot(v_diff, 3, white, 0.1)
+    plot(v_product, 4, white, 0.1)
+    plot(v_quotient, 5, white, 0.1)
+    plot(v_int_quotient, 6, white, 0.1)
+    plot(v_remainder, 7, white, 0.1)
+    plot(v_power, 8, white, 0.1)
+    plot(v_compound1, 9, white, 0.1)
+    plot(v_compound2, 10, white, 0.1)
+    plot(v_c, 11, white, 0.1)
+    plot(v_nested, 12, white, 0.1)
+
+    rest(v_duration)
+}
+print("Test math is executing.")
+call test_math
+print("Test math executed.")

@@ -1,0 +1,12 @@
+
+for v_x in (0, 4, 1)
+    for v_y in (0, 4, 1)
+        v_xfrom = (v_x * 10) + 10
+        v_yfrom = (v_y * 10) + 10
+        plot(v_xfrom, v_yfrom, white, 5)
+    endfor v_y
+endfor v_x
+Rest(5)
+
+
+

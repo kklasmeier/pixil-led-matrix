@@ -1,0 +1,26 @@
+v_size = 8  # 8x8 grid on 64x64 display
+create_array(v_pulse, 64)  # 8x8 = 64 cells
+v_color = 0
+
+# Main loop
+while v_color < 360 then
+    begin_frame
+    clear()
+    # Random pulse origin
+    v_origin = random(0, 63, 0)
+    v_pulse[v_origin] = 10
+    # Update grid
+    for v_i in (0, 63, 1)
+        if v_pulse[v_i] > 0 then
+            v_x = (v_i % v_size) * 8
+            v_y = (v_i / v_size) * 8
+            draw_rectangle(v_x, v_y, 8, 8, v_color, v_pulse[v_i] * 10, true)
+            v_pulse[v_i] = v_pulse[v_i] - 1
+        endif
+    endfor v_i
+    end_frame
+    v_color = v_color + 10
+    rest(0.1)
+    sync_queue
+    print(f"Pulse at {v_origin}")
+endwhile

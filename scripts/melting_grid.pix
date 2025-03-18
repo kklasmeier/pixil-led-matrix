@@ -1,0 +1,66 @@
+# Initialize the grid
+create_array(v_x, 8)              # Numeric array for x-positions
+create_array(v_y, 8)              # Numeric array for y-positions
+create_array(v_height, 8)         # Numeric array for heights
+create_array(v_color, 8)          # Numeric array for colors (1-99)
+create_array(v_drip_y, 8)         # Numeric array for drip y-positions
+
+# Set initial positions and random numeric colors
+for v_i in (0, 7, 1) then
+    v_x[v_i] = 7 + v_i * 8        # Columns at 7, 15, 23, ..., 63 (shifted +3)
+    v_y[v_i] = 4                  # Top row
+    v_height[v_i] = 6             # Start height
+    v_drip_y[v_i] = -1            # No drips yet
+    v_color[v_i] = random(1, 99, 0)  # All columns get random numeric color 1-99
+endfor v_i
+
+# Main melting loop - runs forever
+while 1 then
+    begin_frame                   # Clear frame each cycle
+    for v_i in (0, 7, 1) then
+        # Stretch squares slowly (30% chance)
+        if random(0, 1, 0) > 0.3 then
+            v_height[v_i] = v_height[v_i] + 1
+        endif
+
+        # Draw rectangles: filled for first 3, outline for others
+        print(f"int(v_color[v_i]) = {int(v_color[v_i])}")
+        sync_queue
+        if v_i <= 2 then
+            draw_rectangle(v_x[v_i], v_y[v_i], 6, v_height[v_i], {int(v_color[v_i])}, true)
+        else
+            draw_rectangle(v_x[v_i], v_y[v_i], 6, v_height[v_i], {int(v_color[v_i])}, false)
+        endif
+
+        # Check if rectangle touches puddle (y=60)
+        if v_y[v_i] + v_height[v_i] >= 60 then
+            v_y[v_i] = 60             # Snap to puddle
+            draw_rectangle(v_x[v_i], v_y[v_i], 6, v_height[v_i], {int(v_color[v_i])}, true)  # Flash before reset
+            v_y[v_i] = 4              # Respawn at top
+            v_height[v_i] = 6         # Reset height
+            v_drip_y[v_i] = -1        # Cancel any drip
+        endif
+
+        # Handle drips with nested ifs
+        if v_height[v_i] > 12 then
+            if v_drip_y[v_i] == -1 then
+                v_drip_y[v_i] = v_y[v_i] + v_height[v_i]  # Start drip
+            endif
+        endif
+        if v_drip_y[v_i] >= 0 then
+            plot(v_x[v_i] + random(-1, 1, 0), v_drip_y[v_i], {int(v_color[v_i])}, 200)
+            v_drip_y[v_i] = v_drip_y[v_i] + 1
+            if v_drip_y[v_i] >= 63 then
+                v_drip_y[v_i] = -1    # Reset drip
+            endif
+        endif
+    endfor v_i
+
+    # Draw puddle (simplified, could track colors later)
+    begin_frame(true)             # Overlay puddle
+    draw_rectangle(0, 60, 64, 4, red:30, true)  # Base puddle, tweak as needed
+    end_frame
+
+    end_frame
+    rest(0.1)                     # Frame rate ~10 FPS
+endwhile

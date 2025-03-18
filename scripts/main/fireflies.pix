@@ -1,0 +1,346 @@
+throttle(.1)
+# Define a slight trail for the movement effect
+define_sprite(trail, 2, 2)
+    plot(1, 1, yellow, 20)
+endsprite
+clear()
+
+# Create night sky background
+begin_frame
+    # Draw night sky with stars
+    for v_y in (0, 44, 4) then
+        for v_x in (0, 63, 4) then
+            if random(0, 100, 0) < 10 then
+                v_star_bright = random(10, 40, 0)
+                plot(v_x, v_y, white, v_star_bright)
+            endif
+        endfor v_x
+    endfor v_y
+    
+    # Draw moon
+    draw_circle(10, 10, 6, silver, 30, true)
+    draw_circle(12, 8, 2, silver, 15, true)
+    
+    # Draw ground silhouette
+    draw_rectangle(0, 45, 64, 19, dark_brown, 20, true)
+    
+    # Draw some terrain variation on the ground
+    draw_polygon(10, 45, 8, 3, dark_brown, 25, 180, true)
+    draw_polygon(30, 45, 12, 3, dark_brown, 25, 180, true)
+    draw_polygon(50, 45, 10, 3, dark_brown, 25, 180, true)
+    
+    # Add a few silhouetted trees
+    draw_polygon(15, 45, 5, 3, dark_brown, 30, 0, true)
+    draw_rectangle(14, 45, 2, 3, dark_brown, 30, true)
+    
+    draw_polygon(40, 45, 8, 3, dark_brown, 30, 0, true)
+    draw_rectangle(39, 45, 2, 5, dark_brown, 30, true)
+    
+    draw_polygon(55, 45, 6, 3, dark_brown, 30, 0, true)
+    draw_rectangle(54, 45, 2, 4, dark_brown, 30, true)
+    
+    # Draw grass tufts at varied positions
+    # First row of grass - varied heights and positions
+    draw_line(3, 45, 4, 43, forest_green, 40)
+    draw_line(4, 43, 5, 45, forest_green, 40)
+    
+    draw_line(8, 45, 9, 42, forest_green, 40)
+    draw_line(9, 42, 10, 45, forest_green, 40)
+    
+    draw_line(19, 45, 21, 42, forest_green, 40)
+    draw_line(21, 42, 23, 45, forest_green, 40)
+    
+    draw_line(24, 45, 25, 44, forest_green, 40)
+    draw_line(25, 44, 26, 45, forest_green, 40)
+    
+    draw_line(32, 45, 33, 43, forest_green, 40)
+    draw_line(33, 43, 34, 45, forest_green, 40)
+    
+    draw_line(43, 45, 45, 41, forest_green, 40)
+    draw_line(45, 41, 47, 45, forest_green, 40)
+    
+    draw_line(51, 45, 52, 43, forest_green, 40)
+    draw_line(52, 43, 53, 45, forest_green, 40)
+    
+    draw_line(58, 45, 60, 42, forest_green, 40)
+    draw_line(60, 42, 62, 45, forest_green, 40)
+    
+    # Second row - shorter grass in between
+    draw_line(6, 45, 7, 44, forest_green, 35)
+    draw_line(13, 45, 14, 44, forest_green, 35)
+    draw_line(28, 45, 29, 43, forest_green, 35)
+    draw_line(36, 45, 37, 44, forest_green, 35)
+    draw_line(48, 45, 49, 44, forest_green, 35)
+    draw_line(56, 45, 57, 43, forest_green, 35)
+end_frame
+
+# Define firefly sprites with different brightness levels
+define_sprite(firefly_dim, 3, 3)
+    plot(1, 1, yellow, 30)
+endsprite
+
+define_sprite(firefly_med, 3, 3)
+    draw_circle(1, 1, 1, yellow, 40, true)
+endsprite
+
+define_sprite(firefly_bright, 4, 4)
+    draw_circle(1, 1, 1, yellow, 60, true)
+    draw_circle(2, 2, 1, white, 40, true)
+endsprite
+
+
+
+# Configuration values
+v_num_fireflies = 20
+v_max_blink_time = 50
+v_min_blink_time = 20
+
+# Create arrays for firefly properties
+create_array(v_firefly_x, v_num_fireflies)
+create_array(v_firefly_y, v_num_fireflies)
+create_array(v_firefly_state, v_num_fireflies) # 0=off, 1=dim, 2=med, 3=bright
+create_array(v_firefly_blink_counter, v_num_fireflies)
+create_array(v_firefly_blink_limit, v_num_fireflies)
+create_array(v_firefly_dir_x, v_num_fireflies)
+create_array(v_firefly_dir_y, v_num_fireflies)
+create_array(v_firefly_speed, v_num_fireflies)
+create_array(v_firefly_group, v_num_fireflies)
+
+# Initialize fireflies
+v_group_center_x = random(20, 40, 0)
+v_group_center_y = random(15, 35, 0)  # Keep group center in the sky area
+
+for v_i in (0, v_num_fireflies - 1, 1) then
+    # Determine if firefly belongs to a group or is independent
+    v_firefly_group[v_i] = random(0, 100, 0) < 70
+    
+    if v_firefly_group[v_i] == 1 then
+        # Grouped fireflies start near the group center
+        v_firefly_x[v_i] = v_group_center_x + random(-10, 10, 0)
+        v_firefly_y[v_i] = v_group_center_y + random(-10, 10, 0)
+    else
+        # Independent fireflies can be anywhere including ground area
+        v_firefly_x[v_i] = random(5, 58, 0)
+        
+        # 70% in sky, 30% near ground
+        if random(0, 100, 0) < 70 then
+            v_firefly_y[v_i] = random(5, 42, 0)  # Sky area
+        else
+            v_firefly_y[v_i] = random(43, 58, 0)  # Ground area
+        endif
+    endif
+    
+    v_firefly_state[v_i] = random(0, 3, 0)
+    v_firefly_blink_counter[v_i] = 0
+    v_firefly_blink_limit[v_i] = random(v_min_blink_time, v_max_blink_time, 0)
+    
+    # Random direction vector normalized to create smooth movement
+    v_dx = random(-100, 100, 0) / 100
+    v_dy = random(-100, 100, 0) / 100
+    
+    # Normalize to get direction vector
+    v_length = sqrt(v_dx * v_dx + v_dy * v_dy)
+    if v_length == 0 then
+        v_length = 1
+    endif
+    
+    v_firefly_dir_x[v_i] = v_dx / v_length
+    v_firefly_dir_y[v_i] = v_dy / v_length
+    v_firefly_speed[v_i] = random(5, 15, 0) / 10
+    
+    # Show the firefly based on its state
+    if v_firefly_state[v_i] == 1 then
+        show_sprite(firefly_dim, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+    elseif v_firefly_state[v_i] == 2 then
+        show_sprite(firefly_med, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+    elseif v_firefly_state[v_i] == 3 then
+        show_sprite(firefly_bright, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+    endif
+endfor v_i
+
+# Variables for group movement
+v_group_dir_x = random(-100, 100, 0) / 100
+v_group_dir_y = random(-100, 100, 0) / 100
+v_group_timer = 0
+v_group_change_dir = random(50, 100, 0)
+v_group_speed = 0.2
+
+# Main animation loop
+v_time = 0
+v_trail_id = 100
+
+while true then
+    v_time = v_time + 1
+
+    
+    # Update group movement
+    v_group_timer = v_group_timer + 1
+    if v_group_timer >= v_group_change_dir then
+        v_group_dir_x = random(-100, 100, 0) / 100
+        v_group_dir_y = random(-100, 100, 0) / 100
+        v_group_timer = 0
+        v_group_change_dir = random(50, 100, 0)
+    endif
+    
+    v_group_center_x = v_group_center_x + v_group_dir_x * v_group_speed
+    v_group_center_y = v_group_center_y + v_group_dir_y * v_group_speed
+    
+    # Keep group center within bounds and above ground mostly
+    if v_group_center_x < 10 then
+        v_group_center_x = 10
+        v_group_dir_x = abs(v_group_dir_x)
+    elseif v_group_center_x > 53 then
+        v_group_center_x = 53
+        v_group_dir_x = -abs(v_group_dir_x)
+    endif
+    
+    if v_group_center_y < 10 then
+        v_group_center_y = 10
+        v_group_dir_y = abs(v_group_dir_y)
+    elseif v_group_center_y > 40 then
+        v_group_center_y = 40
+        v_group_dir_y = -abs(v_group_dir_y)
+        
+        # Group has a tendency to move upward when near ground
+        if random(0, 100, 0) < 40 then
+            v_group_dir_y = -abs(v_group_dir_y)
+        endif
+    endif
+    
+    # Update each firefly
+    for v_i in (0, v_num_fireflies - 1, 1) then
+        # Increment blink counter
+        v_firefly_blink_counter[v_i] = v_firefly_blink_counter[v_i] + 1
+        
+        # Change state when blink counter reaches limit
+        if v_firefly_blink_counter[v_i] >= v_firefly_blink_limit[v_i] then
+            # Hide previous state
+            if v_firefly_state[v_i] == 1 then
+                hide_sprite(firefly_dim, v_i)
+            elseif v_firefly_state[v_i] == 2 then
+                hide_sprite(firefly_med, v_i)
+            elseif v_firefly_state[v_i] == 3 then
+                hide_sprite(firefly_bright, v_i)
+            endif
+            
+            # Change to new state
+            v_firefly_state[v_i] = random(0, 3, 0)
+            
+            # Show new state
+            if v_firefly_state[v_i] == 1 then
+                show_sprite(firefly_dim, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+            elseif v_firefly_state[v_i] == 2 then
+                show_sprite(firefly_med, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+            elseif v_firefly_state[v_i] == 3 then
+                show_sprite(firefly_bright, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+            endif
+            
+            # Reset counter with new random limit
+            v_firefly_blink_counter[v_i] = 0
+            v_firefly_blink_limit[v_i] = random(v_min_blink_time, v_max_blink_time, 0)
+            
+            # Occasionally change direction
+            if random(0, 100, 0) < 30 then
+                v_dx = random(-100, 100, 0) / 100
+                v_dy = random(-100, 100, 0) / 100
+                
+                # Normalize
+                v_length = sqrt(v_dx * v_dx + v_dy * v_dy)
+                if v_length == 0 then
+                    v_length = 1
+                endif
+                
+                v_firefly_dir_x[v_i] = v_dx / v_length
+                v_firefly_dir_y[v_i] = v_dy / v_length
+            endif
+        endif
+        
+        # Add trail occasionally if firefly is lit
+        if v_firefly_state[v_i] > 0 and random(0, 100, 0) < 15 then
+            show_sprite(trail, v_firefly_x[v_i], v_firefly_y[v_i], v_trail_id)
+            v_trail_id = v_trail_id + 1
+            if v_trail_id > 150 then
+                v_trail_id = 100
+            endif
+        endif
+        
+        # Calculate movement
+        if v_firefly_group[v_i] == 1 then
+            # Grouped fireflies move toward group center with some individual variation
+            v_to_center_x = v_group_center_x - v_firefly_x[v_i]
+            v_to_center_y = v_group_center_y - v_firefly_y[v_i]
+            v_dist = sqrt(v_to_center_x * v_to_center_x + v_to_center_y * v_to_center_y)
+            
+            # Mix of group influence and individual movement
+            if v_dist > 15 then
+                # Far from group - stronger pull toward center
+                v_move_x = v_to_center_x * 0.03 + v_firefly_dir_x[v_i] * 0.3 * v_firefly_speed[v_i]
+                v_move_y = v_to_center_y * 0.03 + v_firefly_dir_y[v_i] * 0.3 * v_firefly_speed[v_i]
+            else
+                # Near group - more individual movement
+                v_move_x = v_to_center_x * 0.01 + v_firefly_dir_x[v_i] * v_firefly_speed[v_i]
+                v_move_y = v_to_center_y * 0.01 + v_firefly_dir_y[v_i] * v_firefly_speed[v_i]
+            endif
+        else
+            # Independent fireflies move in their own direction
+            v_move_x = v_firefly_dir_x[v_i] * v_firefly_speed[v_i]
+            v_move_y = v_firefly_dir_y[v_i] * v_firefly_speed[v_i]
+        endif
+        
+        # Update position
+        v_firefly_x[v_i] = v_firefly_x[v_i] + v_move_x
+        v_firefly_y[v_i] = v_firefly_y[v_i] + v_move_y
+        
+        # Keep fireflies within bounds and handle ground interaction
+        if v_firefly_x[v_i] < 2 then
+            v_firefly_x[v_i] = 2
+            v_firefly_dir_x[v_i] = abs(v_firefly_dir_x[v_i])
+        elseif v_firefly_x[v_i] > 61 then
+            v_firefly_x[v_i] = 61
+            v_firefly_dir_x[v_i] = -abs(v_firefly_dir_x[v_i])
+        endif
+        
+        if v_firefly_y[v_i] < 2 then
+            v_firefly_y[v_i] = 2
+            v_firefly_dir_y[v_i] = abs(v_firefly_dir_y[v_i])
+        elseif v_firefly_y[v_i] > 59 then
+            v_firefly_y[v_i] = 59
+            v_firefly_dir_y[v_i] = -abs(v_firefly_dir_y[v_i])
+        endif
+        
+        # Special handling for ground area (y >= 43)
+        if v_firefly_y[v_i] >= 43 then
+            # Fireflies near ground are more likely to change direction upward
+            if random(0, 100, 0) < 5 then
+                v_firefly_dir_y[v_i] = -abs(random(50, 100, 0) / 100)
+                
+                # Normalize the direction vector again
+                v_length = sqrt(v_firefly_dir_x[v_i] * v_firefly_dir_x[v_i] + v_firefly_dir_y[v_i] * v_firefly_dir_y[v_i])
+                if v_length == 0 then
+                    v_length = 1
+                endif
+                
+                v_firefly_dir_x[v_i] = v_firefly_dir_x[v_i] / v_length
+                v_firefly_dir_y[v_i] = v_firefly_dir_y[v_i] / v_length
+            endif
+        endif
+        
+        # Move the firefly sprite if it's visible
+        if v_firefly_state[v_i] == 1 then
+            move_sprite(firefly_dim, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+        elseif v_firefly_state[v_i] == 2 then
+            move_sprite(firefly_med, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+        elseif v_firefly_state[v_i] == 3 then
+            move_sprite(firefly_bright, v_firefly_x[v_i], v_firefly_y[v_i], v_i)
+        endif
+    endfor v_i
+    
+    # Clean up old trails occasionally
+    if v_time % 10 == 0 then
+        for v_t in (100, 150, 1) then
+            hide_sprite(trail, v_t)
+        endfor v_t
+    endif
+    
+    end_frame
+endwhile

@@ -1,0 +1,927 @@
+I use python that interfaces with a 64x64 LED color display to draw objects using a raspberry pi 4. I created a library called "rgb_matrix_api.py" that accepts drawing commands and updates the display using commands. Most commands will draw objects based on coordinates. Colors are strings like red, blue. Many commands accept a duration that will automatically remove (burn out) the drawn object after a specified period of time. Some objects can be filled and the value passed in would be true or false
+
+reference:
+1. Duration is the "burnout" period - the time in milliseconds an object stays lit before automatically being removed. This is useful for making animations and doesn't require tracking of pixel and objects.
+2. Variables (prefixed with v_) must be used for math operations - direct math in commands is not supported
+3. Color names, durations, and sprite names should NOT be wrapped in quotes in commands
+4. Variables can be used in any command parameter position and in conditions
+
+
+Drawing Commands
+----------------
+* draw_line(x1, y1, x2, y2, color, intensity, duration) - Draws a line that burns out after duration milliseconds
+* plot(x, y, color, intensity, duration) - Plots a single point that burns out after duration milliseconds
+* draw_rectangle(x, y, width, height, color, intensity, filled, duration) - Draws a rectangle that burns out after duration milliseconds
+* draw_circle(x, y, radius, color, intensity, filled, duration) - Draws a circle that burns out after duration milliseconds
+* clear() - Clears the display
+* draw_polygon(x, y, radius, sides, color, intensity, rotation, filled, duration) - Draws a polygon with a defined number of sides that burns out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated
+
+Control Commands - Variables and Expressions
+--------------------------------------------
+NOTE: ALL COMMANDS HAVE TO BE ON A SINGLE LINE. YOU CANNOT WRAP ANY COMMAND.
+
+NOTE: All variables are case sensitive.
+
+NOTE: Every variable assignment needs to be on a single line. You cannot assign two different variables on the same line
+
+Variables can be assigned numbers or text:
+v_x = 10            # Position number
+v_size = 12         # Size number
+v_color = "red"     # Direct color name. When putting a color into a variable, you must put it in quotes so variables know to be created as strings instead of numbers
+v_delay = 2.5       # Decimal number
+v_text = "Hello"    # Text string
+v_font = "arial"    # Font name
+
+Math in Variable Assignments:
+v_x = v_x + 10      # Add numbers
+v_y = v_size * 2    # Multiply
+v_z = abs(v_x - 25) # Use math functions
+
+In-Line Math:
+plot(v_x + 5, v_y * 2, red, 100)
+draw_circle(v_x - 10, v_y / 2, v_size + 1, blue, 100, true)
+
+Color Expressions:
+# Basic variable
+v_color = "red"
+plot(10, 20, v_color, 100)
+
+Drawing Commands:
+# Line with variables
+draw_line(v_x, v_y, v_x + 10, v_y + 10, blue, 100)
+
+# Rectangle with expressions
+draw_rectangle(v_x * 2, v_y / 2, v_width + 5, v_height - 2, green, 100)
+
+# Circle with math
+draw_circle(v_x + cos(v_angle), v_y + sin(v_angle), v_radius * 1.5, red, 100)
+
+# Text with mixed variables
+draw_text(v_x + 5, v_y, v_message, v_font, v_size + 2, v_color, v_bright)
+
+
+Arrays
+------
+Arrays are supported for variables too. Arrays can store either numeric values (default) or strings.
+
+Array Creation:
+create_array(v_array, size)           # Create numeric array (default)
+create_array(v_array, size, numeric)        # same as above, but perscribed
+create_array(v_array, size, string)   # Create string array
+
+Array Assignment:
+# Numeric arrays
+v_array[0] = 10                 # Direct numeric value
+v_array[v_i] = 20              # Using variable index
+v_array[v_i + 1] = 30          # Using math in index
+
+# String arrays
+v_words[0] = "Hello"           # Direct string value
+v_words[1] = v_message         # Using string variable
+
+Using Arrays:
+# Basic array access
+# Numeric array
+v_x = v_array[0]               # Get numeric value at index
+
+# String array
+v_text = v_words[0]            # Get string value at index
+
+# Math with array values
+# Numeric arrays
+v_result = v_array[0] + 5      # Array value in math
+v_sum = v_array[0] + v_array[1] # Multiple array values
+
+# String concatenation
+v_message = v_words[0] & " " & v_words[1]  # Join strings with &
+
+# Using in commands
+# Numeric arrays in drawing
+plot(v_array[0], v_array[1], red, 100)               # Direct array values
+draw_circle(v_array[0] + 5, v_array[1] * 2, 5, blue, 100)  # Array with math
+
+# String arrays in text
+draw_text(10, 10, v_words[0], piboto-regular, 12, white, 100)  # Direct string value
+draw_text(10, 10, v_words[0] & " " & v_words[1], piboto-regular, 12, white, 100)  # Concatenated strings
+
+# Complex expressions
+# Numeric arrays
+v_result = (v_array[v_i] / 2) * v_array[v_i + 1]  # Nested array access
+
+# String arrays
+v_text = v_words[0] & " " & v_words[v_i + 1]  # String concatenation with variable index
+
+Notes:
+- Arrays are zero-based (first element is index 0)
+- Array size is fixed at creation
+- Index must be a number or evaluate to a number 
+- Supports math operations in index: v_array[v_i + 1]
+- Numeric arrays support math operations
+- String arrays support concatenation with &
+- String values must be quoted in assignments: v_words[0] = "Hello"
+- Cannot mix types: numeric arrays store numbers, string arrays store text
+- Array type is determined at creation and cannot be changed
+- Can use array values in any command or math expression appropriate for their type
+- Understand that when using arrays, especially in for loops, you need to keep the index size in mind so the array index is not exceeded.
+
+Example Commands:
+# Numeric arrays
+draw_circle(v_points[0] + 5, v_points[1] * 2, v_radius, red, 100, true)
+draw_circle(v_points[0], v_points[1], v_radius, red, 100, true)
+draw_circle((v_points[v_i] / 2) * v_size[v_i], v_y, v_radius, red, 100, true)
+
+# String arrays
+draw_text(10, v_y, v_words[0] & "!", piboto-regular, 12, white, 100)
+print(f"Current word: {v_words[v_i]}")
+
+
+
+
+Math functions
+--------------
+here are all the supported mathematical functions in Pixil (from the MATH_FUNCTIONS dictionary):
+Basic Math:
+
+cos(x) - Cosine function
+sin(x) - Sine function
+tan(x) - Tangent function
+abs(x) - Absolute value
+pow(x,y) - Power function (x raised to power y)
+sqrt(x) - Square root
+exp(x) - Exponential function
+log(x) - Natural logarithm
+log10(x) - Base-10 logarithm
+
+Rounding Functions:
+
+round(x) - Round to nearest integer
+floor(x) - Round down to nearest integer
+ceil(x) - Round up to nearest integer
+trunc(x) - Truncate decimal portion
+int(x) - Convert to integer
+
+Additional Trigonometry:
+
+asin(x) - Arc sine
+acos(x) - Arc cosine
+atan(x) - Arc tangent
+atan2(y,x) - Arc tangent of y/x with correct quadrant
+degrees(x) - Convert radians to degrees
+radians(x) - Convert degrees to radians
+
+Min/Max Operations:
+
+min(x,y) - Minimum of values
+max(x,y) - Maximum of values
+
+Constants:
+
+pi - Mathematical constant π (3.14159...)
+e - Mathematical constant e (2.71828...)
+tau - Mathematical constant τ (2π)
+
+Physics/Advanced Math:
+
+copysign(x,y) - Copy the sign of y to x
+fabs(x) - Floating point absolute value
+remainder(x,y) - IEEE 754 floating point remainder
+fmod(x,y) - Floating point modulo operation
+
+Random Number Generation:
+
+random(min_val, max_val, precision) - Generate random number between min and max with specified decimal precision
+
+
+
+For Loops
+-----------
+The scripting language supports for loops using this syntax:
+
+for <variable> in (<start>, <end>, <step>) then
+   # commands
+endfor <variable>
+
+All parameters support:
+- Direct numbers (1, 5, 1) 
+- Variables (v_start, v_end, v_step)
+- Math expressions (v_x + 2, v_max - 1, v_step * 2)
+
+The variable must be prefixed with v_ and will be automatically created/updated. 
+The loop iterates from start to end using the step increment.
+For loops can be nested within while loops, procedures, if blocks, and other for loops.
+
+Example:
+for v_x in (1, 5, 1)
+   plot(v_x, 10, red)
+endfor v_x
+
+While Loops
+-----------
+The scripting language supports while loops using this syntax:
+
+while <condition> then
+    # commands
+endwhile
+
+The condition follows the same rules as if statements:
+- Can use comparison operators (==, !=, <, >, <=, >=)
+- Can reference variables (v_x < 10)
+- Can use math expressions (v_x + 2 < v_y - 3)
+- Can use boolean variables directly (while v_running then)
+
+Loops continue executing until the condition becomes false.
+While loops can be nested within for loops, procedures, if blocks, and other while loops.
+Important note, there is no support for the break construct to exit while loops.
+
+Example:
+v_x = 1
+while v_x < 5 then
+    plot(v_x, 10, red)
+    v_x = v_x + 1
+endwhile
+
+
+Control Structure - If/Then/Else Capabilities
+---------------------------------------------
+
+Basic If/Then:
+Copyif v_x > 10 then
+    plot(v_x, v_y, red)
+endif
+
+If/Then/Else:
+Copyif v_count < 5 then
+    draw_circle(v_x, v_y, 5, red, 100, true)
+else
+    draw_circle(v_x, v_y, 10, blue, 100, true)
+endif
+
+Multiple Conditions (Elseif):
+Copyif v_value < 10 then
+    draw_text(10, 20, "Low", arial, 12, red)
+elseif v_value < 20 then
+    draw_text(10, 20, "Medium", arial, 12, yellow)
+else
+    draw_text(10, 20, "High", arial, 12, green)
+endif
+
+
+Comparison Operators:
+==    Equal to
+!=    Not equal to
+>     Greater than
+<     Less than
+>=    Greater than or equal
+<=    Less than or equal
+
+Logical Operators:
+and   Logical AND - Both conditions must be true
+or    Logical OR - At least one condition must be true
+
+Math expressions inside if statements:
+if v_radius * 2 > v_max + 5 then
+    draw_circle(v_x, v_y, v_radius, blue, 100, true)
+endif
+
+Compound Conditions with AND:
+if v_x > 5 and v_y < 20 then
+    draw_circle(v_x, v_y, 5, red, 100, true)
+endif
+
+Compound Conditions with OR:
+if v_x < 5 or v_y > 30 then
+    draw_rectangle(v_x, v_y, 10, 10, blue, 100, true)
+endif
+
+Complex Conditions with Precedence:
+if v_x > 5 and v_y < 20 or v_z == 15 then
+    # Evaluates as: (v_x > 5 and v_y < 20) or v_z == 15
+    draw_circle(v_x, v_y, 5, green, 100, true)
+endif
+
+if v_a < 10 or v_b > 20 and v_c == 30 then
+    # Evaluates as: v_a < 10 or (v_b > 20 and v_c == 30)
+    draw_circle(v_x, v_y, 5, purple, 100, true)
+endif
+
+
+Notes:
+* Each if must end with endif
+* Elseif/else are optional
+* Conditions can use variables, math expressions, array access, and function calls
+* AND has higher precedence than OR (AND is evaluated first)
+* Spacing/indentation is recommended but not required
+* Parentheses are NOT supported for grouping conditions
+* Short-circuit evaluation is applied (if the first part of an AND is false, the second part is not evaluated)
+
+Important Limitations:
+Parentheses for grouping conditions are NOT supported:
+# DO NOT DO THIS - Will cause an error:
+if (v_x > 5 or v_y < 10) and v_z == 15 then
+    # This will not work!
+endif
+
+If you need to override default precedence, use nested if statements:
+# To implement "(v_x > 5 or v_y < 10) and v_z == 15":
+if v_z == 15 then
+    if v_x > 5 or v_y < 10 then
+        # Commands here
+    endif
+endif
+
+
+Sprite Operations
+=================
+Define Sprite:
+define_sprite(sprite1, 10, 10)     # name, width, height
+    plot(2, 2, red)                # Draw inside sprite
+    draw_circle(5, 5, 2, blue, 100, true)
+endsprite
+
+# Variables for size
+v_width = 20
+v_height = 15
+define_sprite(sprite2, v_width, v_height)
+    draw_rectangle(2, 2, 5, 5, green, 100, true)
+endsprite
+
+Drawing Inside Sprites:
+Available commands:
+
+plot(x, y, color)
+draw_line(x1, y1, x2, y2, color, intensity)
+draw_rectangle(x, y, width, height, color, intensity, filled)
+draw_circle(x, y, radius, color, intensity, filled)
+draw_text(x, y, text, font, size, color, intensity, effect, modifier)
+
+Display Operations:
+# Show sprite at position
+show_sprite(sprite1, 10, 20)
+
+# Show sprite with instance ID
+show_sprite(sprite1, 10, 20, 1)
+
+# Hide sprite
+hide_sprite(sprite1)
+
+# Hide specific sprite instance
+hide_sprite(sprite1, 1)
+
+# Move sprite to new position
+move_sprite(sprite1, 30, 40)
+
+# Move specific sprite instance
+move_sprite(sprite1, 30, 40, 1)
+
+# With variables/expressions
+show_sprite(sprite1, v_x + 5, v_y * 2)
+move_sprite(sprite1, v_x + cos(v_angle), v_y + sin(v_angle))
+
+# Dispose of a specific sprite instance
+dispose_sprite(sprite1, 1)
+
+# To dispose all defined sprites, used for cleanup:
+dispose_all_sprites()
+
+Sprite Indexing
+Sprites can be instantiated multiple times with different instance IDs:
+Copy# Create multiple instances of the same sprite
+show_sprite(invader, 10, 10, 1)   # First instance at position (10, 10)
+show_sprite(invader, 30, 10, 2)   # Second instance at position (30, 10)
+show_sprite(invader, 50, 10, 3)   # Third instance at position (50, 10)
+
+# Move specific instances
+move_sprite(invader, 10, 20, 1)   # Move first instance to (10, 20)
+
+# Hide specific instances
+hide_sprite(invader, 2)           # Hide second instance
+
+# Dispose of specific instances when no longer needed
+dispose_sprite(invader, 3)        # Remove third instance
+Notes:
+
+Sprite coordinates are relative to sprite's top-left (0,0)
+All drawing must be between define_sprite and endsprite
+Sprite can be redrawn to update its appearance
+Same sprite can be shown multiple times at different positions with different instance IDs
+Variables can be used for positions and drawing inside sprites
+Sprites can be moved without redrawing
+Sprite names don't use quotes
+Instance IDs are optional - if not specified, instance 0 is used
+Instance IDs can be used to create multiple independent copies of the same sprite
+Sprites appear over top of all other drawing operations
+All other drawing operations are written to a background buffer and are maintained when sprites are moved or hidden
+
+
+Color Parameter Specification
+---------------------------
+
+Available named colors
+
+
+The color parameter accepts several formats for specifying colors and their intensities:
+
+1. Direct Color Names
+   - Use predefined color names directly (e.g., red, blue, green)
+	black
+	white
+	gray
+	light_gray
+	dark_gray
+	silver
+	red
+	crimson
+	maroon
+	rose
+	pink
+	salmon
+	coral
+	brown
+	standard_brown
+	dark_brown
+	wood_brown
+	tan
+	orange
+	gold
+	peach
+	bronze
+	yellow
+	lime
+	green
+	olive
+	spring_green
+	forest_green
+	mint
+	teal
+	turquoise
+	cyan
+	sky_blue
+	azure
+	blue
+	navy
+	royal_blue
+	ocean_blue
+	indigo
+	purple
+	violet
+	magenta
+	lavender
+
+   - Example: plot(10, 20, red)
+
+2. Numeric Colors
+   - Use numbers from 0-99 directly
+   - Example: plot(10, 20, 45)
+
+3. Color with Variables
+   - Variables can store color names or numbers
+   - All variables are global
+   - Example: 
+     v_color = "blue"
+     plot(10, 20, v_color)
+     
+     v_color = 45
+     plot(10, 20, v_color)
+
+4. Color with Intensity using variables
+   Format: color:intensity where both parts can be:
+   - Direct values
+   - Variables
+   - Expressions in brackets
+
+   Examples:
+   - Direct values: red:50 or 45:36
+   - With variables: 
+     v_color = "blue"
+     v_intensity = 36
+     plot(10, 20, v_color, v_intensity)
+
+   - With expressions:
+     v_color = 45
+     v_intensity = 36
+     plot(10, 20, v_color / 3, v_intensity + 4)
+
+5. Color using is a string
+    If you want to simply give it a color without variables or expressions, you would just construct your command like this without the square brackets:
+    plot(10, 20, blue, 23)
+    plot(10, 40, 43, 99)
+
+5. Color Rules:
+- Numbers must be integers between 0-100 for both color and intensity.
+- Be sure your to use colors and intensity between 1-100. Do not specify outside this bounds.
+- Intensity is optional and need not be passed when all subsequent optional parameters are not supplied. The optional intensity defaults to 100.
+
+Valid Examples:
+  plot(3, 40, red, 100)                         # Direct color
+  plot(3, 40, 45, 100)                          # Direct number
+  plot(3, 40, v_color, 100)                     # Variable
+  plot(3, 40, red, 50)                          # Direct color with intensity
+  plot(3, 40, 45, 50)                           # Direct number with intensity
+  plot(3, 40, v_color, v_intensity)             # Variable color and intensity
+  plot(3, 40, v_color + 10, 45)                 # Expression color, number intensity
+  plot(3, 40, red, v_intensity)                 # Color with variable intensity
+  plot(3, 40, v_base * 2, v_base_i / 2)         # Expression color and intensity
+
+
+Procedures
+----------
+Procedures allow you to define reusable blocks of commands that can be called multiple times. They help organize code and reduce repetition.
+
+Syntax:
+
+def procedure_name {
+    commands
+}
+
+call procedure_name
+
+Procedures can contain any valid commands including:
+- Drawing commands
+- Control structures (if/then, loops)
+- Variable assignments
+- Other procedure calls
+- Frame control
+
+Procedures don't accept parameters or return values - they simply execute a predefined sequence of commands. All variables used within procedures are global and accessible throughout the script.
+
+
+Example:
+# Define a procedure that draws a target pattern
+def draw_target {
+    draw_circle(32, 32, 20, red, 75, true)
+    draw_circle(32, 32, 15, white, 75, true)
+    draw_circle(32, 32, 10, red, 75, true)
+    draw_circle(32, 32, 5, white, 75, true)
+}
+
+# Call the procedure multiple times in different contexts
+draw_target                  # Draw immediately
+
+begin_frame
+    draw_target             # As part of a frame
+    draw_rectangle(0, 0, 64, 5, blue, 75, true)
+end_frame
+
+for v_y in (0, 50, 10)
+    call draw_target        # Inside a loop
+endfor v_y
+
+
+
+
+
+TEXT COMMANDS REFERENCE
+-----------------------
+Text can be drawn on the LED display by using the draw_text command. Different colors, fonts, font sizes and effects are supported.
+
+COMMAND: draw_text
+Syntax: draw_text(x, y, text, font_name, font_size, color, intensity, effect, effect_modifier)
+
+Parameters:
+- x: integer (0-63) - X coordinate on matrix
+- y: integer (0-63) - Y coordinate on matrix
+- text: string - Text to display (wrapped in quotes)
+- font_name: string - Name of installed font to use
+- font_size: integer - Font size in pixels
+- color: string - Color name or specification
+- Intensity: Color intensity
+- effect: string (optional) - Text effect to apply (defaults to NORMAL)
+- effect_modifier: string (optional) - Modifier for the effect
+
+Effects and Valid Modifiers:
+NORMAL - No modifiers
+TYPE   - SLOW, MEDIUM (default), FAST
+SCAN   - No modifiers
+SLIDE  - LEFT (default), RIGHT, UP, DOWN
+DISSOLVE - IN (default), OUT
+WIPE   - IN_LEFT (default), IN_RIGHT, IN_UP, IN_DOWN, 
+         OUT_LEFT, OUT_RIGHT, OUT_UP, OUT_DOWN
+
+Example:
+draw_text(10, 20, "Hello World", piboto-regular, 12, white, 75, SLIDE, LEFT)
+
+
+COMMAND: clear_text
+Syntax: clear_text(x, y)
+
+Parameters:
+- x: integer (0-63) - X coordinate of text to clear
+- y: integer (0-63) - Y coordinate of text to clear
+
+Example:
+clear_text(10, 20)
+
+
+COLOR SPECIFICATIONS:
+-------------------
+1. Named Colors: red, blue, green, etc.
+2. Color with Intensity: color:intensity
+   - color: Named color or number (0-99)
+   - intensity: Number (0-100)
+
+Example:
+draw_text(10, 20, "Hello", piboto-regular, 12, red, 75)
+
+I created the start of a proprietary scripting language that will generate commands in a python program called Pixil.py that will be sent to this library and i need your help extending it to perform more capabilities. Here is the current code for Pixil.py. Please go through the current code, understand it and then i will work with you on extending it. 
+
+
+
+Frame Control:
+--------------
+
+The frame buffering system allows you to build up a complete frame before displaying it. This is particularly useful for complex animations or when you want multiple drawing operations to appear simultaneously.
+
+Commands:
+* begin_frame(preserve) - Starts frame buffering mode with optional preserve parameter.
+  * preserve: Optional boolean parameter (true/false)
+  * If preserve is true, new frame content will be overlaid on existing display content and after the frame ends, the content persists for additional drawing objects through subsequent commands.
+  * If preserve is omitted or false (default behavior), frame will clear existing display before drawing and after the frame ends through the end_frame command described next, additional content drawn would be on their own clear frame.
+* end_frame - Displays all buffered drawing commands at once, then returns to normal immediate drawing mode.
+
+When begin_frame is called, a fresh canvas is prepared based on the preserve mode:
+* Standard Mode (begin_frame, begin_frame(), or begin_frame(false)):
+  - Clears the current display
+  - Any subsequent drawing commands will be buffered
+  - When end_frame is called, only the new frame's content will be visible
+  - Content written there after would be on a new fresh frame.
+  - This is the default behavior
+  - Important: It is not necessary to use clear() after a begin_frame in standard mode because this command already clears the canvas. If you use clear in this mode, you will create a flicker effect on the display which will look poorly.
+
+* Preserve Mode (begin_frame(true)):
+  - Maintains the current display content and writes additional content to it.
+  - Any subsequent drawing commands will be buffered
+  - When end_frame is called, the new frame's content will be overlaid on top of the existing display allowing content to persist.
+
+
+Example:
+# Draw background
+draw_rectangle(0, 0, 64, 64, blue, 100, true)
+
+# Begin new frame in standard mode - previous content will be replaced
+begin_frame
+    # Multiple commands to create a complex pattern
+    draw_circle(32, 32, 20, red, 100, true)
+    draw_line(10, 10, 54, 54, yellow)
+    draw_line(54, 10, 10, 54, yellow)
+    draw_rectangle(22, 22, 20, 20, green, 100, false)
+end_frame   # All frame contents appear at once, blue background is gone
+
+rest(1)     # Wait 1 second
+
+# Begin new frame in preserve mode - previous content will be kept
+begin_frame(true)
+    # Add more elements on top of existing pattern
+    draw_circle(16, 16, 10, purple, 100, true)
+    draw_circle(48, 48, 10, orange, 100, true)
+    draw_line(16, 48, 48, 16, 100, white)
+end_frame   # New elements appear while keeping previous frame's content
+
+rest(1)     # Wait 1 second
+
+# Begin new frame in standard mode
+begin_frame
+    # Create entirely new pattern, replacing everything
+    draw_rectangle(10, 10, 44, 44, blue, 100, true)
+    draw_circle(32, 32, 15, red, 100, true)
+    draw_polygon(32, 32, 20, 6, yellow, 100, 0, false)
+end_frame   # Only these new elements appear
+
+
+Print Statements
+---------------
+Print statements output text to the console and can be used for debugging, status updates, or user feedback.
+
+Syntax:
+* Basic printing: print("message")
+* Variable printing: print(f"value is: {v_variable}")
+** Notice the "f" within the parenthesis when using the curly brackets.
+* Quick example: print("Drop {v_i} at y = {v_drop_y[v_i]} speed = {v_drop_speed[v_i]}.")
+
+Key Features:
+* Works with both single and double quotes
+* Can access script variables (must be prefixed with v_)
+* Can use with sync_queue to coordinate timing with visual effects
+
+Common Use Cases:
+* Debugging script execution
+* Confirming when animations or effects complete
+* Displaying variable values during execution
+* Status updates for long-running scripts
+
+Example:
+    print("Drawing circles")
+    for v_i in (0, 5, 1)
+        print(f"Iteration {v_i} executing...")
+        draw_circle(v_i * 10, 30, 3, red, 100, true)
+        rest(0.4)
+    endfor v_i
+    sync_queue
+    print("All circles drawn")
+
+
+
+Solution file map:
+------------------
+
+/
+├── Pixil.py                 # Main script interpreter - Parses and executes Pixil script commands
+│
+├── pixil_utils/            
+│   ├── __init__.py          # Package exports for pixil utilities
+│   ├── debug.py             # Manages debug levels and logging
+│   ├── expression_parser.py # Parses variables, math expressions, and formats parameters
+│   ├── file_manager.py      # Handles script file loading and path resolution
+│   ├── math_functions.py    # Math operations, expression evaluation, condition testing
+│   ├── parameter_types.py   # Defines valid command parameters and types
+│   ├── array_manager.py     # Handles numeric and string arrays with bounds checking
+│   ├── cli.py               # Command line argument parsing and validation
+│   ├── script_manager.py    # Manages script loading and execution queuing
+│   ├── terminal_handler.py  # Raw terminal input handling for keyboard control
+│   └── timer_manager.py     # Script duration tracking and timing control
+│
+├── rgb_matrix_lib/       
+│   ├── __init__.py          # Package exports for RGB matrix library
+│   ├── api.py               # Main interface for LED matrix operations
+│   ├── commands.py          # Command parsing and execution management
+│   ├── debug.py             # Hardware-level debug logging
+│   ├── drawing_objects.py   # Shape drawing and burnout management
+│   ├── fonts.py             # Font loading and management
+│   ├── sprite.py            # Sprite creation and manipulation
+│   ├── text_effects.py      # Text animation effects (type, scan, slide, etc.)
+│   ├── text_renderer.py     # Renders text with effects to matrix
+│   └── utils.py             # Color handling and general matrix utilities
+│
+├── shared/
+│   ├── __init__.py          # Package exports for shared components
+│   ├── command_queue.py     # Producer/consumer queue for matrix commands
+│   └── queue_monitor.py     # Real-time monitoring of queue depth
+│
+└── scripts/                 # Contains Pixil script files
+    ├── examples/            # Example and demo scripts
+    ├── tests/               # Test and validation scripts
+    └── user/                # User-created scripts
+
+Key Components:
+- Pixil.py: Main script interpreter
+- pixil_utils: Command parsing and processing
+- rgb_matrix_api: Hardware interface and operations
+- scripts: Script storage and organization
+
+
+The Pixil system uses a producer/consumer architecture with a command queue to manage LED matrix operations:
+
+Pixil (Producer):
+- Interprets scripts and generates commands
+- Sends commands to a queue
+- Continues processing without waiting for commands to complete
+
+RGB_matrix_lib (Consumer):
+- Takes commands from queue
+- Processes them in order
+- Handles actual LED matrix operations
+- Uses timing delays between commands to control animation speed
+
+Pixil.py (parser) -> command_queue.py (queuing) -> api.py (execution)
+
+sync_queue command
+------------------
+The sync_queue command provides synchronization between these two processes. When Pixil sends a sync_queue command, it:
+1. Adds the command to the queue
+2. Waits for the queue to empty
+3. Only continues script execution after rgb_matrix_lib has processed all previous commands
+
+This synchronization is necessary when script execution needs to wait for display operations to complete, such as Coordinating print statements with visual effects like when writing regression test scripts
+
+Sample usage of the sync_queue command:
+
+	print("Drawing circles")  # Prints only after all circles are drawn
+	for v_i in (0, 5, 1)
+	    # Draw circles across the display
+	    draw_circle(v_i * 10, 30, 3, red, 100, true)
+	    rest(0.4)
+	endfor v_i
+	sync_queue
+	print("All circles drawn")  # Prints only after all circles are drawn
+	rest(5)
+	clear()
+
+throttle Command
+----------------
+The throttle command adjusts the timing delay between commands sent to the LED matrix. This helps balance the producer-consumer relationship between Pixil script execution and LED matrix updates.
+
+Syntax:
+throttle(factor)
+
+Parameters:
+- factor (float) - Multiplier for command delay timing
+  * factor < 1.0: Reduces delay between commands (faster execution)
+  * factor = 1.0: Default timing
+  * factor > 1.0: Increases delay between commands (slower execution)
+
+Variables and Math:
+- Supports variables: throttle(v_speed)
+- Supports math expressions: throttle(v_base * 2.5)
+- Supports math functions: throttle(cos(v_angle) + 1.5)
+
+Example Usage:
+v_speed = 0.5
+throttle(0.3)           # Run commands faster (0.3x normal delay)
+throttle(2.0)           # Run commands slower (2x normal delay)
+throttle(v_speed)       # Use variable
+throttle(v_base * 0.5)  # Use math expression
+
+Performance Notes:
+* Useful for tuning animation performance by managing command queue depth
+* Lower values (< 1.0) help reduce queue backup in complex animations
+* Default value of 1.0 is restored at the start of each script
+* Finding the optimal throttle value helps maintain fluid animation while preventing excessive queue buildup
+
+Example Tuning:
+v_complex = 0.3        # Fast for complex patterns
+v_simple = 1.0         # Normal for simple patterns
+throttle(v_complex)    # Speed up for complex section
+# ... complex drawing commands ...
+throttle(v_simple)     # Return to normal for simple section
+
+
+I will need your help with extending it this software and with creating scripts. I will work with you on the changes I need.
+
+
+My current list of scripts are:
+Here are descriptive titles for your Pixil scripts:
+
+1. 3D Perspective - Dynamic 3D depth perception visualization
+2. 3D Shapes - Animated three-dimensional geometric objects
+3. Aurora Borealis - Northern lights simulation with flowing colors
+4. Blob - Organic amorphous shape movement
+5. Boids Flocking Simulation - Simulated bird or fish group behavior
+6. Bouncing Ball - Physics-based ball bounce animation
+7. Bouncing Pixels - Multiple pixel particles with rebound effects
+8. Bubble Pop - Expanding and bursting bubble animation
+9. Circles - Geometric circle patterns and transformations
+10. Clock Wave - Time-based waveform visualization
+11. Color Blend - Smooth transitioning between color palettes
+12. Color Mandala - Symmetrical radial color patterns
+13. Cosmic Nebula - Space gas cloud formation simulation
+14. Cosmic Pulse - Rhythmic space energy visualization
+15. Crystal Growth - Geometric crystalline formation simulation
+16. Dancing Squares - Choreographed square movement patterns
+17. Digital Rain - Matrix-style falling character effect
+18. Drone Show - Coordinated drone light show formation patterns
+19. Dropped Ball - Physics-based falling object simulation
+20. Electric Arcs - Lightning-like electrical discharge effects
+21. Electric Web - Interconnected electrical network visualization
+22. Embers - Glowing particle effect simulation
+23. Etch-a-Sketch - Classic drawing toy simulation
+24. Expanding Rings - Concentric circle growth patterns
+25. Fireflies - Random illuminating light particles
+26. Fireworks - Explosive particle burst patterns
+27. Fish Tank - Aquatic life simulation
+28. Fractal Trees - Recursive branching structure growth
+29. Fractured Mirror - Fragmented reflection patterns
+30. Geometric Kaleidoscope - Symmetrical geometric pattern rotation
+31. Gravity Wells - Orbital motion around gravity points
+32. Hypnosis - Mesmerizing spiral pattern animation
+33. Icicle Drop - Falling and forming ice crystal simulation
+34. Kaleidoscope - Symmetrical mirrored pattern animation
+35. Kinetic Rainbow - Motion-based color spectrum display
+36. Laser Show - Beam-based light performance simulation
+37. Lightning - Electric discharge branching patterns
+38. Liquid Starfield - Flowing star-like particle movement
+39. Lissajous Curves - Mathematical curve pattern generation
+40. Magic Carpets - Undulating textile-like pattern movement
+41. Missile Command - Classic arcade game simulation
+42. Moire Patterns - Overlapping pattern interference effects
+43. Morphing Prism - Shape-shifting color separation effect
+44. Mouse Escape - Interactive chase sequence
+45. Paint Drops - Liquid color diffusion simulation
+46. Particle Fountain - Upward streaming particle emission
+47. Particle Tumbler - Rotating particle containment simulation
+48. Pathfinder - Route-finding algorithm visualization
+49. Pendulum Wave - Physics-based harmonic oscillation patterns
+50. Photon - Light particle simulation
+51. Plasma Ball - Energy field touch response simulation
+52. Pong - Classic paddle and ball arcade game
+53. Prayers - Contemplative animation sequence
+54. Psychedelic Tunnel - Immersive optical illusion animation
+55. Qix - Geometric area capture game simulation
+56. Rainbow Wave Collapse - Spectrum-based wave interference pattern
+57. Rain Drops - Water droplet impact simulation
+58. Rain - Falling water particle simulation
+59. Sand Drop - Granular material physics simulation
+60. Sine Wave Color Flow - Mathematical color wave propagation
+61. Snake - Classic growing-tail game simulation
+62. Solar System - Planetary orbital simulation
+63. Sort Visualizer - Algorithm comparison visualization
+64. Space Invaders - Classic arcade shooter game simulation
+65. Spiral2 - Enhanced spiral pattern generation
+66. Spirograph Sequence - Geometric drawing tool patterns
+67. Sprite With Grid - Character movement on coordinate system
+68. Squares2 - Advanced square pattern generation
+69. Starburst - Radial light explosion effect
+70. Starfield - Space star simulation with depth
+71. Swarm - Collective movement behavior simulation
+72. The Matrix - Digital reality simulation effect
+73. Vortex Spiral - Spinning funnel pattern animation
+74. Wave Grid - Undulating coordinate mesh animation
+75. Wormhole - Space-time tunnel visualization

@@ -1,0 +1,103 @@
+# Wave Grid Pattern Lightshow
+# Initialize base parameters
+v_centerX = 32
+v_centerY = 32
+v_angle = 0
+v_color_base = 45
+v_fade_start = 99
+
+# Animation control variables
+v_frame_mode = 0
+v_speed = 5
+v_rest_time = 0.05
+v_effect_duration = 0
+v_effect_max_time = 2   # Change effect every 3 iterations
+v_burnout_enabled = 0
+v_burnout_min = 100
+v_burnout_max = 500
+
+# Wave grid specific variables
+v_grid_spacing = 4      # Space between grid points
+v_wave_scale = 5        # Scale factor for wave pattern
+v_wave_intensity = 0.5  # Base intensity for wave effect
+v_pattern_type = 0      # Different wave patterns
+
+while 1 then
+    # Change effects periodically
+    if v_effect_duration > v_effect_max_time then
+        v_effect_duration = 0
+        
+        # Random frame mode
+        if random(0, 100, 0) > 50 then
+            v_frame_mode = 0
+        else
+            v_frame_mode = 0
+        endif
+        
+        # Random variations
+        v_speed = random(2, 8, 0)
+        v_grid_spacing = random(3, 6, 0)
+        v_wave_scale = random(3, 8, 0)
+        v_pattern_type = random(0, 3, 0)  # Different wave patterns
+        
+        # Random burnout
+        if random(0, 100, 0) > 70 then
+            v_burnout_enabled = 1
+            v_rest_time = 0.01
+        else
+            v_burnout_enabled = 0
+            v_rest_time = 0.05
+        endif
+    endif
+
+    if v_frame_mode == 1 then
+        begin_frame
+    endif
+    
+    clear
+
+    # Wave Grid Pattern
+    for v_x in (0, 63, v_grid_spacing) then
+        for v_y in (0, 63, v_grid_spacing) then
+            # Calculate distance from center
+            v_dist = sqrt((v_x - v_centerX) * (v_x - v_centerX) + (v_y - v_centerY) * (v_y - v_centerY))
+            
+            # Different wave patterns based on pattern_type
+            if v_pattern_type == 0 then
+                # Circular ripples
+                v_wave = sin(v_dist / v_wave_scale + v_angle)
+            elseif v_pattern_type == 1 then
+                # Diagonal waves
+                v_wave = sin((v_x + v_y) / v_wave_scale + v_angle)
+            elseif v_pattern_type == 2 then
+                # Cross waves
+                v_wave = sin(v_x / v_wave_scale + v_angle) * sin(v_y / v_wave_scale + v_angle)
+            endif
+            
+            # Calculate intensity with wave effect
+            v_intensity = v_fade_start * (v_wave_intensity + 0.5 * v_wave)
+            
+            # Plot point with optional burnout
+            if v_burnout_enabled == 1 then
+                plot(v_x, v_y, v_color_base, v_intensity, random(v_burnout_min, v_burnout_max, 0))
+            else
+                plot(v_x, v_y, v_color_base, v_intensity, 5000)
+                v_rest_time = 3.5
+            endif
+        endfor v_y
+    endfor v_x
+
+    if v_frame_mode == 1 then
+        end_frame
+    endif
+
+    # Update animation
+    v_angle = v_angle + v_speed
+    v_color_base = v_color_base + 1
+    if v_color_base > 99 then
+        v_color_base = 1
+    endif
+
+    v_effect_duration = v_effect_duration + 1
+    rest(v_rest_time)
+endwhile

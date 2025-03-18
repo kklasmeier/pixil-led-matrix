@@ -1,0 +1,104 @@
+# Christmas Wreath Animation
+# Using a 64x64 LED Matrix
+
+# Center position of wreath
+v_center_x = 32
+v_center_y = 32
+
+# Wreath size
+v_radius = 20
+
+# Define the base wreath sprite
+define_sprite(wreath_base, 64, 64)
+    # Main wreath circle (dark green base)
+    draw_circle(32, 32, 20, forest_green, true)
+    # Inner cut out to make it a ring
+    draw_circle(32, 32, 15, black, true)
+endsprite
+
+# Define decorative elements sprite
+define_sprite(decorations, 64, 64)
+    # Red bow at the top
+    draw_polygon(32, 15, 6, 3, red, 180, true)
+    
+    # Berries around the wreath (using direct calculations)
+    # 0 degrees
+    draw_circle(50, 32, 2, red, true)
+    # 30 degrees
+    draw_circle(48, 24, 2, red, true)
+    # 60 degrees
+    draw_circle(42, 18, 2, red, true)
+    # 90 degrees
+    draw_circle(32, 16, 2, red, true)
+    # 120 degrees
+    draw_circle(22, 18, 2, red, true)
+    # 150 degrees
+    draw_circle(16, 24, 2, red, true)
+    # 180 degrees
+    draw_circle(14, 32, 2, red, true)
+    # 210 degrees
+    draw_circle(16, 40, 2, red, true)
+    # 240 degrees
+    draw_circle(22, 46, 2, red, true)
+    # 270 degrees
+    draw_circle(32, 48, 2, red, true)
+    # 300 degrees
+    draw_circle(42, 46, 2, red, true)
+    # 330 degrees
+    draw_circle(48, 40, 2, red, true)
+    
+    # Static light positions
+    plot(50, 32, yellow)
+    plot(47, 25, yellow)
+    plot(41, 19, yellow)
+    plot(32, 17, yellow)
+    plot(23, 19, yellow)
+    plot(17, 25, yellow)
+    plot(14, 32, yellow)
+    plot(17, 39, yellow)
+    plot(23, 45, yellow)
+    plot(32, 47, yellow)
+    plot(41, 45, yellow)
+    plot(47, 39, yellow)
+endsprite
+
+# Animation variables
+v_time = 0
+
+# Animation loop
+while true then
+    # Clear the display
+    # Show base wreath
+    show_sprite(wreath_base, 0, 0)
+    
+    # Animate lights
+    v_angle = v_time * 15
+    
+    # Light animations with pre-calculated positions
+    v_brightness = 50 + abs(cos(v_angle) * 49)
+    plot(50, 32, yellow:{v_brightness})
+    plot(47, 25, yellow:{v_brightness})
+    plot(41, 19, yellow:{v_brightness})
+    plot(32, 17, yellow:{v_brightness})
+    plot(23, 19, yellow:{v_brightness})
+    plot(17, 25, yellow:{v_brightness})
+    plot(14, 32, yellow:{v_brightness})
+    plot(17, 39, yellow:{v_brightness})
+    plot(23, 45, yellow:{v_brightness})
+    plot(32, 47, yellow:{v_brightness})
+    plot(41, 45, yellow:{v_brightness})
+    plot(47, 39, yellow:{v_brightness})
+    
+    # Show decorations
+    show_sprite(decorations, 0, 0)
+    
+    # Add subtle color variation to the bow
+    v_bow_bright = 75 + abs(cos(v_time) * 24)
+    draw_polygon(32, 15, 6, 3, red:{v_bow_bright}, 180, true)
+    
+    # Rest between frames
+    rest(0.05)
+    
+    # Update time variable for animations
+    v_time = v_time + 0.1
+endwhile

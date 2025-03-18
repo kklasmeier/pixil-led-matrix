@@ -1,0 +1,78 @@
+# Cosmic Pulse Animation with color and intensity cycling
+# Creates an animated design with rotating polygons and color transitions
+
+throttle(0)
+# Initialize variables for animation
+v_center_x = 32
+v_center_y = 32
+v_radius = 20
+v_rotation = 0
+v_color_intensity = 1
+v_color_dir = 1
+v_sides = 6
+v_inner_radius = 12
+
+# Color cycling variables
+v_color_number = 1
+v_inner_color_number = 30
+v_accent_color_number = 60
+
+# Animation variables
+v_speed = 2
+v_color_speed = 1
+
+while true then
+    # Clear previous frame
+    clear()
+    begin_frame
+
+    # Calculate color intensity cycling (1-99)
+    if v_color_intensity >= 98 then
+        v_color_dir = -1
+        # Increment color numbers when reaching peak intensity
+        v_color_number = v_color_number + 1
+        v_inner_color_number = v_inner_color_number + 1
+        v_accent_color_number = v_accent_color_number + 1
+        
+        # Reset color numbers if they exceed 99
+        if v_color_number > 99 then
+            v_color_number = 1
+        endif
+        if v_inner_color_number > 99 then
+            v_inner_color_number = 1
+        endif
+        if v_accent_color_number > 99 then
+            v_accent_color_number = 1
+        endif
+    endif
+    if v_color_intensity <= 2 then
+        v_color_dir = 1
+    endif
+    v_color_intensity = v_color_intensity + v_color_speed * v_color_dir
+
+    # Draw outer rotating polygon
+    draw_polygon(v_center_x, v_center_y, v_radius, v_sides, {v_color_number}:{v_color_intensity}, v_rotation, false)
+    
+    # Draw inner counter-rotating polygon
+    draw_polygon(v_center_x, v_center_y, v_inner_radius, v_sides, {v_inner_color_number}:{99-v_color_intensity}, -v_rotation * 2, false)
+    
+    # Draw pulsing center circle
+    draw_circle(v_center_x, v_center_y, 5, {v_accent_color_number}:{v_color_intensity}, true)
+    
+    # Draw accent points at vertices
+    for v_i in (0, 360, 360/v_sides) then
+        v_x = v_center_x + cos(radians(v_i + v_rotation)) * v_radius
+        v_y = v_center_y + sin(radians(v_i + v_rotation)) * v_radius
+        plot(v_x, v_y, {v_accent_color_number}:{99-v_color_intensity}, 0.1)
+    endfor v_i
+
+    # Update rotation
+    v_rotation = v_rotation + v_speed
+    if v_rotation >= 360 then
+        v_rotation = 0
+    endif
+
+    # Display frame and add small delay
+    end_frame
+    rest(0.03)
+endwhile

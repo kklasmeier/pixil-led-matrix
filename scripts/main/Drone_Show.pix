@@ -1,0 +1,840 @@
+# Configurable number of drones
+v_num_drones = 35
+
+# Max steps per path
+v_max_steps = 70
+
+# Total array size for paths (drones * steps)
+v_path_size = v_num_drones * v_max_steps
+
+# Initialize arrays
+create_array(v_drone_x, v_num_drones)
+create_array(v_drone_y, v_num_drones)
+create_array(v_target_x, v_num_drones)
+create_array(v_target_y, v_num_drones)
+create_array(v_delay, v_num_drones)
+create_array(v_steps, v_num_drones)
+create_array(v_path_x, v_path_size)
+create_array(v_path_y, v_path_size)
+
+# Initial color (white)
+v_color = 99
+
+#print("Starting Drone Show")
+
+# Set initial ground positions (line at y=63)
+for v_i in (0, v_num_drones - 1, 1)
+    v_drone_x[v_i] = v_i * 63 / (v_num_drones - 1)
+    v_drone_y[v_i] = 63
+endfor v_i
+
+# Procedure to calculate curved paths
+def calc_paths {
+    #print("Calculating paths")
+    for v_i in (0, v_path_size - 1, 1)
+        v_path_x[v_i] = -1
+        v_path_y[v_i] = -1
+    endfor v_i
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_x1 = v_drone_x[v_d]
+        v_y1 = v_drone_y[v_d]
+        v_x2 = v_target_x[v_d]
+        v_y2 = v_target_y[v_d]
+        
+        v_dx = v_x2 - v_x1
+        v_dy = v_y2 - v_y1
+        v_steps[v_d] = max(abs(v_dx), abs(v_dy))
+        if v_steps[v_d] > v_max_steps then
+            v_steps[v_d] = v_max_steps
+        endif
+        if v_steps[v_d] < 1 then
+            v_steps[v_d] = 1
+        endif
+        
+        v_delay[v_d] = random(0, 10, 0)
+        v_path_type = v_d % 3
+        v_base_idx = v_d * v_max_steps
+        
+        #print(f"Drone {v_d}: steps={v_steps[v_d]}, delay={v_delay[v_d]}, from ({v_x1},{v_y1}) to ({v_x2},{v_y2})")
+        
+        for v_s in (0, v_steps[v_d] - 1, 1)
+            v_t = v_s / v_steps[v_d]
+            v_idx = v_base_idx + v_s
+            
+            if v_path_type == 0 then
+                v_path_x[v_idx] = v_x1 + v_dx * v_t
+                v_path_y[v_idx] = v_y1 + v_dy * v_t
+            elseif v_path_type == 1 then
+                v_path_x[v_idx] = v_x1 + v_dx * v_t
+                v_base_y = v_y1 + v_dy * v_t
+                v_path_y[v_idx] = v_base_y + sin(v_t * pi) * 10
+            else
+                v_x_mid = (v_x1 + v_x2) / 2
+                v_y_mid = min(v_y1, v_y2) - 15
+                v_path_x[v_idx] = (1 - v_t) * (1 - v_t) * v_x1 + 2 * (1 - v_t) * v_t * v_x_mid + v_t * v_t * v_x2
+                v_path_y[v_idx] = (1 - v_t) * (1 - v_t) * v_y1 + 2 * (1 - v_t) * v_t * v_y_mid + v_t * v_t * v_y2
+            endif
+            
+            v_path_x[v_idx] = max(0, min(63, v_path_x[v_idx]))
+            v_path_y[v_idx] = max(0, min(63, v_path_y[v_idx]))
+        endfor v_s
+    endfor v_d
+    #print("Paths calculated")
+}
+
+# Procedure to animate drones
+def animate_drones {
+    #print("Animating drones")
+    v_max_total_steps = 0
+    for v_d in (0, v_num_drones - 1, 1)
+        v_total_steps = v_steps[v_d] + v_delay[v_d]
+        if v_total_steps > v_max_total_steps then
+            v_max_total_steps = v_total_steps
+        endif
+    endfor v_d
+    
+    #print(f"Max steps: {v_max_total_steps}")
+    
+    for v_s in (0, v_max_total_steps, 1)
+        begin_frame
+        for v_d in (0, v_num_drones - 1, 1)
+            v_base_idx = v_d * v_max_steps
+            if v_s >= v_delay[v_d] then
+                v_step = v_s - v_delay[v_d]
+                if v_step < v_steps[v_d] then
+                    v_idx = v_base_idx + v_step
+                    if v_path_x[v_idx] >= 0 then
+                        plot(v_path_x[v_idx], v_path_y[v_idx], v_color, 100)
+                        v_drone_x[v_d] = v_path_x[v_idx]
+                        v_drone_y[v_d] = v_path_y[v_idx]
+                    endif
+                else
+                    plot(v_target_x[v_d], v_target_y[v_d], v_color, 100)
+                    v_drone_x[v_d] = v_target_x[v_d]
+                    v_drone_y[v_d] = v_target_y[v_d]
+                endif
+            else
+                plot(v_drone_x[v_d], v_drone_y[v_d], v_color, 100)
+            endif
+        endfor v_d
+        end_frame
+        rest(0.01)
+    endfor v_s
+    
+    # Hold final frame to ensure all drones are visible
+    begin_frame
+    for v_d in (0, v_num_drones - 1, 1)
+        plot(v_target_x[v_d], v_target_y[v_d], v_color, 100)
+        v_drone_x[v_d] = v_target_x[v_d]
+        v_drone_y[v_d] = v_target_y[v_d]
+    endfor v_d
+    end_frame
+    
+    #print("Animation complete")
+}
+
+# Shape procedures
+def set_circle {
+    v_radius = 20
+    v_center_x = 32
+    v_center_y = 32
+    for v_d in (0, v_num_drones - 1, 1)
+        v_angle = v_d * 2 * pi / v_num_drones
+        v_target_x[v_d] = v_center_x + v_radius * cos(v_angle)
+        v_target_y[v_d] = v_center_y + v_radius * sin(v_angle)
+    endfor v_d
+}
+
+def set_square {
+    v_size = 40
+    v_center_x = 32
+    v_center_y = 32
+    v_half = v_size / 2  # 20
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        if v_t < 0.25 then  # Bottom side: left to right
+            v_target_x[v_d] = v_center_x - v_half + v_size * (v_t / 0.25)  # 12 to 52
+            v_target_y[v_d] = v_center_y + v_half  # 52 (bottom side now at y=52)
+        elseif v_t < 0.5 then  # Right side: bottom to top
+            v_target_x[v_d] = v_center_x + v_half  # 52
+            v_target_y[v_d] = v_center_y + v_half - v_size * ((v_t - 0.25) / 0.25)  # 52 to 12
+        elseif v_t < 0.75 then  # Top side: right to left
+            v_target_x[v_d] = v_center_x + v_half - v_size * ((v_t - 0.5) / 0.25)  # 52 to 12
+            v_target_y[v_d] = v_center_y - v_half  # 12 (top side now at y=12)
+        else  # Left side: top to bottom
+            v_target_x[v_d] = v_center_x - v_half  # 12
+            v_target_y[v_d] = v_center_y - v_half + v_size * ((v_t - 0.75) / 0.25)  # 12 to 52
+        endif
+    endfor v_d
+}
+
+def set_triangle {
+    v_base = 40
+    v_height = 35  # Approx equilateral height
+    v_center_x = 32
+    v_center_y = 32
+    v_base_y = v_center_y - v_height / 2  # ~15
+    v_peak_y = v_center_y + v_height / 2  # ~50
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        if v_t < 0.33 then  # Base: left to right
+            v_target_x[v_d] = v_center_x - v_base / 2 + v_base * (v_t / 0.33)  # 12 to 52
+            v_target_y[v_d] = v_base_y  # 15
+        elseif v_t < 0.66 then  # Left side: base to peak
+            v_target_x[v_d] = v_center_x - v_base / 2 + (v_base / 2) * ((v_t - 0.33) / 0.33)  # 12 to 32
+            v_target_y[v_d] = v_base_y + v_height * ((v_t - 0.33) / 0.33)  # 15 to 50
+        else  # Right side: base to peak
+            v_target_x[v_d] = v_center_x + v_base / 2 - (v_base / 2) * ((v_t - 0.66) / 0.34)  # 52 to 32
+            v_target_y[v_d] = v_base_y + v_height * ((v_t - 0.66) / 0.34)  # 15 to 50
+        endif
+    endfor v_d
+}
+
+def set_pyramid {
+    v_base = 40
+    v_height = 30
+    v_center_x = 32
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        if v_t < 0.25 then
+            v_target_x[v_d] = v_center_x - v_base / 2 + v_base * (v_t / 0.25)
+            v_target_y[v_d] = 63
+        elseif v_t < 0.5 then
+            v_target_x[v_d] = v_center_x + v_base / 2
+            v_target_y[v_d] = 63 - v_height * ((v_t - 0.25) / 0.25)
+        elseif v_t < 0.75 then
+            v_target_x[v_d] = v_center_x - v_base / 2 + v_base * ((v_t - 0.5) / 0.25)
+            v_target_y[v_d] = 63 - v_height
+        else
+            v_target_x[v_d] = v_center_x - v_base / 2
+            v_target_y[v_d] = 63 - v_height * ((v_t - 0.75) / 0.25)
+        endif
+    endfor v_d
+}
+
+def set_smiley {
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        if v_d == 0 then
+            v_target_x[v_d] = 24
+            v_target_y[v_d] = 24
+        elseif v_d == 1 then
+            v_target_x[v_d] = 40
+            v_target_y[v_d] = 24
+        else
+            v_angle = pi * (v_t - 0.1) / 0.8
+            v_target_x[v_d] = 32 + 20 * cos(v_angle)
+            v_target_y[v_d] = 40 + 10 * sin(v_angle)
+        endif
+    endfor v_d
+}
+
+def set_cross {
+    v_height = 40      # Vertical bar height
+    v_width = 20       # Horizontal bar width
+    v_center_x = 32
+    v_bottom_y = 52    # Bottom of vertical (lower on screen)
+    v_top_y = 12       # Top of vertical (higher on screen)
+    v_cross_y = v_top_y + v_height / 3  # Place crossbar 1/3 from top
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        if v_t < 0.33 then  # Horizontal bar: left to right
+            v_target_x[v_d] = v_center_x - v_width / 2 + v_width * (v_t / 0.33)  # 22 to 42
+            v_target_y[v_d] = v_cross_y  # ~25 (1/3 from top)
+        else  # Vertical bar: top to bottom
+            v_target_x[v_d] = v_center_x  # 32
+            v_target_y[v_d] = v_top_y + v_height * ((v_t - 0.33) / 0.67)  # 12 to 52
+        endif
+    endfor v_d
+}
+
+def set_pentagon {
+    v_radius = 22
+    v_center_x = 32
+    v_center_y = 32
+    v_rotation = -pi/2  # Start from top (rotated 90 degrees counterclockwise)
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_angle = v_rotation + v_t * 2 * pi
+        v_side = floor(v_t * 5)  # Determine which of the 5 sides
+        v_side_t = (v_t * 5) - v_side  # Position along the current side (0-1)
+        
+        # Calculate angle for the current vertex and the next
+        v_angle1 = v_rotation + (v_side * 2 * pi / 5)
+        v_angle2 = v_rotation + ((v_side + 1) * 2 * pi / 5)
+        
+        # Linearly interpolate between the two vertices
+        v_target_x[v_d] = v_center_x + v_radius * ((1 - v_side_t) * cos(v_angle1) + v_side_t * cos(v_angle2))
+        v_target_y[v_d] = v_center_y + v_radius * ((1 - v_side_t) * sin(v_angle1) + v_side_t * sin(v_angle2))
+    endfor v_d
+}
+
+def set_heart {
+    v_center_x = 32
+    v_center_y = 30
+    v_size = 18
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_angle = 2 * pi * v_t
+        
+        # Parametric heart equation 
+        # Scale and position the heart on the display
+        if v_t < 0.5 then
+            # Top-left half of heart
+            v_param_t = v_t * 2 * pi  # Scale t to 0-2π
+            v_target_x[v_d] = v_center_x - v_size * (16 * sin(v_param_t) * sin(v_param_t) * sin(v_param_t)) / 16
+            v_target_y[v_d] = v_center_y - v_size * (13 * cos(v_param_t) - 5 * cos(2 * v_param_t) - 2 * cos(3 * v_param_t) - cos(4 * v_param_t)) / 16
+        else
+            # Top-right half of heart
+            v_param_t = (1 - v_t) * 2 * pi  # Scale t to 2π-0 (reverse direction)
+            v_target_x[v_d] = v_center_x + v_size * (16 * sin(v_param_t) * sin(v_param_t) * sin(v_param_t)) / 16
+            v_target_y[v_d] = v_center_y - v_size * (13 * cos(v_param_t) - 5 * cos(2 * v_param_t) - 2 * cos(3 * v_param_t) - cos(4 * v_param_t)) / 16
+        endif
+    endfor v_d
+}
+
+def set_star {
+    v_outer_radius = 24
+    v_inner_radius = 10
+    v_center_x = 32
+    v_center_y = 32
+    v_rotation = pi/2  # Changed from -pi/2 to pi/2 to flip the star
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_point = floor(v_t * 10)  # Which of the 10 points (5 outer, 5 inner)
+        v_is_outer = v_point % 2 == 0  # Even points are outer
+        v_angle = v_rotation + (v_point * pi / 5)  # Each point is 36 degrees apart
+        
+        if v_is_outer then
+            v_target_x[v_d] = v_center_x + v_outer_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_outer_radius * sin(v_angle)
+        else
+            v_target_x[v_d] = v_center_x + v_inner_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_inner_radius * sin(v_angle)
+        endif
+    endfor v_d
+}
+
+def set_cube {
+    v_size = 16        # Half the cube size
+    v_center_x = 32
+    v_center_y = 32
+    v_iso_x = 0.866    # cos(30°) - isometric x factor
+    v_iso_y = 0.5      # sin(30°) - isometric y factor
+    
+    create_array(v_corners_x, 8)
+    create_array(v_corners_y, 8)
+    
+    # Define the 8 corners of the cube in 3D (x,y,z)
+    # Front face (clockwise from top-left)
+    v_corners_x[0] = v_center_x + ((-v_size) * v_iso_x) + ((v_size) * v_iso_x)
+    v_corners_y[0] = v_center_y + ((-v_size) * v_iso_y) - ((v_size) * v_iso_y)
+    
+    v_corners_x[1] = v_center_x + ((v_size) * v_iso_x) + ((v_size) * v_iso_x)
+    v_corners_y[1] = v_center_y + ((v_size) * v_iso_y) - ((v_size) * v_iso_y)
+    
+    v_corners_x[2] = v_center_x + ((v_size) * v_iso_x) - ((v_size) * v_iso_x)
+    v_corners_y[2] = v_center_y + ((v_size) * v_iso_y) + ((v_size) * v_iso_y)
+    
+    v_corners_x[3] = v_center_x + ((-v_size) * v_iso_x) - ((v_size) * v_iso_x)
+    v_corners_y[3] = v_center_y + ((-v_size) * v_iso_y) + ((v_size) * v_iso_y)
+    
+    # Back face (clockwise from top-left)
+    v_corners_x[4] = v_center_x + ((-v_size) * v_iso_x) + ((-v_size) * v_iso_x)
+    v_corners_y[4] = v_center_y + ((-v_size) * v_iso_y) - ((-v_size) * v_iso_y)
+    
+    v_corners_x[5] = v_center_x + ((v_size) * v_iso_x) + ((-v_size) * v_iso_x)
+    v_corners_y[5] = v_center_y + ((v_size) * v_iso_y) - ((-v_size) * v_iso_y)
+    
+    v_corners_x[6] = v_center_x + ((v_size) * v_iso_x) - ((-v_size) * v_iso_x)
+    v_corners_y[6] = v_center_y + ((v_size) * v_iso_y) + ((-v_size) * v_iso_y)
+    
+    v_corners_x[7] = v_center_x + ((-v_size) * v_iso_x) - ((-v_size) * v_iso_x)
+    v_corners_y[7] = v_center_y + ((-v_size) * v_iso_y) + ((-v_size) * v_iso_y)
+    
+    # Distribute drones along the 12 edges of the cube
+    for v_d in (0, v_num_drones - 1, 1)
+        v_edge = floor(v_d / (v_num_drones / 12))
+        if v_edge >= 12 then
+            v_edge = 11
+        endif
+        v_t = (v_d % (v_num_drones / 12)) / (v_num_drones / 12)
+        
+        # Define the 12 edges of the cube (connecting vertex pairs)
+        if v_edge == 0 then  # Front: top edge
+            v_target_x[v_d] = v_corners_x[0] + (v_corners_x[1] - v_corners_x[0]) * v_t
+            v_target_y[v_d] = v_corners_y[0] + (v_corners_y[1] - v_corners_y[0]) * v_t
+        elseif v_edge == 1 then  # Front: right edge
+            v_target_x[v_d] = v_corners_x[1] + (v_corners_x[2] - v_corners_x[1]) * v_t
+            v_target_y[v_d] = v_corners_y[1] + (v_corners_y[2] - v_corners_y[1]) * v_t
+        elseif v_edge == 2 then  # Front: bottom edge
+            v_target_x[v_d] = v_corners_x[2] + (v_corners_x[3] - v_corners_x[2]) * v_t
+            v_target_y[v_d] = v_corners_y[2] + (v_corners_y[3] - v_corners_y[2]) * v_t
+        elseif v_edge == 3 then  # Front: left edge
+            v_target_x[v_d] = v_corners_x[3] + (v_corners_x[0] - v_corners_x[3]) * v_t
+            v_target_y[v_d] = v_corners_y[3] + (v_corners_y[0] - v_corners_y[3]) * v_t
+        elseif v_edge == 4 then  # Back: top edge
+            v_target_x[v_d] = v_corners_x[4] + (v_corners_x[5] - v_corners_x[4]) * v_t
+            v_target_y[v_d] = v_corners_y[4] + (v_corners_y[5] - v_corners_y[4]) * v_t
+        elseif v_edge == 5 then  # Back: right edge
+            v_target_x[v_d] = v_corners_x[5] + (v_corners_x[6] - v_corners_x[5]) * v_t
+            v_target_y[v_d] = v_corners_y[5] + (v_corners_y[6] - v_corners_y[5]) * v_t
+        elseif v_edge == 6 then  # Back: bottom edge
+            v_target_x[v_d] = v_corners_x[6] + (v_corners_x[7] - v_corners_x[6]) * v_t
+            v_target_y[v_d] = v_corners_y[6] + (v_corners_y[7] - v_corners_y[6]) * v_t
+        elseif v_edge == 7 then  # Back: left edge
+            v_target_x[v_d] = v_corners_x[7] + (v_corners_x[4] - v_corners_x[7]) * v_t
+            v_target_y[v_d] = v_corners_y[7] + (v_corners_y[4] - v_corners_y[7]) * v_t
+        elseif v_edge == 8 then  # Connect front to back: top-left
+            v_target_x[v_d] = v_corners_x[0] + (v_corners_x[4] - v_corners_x[0]) * v_t
+            v_target_y[v_d] = v_corners_y[0] + (v_corners_y[4] - v_corners_y[0]) * v_t
+        elseif v_edge == 9 then  # Connect front to back: top-right
+            v_target_x[v_d] = v_corners_x[1] + (v_corners_x[5] - v_corners_x[1]) * v_t
+            v_target_y[v_d] = v_corners_y[1] + (v_corners_y[5] - v_corners_y[1]) * v_t
+        elseif v_edge == 10 then  # Connect front to back: bottom-right
+            v_target_x[v_d] = v_corners_x[2] + (v_corners_x[6] - v_corners_x[2]) * v_t
+            v_target_y[v_d] = v_corners_y[2] + (v_corners_y[6] - v_corners_y[2]) * v_t
+        else  # Connect front to back: bottom-left
+            v_target_x[v_d] = v_corners_x[3] + (v_corners_x[7] - v_corners_x[3]) * v_t
+            v_target_y[v_d] = v_corners_y[3] + (v_corners_y[7] - v_corners_y[3]) * v_t
+        endif
+    endfor v_d
+}
+
+def set_hourglass {
+    v_height = 40     # Total height of hourglass
+    v_width = 24      # Width at top and bottom
+    v_neck = 4        # Width at middle "neck"
+    v_center_x = 32
+    v_center_y = 32
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        
+        if v_t < 0.25 then
+            # Top horizontal (left to right)
+            v_target_x[v_d] = v_center_x - v_width/2 + v_width * (v_t / 0.25)
+            v_target_y[v_d] = v_center_y - v_height/2
+        elseif v_t < 0.375 then
+            # Right diagonal from top (top-right to center)
+            v_segment_t = (v_t - 0.25) / 0.125
+            v_target_x[v_d] = v_center_x + v_width/2 - (v_width/2 - v_neck/2) * v_segment_t
+            v_target_y[v_d] = v_center_y - v_height/2 + (v_height/2) * v_segment_t
+        elseif v_t < 0.5 then
+            # Left diagonal from top (top-left to center)
+            v_segment_t = (v_t - 0.375) / 0.125
+            v_target_x[v_d] = v_center_x - v_width/2 + (v_width/2 - v_neck/2) * v_segment_t
+            v_target_y[v_d] = v_center_y - v_height/2 + (v_height/2) * v_segment_t
+        elseif v_t < 0.625 then
+            # Right diagonal from bottom (center to bottom-right)
+            v_segment_t = (v_t - 0.5) / 0.125
+            v_target_x[v_d] = v_center_x + v_neck/2 + (v_width/2 - v_neck/2) * v_segment_t
+            v_target_y[v_d] = v_center_y + (v_height/2) * v_segment_t
+        elseif v_t < 0.75 then
+            # Left diagonal from bottom (center to bottom-left)
+            v_segment_t = (v_t - 0.625) / 0.125
+            v_target_x[v_d] = v_center_x - v_neck/2 - (v_width/2 - v_neck/2) * v_segment_t
+            v_target_y[v_d] = v_center_y + (v_height/2) * v_segment_t
+        else
+            # Bottom horizontal (right to left)
+            v_segment_t = (v_t - 0.75) / 0.25
+            v_target_x[v_d] = v_center_x + v_width/2 - v_width * v_segment_t
+            v_target_y[v_d] = v_center_y + v_height/2
+        endif
+    endfor v_d
+}
+
+def set_spiral {
+    v_max_radius = 20  # Starting radius
+    v_center_x = 32
+    v_center_y = 32
+    v_max_angle = 4 * pi  # Two full rotations
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones  # 0 to 1
+        v_radius = v_max_radius * (1 - v_t)  # 20 to 0
+        v_angle = v_max_angle * v_t  # 0 to 4π
+        v_target_x[v_d] = v_center_x + v_radius * cos(v_angle)
+        v_target_y[v_d] = v_center_y + v_radius * sin(v_angle)
+    endfor v_d
+}
+
+def set_galaxy {
+    v_radius = 25
+    v_center_x = 32
+    v_center_y = 32
+    v_arms = 2
+    v_rotations = 1.5
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_arm = v_d % v_arms
+        v_angle = v_t * 2 * pi * v_rotations + (2 * pi * v_arm / v_arms)
+        
+        # Spiral equation r = a*e^(b*theta)
+        v_r = v_radius * v_t
+        
+        v_target_x[v_d] = v_center_x + v_r * cos(v_angle)
+        v_target_y[v_d] = v_center_y + v_r * sin(v_angle)
+    endfor v_d
+}
+
+def set_infinity {
+    v_width = 18
+    v_height = 12
+    v_center_x = 32
+    v_center_y = 32
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_angle = 2 * pi * v_t
+        
+        # Lemniscate of Bernoulli (infinity shape)
+        v_denom = 1 + sin(v_angle) * sin(v_angle)
+        v_r = cos(v_angle) / v_denom
+        
+        v_target_x[v_d] = v_center_x + v_width * v_r
+        v_target_y[v_d] = v_center_y + v_height * sin(v_angle) * cos(v_angle) / v_denom
+    endfor v_d
+}
+
+def set_atom {
+    v_nucleus_radius = 6
+    v_orbit_radius = 22
+    v_center_x = 32
+    v_center_y = 32
+    v_electrons = 4
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        if v_d < v_electrons then
+            # Electrons at fixed positions
+            v_angle = 2 * pi * v_d / v_electrons
+            v_target_x[v_d] = v_center_x + v_orbit_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_orbit_radius * sin(v_angle)
+        elseif v_d < 2 * v_electrons then
+            # First orbit
+            v_t = (v_d - v_electrons) / v_electrons
+            v_angle = 2 * pi * v_t
+            v_target_x[v_d] = v_center_x + v_orbit_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_orbit_radius * sin(v_angle)
+        elseif v_d < 3 * v_electrons then
+            # Second orbit (tilted)
+            v_t = (v_d - 2 * v_electrons) / v_electrons
+            v_angle = 2 * pi * v_t
+            v_target_x[v_d] = v_center_x + v_orbit_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_orbit_radius * 0.6 * sin(v_angle)
+        else
+            # Nucleus
+            v_t = (v_d - 3 * v_electrons) / (v_num_drones - 3 * v_electrons)
+            v_angle = 2 * pi * v_t
+            v_target_x[v_d] = v_center_x + v_nucleus_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_nucleus_radius * sin(v_angle)
+        endif
+    endfor v_d
+}
+
+def set_snowflake {
+    v_radius = 25
+    v_center_x = 32
+    v_center_y = 32
+    v_branches = 6
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_branch = v_d % v_branches
+        v_pos = floor(v_d / v_branches)
+        v_total_pos = v_num_drones / v_branches
+        v_t = v_pos / v_total_pos
+        v_branch_angle = 2 * pi * v_branch / v_branches
+        
+        # Calculate position along branch
+        v_dist = v_radius * v_t
+        v_target_x[v_d] = v_center_x + v_dist * cos(v_branch_angle)
+        v_target_y[v_d] = v_center_y + v_dist * sin(v_branch_angle)
+    endfor v_d
+}
+
+def set_wave {
+    v_width = 50
+    v_height = 15
+    v_center_x = 32
+    v_center_y = 32
+    v_waves = 2
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        v_target_x[v_d] = v_center_x - v_width/2 + v_width * v_t
+        v_target_y[v_d] = v_center_y + v_height * sin(v_t * 2 * pi * v_waves)
+    endfor v_d
+}
+
+def set_rings {
+    v_outer_radius = 24
+    v_inner_radius = 12
+    v_center_x = 32
+    v_center_y = 32
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        
+        if v_t < 0.5 then
+            # Outer ring
+            v_angle = 2 * pi * (v_t / 0.5)
+            v_target_x[v_d] = v_center_x + v_outer_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_outer_radius * sin(v_angle)
+        else
+            # Inner ring
+            v_angle = 2 * pi * ((v_t - 0.5) / 0.5)
+            v_target_x[v_d] = v_center_x + v_inner_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_inner_radius * sin(v_angle)
+        endif
+    endfor v_d
+}
+
+
+def set_tree {
+    v_trunk_height = 18
+    v_trunk_width = 8
+    v_crown_radius = 18
+    v_center_x = 32
+    v_center_y = 40
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        
+        if v_t < 0.3 then
+            # Trunk (rectangle) - centered properly
+            v_trunk_t = v_t / 0.3
+            if v_trunk_t < 0.25 then
+                # Left side going up
+                v_target_x[v_d] = v_center_x - v_trunk_width/2
+                v_target_y[v_d] = v_center_y - v_trunk_t * 4 * v_trunk_height
+            elseif v_trunk_t < 0.5 then
+                # Top side left to right
+                v_segment_t = (v_trunk_t - 0.25) * 4
+                v_target_x[v_d] = v_center_x - v_trunk_width/2 + v_trunk_width * v_segment_t
+                v_target_y[v_d] = v_center_y - v_trunk_height
+            elseif v_trunk_t < 0.75 then
+                # Right side going down
+                v_segment_t = (v_trunk_t - 0.5) * 4
+                v_target_x[v_d] = v_center_x + v_trunk_width/2
+                v_target_y[v_d] = v_center_y - v_trunk_height + v_segment_t * v_trunk_height
+            else
+                # Bottom side right to left
+                v_segment_t = (v_trunk_t - 0.75) * 4
+                v_target_x[v_d] = v_center_x + v_trunk_width/2 - v_trunk_width * v_segment_t
+                v_target_y[v_d] = v_center_y
+            endif
+        else
+            # Tree crown (large circle) - centered over the trunk
+            v_crown_t = (v_t - 0.3) / 0.7
+            v_angle = 2 * pi * v_crown_t
+            v_target_x[v_d] = v_center_x + v_crown_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y - v_trunk_height - v_crown_radius/2 + v_crown_radius/2 * sin(v_angle)
+        endif
+    endfor v_d
+}
+
+def set_peace {
+    v_radius = 20
+    v_center_x = 32
+    v_center_y = 32
+    v_stem_length = v_radius * 0.8
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        
+        if v_t < 0.6 then
+            # Outer circle (60% of drones)
+            v_angle = 2 * pi * v_t / 0.6
+            v_target_x[v_d] = v_center_x + v_radius * cos(v_angle)
+            v_target_y[v_d] = v_center_y + v_radius * sin(v_angle)
+        else
+            # Inner peace symbol (40% of drones) - equal distribution
+            v_inner_t = (v_t - 0.6) / 0.4
+            
+            # More balanced distribution for the three lines
+            if v_inner_t < 0.4 then
+                # Vertical line (more drones than before)
+                v_line_t = v_inner_t / 0.4
+                v_target_x[v_d] = v_center_x
+                v_target_y[v_d] = v_center_y + v_stem_length - 2 * v_stem_length * v_line_t
+            elseif v_inner_t < 0.7 then
+                # Left diagonal
+                v_diag_t = (v_inner_t - 0.4) / 0.3
+                v_target_x[v_d] = v_center_x - v_stem_length * v_diag_t
+                v_target_y[v_d] = v_center_y + v_stem_length * v_diag_t
+            else
+                # Right diagonal
+                v_diag_t = (v_inner_t - 0.7) / 0.3
+                v_target_x[v_d] = v_center_x + v_stem_length * v_diag_t
+                v_target_y[v_d] = v_center_y + v_stem_length * v_diag_t
+            endif
+        endif
+    endfor v_d
+}
+
+def set_flame {
+    v_height = 40
+    v_width = 25
+    v_center_x = 32
+    v_center_y = 50  # Moved down from 40 to 50
+    
+    for v_d in (0, v_num_drones - 1, 1)
+        v_t = v_d / v_num_drones
+        
+        # Parametric flame shape
+        v_angle = 2 * pi * v_t
+        v_r = 0.5 + 0.5 * sin(v_angle * 4)  # Creates flame "licks"
+        
+        if v_t < 0.5 then
+            # Left side of flame
+            v_flame_t = v_t * 2
+            v_height_factor = 1 - v_flame_t
+            v_width_factor = sin(pi * v_flame_t) * v_r
+            
+            v_target_x[v_d] = v_center_x - v_width * v_width_factor
+            v_target_y[v_d] = v_center_y - v_height * v_height_factor
+        else
+            # Right side of flame
+            v_flame_t = (v_t - 0.5) * 2
+            v_height_factor = v_flame_t
+            v_width_factor = sin(pi * v_flame_t) * v_r
+            
+            v_target_x[v_d] = v_center_x + v_width * v_width_factor
+            v_target_y[v_d] = v_center_y - v_height * (1 - v_height_factor)
+        endif
+    endfor v_d
+}
+
+# Create array to track shapes
+v_num_shapes = 21  # Total number of shapes
+create_array(v_shape_order, v_num_shapes)
+
+# Procedure to shuffle the shapes for random order
+def shuffle_shapes {
+    #print("Shuffling shapes for next sequence")
+    for v_i in (0, v_num_shapes - 1, 1)
+        v_shape_order[v_i] = v_i
+    endfor v_i
+    
+    # Fisher-Yates shuffle algorithm with bounds checking
+    for v_i in (0, v_num_shapes - 2, 1)
+        # Generate random index from i to n-1
+        v_rand_range = v_num_shapes - v_i - 1
+        v_rand_offset = floor(random(0, v_rand_range + 0.999, 0))
+        v_j = v_i + v_rand_offset
+        
+        # Safety check to ensure v_j is in bounds
+        if v_j >= v_num_shapes then
+            v_j = v_num_shapes - 1
+        endif
+        
+        # Swap elements at i and j
+        v_temp = v_shape_order[v_i]
+        v_shape_order[v_i] = v_shape_order[v_j]
+        v_shape_order[v_j] = v_temp
+    endfor v_i
+}
+
+# Procedure to display a shape based on its index
+def show_shape {
+    if v_current_shape == 0 then
+        #print("Showing peace sign")
+        call set_peace
+    elseif v_current_shape == 1 then
+        #print("Showing flame")
+        call set_flame
+    elseif v_current_shape == 2 then
+        #print("Showing circle")
+        call set_circle
+    elseif v_current_shape == 3 then
+        #print("Showing tree")
+        call set_tree
+    elseif v_current_shape == 4 then
+        #print("Showing rings")
+        call set_rings
+    elseif v_current_shape == 5 then
+        #print("Showing wave")
+        call set_wave
+    elseif v_current_shape == 6 then
+        #print("Showing snowflake")
+        call set_snowflake
+    elseif v_current_shape == 7 then
+        #print("Showing atom")
+        call set_atom
+    elseif v_current_shape == 8 then
+        #print("Showing infinity")
+        call set_infinity
+    elseif v_current_shape == 9 then
+        #print("Showing galaxy")
+        call set_galaxy
+    elseif v_current_shape == 10 then
+        #print("Showing spiral")
+        call set_spiral
+    elseif v_current_shape == 11 then
+        #print("Showing hourglass")
+        call set_hourglass
+    elseif v_current_shape == 12 then
+        #print("Showing cube")
+        call set_cube
+    elseif v_current_shape == 13 then
+        #print("Showing star")
+        call set_star
+    elseif v_current_shape == 14 then
+        #print("Showing heart")
+        call set_heart
+    elseif v_current_shape == 15 then
+        #print("Showing cross")
+        call set_cross
+    elseif v_current_shape == 16 then
+        #print("Showing pentagon")
+        call set_pentagon
+    elseif v_current_shape == 17 then
+        #print("Showing square")
+        call set_square
+    elseif v_current_shape == 18 then
+        #print("Showing triangle")
+        call set_triangle
+    elseif v_current_shape == 19 then
+        #print("Showing pyramid")
+        call set_pyramid
+    else
+        #print("Showing smiley")
+        call set_smiley
+    endif
+    
+    # Common code for all shapes
+    call calc_paths
+    call animate_drones
+    rest(1)
+    v_color = (v_color + 20) % 99
+    if v_color == 0 then
+        v_color = 1
+    endif
+}
+
+# Main loop
+#print("Starting randomized drone show")
+v_round = 1
+
+while true then
+    #print(f"Beginning round {v_round}")
+    # Shuffle the shapes
+    call shuffle_shapes
+    
+    # Display all shapes in the shuffled order
+    for v_i in (0, v_num_shapes - 1, 1)
+        v_current_shape = v_shape_order[v_i]
+        #print(f"Shape {v_i + 1} of {v_num_shapes}")
+        call show_shape
+    endfor v_i
+    
+    v_round = v_round + 1
+endwhile

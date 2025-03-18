@@ -1,0 +1,132 @@
+# Initialize physics variables
+v_gravity = 9.8  # Gravity acceleration
+v_dt = 0.05      # Time step
+v_bounce = 0.80  # Bounce coefficient (energy loss)
+v_wall_bounce = 0.95  # Wall bounce coefficient
+
+# Ball properties
+v_radius = 3
+v_x = 32.0  # Start in middle
+v_y = 10.0  # Start near top
+v_vx = 8.0  # Initial horizontal velocity
+v_vy = 0.0  # Initial vertical velocity
+
+# Screen boundaries
+v_floor = 60     # Floor y-position
+v_left_wall = 0
+v_right_wall = 63
+
+# Floor line properties
+v_floor_burnout = 30000  # 30 seconds
+
+# Impulse properties
+v_impulse_counter = 0
+v_impulse_interval = 100  # Apply impulse every 100 frames
+
+# Main animation loop
+for v_t in (0, 10000, v_dt)
+    # Calculate clear rectangle coordinates
+    v_draw_x = round(v_x)
+    v_draw_y = round(v_y)
+    
+    # Calculate clear area with extra padding
+    v_clear_x = v_draw_x - v_radius - 2
+    v_clear_y = v_draw_y - v_radius - 2
+    v_clear_w = v_radius * 2 + 4
+    v_clear_bottom = v_draw_y + v_radius + 2
+    
+    # Adjust clear height to not overlap floor
+    if v_clear_bottom >= v_floor - 1 then
+        v_clear_h = v_floor - 1 - v_clear_y
+    else
+        v_clear_h = v_radius * 2 + 4
+    endif
+    
+    # Ensure we don't clear outside screen boundaries
+    if v_clear_x < 0 then
+        v_clear_w = v_clear_w + v_clear_x
+        v_clear_x = 0
+    endif
+    
+    if v_clear_y < 0 then
+        v_clear_h = v_clear_h + v_clear_y
+        v_clear_y = 0
+    endif
+    
+    if v_clear_x + v_clear_w > v_right_wall then
+        v_clear_w = v_right_wall - v_clear_x + 1
+    endif
+    
+    # Clear previous ball position
+    # draw_rectangle(v_clear_x, v_clear_y, v_clear_w, v_clear_h, black, true)
+
+    # Update velocity with gravity
+    v_vy_delta = v_gravity * v_dt
+    v_vy = v_vy + v_vy_delta
+
+    # Increment impulse counter
+    v_impulse_counter = v_impulse_counter + 1
+
+    # Check if we should apply an impulse - now just based on counter
+    if v_impulse_counter >= v_impulse_interval then
+        # Random x impulse between -10 and 10
+        v_impulse_x = random(-10, 10, 1)
+        # Random y impulse between -15 and -10 (upward)
+        v_impulse_y = random(-15, -10, 1)
+        
+        v_vx = v_vx + v_impulse_x
+        v_vy = v_vy + v_impulse_y
+        
+        # Reset counter
+        v_impulse_counter = 0
+        
+    endif
+
+    # Calculate new positions (keep as floats for physics)
+    v_dx = v_vx * v_dt
+    v_dy = v_vy * v_dt
+    v_new_x = v_x + v_dx
+    v_new_y = v_y + v_dy
+
+    # Floor collision check
+    v_ball_bottom = v_new_y + v_radius
+    if v_ball_bottom > v_floor - 1 then
+        v_new_y = v_floor - v_radius - 1
+        v_vy = v_vy * -v_bounce
+    endif
+
+    # Left wall collision check
+    v_ball_left = v_new_x - v_radius
+    if v_ball_left < v_left_wall then
+        v_new_x = v_left_wall + v_radius
+        v_vx = v_vx * -v_wall_bounce
+    endif
+
+    # Right wall collision check
+    v_ball_right = v_new_x + v_radius
+    if v_ball_right > v_right_wall then
+        v_new_x = v_right_wall - v_radius
+        v_vx = v_vx * -v_wall_bounce
+    endif
+
+    # Update position (keep as floats for physics)
+    v_x = v_new_x
+    v_y = v_new_y
+
+    # Convert to integer coordinates for drawing
+    v_draw_x = round(v_x)
+    v_draw_y = round(v_y)
+    
+    # Calculate inner radius for second circle
+    v_inner_radius = v_radius - 1
+
+    # Draw the ball with two circles for depth effect
+    begin_frame
+    draw_line(0, v_floor, 63, v_floor, white, 50)
+    draw_circle(v_draw_x, v_draw_y, v_radius, cyan, 100, false)
+    draw_circle(v_draw_x, v_draw_y, v_inner_radius, blue, 100, true)
+    end_frame
+
+    # Rest between frames
+    rest(0.01)
+endfor v_t

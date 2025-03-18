@@ -1,0 +1,8 @@
+v_x1 = 10
+v_y1 = 20
+v_radius = 15
+clear
+draw_line(0, 0, v_x1, v_y1, red, 5)
+rest(1)
+draw_circle(32, 32, v_radius, blue, false, 7.02)
+plot(v_x1, v_y1, white, 2)

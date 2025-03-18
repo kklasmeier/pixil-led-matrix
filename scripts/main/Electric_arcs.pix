@@ -1,0 +1,101 @@
+# Define constants
+v_num_arcs = 6            # Number of simultaneous arcs
+v_colors = 5              # Number of bright colors
+create_array(v_color_list, v_colors, string)  # Array for colors
+v_color_list[0] = "white"
+v_color_list[1] = "blue"
+v_color_list[2] = "yellow"
+v_color_list[3] = "cyan"
+
+v_center_x = 32           # Center of display
+v_center_y = 32
+v_outer_radius = 30       # Outer circle radius
+v_inner_radius = 4        # Inner sphere radius
+
+# Arrays to store arc start/end points and colors
+create_array(v_start_x, v_num_arcs, numeric)  # On outer circle
+create_array(v_start_y, v_num_arcs, numeric)
+create_array(v_end_x, v_num_arcs, numeric)    # On inner sphere's closest edge
+create_array(v_end_y, v_num_arcs, numeric)
+create_array(v_arc_color, v_num_arcs, numeric)  # Index into v_color_list
+
+# Procedure to initialize a new arc
+def init_arc {
+    v_angle = random(0, 360, 0)  # Random angle for outer point
+    v_start_x[v_i] = v_center_x + v_outer_radius * cos(radians(v_angle))
+    v_start_y[v_i] = v_center_y + v_outer_radius * sin(radians(v_angle))
+    
+    v_start_x[v_i] = max(0, min(63, round(v_start_x[v_i])))
+    v_start_y[v_i] = max(0, min(63, round(v_start_y[v_i])))
+    
+    v_dx = v_start_x[v_i] - v_center_x
+    v_dy = v_start_y[v_i] - v_center_y
+    v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+    if v_dist < 1 then  # Avoid division by zero
+        v_dist = 1
+    endif
+    v_scale = v_inner_radius / v_dist
+    
+    v_end_x[v_i] = v_center_x + v_dx * v_scale
+    v_end_y[v_i] = v_center_y + v_dy * v_scale
+    
+    v_end_x[v_i] = max(0, min(63, round(v_end_x[v_i])))
+    v_end_y[v_i] = max(0, min(63, round(v_end_y[v_i])))
+    
+    v_arc_color[v_i] = random(0, v_colors - 1, 0)  # Random color index 0-3
+}
+
+# Procedure to draw an arc with jagged segments
+def draw_arc {
+    v_dx = (v_end_x[v_i] - v_start_x[v_i]) / 3
+    v_dy = (v_end_y[v_i] - v_start_y[v_i]) / 3
+    
+    v_mid1_x = v_start_x[v_i] + v_dx + random(-5, 5, 0)
+    v_mid1_y = v_start_y[v_i] + v_dy + random(-5, 5, 0)
+    v_mid2_x = v_start_x[v_i] + v_dx * 2 + random(-5, 5, 0)
+    v_mid2_y = v_start_y[v_i] + v_dy * 2 + random(-5, 5, 0)
+    
+    v_mid1_x = max(0, min(63, v_mid1_x))
+    v_mid1_y = max(0, min(63, v_mid1_y))
+    v_mid2_x = max(0, min(63, v_mid2_x))
+    v_mid2_y = max(0, min(63, v_mid2_y))
+    
+    # Draw bright main arc (intensity 99)
+    draw_line(v_start_x[v_i], v_start_y[v_i], v_mid1_x, v_mid1_y, v_color_list[v_arc_color[v_i]], 99)
+    draw_line(v_mid1_x, v_mid1_y, v_mid2_x, v_mid2_y, v_color_list[v_arc_color[v_i]], 99)
+    draw_line(v_mid2_x, v_mid2_y, v_end_x[v_i], v_end_y[v_i], v_color_list[v_arc_color[v_i]], 99)
+    
+    # Draw faint trail with burnout
+    draw_line(v_start_x[v_i], v_start_y[v_i], v_mid1_x, v_mid1_y, v_color_list[v_arc_color[v_i]], 25, 200)
+    draw_line(v_mid1_x, v_mid1_y, v_mid2_x, v_mid2_y, v_color_list[v_arc_color[v_i]], 25, 200)
+    draw_line(v_mid2_x, v_mid2_y, v_end_x[v_i], v_end_y[v_i], v_color_list[v_arc_color[v_i]], 25, 200)
+}
+
+# Initialize arcs
+for v_i in (0, v_num_arcs - 1, 1) then
+    call init_arc
+endfor v_i
+
+# Infinite loop for arc animation
+v_timer = 0               # Timer for arc updates
+while true then
+    begin_frame           # Fresh frame each iteration
+        # Draw outer circle and inner sphere
+        draw_circle(v_center_x, v_center_y, v_outer_radius, purple, 50, false)
+        draw_circle(v_center_x, v_center_y, v_inner_radius, purple, 75, true)
+        
+        # Draw all arcs
+        for v_i in (0, v_num_arcs - 1, 1) then
+            call draw_arc
+        endfor v_i
+    end_frame             # Display it
+    
+    rest(0.1)             # 10 FPS for electric feel
+    
+    v_timer = v_timer + 1
+    if v_timer >= 5 then  # Update one arc every 0.5s
+        v_i = random(0, v_num_arcs - 1, 0)  # Pick random arc
+        call init_arc    # New start/end points and color
+        v_timer = 0      # Reset timer
+    endif
+endwhile

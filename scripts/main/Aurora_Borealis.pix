@@ -1,0 +1,79 @@
+# Aurora Borealis
+# Simulates the flowing waves of the northern lights
+
+# Parameters
+v_width = 64
+v_height = 64
+v_num_waves = 4
+v_wave_height = 20
+
+# Create wave arrays
+create_array(v_wave_offset, v_num_waves + 1)
+create_array(v_wave_speed, v_num_waves + 1)
+create_array(v_wave_phase, v_num_waves + 1)
+create_array(v_wave_color, v_num_waves + 1, string)
+
+# Set wave properties
+v_wave_color[0] = "green"
+v_wave_color[1] = "cyan"
+v_wave_color[2] = "teal"
+v_wave_color[3] = "indigo"
+v_wave_color[4] = "purple"
+
+# Initialize waves
+for v_i in (0, v_num_waves - 1, 1) then
+    v_wave_offset[v_i] = v_i * (v_height / v_num_waves)
+    v_wave_speed[v_i] = random(1, 4, 1) * 0.01
+    v_wave_phase[v_i] = random(0, 100, 0) * 0.1
+endfor v_i
+
+# Main animation loop
+v_running = 1
+v_frame = 0
+
+while v_running == 1 then
+    begin_frame
+    
+    # Draw each wave
+    for v_wave in (0, v_num_waves - 1, 1) then
+        v_base_height = v_wave_offset[v_wave]
+        v_phase = v_wave_phase[v_wave]
+        
+        # Draw wave points across the width
+        for v_x in (0, v_width - 1, 2) then
+            # Calculate wave height using two sin waves for more natural movement
+            v_wave_y = v_base_height + sin(v_x * 0.1 + v_phase) * (v_wave_height * 0.5)
+            v_wave_y = v_wave_y + sin(v_x * 0.05 + v_phase * 1.5) * (v_wave_height * 0.3)
+            
+            # Calculate intensity falloff from wave center
+            v_intensity = 80 - abs(v_wave_y - v_base_height) * 2
+            if v_intensity < 30 then
+                v_intensity = random(15, 40, 0)
+            endif
+            
+            # Draw vertical line at this x position
+            v_line_top = v_wave_y - random(2, 6, 0)
+            v_line_height = random(3, 8, 0)
+            
+            draw_line(v_x, v_line_top, v_x, v_line_top + v_line_height, v_wave_color[v_wave], v_intensity)
+        endfor v_x
+        
+        # Update wave phase
+        v_wave_phase[v_wave] = v_wave_phase[v_wave] + v_wave_speed[v_wave]
+    endfor v_wave
+    
+    # Draw a few stars in background
+    if v_frame % 10 == 0 then
+        v_star_x = random(0, v_width - 1, 0)
+        v_star_y = random(0, v_height / 2 - 1, 0)
+        plot(v_star_x, v_star_y, white, random(50, 100, 0), random(30, 100, 0))
+    endif
+    
+    end_frame
+    
+    # Animation control
+    v_frame = v_frame + 1
+    
+endwhile
+
+clear()

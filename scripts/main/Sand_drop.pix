@@ -1,0 +1,83 @@
+# Define sprites
+define_sprite(chute, 5, 5)
+    draw_rectangle(0, 0, 3, 2, navy, 100, true)
+    plot(1, 2, royal_blue, 100)
+endsprite
+
+define_sprite(sand, 1, 1)
+    plot(0, 0, yellow, 70)
+endsprite
+
+create_array(v_pile_height, 64)
+
+# Physics constants
+v_gravity = 9.8
+v_dt = 0.016
+v_damping = 0.99
+v_move_delay = 0.01
+
+# Initialize variables
+v_x = 32
+v_direction = 1
+v_particle_x = 0
+v_particle_y = 3
+v_velocity_y = 0
+v_time = 0
+
+# Color variation for sand texture
+create_array(v_sand_colors, 4, string)
+v_sand_colors[0] = "yellow:85"
+v_sand_colors[1] = "gold:75"
+v_sand_colors[2] = "yellow:50"
+v_sand_colors[3] = "tan:70"
+
+show_sprite(chute, v_x, 0)
+show_sprite(sand, v_particle_x, v_particle_y)
+
+while 1 then
+    v_x = v_x + v_direction
+    
+    v_random = random(1, 20, 0)
+    if v_random == 1 then
+        v_direction = v_direction * -1
+    endif
+    
+    if v_x <= 0 then
+        v_direction = 1
+    endif
+    if v_x >= 62 then
+        v_direction = -1
+    endif
+    #rest(.5)
+    move_sprite(chute, v_x, 0)
+    
+    v_velocity_y = (v_velocity_y + v_gravity * v_dt) * v_damping
+    v_particle_y = v_particle_y + v_velocity_y
+    v_time = v_time + v_dt
+    
+    move_sprite(sand, v_particle_x, v_particle_y)
+    
+    v_floor_height = 63 - v_pile_height[v_particle_x]
+    if v_particle_y >= v_floor_height then
+        # Add texture variation using predefined color:intensity strings
+        v_color_index = random(0, 3, 0)
+        if v_color_index == 0 then
+            plot(v_particle_x, v_floor_height, yellow, 85)
+        elseif v_color_index == 1 then
+            plot(v_particle_x, v_floor_height, gold, 75)
+        elseif v_color_index == 2 then
+            plot(v_particle_x, v_floor_height, yellow, 50)
+        else
+            plot(v_particle_x, v_floor_height, tan, 70)
+        endif
+        
+        v_pile_height[v_particle_x] = v_pile_height[v_particle_x] + 1
+        
+        v_particle_x = v_x + 1
+        v_particle_y = 3
+        v_velocity_y = random(-1, 1, 0.1)
+        v_time = 0
+    endif
+    
+    rest(v_move_delay)
+endwhile

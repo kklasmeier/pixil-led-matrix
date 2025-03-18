@@ -1,0 +1,123 @@
+# Gravity wells setup
+create_array(v_wells_x, 3)
+create_array(v_wells_y, 3)
+create_array(v_wells_force, 3)  # Store force per well
+v_wells_x[0] = 32
+v_wells_y[0] = 32
+v_wells_force[0] = 0.7
+v_wells_x[1] = 16
+v_wells_y[1] = 16
+v_wells_force[1] = 0.5
+v_wells_x[2] = 48
+v_wells_y[2] = 48
+v_wells_force[2] = 0.6
+
+# Colors
+create_array(v_colors, 3, string)
+v_colors[0] = "cyan"
+v_colors[1] = "purple"
+v_colors[2] = "yellow"
+
+# Particles setup
+create_array(v_particles_x, 15)
+create_array(v_particles_y, 15)
+create_array(v_vel_x, 15)
+create_array(v_vel_y, 15)
+for v_i in (0, 14, 1) then  # Changed from (0, 15, 1) to (0, 14, 1)
+    v_particles_x[v_i] = random(0, 63, 0)
+    v_particles_y[v_i] = random(0, 63, 0)
+    v_vel_x[v_i] = random(-0.5, 0.5, 1)
+    v_vel_y[v_i] = random(-0.5, 0.5, 1)
+endfor v_i
+
+# Timing and variation control
+v_time = 0
+v_change_timer = 0
+v_change_interval = 1.5  # Seconds between major changes
+
+# Animation loop
+while true then
+    begin_frame
+    
+    # Update well positions and forces periodically
+    v_change_timer = v_change_timer + 0.025
+    if v_change_timer >= v_change_interval then
+        # Randomly reposition one well
+        v_well_idx = random(0, 2, 0)
+        v_wells_x[v_well_idx] = random(10, 54, 0)
+        v_wells_y[v_well_idx] = random(10, 54, 0)
+        
+        # Randomly adjust all forces
+        for v_j in (0, 2, 1) then  # Changed from (0, 3, 1) to (0, 2, 1)
+            v_wells_force[v_j] = random(0.3, 2.0, 1)
+        endfor v_j
+        
+        # Occasionally perturb particle velocities
+        if random(0, 1, 0) == 1 then
+            for v_i in (0, 14, 1) then  # Changed from (0, 15, 1) to (0, 14, 1)
+                v_vel_x[v_i] = v_vel_x[v_i] + random(-1.0, 1.0, 1)
+                v_vel_y[v_i] = v_vel_y[v_i] + random(-1.0, 1.0, 1)
+            endfor v_i
+        endif
+        
+        v_change_timer = 0  # Reset timer
+    endif
+    
+    # Oscillate wells slightly for extra motion
+    v_wells_x[1] = v_wells_x[1] + sin(v_time) * 2
+    v_wells_y[1] = v_wells_y[1] + cos(v_time) * 2
+    v_wells_x[2] = v_wells_x[2] + sin(v_time + 1.5) * 2
+    v_wells_y[2] = v_wells_y[2] + cos(v_time + 1.5) * 2
+    
+    # Draw particles
+    for v_i in (0, 14, 1) then  # Changed from (0, 15, 1) to (0, 14, 1)
+        v_x = v_particles_x[v_i]
+        v_y = v_particles_y[v_i]
+        plot(v_x, v_y, v_colors[v_i % 3], 75, 250)
+        
+        # Calculate gravitational pull from each well
+        v_ax = 0
+        v_ay = 0
+        for v_j in (0, 2, 1) then  # Changed from (0, 3, 1) to (0, 2, 1)
+            v_dx = v_wells_x[v_j] - v_x
+            v_dy = v_wells_y[v_j] - v_y
+            v_dist = max(sqrt(v_dx * v_dx + v_dy * v_dy), 1)
+            v_force = v_wells_force[v_j] / v_dist
+            v_ax = v_ax + (v_dx * v_force)
+            v_ay = v_ay + (v_dy * v_force)
+        endfor v_j
+        
+        # Update velocity and position
+        v_vel_x[v_i] = v_vel_x[v_i] + v_ax * 0.05
+        v_vel_y[v_i] = v_vel_y[v_i] + v_ay * 0.05
+        v_particles_x[v_i] = v_x + v_vel_x[v_i]
+        v_particles_y[v_i] = v_y + v_vel_y[v_i]
+        
+        # Bounce off edges with damping
+        if v_particles_x[v_i] < 0 then
+            v_particles_x[v_i] = 0
+            v_vel_x[v_i] = abs(v_vel_x[v_i]) * 0.8
+        endif
+        if v_particles_x[v_i] > 63 then
+            v_particles_x[v_i] = 63
+            v_vel_x[v_i] = -abs(v_vel_x[v_i]) * 0.8
+        endif
+        if v_particles_y[v_i] < 0 then
+            v_particles_y[v_i] = 0
+            v_vel_y[v_i] = abs(v_vel_y[v_i]) * 0.8
+        endif
+        if v_particles_y[v_i] > 63 then
+            v_particles_y[v_i] = 63
+            v_vel_y[v_i] = -abs(v_vel_y[v_i]) * 0.8
+        endif
+    endfor v_i
+    
+    # Draw wells faintly
+    for v_j in (0, 2, 1) then  # Changed from (0, 3, 1) to (0, 2, 1)
+        plot(v_wells_x[v_j], v_wells_y[v_j], white, 30, 250)
+    endfor v_j
+    
+    end_frame
+    v_time = v_time + 0.1
+    rest(0.025)  # ~40 FPS
+endwhile

@@ -1,0 +1,658 @@
+# 3D Shape Animation with Multiple Shapes
+# Global animation controls
+v_speedctrl = 20
+v_maxrotspeed = 0.1
+v_resttime = 0.015
+v_shapetime = 10      # How long each shape animates (in seconds)
+v_pausetime = .5      # Pause between shapes (in seconds)
+v_intensity = 75      # Shape color intensity
+
+# Rotation variables
+v_anglex = 0
+v_angley = 0
+v_anglez = 0
+v_rotspeedx = 0.00001 * v_speedctrl
+v_rotspeedy = 0.000015 * v_speedctrl
+v_rotspeedz = 0.000008 * v_speedctrl
+
+# Position and movement
+v_centerx = 32
+v_centery = 32
+v_size = 10
+v_depth = 200
+v_posx = 0
+v_posy = 0
+v_posz = 100
+v_speedx = 2
+v_speedy = 1.5
+v_speedz = 1
+v_boundx = 40  # Increased from 30
+v_boundy = 40  # Increased from 30
+v_boundz = 50
+
+# Arrays for vertex storage and calculations
+create_array(v_screenx, 8)
+create_array(v_screeny, 8)
+create_array(v_x, 8)
+create_array(v_y, 8)
+create_array(v_z, 8)
+create_array(v_maxbound, 3)  # Add this
+create_array(v_minbound, 3)  # Add this
+create_array(v_shapes, 6) # Create array to store shape sequence (1=Tetrahedron, 2=Octahedron, etc)
+
+# Display boundaries
+v_displaywidth = 64
+v_displayheight = 64
+v_displaymargin = 1  # Small margin to ensure visibility
+
+# Initialize tetrahedron vertices
+def init_tetrahedron {
+    # Reset vertices count
+    v_vertcount = 4
+    v_edgecount = 6
+
+    # Base triangle
+    v_x[0] = 1
+    v_y[0] = 0
+    v_z[0] = -0.5774
+    
+    v_x[1] = -0.5
+    v_y[1] = 0.866
+    v_z[1] = -0.5774
+    
+    v_x[2] = -0.5
+    v_y[2] = -0.866
+    v_z[2] = -0.5774
+    
+    # Top point
+    v_x[3] = 0
+    v_y[3] = 0
+    v_z[3] = 1.7321
+}
+
+# Initialize octahedron vertices
+def init_octahedron {
+    # Reset vertices count
+    v_vertcount = 6
+    v_edgecount = 12
+    
+    # Top point
+    v_x[0] = 0
+    v_y[0] = 0
+    v_z[0] = 1.5
+    
+    # Middle square
+    v_x[1] = 1
+    v_y[1] = 0
+    v_z[1] = 0
+    
+    v_x[2] = 0
+    v_y[2] = 1
+    v_z[2] = 0
+    
+    v_x[3] = -1
+    v_y[3] = 0
+    v_z[3] = 0
+    
+    v_x[4] = 0
+    v_y[4] = -1
+    v_z[4] = 0
+    
+    # Bottom point
+    v_x[5] = 0
+    v_y[5] = 0
+    v_z[5] = -1.5
+}
+
+# Initialize pyramid vertices
+def init_pyramid {
+    # Reset vertices count
+    v_vertcount = 5
+    v_edgecount = 8
+    
+    # Square base
+    v_x[0] = -1
+    v_y[0] = -1
+    v_z[0] = -1
+    
+    v_x[1] = 1
+    v_y[1] = -1
+    v_z[1] = -1
+    
+    v_x[2] = 1
+    v_y[2] = 1
+    v_z[2] = -1
+    
+    v_x[3] = -1
+    v_y[3] = 1
+    v_z[3] = -1
+    
+    # Top point
+    v_x[4] = 0
+    v_y[4] = 0
+    v_z[4] = 1.5
+}
+
+# Initialize cube vertices
+def init_cube {
+    # Reset vertices count
+    v_vertcount = 8
+    v_edgecount = 12
+    v_width = 1  # Add this to identify it's a cube
+    
+    # Front face (clockwise from top-left)
+    v_x[0] = -1  # Front top left
+    v_y[0] = -1
+    v_z[0] = 1
+    
+    v_x[1] = 1   # Front top right
+    v_y[1] = -1
+    v_z[1] = 1
+    
+    v_x[2] = 1   # Front bottom right
+    v_y[2] = 1
+    v_z[2] = 1
+    
+    v_x[3] = -1  # Front bottom left
+    v_y[3] = 1
+    v_z[3] = 1
+    
+    # Back face (clockwise from top-left)
+    v_x[4] = -1  # Back top left
+    v_y[4] = -1
+    v_z[4] = -1
+    
+    v_x[5] = 1   # Back top right
+    v_y[5] = -1
+    v_z[5] = -1
+    
+    v_x[6] = 1   # Back bottom right
+    v_y[6] = 1
+    v_z[6] = -1
+    
+    v_x[7] = -1  # Back bottom left
+    v_y[7] = 1
+    v_z[7] = -1
+}
+
+# Initialize rectangular prism vertices
+def init_rectangular_prism {
+    # Reset vertices count
+    v_vertcount = 8
+    v_edgecount = 12
+    v_width = 1.5
+    
+    # Front face (clockwise from top-left)
+    v_x[0] = -1.5  # Front top left (wider)
+    v_y[0] = -1.0
+    v_z[0] = 1.2
+    
+    v_x[1] = 1.5   # Front top right
+    v_y[1] = -1.0
+    v_z[1] = 1.2
+    
+    v_x[2] = 1.5   # Front bottom right
+    v_y[2] = 1.0
+    v_z[2] = 1.2
+    
+    v_x[3] = -1.5  # Front bottom left
+    v_y[3] = 1.0
+    v_z[3] = 1.2
+    
+    # Back face (clockwise from top-left)
+    v_x[4] = -1.5  # Back top left
+    v_y[4] = -1.0
+    v_z[4] = -1.2
+    
+    v_x[5] = 1.5   # Back top right
+    v_y[5] = -1.0
+    v_z[5] = -1.2
+    
+    v_x[6] = 1.5   # Back bottom right
+    v_y[6] = 1.0
+    v_z[6] = -1.2
+    
+    v_x[7] = -1.5  # Back bottom left
+    v_y[7] = 1.0
+    v_z[7] = -1.2
+}
+
+# Initialize triangular prism vertices
+def init_triangular_prism {
+    # Reset vertices count
+    v_vertcount = 6
+    v_edgecount = 9
+    
+    # Front triangle
+    v_x[0] = -1    # Front bottom left
+    v_y[0] = 1
+    v_z[0] = 1.5
+    
+    v_x[1] = 1     # Front bottom right
+    v_y[1] = 1
+    v_z[1] = 1.5
+    
+    v_x[2] = 0     # Front top
+    v_y[2] = -1
+    v_z[2] = 1.5
+    
+    # Back triangle
+    v_x[3] = -1    # Back bottom left
+    v_y[3] = 1
+    v_z[3] = -1.5
+    
+    v_x[4] = 1     # Back bottom right
+    v_y[4] = 1
+    v_z[4] = -1.5
+    
+    v_x[5] = 0     # Back top
+    v_y[5] = -1
+    v_z[5] = -1.5
+}
+
+# Draw tetrahedron edges
+def draw_tetrahedron {
+    # Base triangle with darker color
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], indigo, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], indigo, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[0], v_screeny[0], indigo, v_intensity)
+    
+    # Edges to top point with brighter color
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[3], v_screeny[3], violet, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[3], v_screeny[3], violet, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[3], v_screeny[3], violet, v_intensity)
+}
+
+# Draw octahedron edges
+def draw_octahedron {
+    # Edges from top point to middle square
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], cyan, v_intensity)
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[2], v_screeny[2], cyan, v_intensity)
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[3], v_screeny[3], cyan, v_intensity)
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[4], v_screeny[4], cyan, v_intensity)
+    
+    # Middle square
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], azure, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[3], v_screeny[3], azure, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[4], v_screeny[4], azure, v_intensity)
+    draw_line(v_screenx[4], v_screeny[4], v_screenx[1], v_screeny[1], azure, v_intensity)
+    
+    # Edges from bottom point to middle square
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[1], v_screeny[1], sky_blue, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[2], v_screeny[2], sky_blue, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[3], v_screeny[3], sky_blue, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[4], v_screeny[4], sky_blue, v_intensity)
+}
+
+# Draw pyramid edges
+def draw_pyramid {
+    # Base square
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], gold, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], gold, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[3], v_screeny[3], gold, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[0], v_screeny[0], gold, v_intensity)
+    
+    # Edges to top point
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[4], v_screeny[4], orange, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[4], v_screeny[4], orange, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[4], v_screeny[4], orange, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[4], v_screeny[4], orange, v_intensity)
+}
+
+# Draw cube edges
+def draw_cube {
+    # Front face
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], crimson, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], crimson, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[3], v_screeny[3], crimson, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[0], v_screeny[0], crimson, v_intensity)
+    
+    # Back face
+    draw_line(v_screenx[4], v_screeny[4], v_screenx[5], v_screeny[5], maroon, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[6], v_screeny[6], maroon, v_intensity)
+    draw_line(v_screenx[6], v_screeny[6], v_screenx[7], v_screeny[7], maroon, v_intensity)
+    draw_line(v_screenx[7], v_screeny[7], v_screenx[4], v_screeny[4], maroon, v_intensity)
+    
+    # Connecting edges
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[4], v_screeny[4], red, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[5], v_screeny[5], red, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[6], v_screeny[6], red, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[7], v_screeny[7], red, v_intensity)
+}
+
+# Draw rectangular prism edges
+def draw_rectangular_prism {
+    # Front face
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], spring_green, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], spring_green, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[3], v_screeny[3], spring_green, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[0], v_screeny[0], spring_green, v_intensity)
+    
+    # Back face
+    draw_line(v_screenx[4], v_screeny[4], v_screenx[5], v_screeny[5], teal, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[6], v_screeny[6], teal, v_intensity)
+    draw_line(v_screenx[6], v_screeny[6], v_screenx[7], v_screeny[7], teal, v_intensity)
+    draw_line(v_screenx[7], v_screeny[7], v_screenx[4], v_screeny[4], teal, v_intensity)
+    
+    # Connecting edges
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[4], v_screeny[4], turquoise, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[5], v_screeny[5], turquoise, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[6], v_screeny[6], turquoise, v_intensity)
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[7], v_screeny[7], turquoise, v_intensity)
+}
+
+# Draw triangular prism edges
+def draw_triangular_prism {
+    # Front triangle
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[1], v_screeny[1], royal_blue, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[2], v_screeny[2], royal_blue, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[0], v_screeny[0], royal_blue, v_intensity)
+    
+    # Back triangle
+    draw_line(v_screenx[3], v_screeny[3], v_screenx[4], v_screeny[4], navy, v_intensity)
+    draw_line(v_screenx[4], v_screeny[4], v_screenx[5], v_screeny[5], navy, v_intensity)
+    draw_line(v_screenx[5], v_screeny[5], v_screenx[3], v_screeny[3], navy, v_intensity)
+    
+    # Connecting edges
+    draw_line(v_screenx[0], v_screeny[0], v_screenx[3], v_screeny[3], ocean_blue, v_intensity)
+    draw_line(v_screenx[1], v_screeny[1], v_screenx[4], v_screeny[4], ocean_blue, v_intensity)
+    draw_line(v_screenx[2], v_screeny[2], v_screenx[5], v_screeny[5], ocean_blue, v_intensity)
+}
+
+# Animation sequence for any shape
+def animate_shape {
+    # Reset rotation angles
+    v_anglex = 0
+    v_angley = 0
+    v_anglez = 0
+    
+    # Reset position to center
+    v_posx = 0
+    v_posy = 0
+    v_posz = 100
+    
+    # Randomize initial movement direction
+    v_speedx = random(-2.5, 2.5, 1)
+    v_speedy = random(-2.0, 2.0, 1)
+    v_speedz = random(-1.5, 1.5, 1)
+    
+    # Make sure we're not starting with zero speed
+    if abs(v_speedx) < 0.5 then
+        v_speedx = 1.5
+    endif
+    if abs(v_speedy) < 0.5 then
+        v_speedy = 1.5
+    endif
+    if abs(v_speedz) < 0.5 then
+        v_speedz = 1.0
+    endif
+    
+    # Randomize initial rotation speeds
+    v_rotspeedx = random(-2, 2, 3) / 100000 * v_speedctrl
+    v_rotspeedy = random(-2, 2, 3) / 100000 * v_speedctrl
+    v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
+    
+    # Make sure we have some rotation
+    if abs(v_rotspeedx) < 0.00001 then
+        v_rotspeedx = 0.00001
+    endif
+    if abs(v_rotspeedy) < 0.00001 then
+        v_rotspeedy = 0.00001
+    endif
+    if abs(v_rotspeedz) < 0.00001 then
+        v_rotspeedz = 0.00001
+    endif
+    
+    # Animation loop
+    v_starttime = 0
+    while v_starttime < v_shapetime then
+        v_starttime = v_starttime + v_resttime
+        
+        # Update position
+        v_posx = v_posx + v_speedx
+        v_posy = v_posy + v_speedy
+        v_posz = v_posz + v_speedz
+        
+        # Update rotation angles
+        v_anglex = v_anglex + v_rotspeedx
+        v_angley = v_angley + v_rotspeedy
+        v_anglez = v_anglez + v_rotspeedz
+        
+        # Calculate effective size in each direction (reduced influence)
+        v_effectivex = (v_maxbound[0] - v_minbound[0]) / 3  # Reduced from 2 to 3
+        v_effectivey = (v_maxbound[1] - v_minbound[1]) / 3
+        v_effectivez = (v_maxbound[2] - v_minbound[2]) / 3
+        
+        # Position bounds checking with dynamic boundaries
+        if v_posx > v_boundx - v_effectivex then
+            v_speedx = -2.5  # Slightly increased bounce speed
+        endif
+        if v_posx < -v_boundx + v_effectivex then
+            v_speedx = 2.5
+        endif
+        
+        if v_posy > v_boundy - v_effectivey then
+            v_speedy = -2  # Slightly increased bounce speed
+        endif
+        if v_posy < -v_boundy + v_effectivey then
+            v_speedy = 2
+        endif
+        
+        if v_posz > 150 - v_effectivez then
+            v_speedz = -1.5  # Slightly increased bounce speed
+        endif
+        if v_posz < 50 + v_effectivez then
+            v_speedz = 1.5
+        endif
+        
+        # Randomly change rotation speeds occasionally
+        v_random = random(0, 100, 0)
+        if v_random < 1 then
+            v_rotspeedx = random(-2, 2, 3) / 100000 * v_speedctrl
+        endif
+        if v_random > 98 then
+            v_rotspeedy = random(-2, 2, 3) / 100000 * v_speedctrl
+        endif
+        if v_random > 48 then
+            if v_random < 52 then
+                v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
+            endif
+        endif
+        
+        # Limit rotation speeds
+        if v_rotspeedx > v_maxrotspeed then
+            v_rotspeedx = v_maxrotspeed
+        endif
+        if v_rotspeedx < -v_maxrotspeed then
+            v_rotspeedx = -v_maxrotspeed
+        endif
+        if v_rotspeedy > v_maxrotspeed then
+            v_rotspeedy = v_maxrotspeed
+        endif
+        if v_rotspeedy < -v_maxrotspeed then
+            v_rotspeedy = -v_maxrotspeed
+        endif
+        if v_rotspeedz > v_maxrotspeed then
+            v_rotspeedz = v_maxrotspeed
+        endif
+        if v_rotspeedz < -v_maxrotspeed then
+            v_rotspeedz = -v_maxrotspeed
+        endif
+        
+        begin_frame
+        
+        # Transform and project all points
+        # Initialize min/max screen coordinates
+        v_minscreenx = v_displaywidth
+        v_maxscreenx = 0
+        v_minscreeny = v_displayheight
+        v_maxscreeny = 0
+        
+        for v_i in (0, v_vertcount - 1, 1) then
+            # Start with original point
+            v_px = v_x[v_i]
+            v_py = v_y[v_i]
+            v_pz = v_z[v_i]
+            
+            # Rotate around X axis
+            v_tempy = v_py
+            v_tempz = v_pz
+            v_py = v_tempy * cos(v_anglex) - v_tempz * sin(v_anglex)
+            v_pz = v_tempy * sin(v_anglex) + v_tempz * cos(v_anglex)
+            
+            # Rotate around Y axis
+            v_tempx = v_px
+            v_tempz = v_pz
+            v_px = v_tempx * cos(v_angley) + v_tempz * sin(v_angley)
+            v_pz = -v_tempx * sin(v_angley) + v_tempz * cos(v_angley)
+            
+            # Rotate around Z axis
+            v_tempx = v_px
+            v_tempy = v_py
+            v_px = v_tempx * cos(v_anglez) - v_tempy * sin(v_anglez)
+            v_py = v_tempx * sin(v_anglez) + v_tempy * cos(v_anglez)
+            
+            # Scale and translate
+            v_px = v_px * v_size + v_posx
+            v_py = v_py * v_size + v_posy
+            v_pz = v_pz * v_size + v_posz
+            
+            # Perspective projection
+            v_scale = v_depth / (v_depth + v_pz)
+            v_screenx[v_i] = v_px * v_scale + v_centerx
+            v_screeny[v_i] = v_py * v_scale + v_centery
+            
+            # Track min/max screen coordinates
+            if v_screenx[v_i] < v_minscreenx then
+                v_minscreenx = v_screenx[v_i]
+            endif
+            if v_screenx[v_i] > v_maxscreenx then
+                v_maxscreenx = v_screenx[v_i]
+            endif
+            if v_screeny[v_i] < v_minscreeny then
+                v_minscreeny = v_screeny[v_i]
+            endif
+            if v_screeny[v_i] > v_maxscreeny then
+                v_maxscreeny = v_screeny[v_i]
+            endif
+        endfor v_i
+        
+        # Check for screen boundary collisions using actual shape extents
+        if v_maxscreenx > v_displaywidth - v_displaymargin then
+            v_speedx = -2.5
+            if v_rotspeedz > 0 then
+                v_rotspeedz = -v_rotspeedz
+            endif
+        endif
+        if v_minscreenx < v_displaymargin then
+            v_speedx = 2.5
+            if v_rotspeedz < 0 then
+                v_rotspeedz = -v_rotspeedz
+            endif
+        endif
+        
+        if v_maxscreeny > v_displayheight - v_displaymargin then
+            v_speedy = -2
+            if v_rotspeedx > 0 then
+                v_rotspeedx = -v_rotspeedx
+            endif
+        endif
+        if v_minscreeny < v_displaymargin then
+            v_speedy = 2
+            if v_rotspeedx < 0 then
+                v_rotspeedx = -v_rotspeedx
+            endif
+        endif
+        
+        # Z-axis boundary check (keeps shape visible)
+        if v_posz > 150 then
+            v_speedz = -1.5
+            if v_rotspeedy > 0 then
+                v_rotspeedy = -v_rotspeedy
+            endif
+        endif
+        if v_posz < 50 then
+            v_speedz = 1.5
+            if v_rotspeedy < 0 then
+                v_rotspeedy = -v_rotspeedy
+            endif
+        endif
+        
+        # Draw current shape
+        if v_vertcount == 4 then
+            call draw_tetrahedron
+        endif
+        if v_vertcount == 6 then
+            if v_edgecount == 12 then
+                call draw_octahedron
+            else
+                call draw_triangular_prism
+            endif
+        endif
+        if v_vertcount == 5 then
+            call draw_pyramid
+        endif
+        if v_vertcount == 8 then
+            if abs(v_width - 1) < 0.1 then
+                call draw_cube
+            else
+                call draw_rectangular_prism
+            endif
+        endif
+        
+        end_frame
+        rest(v_resttime)
+    endwhile
+}
+
+# Main animation loop
+while true then
+    # Initialize array with shape numbers
+    v_shapes[0] = 1  # Tetrahedron
+    v_shapes[1] = 2  # Octahedron
+    v_shapes[2] = 3  # Pyramid
+    v_shapes[3] = 4  # Cube
+    v_shapes[4] = 5  # Rectangular prism
+    v_shapes[5] = 6  # Triangular prism
+    
+    # Shuffle array using Fisher-Yates algorithm
+    v_i = 5  # Start from last element
+    while v_i > 0 then
+        # Generate random index between 0 and i
+        v_j = random(0, v_i, 0)
+        
+        # Swap elements at i and j
+        v_temp = v_shapes[v_i]
+        v_shapes[v_i] = v_shapes[v_j]
+        v_shapes[v_j] = v_temp
+        
+        v_i = v_i - 1
+    endwhile
+    
+    # Run through the shuffled sequence
+    for v_i in (0, 5, 1) then
+        # Select shape based on shuffled array
+        if v_shapes[v_i] == 1 then
+            call init_tetrahedron
+        endif
+        if v_shapes[v_i] == 2 then
+            call init_octahedron
+        endif
+        if v_shapes[v_i] == 3 then
+            call init_pyramid
+        endif
+        if v_shapes[v_i] == 4 then
+            call init_cube
+        endif
+        if v_shapes[v_i] == 5 then
+            call init_rectangular_prism
+        endif
+        if v_shapes[v_i] == 6 then
+            call init_triangular_prism
+        endif
+        
+        call animate_shape
+        clear()
+        rest(v_pausetime)
+    endfor v_i
+endwhile

@@ -1,0 +1,278 @@
+# Define variables for base tree
+v_center_x = 32
+v_center_y = 32
+v_tree_height = 40
+v_tree_width = 30
+v_trunk_width = 6
+v_trunk_height = 8
+
+# Define variables for colors
+v_tree_color = "forest_green"
+v_trunk_color = "standard_brown:70"
+v_light_colors = "red" # Define variables for base tree
+v_center_x = 32
+v_center_y = 32
+v_tree_height = 40
+v_tree_width = 30
+v_trunk_width = 6
+v_trunk_height = 8
+
+# Define variables for colors
+v_tree_color = "forest_green"
+v_trunk_color = "standard_brown:70"
+v_light_colors = "red"
+v_present_color1 = "red"
+v_present_color2 = "blue"
+
+# Create a procedure for the tree
+def draw_tree {
+    # Draw trunk
+    v_trunk_x = v_center_x - v_trunk_width / 2
+    v_trunk_y = v_center_y + v_tree_height/2 - v_trunk_height
+    draw_rectangle(v_trunk_x, v_trunk_y, v_trunk_width, v_trunk_height, v_trunk_color, true)
+
+    # Draw triangular tree sections
+    v_section_height = v_tree_height/3
+    v_top_y = v_center_y - v_tree_height/2
+    v_sides = 3
+
+    # Bottom section
+    draw_polygon(v_center_x, v_top_y + v_section_height * 2, v_tree_width/2, v_sides, v_tree_color, 0, true)
+    
+    # Middle section
+    draw_polygon(v_center_x, v_top_y + v_section_height, v_tree_width/2.5, v_sides, v_tree_color, 0, true)
+    
+    # Top section
+    draw_polygon(v_center_x, v_top_y, v_tree_width/3.5, v_sides, v_tree_color, 0, true)
+}
+
+# Create a procedure for presents
+def draw_presents {
+    # Draw two presents under the tree
+    v_present_y = v_center_y + v_tree_height/2
+    draw_rectangle(v_center_x - 12, v_present_y, 8, 8, v_present_color1, true)
+    draw_rectangle(v_center_x + 4, v_present_y, 10, 6, v_present_color2, true)
+}
+
+# Main loop for twinkling lights
+
+while true then
+    begin_frame
+    
+    # Draw base scene
+    clear()
+    call draw_tree
+    call draw_presents
+    
+    # Draw twinkling lights
+    for v_i in (0, 8, 1) then
+        # Random position offset for each light
+        v_x = v_center_x - 15 + v_i * 4
+        v_y = v_center_y - 10 + v_i * 2
+        
+        # Random intensity for twinkling effect
+        v_intensity = random(50, 99, 0)
+        
+        # Alternate colors
+        if v_i % 2 == 0 then
+            plot(v_x, v_y, red:{v_intensity})
+        else
+            plot(v_x, v_y, gold:{v_intensity})
+        endif
+    endfor v_i
+    
+    # Second row of lights
+    for v_i in (0, 6, 1) then
+        v_x = v_center_x - 10 + v_i * 4
+        v_y = v_center_y + v_i
+        v_intensity = random(50, 99, 0)
+        
+        if v_i % 2 == 0 then
+            plot(v_x, v_y, blue:{v_intensity})
+        else
+            plot(v_x, v_y, yellow:{v_intensity})
+        endif
+    endfor v_i
+    
+    # Bottom row of lights
+    for v_i in (0, 8, 1) then
+        v_x = v_center_x - 15 + v_i * 4
+        v_y = v_center_y + 10 - v_i
+        v_intensity = random(50, 99, 0)
+        
+        if v_i % 2 == 0 then
+            plot(v_x, v_y, purple:{v_intensity})
+        else
+            plot(v_x, v_y, cyan:{v_intensity})
+        endif
+    endfor v_i
+    
+    end_frame
+    rest(5)
+endwhile
+
+# Variables for light colors array
+v_color1 = red
+v_color2 = gold
+v_color3 = blue
+v_color4 = yellow
+v_color5 = purple
+v_color6 = cyan
+
+# Create a procedure for the tree
+def draw_tree {
+    # Draw trunk
+    v_trunk_x = v_center_x - v_trunk_width / 2
+    v_trunk_y = v_center_y + v_tree_height/2 - v_trunk_height
+    draw_rectangle(v_trunk_x, v_trunk_y, v_trunk_width, v_trunk_height, v_trunk_color, true)
+
+    # Draw triangular tree sections
+    v_section_height = v_tree_height/3
+    v_top_y = v_center_y - v_tree_height/2
+    v_sides = 3
+
+    # Bottom section
+    draw_polygon(v_center_x, v_top_y + v_section_height * 2, v_tree_width/2, v_sides, v_tree_color, 0, true)
+    
+    # Middle section
+    draw_polygon(v_center_x, v_top_y + v_section_height, v_tree_width/2.5, v_sides, v_tree_color, 0, true)
+    
+    # Top section
+    draw_polygon(v_center_x, v_top_y, v_tree_width/3.5, v_sides, v_tree_color, 0, true)
+}
+
+# Create a procedure for presents
+def draw_presents {
+    # Draw two presents under the tree
+    v_present_y = v_center_y + v_tree_height/2
+    draw_rectangle(v_center_x - 12, v_present_y, 8, 8, red, true)
+    draw_rectangle(v_center_x + 4, v_present_y, 10, 6, blue, true)
+}
+
+# Create a procedure for drawing lights that follow tree contour
+def draw_lights {
+    # Top section lights (smaller spacing)
+    v_top_start = v_center_y - v_tree_height/2 + 5
+    for v_i in (0, 5, 1) then
+        v_angle = v_i * 30
+        v_radius = 5
+        v_x = v_center_x + cos(v_angle) * v_radius
+        v_y = v_top_start + v_i * 2
+        
+        v_intensity = random(30, 99, 0)
+        v_color_pick = v_i % 6# Create a procedure for the tree
+def draw_tree {
+    # Draw trunk
+    v_trunk_x = v_center_x - v_trunk_width / 2
+    v_trunk_y = v_center_y + v_tree_height/2 - v_trunk_height
+    draw_rectangle(v_trunk_x, v_trunk_y, v_trunk_width, v_trunk_height, v_trunk_color, true)
+
+    # Draw triangular tree sections
+    v_section_height = v_tree_height/3
+    v_top_y = v_center_y - v_tree_height/2
+    v_sides = 3
+
+    # Bottom section
+    draw_polygon(v_center_x, v_top_y + v_section_height * 2, v_tree_width/2, v_sides, v_tree_color, 0, true)
+    
+    # Middle section
+    draw_polygon(v_center_x, v_top_y + v_section_height, v_tree_width/2.5, v_sides, v_tree_color, 0, true)
+    
+    # Top section
+    draw_polygon(v_center_x, v_top_y, v_tree_width/3.5, v_sides, v_tree_color, 0, true)
+}
+
+# Create a procedure for presents
+def draw_presents {
+    # Draw two presents under the tree
+    v_present_y = v_center_y + v_tree_height/2
+    draw_rectangle(v_center_x - 12, v_present_y, 8, 8, v_present_color1, true)
+    draw_rectangle(v_center_x + 4, v_present_y, 10, 6, v_present_color2, true)
+}
+
+# Main loop for twinkling lights
+while true then
+    begin_frame
+    
+    # Draw base scene
+    clear()
+    call draw_tree
+    call draw_presents
+    
+    # Top section lights - tighter spacing, smaller triangle
+    for v_i in (0, 5, 1) then
+        v_width = 6  # Width of light placement
+        v_x = v_center_x - v_width + v_i * 3
+        v_y = v_center_y - v_tree_height/2 + v_i * 2
+        
+        # More dramatic intensity variation
+        v_intensity = random(20, 99, 0)
+        
+        # Random color selection
+        v_color_pick = random(1, 6, 0)
+        if v_color_pick == 1 then
+            plot(v_x, v_y, red:{v_intensity})
+        elseif v_color_pick == 2 then
+            plot(v_x, v_y, gold:{v_intensity})
+        elseif v_color_pick == 3 then
+            plot(v_x, v_y, cyan:{v_intensity})
+        elseif v_color_pick == 4 then
+            plot(v_x, v_y, yellow:{v_intensity})
+        elseif v_color_pick == 5 then
+            plot(v_x, v_y, magenta:{v_intensity})
+        else
+            plot(v_x, v_y, blue:{v_intensity})
+        endif
+    endfor v_i
+    
+    # Middle section lights - medium spacing
+    for v_i in (0, 7, 1) then
+        v_width = 10
+        v_x = v_center_x - v_width + v_i * 3
+        v_y = v_center_y - v_tree_height/4 + v_i * 2
+        
+        v_intensity = random(20, 99, 0)
+        
+        v_color_pick = random(1, 6, 0)
+        if v_color_pick == 1 then
+            plot(v_x, v_y, red:{v_intensity})
+        elseif v_color_pick == 2 then
+            plot(v_x, v_y, gold:{v_intensity})
+        elseif v_color_pick == 3 then
+            plot(v_x, v_y, cyan:{v_intensity})
+        elseif v_color_pick == 4 then
+            plot(v_x, v_y, yellow:{v_intensity})
+        elseif v_color_pick == 5 then
+            plot(v_x, v_y, magenta:{v_intensity})
+        else
+            plot(v_x, v_y, blue:{v_intensity})
+        endif
+    endfor v_i
+    
+    # Bottom section lights - wider spacing, larger triangle
+    for v_i in (0, 9, 1) then
+        v_width = 14
+        v_x = v_center_x - v_width + v_i * 3
+        v_y = v_center_y + v_i * 2
+        
+        v_intensity = random(20, 99, 0)
+        
+        v_color_pick = random(1, 6, 0)
+        if v_color_pick == 1 then
+            plot(v_x, v_y, red:{v_intensity})
+        elseif v_color_pick == 2 then
+            plot(v_x, v_y, gold:{v_intensity})
+        elseif v_color_pick == 3 then
+            plot(v_x, v_y, cyan:{v_intensity})
+        elseif v_color_pick == 4 then
+            plot(v_x, v_y, yellow:{v_intensity})
+        elseif v_color_pick == 5 then
+            plot(v_x, v_y, magenta:{v_intensity})
+        else
+            plot(v_x, v_y, blue:{v_intensity})
+        endif
+    endfor v_i
+    
+    end_frame
+    rest(0.2)  # Faster twinkling
+endwhile

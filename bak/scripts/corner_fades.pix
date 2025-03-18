@@ -1,0 +1,121 @@
+print("==================================================")
+print("Test 29: Draws diagonal fade pattern rotating corners each iteration")
+print("Expected: See diagonal line pattern rotating clockwise with different colors and fading intensity")
+
+# Initialize variables
+v_x1 = 0         # Start X of line
+v_y1 = 0         # Start Y of line
+v_x2 = 0         # End X of line
+v_y2 = 0         # End Y of line
+v_color = 9      # Starting color
+v_step = 10      # Color step value
+v_count = 0      # Loop counter
+v_delay = .25      # Delay between refreshes
+v_total_lines = 127  # Total number of lines we'll draw (64 + 63)
+v_pattern = 0
+# Run loop 10 times
+for v_go in (1, 10, 1)
+    for v_count in (1, 10, 1)
+    
+        # Calculate pattern (1-4) based on current count
+        v_pattern = v_pattern + 1
+        if v_pattern > 4 then
+            v_pattern = 1
+        endif
+        
+        # First half of pattern
+        for v_i in (0, 63, 1)
+            # Calculate intensity
+            v_intensity = 99 - ((v_i * 99) / v_total_lines)
+            
+            # Pattern 1: Top-left to bottom-right
+            if v_pattern == 1 then
+                v_x1 = v_i
+                v_y1 = 0
+                v_x2 = 0
+                v_y2 = v_i
+            endif
+            
+            # Pattern 2: Top-right to bottom-left
+            if v_pattern == 2 then
+                v_x1 = 63 - v_i
+                v_y1 = 0
+                v_x2 = 63
+                v_y2 = v_i
+            endif
+            
+            # Pattern 3: Bottom-right to top-left
+            if v_pattern == 3 then
+                v_x1 = 63 - v_i
+                v_y1 = 63
+                v_x2 = 63
+                v_y2 = 63 - v_i
+            endif
+            
+            # Pattern 4: Bottom-left to top-right
+            if v_pattern == 4 then
+                v_x1 = v_i
+                v_y1 = 63
+                v_x2 = 0
+                v_y2 = 63 - v_i
+            endif
+            
+            # Draw line with current color and scaled intensity
+            draw_line(v_x1, v_y1, v_x2, v_y2, [v_color]:[v_intensity])
+        endfor v_i
+        
+        # Second half of pattern
+        for v_i in (1, 63, 1)
+            # Calculate intensity
+            v_intensity = 99 - (((v_i + 64) * 99) / v_total_lines)
+            
+            # Pattern 1: Top-left to bottom-right
+            if v_pattern == 1 then
+                v_x1 = 63
+                v_y1 = v_i
+                v_x2 = v_i
+                v_y2 = 63
+            endif
+            
+            # Pattern 2: Top-right to bottom-left
+            if v_pattern == 2 then
+                v_x1 = 0
+                v_y1 = v_i
+                v_x2 = 63 - v_i
+                v_y2 = 63
+            endif
+            
+            # Pattern 3: Bottom-right to top-left
+            if v_pattern == 3 then
+                v_x1 = 0
+                v_y1 = 63 - v_i
+                v_x2 = 63 - v_i
+                v_y2 = 0
+            endif
+            
+            # Pattern 4: Bottom-left to top-right
+            if v_pattern == 4 then
+                v_x1 = 63
+                v_y1 = 63 - v_i
+                v_x2 = v_i
+                v_y2 = 0
+            endif
+            
+            # Draw line with current color and scaled intensity
+            draw_line(v_x1, v_y1, v_x2, v_y2, [v_color]:[v_intensity])
+        endfor v_i
+        
+        # Increment base color for next iteration
+        v_color = v_color + v_step
+        if v_color > 99 then
+            v_color = 9
+        endif
+        
+        # Wait before next iteration
+        rest(v_delay)
+        
+    endfor v_count
+endfor v_go
+rest(5)
+
+print("==================================================")

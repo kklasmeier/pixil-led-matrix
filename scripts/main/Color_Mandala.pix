@@ -1,0 +1,113 @@
+# Color Mandala Effect with Dynamic Patterns
+
+throttle(0)
+# Initialize variables
+v_time = 0
+v_base_color = 20
+v_layers = 6  # Number of polygon layers
+v_base_rotation = 0
+
+# Arrays for layer properties
+create_array(v_rotation_speeds, v_layers)  # Different speeds for each layer
+create_array(v_sizes, v_layers)            # Different sizes for each layer
+create_array(v_sides, v_layers)            # Number of sides for each layer
+create_array(v_color_offsets, v_layers)    # Color offset for each layer
+
+# Initialize layer properties
+for v_i in (0, v_layers - 1, 1) then
+    # Alternate rotation directions and speeds
+    if v_i % 2 == 0 then
+        v_rotation_speeds[v_i] = 0.5 + (v_i * 0.2)
+    else
+        v_rotation_speeds[v_i] = -0.3 - (v_i * 0.2)
+    endif
+    
+    # Size decreases for inner layers
+    v_sizes[v_i] = 30 - (v_i * 4)
+    
+    # Number of sides varies per layer (5 to 10 sides)
+    v_sides[v_i] = 5 + (v_i % 6)
+    
+    # Color offset increases for each layer
+    v_color_offsets[v_i] = v_i * 10
+endfor v_i
+
+# Main animation loop
+while true then
+    #clear()
+    
+    # Update time and base rotation
+    v_time = v_time + 0.05
+    v_base_rotation = v_base_rotation + 0.2
+    
+    # Update base color (cycles through spectrum)
+    v_base_color = v_base_color + 0.1
+    if v_base_color > 98 then
+        v_base_color = 20
+    endif
+    
+    # Draw mandala layers from outside in
+    for v_i in (0, v_layers - 1, 1) then
+        # Calculate current layer properties
+        v_size = v_sizes[v_i]
+        v_rot_speed = v_rotation_speeds[v_i]
+        v_num_sides = v_sides[v_i]
+        
+        # Calculate color for this layer
+        v_layer_color = v_base_color + v_color_offsets[v_i]
+        if v_layer_color > 98 then
+            v_layer_color = v_layer_color - 78
+        endif
+
+        begin_frame(True)        
+        # Draw multiple polygons for each layer with different rotations
+        for v_j in (0, 2, 1) then
+            v_rot = v_base_rotation * v_rot_speed + (v_j * 360 / v_num_sides / 2)
+            v_intensity = 50 + sin(v_time * 2 + v_i * 0.5) * 30
+            
+            # Draw filled and outline polygons
+            draw_polygon(32, 32, v_size - (v_j * 2), v_num_sides, v_layer_color, v_intensity, v_rot, false)
+            
+            # Draw connecting lines between layers for more intricate pattern
+            if v_j == 0 then
+                v_inner_size = v_size * 0.8
+                for v_k in (0, v_num_sides - 1, 1) then
+                    v_angle1 = v_rot + (v_k * 360 / v_num_sides)
+                    v_x1 = 32 + cos(v_angle1) * v_size
+                    v_y1 = 32 + sin(v_angle1) * v_size
+                    v_x2 = 32 + cos(v_angle1) * v_inner_size
+                    v_y2 = 32 + sin(v_angle1) * v_inner_size
+                    draw_line(v_x1, v_y1, v_x2, v_y2, v_layer_color, v_intensity * 0.7)
+                endfor v_k
+            endif
+        endfor v_j
+        end_frame
+
+        # Add spinning dots at vertices for extra detail
+        v_dot_size = 2
+        # Calculate dot color with wrapping
+        v_dot_color = v_layer_color + 20
+        if v_dot_color > 98 then
+            v_dot_color = v_dot_color - 78
+        endif
+        
+    endfor v_i
+    
+    # Add central starburst effect
+    v_burst_color = v_base_color + 40
+    if v_burst_color > 98 then
+        v_burst_color = v_burst_color - 78
+    endif
+    
+    for v_k in (0, 11, 1) then
+        v_angle = v_base_rotation * 2 + (v_k * 30)
+        v_len = 4 + sin(v_time * 3) * 2
+        v_x2 = 32 + cos(v_angle) * v_len
+        v_y2 = 32 + sin(v_angle) * v_len
+        draw_line(32, 32, v_x2, v_y2, v_burst_color, 90)
+    endfor v_k
+    
+    # Center dot
+    draw_circle(32, 32, 2, v_burst_color, 99, true)
+    
+endwhile

@@ -1,0 +1,101 @@
+v_linesize = 64
+v_radius = 32
+
+def square_loop_out {
+    for v_line in (0, 30, 2)
+        v_working_line = v_linesize - v_line - v_line
+        draw_rectangle(v_line, v_line, v_working_line, v_working_line, blue, 1000)
+        rest(.01)
+    endfor v_line
+}
+
+def square_loop_in {
+    for v_line in (30, 0, -2)
+        v_working_line = v_linesize - v_line - v_line
+        draw_rectangle(v_line, v_line, v_working_line, v_working_line, blue, 1000)
+        rest(.01)
+    endfor v_line
+}
+
+def circle_loop_out {
+    for v_line in (2, 46, 2)
+        draw_circle(32, 32, v_line, red, 1000)
+        rest(.01)
+    endfor v_line
+}
+
+def circle_loop_in {
+    for v_line in (44, 0, -2)
+        draw_circle(32, 32, v_line, red, 1000)
+        rest(.01)
+    endfor v_line
+}
+
+def center_line_fan_out {
+    for v_line in (0, 31, 1)
+        v_right = 32 + v_line
+        v_left = 31 - v_line
+        draw_line(v_right, 32, v_right, 33, green)
+        draw_line(v_left, 32, v_left, 33, green)
+        rest(.005)
+    endfor v_line
+}
+
+def center_line_wipe {
+    v_top = 32
+    v_bottom = 31
+    for v_x in (0, 31, 1)
+        v_top = v_top - 1
+        v_bottom = v_bottom + 1
+        draw_line(0, v_top, 63, v_top, green, 100)
+        draw_line(0, v_bottom, 63, v_bottom, green, 150)
+        rest(.005)
+    endfor v_x
+}
+
+def edge_quarter_circles {
+    for v_x in (0, 65, 1)
+        draw_circle(0, 0, v_x, magenta)
+        draw_circle(63, 0, v_x, magenta)
+        draw_circle(0, 63, v_x, magenta)
+        draw_circle(63, 63, v_x, magenta)
+        rest(.01)
+    endfor v_x
+}
+
+def disolve_in {
+    for v_x in (1, 300, 1)
+        v_plotx = random(0, 63, 0)
+        v_ploty = random(0, 63, 0)
+        plot(v_plotx, v_ploty, white, 12000)
+    endfor v_x
+}
+
+def disolve_out {
+    for v_x in (1, 300, 1)
+        v_plotx = random(0, 63, 0)
+        v_ploty = random(0, 63, 0)
+        plot(v_plotx, v_ploty, black)
+    endfor v_x
+}
+
+for v_iterate in (0, 0, 1)
+    call square_loop_out
+    rest(1)
+    call square_loop_in
+    call circle_loop_out
+    rest(1)
+    call circle_loop_in
+    rest(1)
+    call center_line_fan_out
+    call center_line_wipe
+    edge_quarter_circles
+    rest(5)
+    clear()
+    call disolve_in
+    rest(24)
+    
+endfor v_iterate
+rest(5)
+
+

@@ -1,0 +1,97 @@
+# Aurora Borealis Effect with Color Shifting and Dynamic Patterns
+
+throttle(1)
+# Initialize variables
+v_time = 0
+v_wave_speed = 80
+v_pattern_counter = 0
+v_base_color = 20  # Starting color in spectrum
+
+# Wave pattern variables that will change
+v_amplitude1 = 15
+v_amplitude2 = 12
+v_frequency1 = 20
+v_frequency2 = 15
+v_height1 = 32
+v_height2 = 25
+
+# Create arrays for wave points
+create_array(v_points1, 64)
+create_array(v_points2, 64)
+create_array(v_intensities1, 64)
+create_array(v_intensities2, 64)
+
+# Main animation loop
+while true then
+    # Clear for next frame
+
+    # Update time and color
+    v_time = v_time + v_wave_speed
+    v_base_color = v_base_color + 1
+    if v_base_color > 98 then
+        v_base_color = 20
+    endif
+    
+    # Second color offset by 30 in spectrum
+    v_color2 = v_base_color + 30
+    if v_color2 > 98 then
+        v_color2 = v_color2 - 78  # Wrap back to start of spectrum
+    endif
+
+    # Update pattern every 10 cycles
+    v_pattern_counter = v_pattern_counter + 1
+    if v_pattern_counter > 2 then  # 200 frames ≈ 10 seconds at 0.05 rest
+        v_pattern_counter = 0
+        
+        # Randomize wave parameters
+        v_amplitude1 = 10 + random(5, 10, 0)
+        v_amplitude2 = 8 + random(4, 8, 0)
+        v_frequency1 = 15 + random(5, 15, 0)
+        v_frequency2 = 12 + random(3, 12, 0)
+        v_height1 = 25 + random(5, 15, 0)
+        v_height2 = 20 + random(5, 15, 0)
+        v_wave_speed = 0.05 + random(0.05, 0.15, 2)
+    endif
+
+    # Calculate wave points with current pattern
+    for v_x in (0, 63, 1) then
+        # First wave
+        v_phase1 = v_time + (v_x / v_frequency1)
+        v_y1 = v_height1 + sin(v_phase1) * v_amplitude1
+        v_points1[v_x] = v_y1
+        
+        # Intensity variation for first wave
+        v_intensity1 = 50 + sin(v_phase1 * 1.5) * 30
+        v_intensities1[v_x] = v_intensity1
+
+        # Second wave (different phase and amplitude)
+        v_phase2 = v_time * 1.2 + (v_x / v_frequency2)
+        v_y2 = v_height2 + sin(v_phase2) * v_amplitude2
+        v_points2[v_x] = v_y2
+        
+        # Intensity variation for second wave
+        v_intensity2 = 40 + sin(v_phase2 * 2) * 35
+        v_intensities2[v_x] = v_intensity2
+    endfor v_x
+
+    # Draw the waves with varying intensity
+    for v_x in (0, 62, 1) then
+        # Draw first wave segments
+        v_y1_start = v_points1[v_x]
+        v_y1_end = v_points1[v_x + 1]
+        v_intensity = v_intensities1[v_x]
+        #draw_line(v_x, v_y1_start, v_x + 1, v_y1_end, {v_base_color}:{v_intensity}, 900)
+
+        # Draw second wave segments
+        v_y2_start = v_points2[v_x]
+        v_y2_end = v_points2[v_x + 1]
+        v_intensity = v_intensities2[v_x]
+        #draw_line(v_x, v_y2_start, v_x + 1, v_y2_end, {v_color2}:{v_intensity}, 900)
+
+        # Add vertical glow lines with reduced intensity
+        v_glow_intensity = v_intensity / 2
+        draw_line(v_x, v_y1_start - 5, v_x, v_y1_start + 5, {v_base_color}:{v_glow_intensity}, 300)
+        draw_line(v_x, v_y2_start - 4, v_x, v_y2_start + 4, {v_color2}:{v_glow_intensity}, 300)
+    endfor v_x
+
+endwhile

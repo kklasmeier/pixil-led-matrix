@@ -1,0 +1,99 @@
+# Hypnotic Tunnel Effect
+# Uses concentric polygons with rotation and color shifts to create a tunnel effect
+
+throttle(.3)
+# Initialize configuration variables
+v_base_x = 32           # Base center X
+v_base_y = 32           # Base center Y
+v_orbit_radius = 10     # Radius of center point orbit
+v_orbit_angle = 0       # Orbit rotation angle
+v_orbit_speed = 0.05    # Speed of orbit rotation (smaller = slower: try 0.1 to 2)
+v_orbit_dir = 1         # Orbit direction (1 = clockwise, -1 = counter-clockwise)
+
+v_min_sides = 2         # Minimum number of sides
+v_max_sides = 8         # Maximum number of sides
+v_rotations = 3         # Number of full rotations before changing sides
+v_sides = v_min_sides   # Current number of sides (start at minimum)
+
+v_min_radius = 3        # Size of smallest (farthest) polygon
+v_min_intensity = 20    # Intensity of smallest polygon
+v_num_rings = 15        # Number of rings to draw
+v_radius_step = 6       # Growth rate of polygons
+v_intensity_step = 6    # How much brighter each ring gets
+v_angle = 0             # Initial rotation angle
+
+# Direction controls (-1 for counterclockwise, 1 for clockwise)
+v_rotation_dir = -1     # Direction of spinning animation
+v_shift_dir = 1         # Direction of polygon offset shift
+v_rotation_speed = 2    # Speed of rotation
+v_shift_amount = 8      # Amount each polygon is shifted from the previous
+
+v_color_base = 45       # Base color value
+v_degrees_per_rotation = 360  # One full rotation
+v_color_speed = 5 
+
+# Calculate total degrees needed for sequence
+v_sequence_degrees = v_degrees_per_rotation * v_rotations
+
+# Main animation loop
+while 1 then
+    
+    # Calculate orbiting center point
+    v_center_x = v_base_x + (v_orbit_radius * cos(v_orbit_angle))
+    v_center_y = v_base_y + (v_orbit_radius * sin(v_orbit_angle))
+    
+    # Draw multiple concentric polygons starting from smallest/farthest
+    begin_frame(True)
+    for v_i in (0, v_num_rings - 1, 1) then
+        # Calculate radius working outward from minimum
+        v_radius = v_min_radius + (v_i * v_radius_step)
+        
+        # Calculate intensity working outward from minimum
+        v_intensity = v_min_intensity + (v_i * v_intensity_step)
+        
+        # Ensure intensity stays within valid range
+        if v_intensity > 99 then
+            v_intensity = 99
+        endif
+        if v_intensity < 1 then
+            v_intensity = 1
+        endif
+        
+        # Calculate rotation offset for this ring
+        v_rot = v_angle + (v_i * v_shift_amount * v_shift_dir)
+        
+        # Draw the polygon
+        draw_polygon(v_center_x, v_center_y, v_radius, v_sides, v_color_base, v_intensity, v_rot, false)
+
+    endfor v_i
+    end_frame
+    # Update both rotation and orbit angles
+    v_angle = v_angle + (v_rotation_speed * v_rotation_dir)
+    v_orbit_angle = v_orbit_angle + (v_orbit_speed * v_orbit_dir)
+    
+    # Check if we've completed the sequence (3 full rotations)
+    if abs(v_angle) >= v_sequence_degrees then
+        # Reset angle
+        v_angle = 0
+        
+        # Increase number of sides
+        v_sides = v_sides + 1
+        v_color_speed = random(1, 2, 0)
+
+        # If we've reached max sides, reset to minimum and reverse directions
+        if v_sides > v_max_sides then
+            v_sides = v_min_sides
+            # Reverse all directions (rotation, shift, and orbit)
+            v_rotation_dir = v_rotation_dir * -1
+            v_shift_dir = v_shift_dir * -1
+            v_orbit_dir = v_orbit_dir * -1
+        endif
+    endif
+    
+    # Shift base color slowly
+    v_color_base = v_color_base + v_color_speed
+    if v_color_base > 99 then
+        v_color_base = 1
+    endif
+    
+endwhile

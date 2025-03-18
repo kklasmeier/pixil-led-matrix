@@ -1,0 +1,97 @@
+v_particles = 4
+v_max_particles = 7
+create_array(v_x, v_max_particles)
+create_array(v_y, v_max_particles)
+create_array(v_dx, v_max_particles)
+create_array(v_dy, v_max_particles)
+v_color = 0
+v_cycle = 0
+
+# Initialize particles
+for v_i in (0, v_particles - 1, 1)
+    v_x[v_i] = 32
+    v_y[v_i] = 32
+    v_dx[v_i] = random(-2, 2, 1)
+    v_dy[v_i] = random(-2, 2, 1)
+endfor v_i
+
+# Initial clear
+clear()
+
+# Animation loop
+while true then
+    begin_frame(true)
+    v_cycle = v_cycle + 1
+    # Reset every ~15 seconds (assuming ~50ms/frame, adjust if too fast)
+    if v_cycle > 300 then
+        v_particles = 5
+        v_cycle = 0
+        for v_i in (0, v_particles - 1, 1)
+            v_x[v_i] = 32
+            v_y[v_i] = 32
+            v_dx[v_i] = random(-2, 2, 1)
+            v_dy[v_i] = random(-2, 2, 1)
+        endfor v_i
+    endif
+    for v_i in (0, v_particles - 1, 1)
+        # Brighter particles with double plot
+        plot(v_x[v_i], v_y[v_i], min(abs(remainder(v_color, 100)), 99), 100, 100)
+        plot(v_x[v_i], v_y[v_i], white, 75, 50)  # Overlay white for brightness
+        draw_line(v_x[v_i], v_y[v_i], v_x[v_i] - v_dx[v_i], v_y[v_i] - v_dy[v_i], min(abs(remainder(v_color + 20, 100)), 99), 50, 200)
+        draw_line(v_x[v_i], v_y[v_i], v_x[v_i] - v_dx[v_i] * 2, v_y[v_i] - v_dy[v_i] * 2, min(abs(remainder(v_color + 40, 100)), 99), 25, 150)
+        v_x[v_i] = v_x[v_i] + v_dx[v_i]
+        v_y[v_i] = v_y[v_i] + v_dy[v_i]
+        if v_x[v_i] < 0 then
+            v_x[v_i] = 0
+            v_dx[v_i] = -v_dx[v_i]
+            draw_circle(v_x[v_i], v_y[v_i], 3, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 300)
+            draw_circle(v_x[v_i], v_y[v_i], 5, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 150)
+            if v_particles < v_max_particles and random(0, 1, 0) > 0.9 then
+                v_particles = v_particles + 1
+                v_x[v_particles - 1] = v_x[v_i]
+                v_y[v_particles - 1] = v_y[v_i]
+                v_dx[v_particles - 1] = random(-2, 2, 1)
+                v_dy[v_particles - 1] = random(-2, 2, 1)
+            endif
+        elseif v_x[v_i] > 63 then
+            v_x[v_i] = 63
+            v_dx[v_i] = -v_dx[v_i]
+            draw_circle(v_x[v_i], v_y[v_i], 3, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 300)
+            draw_circle(v_x[v_i], v_y[v_i], 5, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 150)
+            if v_particles < v_max_particles and random(0, 1, 0) > 0.9 then
+                v_particles = v_particles + 1
+                v_x[v_particles - 1] = v_x[v_i]
+                v_y[v_particles - 1] = v_y[v_i]
+                v_dx[v_particles - 1] = random(-2, 2, 1)
+                v_dy[v_particles - 1] = random(-2, 2, 1)
+            endif
+        endif
+        if v_y[v_i] < 0 then
+            v_y[v_i] = 0
+            v_dy[v_i] = -v_dy[v_i]
+            draw_circle(v_x[v_i], v_y[v_i], 3, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 300)
+            draw_circle(v_x[v_i], v_y[v_i], 5, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 150)
+            if v_particles < v_max_particles and random(0, 1, 0) > 0.9 then
+                v_particles = v_particles + 1
+                v_x[v_particles - 1] = v_x[v_i]
+                v_y[v_particles - 1] = v_y[v_i]
+                v_dx[v_particles - 1] = random(-2, 2, 1)
+                v_dy[v_particles - 1] = random(-2, 2, 1)
+            endif
+        elseif v_y[v_i] > 63 then
+            v_y[v_i] = 63
+            v_dy[v_i] = -v_dy[v_i]
+            draw_circle(v_x[v_i], v_y[v_i], 3, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 300)
+            draw_circle(v_x[v_i], v_y[v_i], 5, min(abs(remainder(v_color + 60, 100)), 99), 25, false, 150)
+            if v_particles < v_max_particles and random(0, 1, 0) > 0.9 then
+                v_particles = v_particles + 1
+                v_x[v_particles - 1] = v_x[v_i]
+                v_y[v_particles - 1] = v_y[v_i]
+                v_dx[v_particles - 1] = random(-2, 2, 1)
+                v_dy[v_particles - 1] = random(-2, 2, 1)
+            endif
+        endif
+    endfor v_i
+    end_frame
+    v_color = v_color + 0.5  # Slower color shift
+endwhile

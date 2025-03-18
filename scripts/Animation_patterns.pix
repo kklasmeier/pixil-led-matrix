@@ -1,0 +1,144 @@
+# Initialize variables for base pattern
+v_centerX = 32
+v_centerY = 32
+v_radius = 25
+v_angle = 0
+v_color_base = 45
+v_fade_start = 99
+
+# Animation control variables
+v_frame_mode = 1
+v_pattern_type = 0      # Current pattern type
+v_speed = 5
+v_rest_time = 0.05
+v_effect_duration = 0
+v_effect_max_time = 2   # Change effect every 3 iterations
+v_burnout_enabled = 0
+v_burnout_min = 100
+v_burnout_max = 500
+
+# Wave pattern variables
+v_wave_amp = 10         # Wave amplitude
+v_wave_freq = 4         # Wave frequency
+v_wave_speed = 0.2      # Wave movement speed
+v_wave_phase = 0        # Wave phase shift
+
+while 1 then
+    # Change effects periodically
+    if v_effect_duration > v_effect_max_time then
+        v_effect_duration = 0
+        
+        # Randomly select new pattern
+        v_pattern_type = random(0, 4, 0)
+        
+        # Random frame mode
+        if random(0, 100, 0) > 50 then
+            v_frame_mode = 1
+        else
+            v_frame_mode = 0
+        endif
+        
+        # Random speed and effects
+        v_speed = random(2, 8, 0)
+        v_wave_amp = random(5, 15, 0)
+        v_wave_freq = random(2, 6, 0)
+        
+        # Random burnout
+        if random(0, 100, 0) > 70 then
+            v_burnout_enabled = 1
+            v_rest_time = 0.01
+        else
+            v_burnout_enabled = 0
+            v_rest_time = 0.05
+        endif
+    endif
+
+    if v_frame_mode == 1 then
+        begin_frame
+    endif
+    
+    clear
+
+    # Pattern 0: Expanding/Contracting Circles
+    if v_pattern_type == 0 then
+        v_current_radius = v_radius + v_wave_amp * sin(v_angle)
+        for v_r in (0, v_current_radius, 2) then
+            for v_a in (0, 360, 10) then
+                v_x = v_centerX + v_r * cos(v_a)
+                v_y = v_centerY + v_r * sin(v_a)
+                v_intensity = v_fade_start * (1 - v_r / v_current_radius)
+                
+                if v_burnout_enabled == 1 then
+                    plot(v_x, v_y, {v_color_base}:{v_intensity}, random(v_burnout_min, v_burnout_max, 0))
+                else
+                    plot(v_x, v_y, {v_color_base}:{v_intensity})
+                endif
+            endfor v_a
+        endfor v_r
+
+    # Pattern 1: Starburst
+    elseif v_pattern_type == 1 then
+        for v_a in (0, 360, 5) then
+            v_r = v_radius + v_wave_amp * sin(v_a * v_wave_freq + v_angle)
+            for v_d in (0, v_r, 2) then
+                v_x = v_centerX + v_d * cos(v_a)
+                v_y = v_centerY + v_d * sin(v_a)
+                v_intensity = v_fade_start * (1 - v_d / v_r)
+                
+                if v_burnout_enabled == 1 then
+                    plot(v_x, v_y, {v_color_base}:{v_intensity}, random(v_burnout_min, v_burnout_max, 0))
+                else
+                    plot(v_x, v_y, {v_color_base}:{v_intensity})
+                endif
+            endfor v_d
+        endfor v_a
+
+    # Pattern 2: Wave Grid
+    elseif v_pattern_type == 2 then
+        for v_x in (0, 63, 4) then
+            for v_y in (0, 63, 4) then
+                v_dist = sqrt((v_x - v_centerX) * (v_x - v_centerX) + (v_y - v_centerY) * (v_y - v_centerY))
+                v_wave = sin(v_dist / 5 + v_angle)
+                v_intensity = v_fade_start * (0.5 + 0.5 * v_wave)
+                
+                if v_burnout_enabled == 1 then
+                    plot(v_x, v_y, {v_color_base}:{v_intensity}, random(v_burnout_min, v_burnout_max, 0))
+                else
+                    plot(v_x, v_y, {v_color_base}:{v_intensity})
+                endif
+            endfor v_y
+        endfor v_x
+
+    # Pattern 3: Dancing Squares
+    elseif v_pattern_type == 3 then
+        for v_size in (5, 30, 5) then
+            v_offset = v_wave_amp * sin(v_angle + v_size)
+            v_x1 = v_centerX - v_size + v_offset
+            v_y1 = v_centerY - v_size
+            v_x2 = v_centerX + v_size + v_offset
+            v_y2 = v_centerY + v_size
+            v_intensity = v_fade_start * (1 - v_size / 30)
+            
+            if v_burnout_enabled == 1 then
+                draw_rectangle(v_x1, v_y1, v_size * 2, v_size * 2, {v_color_base}:{v_intensity}, 0, random(v_burnout_min, v_burnout_max, 0))
+            else
+                draw_rectangle(v_x1, v_y1, v_size * 2, v_size * 2, {v_color_base}:{v_intensity}, 0)
+            endif
+        endfor v_size
+    endif
+
+    if v_frame_mode == 1 then
+        end_frame
+    endif
+
+    # Update animation
+    v_angle = v_angle + v_speed
+    v_wave_phase = v_wave_phase + v_wave_speed
+    v_color_base = v_color_base + 1
+    if v_color_base > 99 then
+        v_color_base = 1
+    endif
+
+    v_effect_duration = v_effect_duration + 1
+    rest(v_rest_time)
+endwhile

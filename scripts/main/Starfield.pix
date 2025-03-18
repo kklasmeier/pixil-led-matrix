@@ -1,0 +1,111 @@
+# 3D Starfield Animation with Auto-Cycling
+# Creates perspective effect of stars moving from center outward
+
+# Constants
+v_center_x = 32          # Center of display X
+v_center_y = 32          # Center of display Y
+v_min_z = 1             # Minimum Z distance
+v_max_z = 20            # Maximum Z distance
+v_speed = 1             # Speed of stars
+
+# Cycling control variables
+v_frame_counter = 0     # Count frames for timing
+v_cycle_frames = 3000   # Frames before changing (30 seconds at 0.01s rest)
+v_frame_mode = 1        # Start with frame mode on
+v_num_stars = random(5, 30, 0)  # Initial number of stars
+
+# Create arrays for star positions - we'll use max possible size
+create_array(v_x, 50)    # X coordinates (sized for maximum possible stars)
+create_array(v_y, 50)    # Y coordinates
+create_array(v_z, 50)    # Z coordinates (depth)
+
+# Initialize star positions randomly
+def initialize_stars {
+    v_i = 0
+    while v_i < v_num_stars then
+        # Random position around center
+        v_z[v_i] = random(v_min_z, v_max_z, 1)
+        v_x[v_i] = random(-20, 20, 1)
+        v_y[v_i] = random(-20, 20, 1)
+        v_i = v_i + 1
+    endwhile
+}
+
+# Procedure to change visualization
+def change_visualization {
+    # Randomly change number of stars (5-30)
+    v_num_stars = random(5, 30, 0)
+    
+    # Toggle frame mode
+    if v_frame_mode == 1 then
+        v_frame_mode = 0
+    else
+        v_frame_mode = 1
+    endif
+    
+    # Reinitialize stars with new count
+    call initialize_stars
+}
+
+# Initial star setup
+call initialize_stars
+
+# Main animation loop
+while true then
+    # Handle frame mode
+    if v_frame_mode == 1 then
+        begin_frame
+    endif
+    
+    # Update and draw each star
+    v_i = 0
+    while v_i < v_num_stars then
+        # Move star closer (decrease Z)
+        v_z[v_i] = v_z[v_i] - v_speed
+        
+        # Calculate perspective projection
+        v_perspective = v_max_z / v_z[v_i]
+        v_proj_x = v_x[v_i] * v_perspective + v_center_x
+        v_proj_y = v_y[v_i] * v_perspective + v_center_y
+        
+        # Calculate brightness based on Z position with proper scaling and clamping
+        v_z_range = v_max_z - v_min_z
+        v_bright = ((v_max_z - v_z[v_i]) / v_z_range) * 98 + 1
+
+        # Clamp brightness to valid range
+        if v_bright < 1 then
+            v_bright = 1
+        endif
+        if v_bright > 99 then
+            v_bright = 99
+        endif
+        
+        # OPTIMIZED: Draw star if in bounds using compound conditions
+        if v_proj_x >= 0 and v_proj_x < 64 and v_proj_y >= 0 and v_proj_y < 64 then
+            # Draw star with perspective-based brightness
+            plot(v_proj_x, v_proj_y, white, v_bright, 1000)
+        endif
+        
+        # Reset star if it moves too close
+        if v_z[v_i] <= v_min_z then
+            v_z[v_i] = v_max_z
+            v_x[v_i] = random(-20, 20, 1)
+            v_y[v_i] = random(-20, 20, 1)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    if v_frame_mode == 1 then
+        end_frame
+    endif
+    
+    # Increment frame counter and check for cycle
+    v_frame_counter = v_frame_counter + 1
+    if v_frame_counter >= v_cycle_frames then
+        v_frame_counter = 0
+        call change_visualization
+    endif
+    
+    rest(0.01)
+endwhile

@@ -1,0 +1,58 @@
+# Define our drawing particle
+define_sprite(tracer, 3, 3)
+    draw_circle(1, 1, 1, white, true)
+endsprite
+
+# Animation settings
+v_speed = .02
+v_burnout = 100
+v_center_x = 32
+v_center_y = 32
+
+# Radii for the circles
+v_big_radius = 20
+v_small_radius = 8
+
+# Show tracer at starting position
+show_sprite(tracer, v_center_x, v_center_y)
+
+# Main animation loop
+for v_loop in (1, 4, 1)
+    # Draw one complete pattern
+    for v_angle in (0, 360, 2)
+        # Calculate positions - inner circle rolls around outer circle
+        v_outer_x = v_big_radius * cos(v_angle)
+        v_outer_y = v_big_radius * sin(v_angle)
+        
+        # Inner circle rotation is faster to create patterns
+        v_inner_x = v_small_radius * cos(v_angle * 3)
+        v_inner_y = v_small_radius * sin(v_angle * 3)
+        
+        # Combine movements and center on screen
+        v_calc_x = v_center_x + v_outer_x + v_inner_x
+        v_calc_y = v_center_y + v_outer_y + v_inner_y
+        
+        # Round for drawing
+        v_x = round(v_calc_x)
+        v_y = round(v_calc_y)
+        
+        begin_frame
+        # Draw with different colors each loop
+        if v_loop == 1 then
+            draw_circle(v_x, v_y, 1, cyan, true, v_burnout)
+        endif
+        if v_loop == 2 then
+            draw_circle(v_x, v_y, 1, magenta, true, v_burnout)
+        endif
+        if v_loop == 3 then
+            draw_circle(v_x, v_y, 1, yellow, true, v_burnout)
+        endif
+        if v_loop == 4 then
+            draw_circle(v_x, v_y, 1, white, true, v_burnout)
+        endif
+        end_frame
+        
+        move_sprite(tracer, v_x, v_y)
+        rest(v_speed)
+    endfor v_angle
+endfor v_loop

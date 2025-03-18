@@ -1,0 +1,39 @@
+# Test script for print functionality
+
+# 2. Printing in a procedure
+def test_procedure {
+    print("2. Procedure print test")
+    v_proc = 100
+    print(f"TEST 2: Procedure variable value: v_proc = {v_proc}")
+    print(f"TEST 2: Accessing base variable: v_base = {v_base}")
+}
+
+# 1. Printing in the base script
+print("TEST 1: Base script print test")
+v_base = 42
+print(f"TEST 1: Base variable value: v_base = {v_base}")
+
+# Calling the procedure to test procedure prints
+call test_procedure
+
+# 3. Printing in a loop
+print("TEST 3: Loop print test")
+for v_loop in (1, 5, 2)
+    print(f"TEST 3: Loop iteration: v_loop = {v_loop}")
+    print("TEST 3: This is a static print inside the loop")
+endfor v_loop
+
+# 4. Printing in an if-then-else statement
+print("TEST 4: If-then-else print test")
+v_condition = 15
+
+if v_condition > 10 then
+    print("TEST 4: Condition is true")
+    print(f"TEST 4: v_condition = {v_condition}, which is greater than 10")
+else
+    print("TEST 4: Condition is false")
+    print(f"TEST 4: v_condition = {v_condition}, which is not greater than 10")
+endif
+
+# Final print to show we're back in the base script
+print("TEST: Test script completed")

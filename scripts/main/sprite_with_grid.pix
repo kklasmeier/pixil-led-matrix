@@ -1,0 +1,120 @@
+throttle(0)
+
+# Define sprites (5x5 pixels each)
+v_size = 10
+
+define_sprite(yellow_circle, v_size, v_size)
+    draw_circle(5, 5, 4, yellow, 100, true)  # Yellow ball, center at (2,2), radius 2, filled
+    draw_circle(5, 5, 3, yellow, 75, false)  # Yellow ball, center at (2,2), radius 2, filled
+    draw_circle(5, 5, 4, yellow, 50, false)  # Yellow ball, center at (2,2), radius 2, filled
+endsprite
+
+define_sprite(blue_circle, v_size, v_size)
+    draw_circle(5, 5, 4, blue, 100, true)    # Blue ball, center at (2,2), radius 2, filled
+    draw_circle(5, 5, 3, blue, 75, false)    # Blue ball, center at (2,2), radius 2, filled
+    draw_circle(5, 5, 4, blue, 50, false)    # Blue ball, center at (2,2), radius 2, filled
+endsprite
+
+# Variables for grid and sprite movement
+v_grid_spacing = 4        # Tight grid with lines every 4 pixels
+v_screen_width = 64       # Display width
+v_screen_height = 64      # Display height
+
+# Yellow ball variables
+v_yellow_x = 0            # Current yellow sprite X position
+v_yellow_y = 0            # Current yellow sprite Y position
+v_yellow_target_x = 0     # Yellow target X position
+v_yellow_target_y = 0     # Yellow target Y position
+v_yellow_steps = 30       # Number of steps for smooth movement
+v_yellow_step_count = 0   # Current step in yellow movement
+
+# Blue ball variables
+v_blue_x = 0              # Current blue sprite X position
+v_blue_y = 0              # Current blue sprite Y position
+v_blue_target_x = 0       # Blue target X position
+v_blue_target_y = 0       # Blue target Y position
+v_blue_steps = 30         # Number of steps for smooth movement
+v_blue_step_count = 0     # Current step in blue movement
+
+v_move_speed = 0.05       # Delay between steps for smooth animation
+
+# Procedure to draw the green grid
+def draw_grid {
+    # Vertical lines
+    for v_x in (0, v_screen_width - 1, v_grid_spacing) then
+        draw_line(v_x, 0, v_x, v_screen_height - 1, green, 15)
+    endfor v_x
+    
+    # Horizontal lines
+    for v_y in (0, v_screen_height - 1, v_grid_spacing) then
+        draw_line(0, v_y, v_screen_width - 1, v_y, green, 15)
+    endfor v_y
+
+    draw_line(63, 0, 63, 63, green, 15)
+    draw_line(0, 63, 63, 63, green, 15)
+}
+
+# Procedure to pick a new random target for yellow sprite
+def pick_new_target_yellow {
+    v_yellow_target_x = random(-4, 58, 0)  # 0 to 58 (64 - 5 - 1) for full coverage
+    v_yellow_target_y = random(-4, 58, 0)  # 0 to 58 (64 - 5 - 1) for full coverage
+    v_yellow_step_count = 0
+}
+
+# Procedure to pick a new random target for blue sprite
+def pick_new_target_blue {
+    v_blue_target_x = random(-4, 58, 0)    # 0 to 58 (64 - 5 - 1) for full coverage
+    v_blue_target_y = random(-4, 58, 0)    # 0 to 58 (64 - 5 - 1) for full coverage
+    v_blue_step_count = 0
+}
+
+# Initialize sprite positions and draw grid
+v_yellow_x = 0
+v_yellow_y = 0
+v_blue_x = 58             # Start blue ball on opposite side
+v_blue_y = 58
+call draw_grid
+call pick_new_target_yellow
+call pick_new_target_blue
+show_sprite(yellow_circle, v_yellow_x, v_yellow_y)
+show_sprite(blue_circle, v_blue_x, v_blue_y)
+
+# Main animation loop with frame mode
+while 1 then
+    #begin_frame(true)  # Preserve background
+        begin_frame(true)
+        # Move the yellow sprite
+        move_sprite(yellow_circle, v_yellow_x, v_yellow_y)
+        # Move the blue sprite
+        move_sprite(blue_circle, v_blue_x, v_blue_y)
+        end_frame
+
+        # Interpolate yellow sprite position toward target
+        if v_yellow_step_count < v_yellow_steps then
+            v_dx = (v_yellow_target_x - v_yellow_x) / (v_yellow_steps - v_yellow_step_count)
+            v_dy = (v_yellow_target_y - v_yellow_y) / (v_yellow_steps - v_yellow_step_count)
+            v_yellow_x = v_yellow_x + v_dx
+            v_yellow_y = v_yellow_y + v_dy
+            v_yellow_step_count = v_yellow_step_count + 1
+        else
+            v_yellow_x = v_yellow_target_x
+            v_yellow_y = v_yellow_target_y
+            call pick_new_target_yellow
+        endif
+        
+        # Interpolate blue sprite position toward target
+        if v_blue_step_count < v_blue_steps then
+            v_dx = (v_blue_target_x - v_blue_x) / (v_blue_steps - v_blue_step_count)
+            v_dy = (v_blue_target_y - v_blue_y) / (v_blue_steps - v_blue_step_count)
+            v_blue_x = v_blue_x + v_dx
+            v_blue_y = v_blue_y + v_dy
+            v_blue_step_count = v_blue_step_count + 1
+        else
+            v_blue_x = v_blue_target_x
+            v_blue_y = v_blue_target_y
+            call pick_new_target_blue
+        endif
+    #end_frame
+    
+    rest(v_move_speed)
+endwhile

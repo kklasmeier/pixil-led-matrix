@@ -1,0 +1,99 @@
+# 3D Dot Matrix - Five layers with extended depth
+# Deep grid pattern with smooth transitions
+throttle(0)
+# Movement control
+v_angle = 0
+v_speed = 0.2      
+v_frames = 10000    
+v_move_range = 6   
+
+# Layer 5 - Furthest (5 pixel spacing)
+v_l5_x1 = 27
+v_l5_x2 = 32
+v_l5_x3 = 37
+v_l5_y1 = 27
+v_l5_y2 = 32
+v_l5_y3 = 37
+
+# Layer 4 (7 pixel spacing)
+v_l4_x1 = 25
+v_l4_x2 = 32
+v_l4_x3 = 39
+v_l4_y1 = 25
+v_l4_y2 = 32
+v_l4_y3 = 39
+
+# Layer 3 (10 pixel spacing)
+v_l3_x1 = 22
+v_l3_x2 = 32
+v_l3_x3 = 42
+v_l3_y1 = 22
+v_l3_y2 = 32
+v_l3_y3 = 42
+
+# Layer 2 (14 pixel spacing)
+v_l2_x1 = 18
+v_l2_x2 = 32
+v_l2_x3 = 46
+v_l2_y1 = 18
+v_l2_y2 = 32
+v_l2_y3 = 46
+
+# Layer 1 - Closest (20 pixel spacing)
+v_l1_x1 = 12
+v_l1_x2 = 32
+v_l1_x3 = 52
+v_l1_y1 = 12
+v_l1_y2 = 32
+v_l1_y3 = 52
+
+# Animation loop
+for v_frame in (0, v_frames, 1)
+    # Calculate base movement
+    v_base_x = cos(v_angle) * v_move_range
+    v_base_y = sin(v_angle) * v_move_range
+    
+    begin_frame
+    
+    # Layer 5 - Furthest dots
+    for v_y in (v_l5_y1, v_l5_y3, 5)
+        for v_x in (v_l5_x1, v_l5_x3, 5)
+            plot(v_x + v_base_x * 0.1, v_y + v_base_y * 0.1, white:10)
+        endfor v_x
+    endfor v_y
+    
+    # Layer 4
+    for v_y in (v_l4_y1, v_l4_y3, 7)
+        for v_x in (v_l4_x1, v_l4_x3, 7)
+            plot(v_x + v_base_x * 0.25, v_y + v_base_y * 0.25, white:25)
+        endfor v_x
+    endfor v_y
+    
+    # Layer 3
+    for v_y in (v_l3_y1, v_l3_y3, 10)
+        for v_x in (v_l3_x1, v_l3_x3, 10)
+            plot(v_x + v_base_x * 0.45, v_y + v_base_y * 0.45, white:45)
+        endfor v_x
+    endfor v_y
+    
+    # Layer 2
+    for v_y in (v_l2_y1, v_l2_y3, 14)
+        for v_x in (v_l2_x1, v_l2_x3, 14)
+            plot(v_x + v_base_x * 0.7, v_y + v_base_y * 0.7, white:70)
+        endfor v_x
+    endfor v_y
+    
+    # Layer 1 - Closest
+    for v_y in (v_l1_y1, v_l1_y3, 20)
+        for v_x in (v_l1_x1, v_l1_x3, 20)
+            plot(v_x + v_base_x * 1.0, v_y + v_base_y * 1.0, white:90)
+        endfor v_x
+    endfor v_y
+    
+    end_frame
+    
+    # Increment angle for next frame
+    v_angle = v_angle + v_speed
+    
+    rest(0.05)
+endfor v_frame

@@ -1,0 +1,86 @@
+# Initialize variables for beam positions and angles
+v_center_x = 32
+v_center_y = 32
+v_angle1 = 0
+v_angle2 = 90
+v_radius = 30
+v_beam_intensity = 99
+
+# Create color sequence
+create_array(v_colors, 6, string)
+v_colors[0] = "red"
+v_colors[1] = "blue"
+v_colors[2] = "green"
+v_colors[3] = "purple"
+v_colors[4] = "cyan"
+v_colors[5] = "yellow"
+
+v_color1 = 0
+v_color2 = 1
+v_frame_count = 0
+
+# Main animation loop
+while 1 > 0 then
+    # Start new frame
+    begin_frame
+
+    # Alternate between fixed and circular movement every 200 frames
+    if v_frame_count % 400 < 200 then
+        # Fixed center point
+        v_center_x = 32
+        v_center_y = 32
+    else
+        # Circular movement
+        v_center_x = 32 + cos(v_frame_count * 0.1) * 15
+        v_center_y = 32 + sin(v_frame_count * 0.1) * 15
+    endif
+
+    # Always increment angles with different speeds
+    v_angle1 = v_angle1 + 3
+    v_angle2 = v_angle2 + 4
+
+    # Calculate beam endpoints
+    v_x1 = v_center_x + cos(v_angle1) * v_radius
+    v_y1 = v_center_y + sin(v_angle1) * v_radius
+    v_x2 = v_center_x + cos(v_angle2) * v_radius
+    v_y2 = v_center_y + sin(v_angle2) * v_radius
+
+    # Draw first beam with gradient
+    v_steps = 8
+    for v_i in (0, v_steps, 1) then
+        v_t = v_i / v_steps
+        v_px = v_center_x + (v_x1 - v_center_x) * v_t
+        v_py = v_center_y + (v_y1 - v_center_y) * v_t
+        v_intensity = v_beam_intensity * (1 - v_t * 0.6)
+        plot(v_px, v_py, {v_colors[v_color1]}:{v_intensity})
+    endfor v_i
+
+    # Draw second beam with gradient
+    for v_i in (0, v_steps, 1) then
+        v_t = v_i / v_steps
+        v_px = v_center_x + (v_x2 - v_center_x) * v_t
+        v_py = v_center_y + (v_y2 - v_center_y) * v_t
+        v_intensity = v_beam_intensity * (1 - v_t * 0.6)
+        plot(v_px, v_py, {v_colors[v_color2]}:{v_intensity})
+    endfor v_i
+
+    # Change colors every 40 frames
+    if v_frame_count % 40 == 0 then
+        v_color1 = v_color1 + 1
+        v_color2 = v_color2 + 1
+        if v_color1 >= 6 then
+            v_color1 = 0
+        endif
+        if v_color2 >= 6 then
+            v_color2 = 0
+        endif
+    endif
+
+    # Display frame and increment counter
+    end_frame
+    v_frame_count = v_frame_count + 1
+    rest(0.1)
+endwhile
+
+# Cleanup
+clear()

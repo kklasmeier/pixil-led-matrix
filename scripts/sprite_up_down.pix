@@ -1,0 +1,92 @@
+throttle(0)
+# Define the red ball sprite (far left)
+define_sprite(red_ball, 8, 8)
+    draw_circle(4, 4, 3, red, 100, true)
+endsprite
+
+# Define the yellow ball sprite (left-middle)
+define_sprite(yellow_ball, 8, 8)
+    draw_circle(4, 4, 3, yellow, 100, true)
+endsprite
+
+# Define the green ball sprite (center)
+define_sprite(green_ball, 8, 8)
+    draw_circle(4, 4, 3, green, 100, true)
+endsprite
+
+# Define the purple ball sprite (right-middle)
+define_sprite(purple_ball, 8, 8)
+    draw_circle(4, 4, 3, purple, 100, true)
+endsprite
+
+# Define the blue ball sprite (far right)
+define_sprite(blue_ball, 8, 8)
+    draw_circle(4, 4, 3, blue, 100, true)
+endsprite
+
+# Initialize variables
+v_angle = 0           # Angle for sine wave animation
+v_speed = 0.1         # Speed of animation (radians per frame)
+v_center_y = 32       # Vertical center of the display (64 / 2)
+v_amplitude = 20      # How far up/down the balls move from center
+v_red_x = 0           # Red ball (0 to 7)
+v_yellow_x = 14       # Yellow ball (14 to 21)
+v_green_x = 28        # Green ball (28 to 35)
+v_purple_x = 42       # Purple ball (42 to 49)
+v_blue_x = 56         # Blue ball (56 to 63)
+
+# Draw a simple background (optional, for visual context)
+draw_line(0, 32, 63, 32, gray, 100)    # Horizontal center line (gray to avoid green confusion)
+
+# Show the sprites at their initial positions
+v_red_y = v_center_y
+v_yellow_y = v_center_y
+v_green_y = v_center_y
+v_purple_y = v_center_y
+v_blue_y = v_center_y
+show_sprite(red_ball, v_red_x, v_red_y)
+show_sprite(yellow_ball, v_yellow_x, v_yellow_y)
+show_sprite(green_ball, v_green_x, v_green_y)
+show_sprite(purple_ball, v_purple_x, v_purple_y)
+show_sprite(blue_ball, v_blue_x, v_blue_y)
+
+# Sync queue to ensure sprites are displayed before moving
+sync_queue
+print("All five sprites shown")
+
+# Main animation loop (limited for testing, ~2 cycles)
+while true then
+    # Calculate new Y positions using sine with phase offsets
+    v_red_y = v_center_y + (sin(v_angle) * v_amplitude)              # Red: no offset
+    v_yellow_y = v_center_y + (sin(v_angle + 0.5) * v_amplitude)     # Yellow: slight offset
+    v_green_y = v_center_y + (sin(v_angle + pi) * v_amplitude)       # Green: opposite
+    v_purple_y = v_center_y + (sin(v_angle + 1.5) * v_amplitude)     # Purple: offset
+    v_blue_y = v_center_y + (sin(v_angle + 2) * v_amplitude)         # Blue: further offset
+
+    begin_frame(true)
+    # Move sprites to their new positions
+    move_sprite(red_ball, v_red_x, v_red_y)
+    move_sprite(yellow_ball, v_yellow_x, v_yellow_y)
+    move_sprite(green_ball, v_green_x, v_green_y)
+    move_sprite(purple_ball, v_purple_x, v_purple_y)
+    move_sprite(blue_ball, v_blue_x, v_blue_y)
+    end_frame
+
+    # Increment angle for next frame
+    v_angle = v_angle + v_speed
+
+    # Small delay to control animation speed
+    rest(1.05)
+
+    # Sync queue to ensure smooth rendering
+    #sync_queue
+endwhile
+
+# Cleanup
+hide_sprite(red_ball)
+hide_sprite(yellow_ball)
+hide_sprite(green_ball)
+hide_sprite(purple_ball)
+hide_sprite(blue_ball)
+dispose_all_sprites()
+clear()

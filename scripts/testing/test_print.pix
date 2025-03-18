@@ -1,0 +1,43 @@
+# Test script for Pixil print statements
+
+# Simple print statement
+print("Hello, Pixil!")
+
+# Variable assignment
+v_x = 10
+v_y = 20
+
+# Print with variable substitution
+print("The value of v_x is {v_x}")
+
+# Print with multiple variables
+print("v_x = {v_x} and v_y = {v_y}")
+
+# Print with expression
+print("The sum of v_x and v_y is {v_x + v_y}")
+
+# Print with mixed content
+print("v_x squared is {v_x * v_x}, and v_y divided by 2 is {v_y / 2}")
+
+# Test print within a loop
+for v_i in (1, 5, 1) {
+    print("Loop iteration: {v_i}")
+}
+
+# Test print with conditional
+if v_x < v_y then
+    print("v_x is less than v_y")
+else
+    print("v_x is not less than v_y")
+endif
+
+# Test print with procedure
+def test_procedure {
+    v_z = 30
+    print("Inside procedure: v_z = {v_z}")
+}
+
+call test_procedure
+
+# Final print to indicate end of test
+print("Print test completed!")

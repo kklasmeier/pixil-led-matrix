@@ -1,0 +1,255 @@
+# Ripple Tank with Multiple Morph Patterns
+# Features random color schemes and morphing patterns
+throttle(0)
+# Configuration variables
+v_max_sources = 5
+v_matrix_size = 64
+v_wave_speed = 0.2
+v_decay_rate = 0.97
+v_intensity_scale = 35
+v_height = 0
+
+# Arrays for wave sources
+create_array(v_source_x, v_max_sources)
+create_array(v_source_y, v_max_sources)
+create_array(v_source_phase, v_max_sources)
+create_array(v_source_active, v_max_sources)
+
+# Choose random color scheme
+v_color_choice = random(1, 8, 0)
+
+# Set peak and trough colors based on random selection
+if v_color_choice == 1 then
+    v_peak_color = "cyan"
+    v_trough_color = "blue"
+    print("Color scheme: Ocean Waves")
+elseif v_color_choice == 2 then
+    v_peak_color = "magenta"
+    v_trough_color = "purple"
+    print("Color scheme: Cosmic Ripples")
+elseif v_color_choice == 3 then
+    v_peak_color = "yellow"
+    v_trough_color = "orange"
+    print("Color scheme: Solar Flares")
+elseif v_color_choice == 4 then
+    v_peak_color = "mint"
+    v_trough_color = "forest_green"
+    print("Color scheme: Emerald Pool")
+elseif v_color_choice == 5 then
+    v_peak_color = "coral"
+    v_trough_color = "crimson"
+    print("Color scheme: Lava Flow")
+elseif v_color_choice == 6 then
+    v_peak_color = "azure"
+    v_trough_color = "royal_blue"
+    print("Color scheme: Arctic Waters")
+elseif v_color_choice == 7 then
+    v_peak_color = "gold"
+    v_trough_color = "bronze"
+    print("Color scheme: Desert Mirage")
+else
+    v_peak_color = "lavender"
+    v_trough_color = "indigo"
+    print("Color scheme: Twilight Pond")
+endif
+
+if v_height > 0 then
+    v_color = v_peak_color
+else
+    v_color = v_trough_color
+endif
+
+# Choose random morph pattern
+v_pattern = random(1, 4, 0)
+if v_pattern == 1 then
+    print("Pattern: Quadrant Mirror")
+elseif v_pattern == 2 then
+    print("Pattern: Spiral Wave")
+elseif v_pattern == 3 then
+    print("Pattern: Linear Sweep")
+else
+    print("Pattern: Radial Pulse")
+endif
+
+# Initialize wave sources
+v_source_count = 3
+for v_i in (0, v_source_count - 1, 1) then
+    v_source_x[v_i] = random(10, 54, 0)
+    v_source_y[v_i] = random(10, 54, 0)
+    v_source_phase[v_i] = 0
+    v_source_active[v_i] = 1
+endfor v_i
+
+# Performance optimization
+throttle(0.3)
+
+# Animation loop
+v_time = 0
+v_angle = 0
+
+while 1 == 1 then
+#    begin_frame
+    
+    # Update all sources at once
+    for v_src in (0, v_source_count - 1, 1) then
+        if v_source_active[v_src] == 1 then
+            v_source_phase[v_src] = v_source_phase[v_src] + v_wave_speed
+        endif
+    endfor v_src
+    
+    if v_pattern == 1 then
+        # Quadrant Mirror Pattern
+        v_quad_size = 32
+        for v_y in (0, v_quad_size - 1, 1) then
+            for v_x in (0, v_quad_size - 1, 1) then
+                v_height = 0
+                for v_src in (0, v_source_count - 1, 1) then
+                    if v_source_active[v_src] == 1 then
+                        v_dx = v_x - v_source_x[v_src]
+                        v_dy = v_y - v_source_y[v_src]
+                        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        v_phase = v_source_phase[v_src]
+                        v_contrib = sin(v_dist / 4 - v_phase) * pow(v_decay_rate, v_dist)
+                        v_height = v_height + v_contrib
+                    endif
+                endfor v_src
+                
+                v_raw_intensity = abs(v_height * v_intensity_scale)
+                v_capped_intensity = min(v_raw_intensity, 99)
+                
+                if v_height > 0 then
+                    v_color = v_peak_color
+                else
+                    v_color = v_trough_color
+                endif
+                
+                plot(v_x, v_y, v_color, v_capped_intensity)
+                plot(63 - v_x, v_y, v_color, v_capped_intensity)
+                plot(v_x, 63 - v_y, v_color, v_capped_intensity)
+                plot(63 - v_x, 63 - v_y, v_color, v_capped_intensity)
+            endfor v_x
+        endfor v_y
+        
+    elseif v_pattern == 2 then
+        # Spiral Wave Pattern
+        v_angle = v_angle + 0.1
+        for v_r in (0, 31, 1) then
+            for v_t in (0, 360, 6) then
+                v_rad = radians(v_t + v_angle)
+                v_x = 32 + v_r * cos(v_rad)
+                v_y = 32 + v_r * sin(v_rad)
+                
+                v_height = 0
+                for v_src in (0, v_source_count - 1, 1) then
+                    if v_source_active[v_src] == 1 then
+                        v_dx = v_x - v_source_x[v_src]
+                        v_dy = v_y - v_source_y[v_src]
+                        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        v_phase = v_source_phase[v_src]
+                        v_contrib = sin(v_dist / 4 - v_phase) * pow(v_decay_rate, v_dist)
+                        v_height = v_height + v_contrib
+                    endif
+                endfor v_src
+                
+                v_raw_intensity = abs(v_height * v_intensity_scale)
+                v_capped_intensity = min(v_raw_intensity, 99)
+                
+                if v_height > 0 then
+                    v_color = v_peak_color
+                else
+                    v_color = v_trough_color
+                endif
+                
+                plot(v_x, v_y, v_color, v_capped_intensity)
+            endfor v_t
+        endfor v_r
+        
+    elseif v_pattern == 3 then
+        # Linear Sweep Pattern
+        for v_y in (0, 63, 1) then
+            for v_x in (0, 63, 1) then
+                v_height = 0
+                for v_src in (0, v_source_count - 1, 1) then
+                    if v_source_active[v_src] == 1 then
+                        v_dx = v_x - v_source_x[v_src]
+                        v_dy = v_y - v_source_y[v_src]
+                        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        v_phase = v_source_phase[v_src]
+                        v_sweep = sin(v_x / 10 + v_time)  # Add horizontal wave
+                        v_contrib = sin(v_dist / 4 - v_phase + v_sweep) * pow(v_decay_rate, v_dist)
+                        v_height = v_height + v_contrib
+                    endif
+                endfor v_src
+                
+                v_raw_intensity = abs(v_height * v_intensity_scale)
+                v_capped_intensity = min(v_raw_intensity, 99)
+                
+                if v_height > 0 then
+                    v_color = v_peak_color
+                else
+                    v_color = v_trough_color
+                endif
+                
+                plot(v_x, v_y, v_color, v_capped_intensity)
+            endfor v_x
+        endfor v_y
+        
+    else
+        # Radial Pulse Pattern
+        for v_y in (0, 63, 1) then
+            for v_x in (0, 63, 1) then
+                v_dx = v_x - 32
+                v_dy = v_y - 32
+                v_center_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                
+                v_height = 0
+                for v_src in (0, v_source_count - 1, 1) then
+                    if v_source_active[v_src] == 1 then
+                        v_dx = v_x - v_source_x[v_src]
+                        v_dy = v_y - v_source_y[v_src]
+                        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        v_phase = v_source_phase[v_src]
+                        v_pulse = sin(v_center_dist / 4 - v_time * 2)  # Radial pulse
+                        v_contrib = sin(v_dist / 4 - v_phase) * pow(v_decay_rate, v_dist) * v_pulse
+                        v_height = v_height + v_contrib
+                    endif
+                endfor v_src
+                
+                v_raw_intensity = abs(v_height * v_intensity_scale)
+                v_capped_intensity = min(v_raw_intensity, 99)
+                
+                if v_height > 0 then
+                    v_color = v_peak_color
+                else
+                    v_color = v_trough_color
+                endif
+                
+                plot(v_x, v_y, v_color, v_capped_intensity)
+            endfor v_x
+        endfor v_y
+    endif
+    
+#    end_frame
+    
+    # Source management (very occasional changes)
+    v_random = random(0, 200, 0)
+    if v_random < 1 then
+        if v_source_count < v_max_sources then
+            v_source_x[v_source_count] = random(10, 54, 0)
+            v_source_y[v_source_count] = random(10, 54, 0)
+            v_source_phase[v_source_count] = 0
+            v_source_active[v_source_count] = 1
+            v_source_count = v_source_count + 1
+        endif
+    endif
+    
+    if v_random < 1 then
+        if v_source_count > 1 then
+            v_remove = random(0, v_source_count - 1, 0)
+            v_source_active[v_remove] = 0
+        endif
+    endif
+    
+    v_time = v_time + 0.03
+    
+endwhile

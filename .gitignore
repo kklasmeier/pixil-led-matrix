@@ -1,0 +1,27 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local development settings
+.env
+.vscode/settings.json
+*.log
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Specific to LED matrix projects
+*.bak
+*.tmp
+
+# Potential virtual environment folders
+venv/
+env/
+

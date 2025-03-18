@@ -1,0 +1,2572 @@
+# Comprehensive Pixil Interpreter Test Script
+
+# Set the delay between tests
+v_delay = 2
+v_object_burnout0 = 4100
+v_object_burnout = 5000
+
+
+# Test 1: Basic commands and variable assignment
+print("Test 1: Basic commands and variable assignment")
+print("Expected: A blue dot at (10, 20) and a red line from (0, 0) to (30, 40)")
+v_x = 10
+v_y = 20
+plot(v_x, v_y, blue, v_object_burnout)
+draw_line(0, 0, 30, 40, red, v_object_burnout)
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 2: If-then-else construct and equality check
+print("Test 2: If-then-else construct and equality check")
+print("Expected: A green rectangle, then a yellow circle, then a blue square")
+v_condition = 5
+if v_condition > 3 then
+    draw_rectangle(5, 5, 25, 25, green, true, v_object_burnout)
+else
+    draw_circle(15, 15, 10, red, false, v_object_burnout)
+endif
+
+v_condition = 2
+if v_condition > 3 then
+    draw_rectangle(35, 5, 25, 25, green, true, v_object_burnout)
+else
+    draw_circle(45, 15, 10, yellow, false, v_object_burnout)
+endif
+
+v_equality = 10
+if v_equality == 10 then
+    draw_rectangle(5, 35, 25, 25, blue, true, v_object_burnout)
+else
+    draw_circle(15, 45, 10, red, false, v_object_burnout)
+endif
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+v_x = 10
+v_y = 20
+
+# Test 3: Basic for loop
+print("Test 3: Basic for loop")
+print("Expected: 5 blue dots in a diagonal line")
+for v_i in (0, 4, 1)
+    v_x = v_i * 10
+    v_y = v_i * 10
+    plot(v_x, v_y, blue, v_object_burnout)
+endfor v_i
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 4: Nested for loops
+print("Test 4: Nested for loops")
+print("Expected: A 3x3 grid of red dots")
+for v_x in (10, 30, 10)
+    for v_y in (10, 30, 10)
+        plot(v_x, v_y, red, v_object_burnout)
+    endfor v_y
+endfor v_x
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 5: Complex nested loops with commands before and after
+print("Test 5: Complex nested loops with commands before and after")
+print("Expected: A blue rectangle outline, filled with a pattern of green and yellow dots")
+draw_rectangle(5, 5, 55, 55, blue, false, v_object_burnout)
+for v_x in (10, 50, 20)
+    plot(v_x, 8, green, v_object_burnout)
+    for v_y in (15, 45, 15)
+        plot(v_x, v_y, yellow, v_object_burnout)
+    endfor v_y
+    plot(v_x, 55, green, v_object_burnout)
+endfor v_x
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 6: Multiple nested loops with commands in between
+print("Test 6: Multiple nested loops with commands in between")
+print("Expected: A pattern of red and blue dots with green dots in between")
+for v_outer in (0, 1, 1)
+    v_x_start = v_outer * 32 + 2
+    plot(v_x_start, 0, green, v_object_burnout)
+    
+    for v_x in (5, 25, 10)
+        v_x_actual = v_x + v_x_start
+        plot(v_x_actual, 10, red, v_object_burnout)
+    endfor v_x
+    
+    plot(v_x_start, 20, green, v_object_burnout)
+    
+    for v_y in (25, 55, 15)
+        plot(v_x_start, v_y, blue, v_object_burnout)
+    endfor v_y
+    
+    plot(v_x_start, 63, green, v_object_burnout)
+endfor v_outer
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 7: Random number generation and clear command
+print("Test 7: Random number generation and clear command")
+print("Expected: 10 random dots, then screen clear, then 10 new random dots")
+v_colors = "red"
+for v_i in (0, 9, 1)
+    v_x = random(0, 63, 0)
+    v_y = random(0, 63, 0)
+    v_color_index = random(0, 5, 0)
+    plot(v_x, v_y, v_colors, v_object_burnout)
+endfor v_i
+rest(5)
+clear()
+rest(2)
+v_colors = "green"
+for v_i in (0, 9, 1)
+    v_x = random(0, 63, 0)
+    v_y = random(0, 63, 0)
+    v_color_index = random(0, 5, 0)
+    plot(v_x, v_y, v_colors, v_object_burnout)
+endfor v_i
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 8: Complex expressions in command arguments
+print("Test 8: Complex expressions in command arguments")
+print("Expected: A growing series of concentric circles")
+v_base_radius = 5
+for v_i in (1, 5, 1)
+    v_radius = v_base_radius * v_i
+    v_x = 32
+    v_y = 32
+    if v_i == 1 then
+        v_color = "red"
+    endif
+    if v_i == 2 then
+        v_color = "green"
+    endif
+    if v_i == 3 then
+        v_color = "blue"
+    endif
+    if v_i == 4 then
+        v_color = "yellow"
+    endif
+    if v_i > 4 then
+        v_color = "cyan"
+    endif
+    draw_circle(v_x, v_y, v_radius, v_color, false, v_object_burnout)
+endfor v_i
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 9: Procedure with parameters
+print("Test 9: Procedure with parameters")
+print("Expected: Three circles of different colors and sizes")
+def draw_parameterized_circle {
+    v_x = 32
+    v_y = 32
+    draw_circle(v_x, v_y, v_radius, v_color, false, v_object_burnout)
+}
+
+v_radius = 10
+v_color = "red"
+call draw_parameterized_circle
+
+v_radius = 20
+v_color = "green"
+call draw_parameterized_circle
+
+v_radius = 30
+v_color = "blue"
+call draw_parameterized_circle
+
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 10: Procedure with a for loop
+print("Test 10: Procedure with a for loop")
+print("Expected: A diagonal line of yellow dots")
+def diagonal_line {
+    for v_i in (0, 5, 1)
+        v_x = v_i * 10
+        v_y = v_i * 10 + 3
+        plot(v_x, v_y, yellow, v_object_burnout)
+    endfor v_i
+}
+call diagonal_line
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 11: Procedure with an if condition
+print("Test 11: Procedure with an if condition")
+print("Expected: A blue circle if v_draw is true, nothing otherwise")
+def conditional_circle {
+    if v_draw == 1 then
+        draw_circle(32, 32, 20, blue, false, v_object_burnout)
+    endif
+}
+
+v_draw = 1
+call conditional_circle
+rest(5)
+
+v_draw = 0
+call conditional_circle
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 12: Nested procedures
+print("Test 12: Nested procedures")
+print("Expected: A red square with a green circle inside")
+def inner_circle {
+    draw_circle(25, 25, 10, green, true, v_object_burnout0)
+}
+
+def outer_square {
+    draw_rectangle(10, 10, 40, 40, red, false, v_object_burnout)
+    call inner_circle
+}
+
+call outer_square
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+# Test 13: Procedure with a for loop and an if condition
+print("Test 13: Procedure with a for loop and an if condition")
+print("Expected: A checkerboard pattern of red and blue squares within a 64x64 grid")
+def checkerboard {
+    v_square_size = 16
+    v_grid_size = 4
+    for v_x in (0, v_grid_size, 1)
+        for v_y in (0, v_grid_size, 1)
+            v_sum = v_x + v_y
+            v_is_even = v_sum - ((v_sum // 2) * 2)
+            if v_is_even == 0 then
+                v_color = "blue"
+            else
+                v_color = "red"
+            endif
+            v_start_x = v_x * v_square_size
+            v_start_y = v_y * v_square_size
+            draw_rectangle(v_start_x, v_start_y, v_square_size, v_square_size, v_color, false, v_object_burnout)
+        endfor v_y
+    endfor v_x
+}
+call checkerboard
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+# Test 14: Burnout parameter regression test
+print("Test 14: Burnout parameter regression test")
+print("Expected: Various shapes with different burnout times")
+print("Blue shapes (top half) have integer burnouts (2 seconds)")
+print("Red shapes (bottom half) have float burnouts (3.5 seconds)")
+
+# Setup variables
+v_int_burnout = 2000  # 2 seconds
+v_float_burnout = 3500  # 3.5 seconds
+v_int_color = "blue"
+v_float_color = "red"
+
+# Clear the display
+clear()
+draw_rectangle(0, 0, 63, 63, green)
+
+# Integer burnout shapes (top half)
+# Plot
+plot(5, 5, v_int_color, v_int_burnout)
+
+# Line
+draw_line(10, 0, 30, 20, v_int_color, v_int_burnout)
+
+# Rectangle (outline)
+draw_rectangle(35, 5, 10, 10, v_int_color, False, v_int_burnout)
+
+# Rectangle (filled)
+draw_rectangle(50, 5, 10, 10, v_int_color, True, v_int_burnout)
+
+# Circle (outline)
+draw_circle(15, 25, 5, v_int_color, False, v_int_burnout)
+
+# Circle (filled)
+draw_circle(30, 25, 5, v_int_color, True, v_int_burnout)
+
+# Float burnout shapes (bottom half)
+# Plot
+plot(5, 37, v_float_color, v_float_burnout)
+
+# Line
+draw_line(10, 32, 30, 52, v_float_color, v_float_burnout)
+
+# Rectangle (outline)
+draw_rectangle(35, 37, 10, 10, v_float_color, False, v_float_burnout)
+
+# Rectangle (filled)
+draw_rectangle(50, 37, 10, 10, v_float_color, True, v_float_burnout)
+
+# Circle (outline)
+draw_circle(15, 57, 5, v_float_color, False, v_float_burnout)
+
+# Circle (filled)
+draw_circle(30, 57, 5, v_float_color, True, v_float_burnout)
+
+# Multiple objects with different burnouts
+plot(60, 5, v_int_color, 1000)   # 1 second
+plot(60, 15, v_int_color, 2000)  # 2 seconds
+plot(60, 25, v_int_color, 3000)  # 3 seconds
+plot(60, 35, v_float_color, 4500) # 4.5 seconds
+
+# Wait to observe the burnout effect
+rest(v_delay)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+# Test 15: Frame Buffer Mode vs Normal Mode
+print("Test: Frame Buffer Mode vs Normal Mode")
+print("Part 1: Normal mode - watch objects appear one by one")
+draw_rectangle(10, 10, 44, 44, blue, false)
+rest(2)
+draw_circle(20, 20, 5, red, true)
+rest(2)
+draw_circle(35, 20, 5, green, true)
+rest(2)
+plot(32, 32, yellow)
+rest(4)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("Part 2: Frame buffer mode - all objects should appear at once")
+begin_frame
+draw_rectangle(10, 10, 44, 44, blue, false)
+draw_circle(20, 20, 5, red, true)
+draw_circle(35, 20, 5, green, true)
+plot(32, 32, yellow)
+end_frame
+rest(4)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+
+print("Part 3: Mixed mode - rectangle immediate, circles buffered")
+clear()
+draw_rectangle(10, 10, 44, 44, blue, false)
+rest(2)
+begin_frame
+draw_circle(20, 20, 5, red, true)
+draw_circle(35, 20, 5, green, true)
+draw_circle(27, 35, 5, yellow, true)
+end_frame
+rest(4)
+clear()
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+
+print("==================================================")
+print("Test 16: Sprite Definition and Manipulation")
+print("Expected: A 10x10 sprite with a blue border and red center,")
+print("          displayed at (20,20), then moved to (40,40), then removed.")
+
+print("Step 1: Defining sprites...")
+print("  - Defining main test sprite...")
+# Define a simple test sprite
+define_sprite(test_sprite, 10, 10)
+    draw_rectangle(0, 0, 9, 9, blue, false, 100)    # Border
+    draw_rectangle(2, 2, 5, 5, red, true, 100)      # Fill
+endsprite
+
+print("  - Defining overlay sprite...")
+# Define the overlay sprite
+define_sprite(overlay_sprite, 6, 6)
+    draw_circle(3, 3, 2, green, true, 100)
+endsprite
+
+print("Step 2: Testing initial sprite display at (20,20)...")
+# Test sprite visibility
+show_sprite(test_sprite, 20, 20)
+rest(2)
+
+sync_queue()
+
+print("Step 3: Testing sprite movement to (40,40)...")
+# Test sprite movement
+move_sprite(test_sprite, 40, 40)
+rest(2)
+
+sync_queue()
+
+print("Step 4: Testing sprite hide functionality...")
+# Test sprite hiding
+hide_sprite(test_sprite)
+rest(2)
+
+sync_queue()
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+
+print("==================================================")
+
+# Test 17: Layered Sprite Movement and Background Preservation
+print("Test 16: Layered Sprite Movement and Background Preservation")
+print("Expected: Red background with overlapping blue and yellow sprites that maintain proper z-order during movement")
+print("--")
+print("Should see:")
+print("1. Red 20x20 background")
+print("2. Blue 10x10 sprite appearing at (5,5)")
+print("3. Yellow 8x8 sprite appearing at (10,10), overlapping blue")
+print("4. Blue sprite moves to (15,15), background restored")
+print("5. Yellow sprite moves to (18,18), maintaining z-order")
+print("Background should be preserved throughout all movements")
+
+# Draw permanent red background
+draw_rectangle(0, 0, 20, 20, red, true)  # Fill area with red
+rest(2)
+
+# Create first sprite (appears on bottom)
+define_sprite(sprite1, 10, 10)
+   draw_rectangle(0, 0, 10, 10, blue, true)  # Fill with blue
+endsprite
+
+# Create second sprite (appears on top)
+define_sprite(sprite2, 8, 8)
+   draw_rectangle(0, 0, 8, 8, yellow, true)  # Fill with yellow
+endsprite
+
+# Position sprites to overlap
+show_sprite(sprite1, 5, 5)    # Blue sprite over red
+show_sprite(sprite2, 10, 10)  # Yellow sprite partially over blue
+rest(2)
+
+# Move first sprite while maintaining overlap
+move_sprite(sprite1, 15, 15)  # Blue moves but still under yellow
+rest(2)
+
+# Move second sprite while maintaining overlap
+move_sprite(sprite2, 18, 18)  # Yellow follows blue, staying on top
+rest(2)
+
+# Move first sprite while maintaining overlap
+move_sprite(sprite1, 30, 30)  # Blue moves but still under yellow
+rest(2)
+
+# Move second sprite while maintaining overlap
+move_sprite(sprite2, 35, 35)  # Yellow follows blue, staying on top
+rest(2)
+
+hide_sprite(sprite1)
+rest(2)
+
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Initialize test variables
+v_num = 2
+v_scale = 1.5
+v_offset = 10
+v_duration = 2500
+v_delay = 3
+
+print("=== Inline Math Expression Regression Tests ===")
+print("Note: Each test will show for 2.5 seconds")
+
+# Test 18 Inline Math: Test 1: Plot Command
+print("Test 1: Plot Command")
+print("Expected: A red dot at position (37, 42)")
+print("Math: Using multiplication and division")
+plot(v_num * 32 / 1.75 + 1, (100 - 16) / v_num, red, v_duration / v_num)
+rest(v_delay)
+
+sync_queue()
+
+
+# Test 18 Inline Math: Test 2: Draw Line Command
+print("Test 2: Draw Line Command")
+print("Expected: A blue diagonal line from (10, 15) to (50, 45)")
+print("Math: Using addition, subtraction and variables")
+draw_line(v_offset, v_offset + 5, v_offset * 5, (v_offset * 5) - 5, blue, v_duration)
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 2.1: Draw another line
+print("Test 1: Draw a line.")
+print("Expected: A green line will be drawn from 4,5 to 27,53)
+v_num = 2
+draw_line(((12 - 4)/v_num), ((12 - 2) / v_num), ((60 - 6) / v_num), (110 - 4) / v_num, green, 3000 - v_num)
+rest(3)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 3: Draw Rectangle (Unfilled)
+print("Test 3: Draw Rectangle - Unfilled")
+print("Expected: A green rectangle outline at (20, 20) with size 24x24")
+print("Math: Using multiplication and variables")
+draw_rectangle(v_num * 10, v_num * 10, v_scale * 16, v_num * 12, green, false, v_duration-1)
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 4: Draw Rectangle (Filled)
+print("Test 4: Draw Rectangle - Filled")
+print("Expected: A yellow filled rectangle at (30, 30) with size 15x15")
+print("Math: Using division and addition")
+draw_rectangle(v_offset * 3, (v_offset * 2) + v_offset, (45 / v_num) - v_offset, 30 / v_num, yellow, true, v_duration-1)
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 5: Draw Circle (Unfilled)
+print("Test 5: Draw Circle - Unfilled")
+print("Expected: A magenta circle outline at (32, 32) with radius 10")
+print("Math: Using complex expressions")
+draw_circle(64 / v_num, v_scale * 20 + 2, v_offset, magenta, false, v_duration - 1000)
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 6: Draw Circle (Filled)
+print("Test 6: Draw Circle - Filled")
+print("Expected: A cyan filled circle at (45, 45) with radius 8")
+print("Math: Using multiplication and subtraction")
+draw_circle(v_offset * 4 + 5, (v_offset * 5) - 5, v_num * 4, cyan, true, v_duration + 500)
+rest(v_delay)
+clear()
+
+sync_queue()
+
+# Test 18 Inline Math: Test 7: Multiple Objects with Math
+print("Test 7: Multiple Objects Test")
+print("Expected: A complex pattern with multiple shapes using different math")
+v_center = 32
+v_rad = 15
+draw_circle(v_center, v_center, v_rad, blue, false, v_duration-1)
+draw_circle(v_center, v_center, v_rad / 2, red, true, v_duration-1)
+draw_line(v_center - v_rad, v_center, v_center + v_rad, v_center, green, v_duration-1)
+draw_line(v_center, v_center - v_rad, v_center, v_center + v_rad, yellow, v_duration-1)
+rest(v_delay)
+clear()
+
+sync_queue()
+
+# Test 18 Inline Math: Test 8: Dynamic Pattern
+print("Test 8: Dynamic Pattern")
+print("Expected: A series of concentric rectangles with an Offset placement and calculated sizes")
+for v_i in (1, 4, 1)
+    v_size = v_i * 10
+    v_pos = (64 - v_size) / 2
+    draw_rectangle((63 - v_size) / 2, (63 - v_size) / 2, v_i * 10, v_i * 10, blue, false, v_duration-1)
+endfor v_i
+rest(v_delay)
+clear()
+
+sync_queue()
+
+# Additional test variables
+v_start = 5
+v_end = 20
+v_step = 1.5
+v_compare = 12
+v_sprite_x = 15
+v_sprite_y = 25
+
+# Test 18 Inline Math: Test 9: For Loop with Math Expressions
+print("Test 9: For Loop with Math Expressions")`
+print("Expected: 5 blue dots in a diagonal pattern, spaced using calculated positions")
+for v_i in (v_start * 1, v_end / 2, v_step + 0.5)
+    v_x = v_i * 3
+    v_y = v_i * 3
+    plot(v_x, v_y, blue, v_duration)
+endfor v_i
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 10: Complex If Conditions with Math
+print("Test 10: Complex If Conditions with Math")
+print("Expected: Different shapes based on calculated conditions")
+v_test = 8
+if (v_test * 2) > (v_compare + 2) then
+    draw_circle(30, 30, v_test, red, true, v_duration)
+else
+    draw_rectangle(25, 25, v_test * 2, v_test * 2, green, true, v_duration)
+endif
+
+if (v_start + v_end) / 2 == v_compare then
+    draw_circle(45, 45, 10, blue, false, v_duration)
+else
+    draw_line(40, 40, 50, 50, yellow, v_duration)
+endif
+rest(v_delay)
+
+sync_queue()
+
+# Test 18 Inline Math: Test 11: Sprite with Math Expressions
+print("Test 11: Sprite with Math Expressions")
+print("Expected: A sprite with calculated size and position")
+
+# Define sprite with calculated size
+define_sprite(math_sprite, v_start * 2, v_end / 2)
+    draw_rectangle(0, 0, v_start * 2 - 1, v_end / 2 - 1, blue, false)
+    draw_circle(v_start, v_start / 2, 3, red, true)
+endsprite
+
+# Show and move sprite with calculated positions
+print("Step 1: Show sprite at calculated position")
+show_sprite(math_sprite, v_sprite_x * 2, v_sprite_y + 5)
+rest(v_delay)
+
+sync_queue()
+
+print("Step 2: Move sprite to new calculated position")
+move_sprite(math_sprite, (v_sprite_x + v_end) / 2, v_sprite_y * 1.5)
+rest(v_delay)
+
+print("Step 3: Hide sprite")
+hide_sprite(math_sprite)
+rest(v_delay)
+
+# Test 18 Inline Math: Test 12: Combined Math Operations
+print("Test 12: Combined Math Operations")
+print("Expected: A pattern combining loops and if conditions")
+for v_i in (1, v_end / 4, v_step)
+    if v_i * v_scale > v_offset then
+        draw_circle(v_center, v_center, v_i * 3, green, false, v_duration)
+    else
+        draw_rectangle(v_center - v_i, v_center - v_i, v_i * 2, v_i * 2, red, true, v_duration)
+    endif
+    rest(.5)
+endfor v_i
+rest(v_delay)
+
+sync_queue()
+
+print("==================================================")
+
+v_delay = 4
+v_object_burnout = 3500
+
+# Test 19: Basic if-elseif-else with math expressions
+print("Test 19: Basic if-elseif-else with math expressions")
+print("Expected: A single blue circle at center (30,30) with radius 10")
+v_x = 5
+v_multiplier = 2
+if v_x * v_multiplier > 15 then
+    draw_circle(30, 30, 10, red, true, v_object_burnout)
+elseif v_x * v_multiplier > 5 then
+    draw_circle(30, 30, 10, blue, true, v_object_burnout)
+else
+    draw_circle(30, 30, 10, yellow, true, v_object_burnout)
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 20: Nested if statements
+print("Test 20: Nested if statements")
+print("Expected: A red square (20,20,20,20) with a green circle (radius 5) inside it at (30,30)")
+v_size = 20
+if v_size >= 20 then
+    draw_rectangle(20, 20, 20, 20, red, true, v_object_burnout)
+    if v_size == 20 then
+        draw_circle(30, 30, 5, green, true, v_object_burnout)
+    else
+        draw_circle(30, 30, 5, blue, true, v_object_burnout)
+    endif
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 21: Multiple elseif with math
+print("Test 21: Multiple elseif with math")
+print("Expected: Two shapes - yellow circle (radius 8) at (20,20) and blue circle (radius 4) at (40,40)")
+v_value = 15
+if v_value > 20 then
+    draw_circle(20, 20, 8, red, true, v_object_burnout)
+    draw_circle(40, 40, 4, red, true, v_object_burnout)
+elseif v_value > 10 then
+    draw_circle(20, 20, 8, yellow, true, v_object_burnout)
+    draw_circle(40, 40, 4, blue, true, v_object_burnout)
+else
+    draw_circle(20, 20, 8, green, true, v_object_burnout)
+    draw_circle(40, 40, 4, green, true, v_object_burnout)
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 22: Nested if with variable modification
+print("Test 22: Nested if with variable modification")
+print("Expected: A magenta square outline (10,10,40,40) with a yellow circle (radius 5) at (30,30)")
+v_start = 5
+v_calc = v_start * 3
+if v_calc >= 15 then
+    draw_rectangle(10, 10, 40, 40, magenta, false, v_object_burnout)
+    if v_calc == 15 then
+        draw_circle(30, 30, 5, yellow, true, v_object_burnout)
+    else
+        draw_circle(30, 30, 5, red, true, v_object_burnout)
+    endif
+else
+    draw_rectangle(10, 10, 40, 40, blue, false, v_object_burnout)
+    draw_circle(30, 30, 5, green, true, v_object_burnout)
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 23: If conditions with loops
+print("Test 23: If conditions with loops")
+print("Expected: Three blue dots in a vertical line at x=30, y positions 20,30,40")
+v_count = 3
+if v_count == 3 then
+    for v_y in (20, 40, 10)
+        plot(30, v_y, blue, v_object_burnout)
+    endfor v_y
+else
+    for v_y in (20, 40, 10)
+        plot(30, v_y, red, v_object_burnout)
+    endfor v_y
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 24: Verifying else condition execution
+print("Test 24: Verifying else condition execution")
+print("Expected: A single green circle at center (30,30) with radius 15")
+v_test = 5
+if v_test > 10 then
+    draw_circle(30, 30, 15, red, true, v_object_burnout)
+elseif v_test > 8 then
+    draw_circle(30, 30, 15, blue, true, v_object_burnout)
+elseif v_test > 6 then
+    draw_circle(30, 30, 15, yellow, true, v_object_burnout)
+else
+    draw_circle(30, 30, 15, green, true, v_object_burnout)
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 25: Complex math expressions in conditions
+print("Test 25: Complex math expressions in conditions")
+print("Expected: A single green circle at (30,30) with radius 10")
+v_base = 4
+v_multiplier = 3
+v_offset = 2
+if (v_base * v_multiplier) + v_offset > 15 then
+    draw_circle(30, 30, 10, red, true, v_object_burnout)
+elseif (v_base * v_multiplier) - v_offset > 10 then
+    draw_circle(30, 30, 10, cyan, true, v_object_burnout)
+elseif v_base * (v_multiplier + v_offset) > 20 then
+    draw_circle(30, 30, 10, yellow, true, v_object_burnout)
+else
+    draw_circle(30, 30, 10, green, true, v_object_burnout)
+endif
+rest(v_delay)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test 26: Draws a line across the matrix using all supported named colors")
+print("Expected: See horizontal lines for all colors")
+
+# Initialize start position variables
+v_x1 = 0        # Start of line
+v_x2 = 63       # End of line (64x64 matrix)
+v_y = 0         # Starting Y position
+v_spacing = 2   # Space between lines
+v_duration = 2000  # How long each line stays visible
+v_delay = 0.1   # Delay between drawing each line
+
+# Define procedure for drawing line
+def draw_colored_line {
+    v_y = v_y + v_spacing
+    draw_line(v_x1, v_y, v_x2, v_y, v_color, v_duration)
+    rest(v_delay)
+}
+
+# Draw lines with different colors by setting color and calling procedure
+v_color = "black"
+call draw_colored_line
+
+v_color = "white"
+call draw_colored_line
+
+v_color = "red"
+call draw_colored_line
+
+v_color = "rose"
+call draw_colored_line
+
+v_color = "pink"
+call draw_colored_line
+
+v_color = "salmon"
+call draw_colored_line
+
+v_color = "coral"
+call draw_colored_line
+
+v_color = "orange"
+call draw_colored_line
+
+v_color = "gold"
+call draw_colored_line
+
+v_color = "yellow"
+call draw_colored_line
+
+v_color = "lime"
+call draw_colored_line
+
+v_color = "green"
+call draw_colored_line
+
+v_color = "spring_green"
+call draw_colored_line
+
+v_color = "forest_green"
+call draw_colored_line
+
+v_color = "teal"
+call draw_colored_line
+
+v_color = "turquoise"
+call draw_colored_line
+
+v_color = "cyan"
+call draw_colored_line
+
+v_color = "sky_blue"
+call draw_colored_line
+
+v_color = "azure"
+call draw_colored_line
+
+v_color = "blue"
+call draw_colored_line
+
+v_color = "ocean_blue"
+call draw_colored_line
+
+v_color = "indigo"line
+call draw_colored_line
+
+v_color = "purple"
+call draw_colored_line
+
+v_color = "violet"
+call draw_colored_line
+
+v_color = "magenta"
+call draw_colored_line
+
+v_color = "lavender"
+call draw_colored_line
+
+# Wait for duration before script ends
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test 27: Draws horizontal lines in sequence from top to bottom using loop count")
+print("Expected: See horizontal lines drawn top to bottom cycling through colors and intensities")
+
+# Initialize variables
+v_x1 = 0          # Start of line
+v_x2 = 63         # End of line 
+v_y = 0           # Y position
+v_duration = 2000 # Duration in milliseconds
+v_delay = 0.1     # Delay between draws
+
+# Run loop from 1 to 99 drawing lines
+for v_i in (1, 99, 1)
+   draw_line(v_x1, v_y, v_x2, v_y, {v_i}:{v_i}, v_duration)
+   rest(v_delay)
+   
+   # Increment Y position
+   v_y = v_y + 1
+   
+   # Reset Y to 0 if we hit bottom
+   if v_y > 63 then
+       v_y = 0
+   endif
+endfor v_i
+
+# Wait before ending
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test RGB Matrix Color Parameter Regression Test")
+print("Test 28: Tests all valid color parameter scenarios with all shape types")
+print("#1 - Direct color:           plot(3, 40, red)")
+print("#2 - Direct number:          plot(3, 40, 45)")
+print("#3 - Variable:               plot(3, 40, v_color)")
+print("#4 - Direct color:intensity: plot(3, 40, red:50)")
+print("#5 - Direct number:number:   plot(3, 40, 45:50)")
+print("#6 - Variable:Variable:      plot(3, 40, {v_color}:{v_intensity})")
+print("#7 - Expression:Number:      plot(3, 40, {v_color + 10}:45)")
+print("#8 - Color:Variable:         plot(3, 40, red:{v_intensity})")
+print("#9 - Expression:Expression:  plot(3, 40, {v_base * 2}:{v_base_i / 2})")
+
+# Constants for the test
+v_delay = 2       # Delay between scenarios
+v_intensity = 75  # Base intensity for variable tests
+v_color_1 = "red"    # Base color for red tests
+v_color_2 = "blue"   # Base color for blue tests
+v_color_3 = "green"  # Base color for green tests
+v_color_4 = "yellow" # Base color for yellow tests
+v_base = 45      # Base number for calculations
+v_base_i = 75    # Base intensity for calculations
+
+# Initialize numeric color variables (at the top with other variables)
+v_red = 10      # Number for red
+v_blue = 90     # Number for blue
+v_green = 70    # Number for green
+v_yellow = 50   # Number for yellow
+
+
+# Grid positions for direct shapes (2x2 grid in top area)
+# Top left quadrant (plot)
+v_plot_x = 10       
+v_plot_y = 10
+
+# Top right quadrant (line)
+v_line_x = 40       
+v_line_y = 10
+
+# Bottom left quadrant (rectangle)
+v_rect_x = 10      
+v_rect_y = 30
+
+# Bottom right quadrant (circle)
+v_circle_x = 40     
+v_circle_y = 30
+
+# Position for sprite display at bottom
+v_sprite_x = 12     
+v_sprite_y = 50     
+
+# Test 1: Direct color name
+print("Test 1: Direct color name")
+clear()
+define_sprite(test_sprite1, 40, 10)
+   plot(3, 5, red, 100)
+   draw_line(13, 2, 13, 8, blue, 100)
+   draw_rectangle(23, 2, 4, 6, green, true, 100)
+   draw_circle(35, 5, 3, yellow, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow, false)
+show_sprite(test_sprite1, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 2: Direct number
+# Test 2: Direct number
+print("Test 2: Direct number")
+clear()
+define_sprite(test_sprite2, 40, 10)
+    plot(3, 5, 10, 100)          # red
+    draw_line(13, 2, 13, 8, 90, 100)     # blue
+    draw_rectangle(23, 2, 4, 6, 70, true, 100)    # green
+    draw_circle(35, 5, 3, 50, false, 100)    # yellow
+endsprite
+
+plot(v_plot_x, v_plot_y, 10)         # red
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, 90)    # blue
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, 70, true)    # green
+draw_circle(v_circle_x, v_circle_y, 5, 50, false)   # yellow
+show_sprite(test_sprite2, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 3: Variable color
+print("Test 3: Variable color")
+clear()
+define_sprite(test_sprite3, 40, 10)
+   plot(3, 5, v_color_1, 100)
+   draw_line(13, 2, 13, 8, v_color_2, 100)
+   draw_rectangle(23, 2, 4, 6, v_color_3, true, 100)
+   draw_circle(35, 5, 3, v_color_4, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, v_color_1)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, v_color_2)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, v_color_3, true)
+draw_circle(v_circle_x, v_circle_y, 5, v_color_4, false)
+show_sprite(test_sprite3, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 4: Direct color:intensity
+print("Test 4: Direct color:intensity")
+clear()
+define_sprite(test_sprite4, 40, 10)
+   plot(3, 5, red:75, 100)
+   draw_line(13, 2, 13, 8, blue:75, 100)
+   draw_rectangle(23, 2, 4, 6, green:75, true, 100)
+   draw_circle(35, 5, 3, yellow:75, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red:75)
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue:75)
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green:75, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow:75, false)
+show_sprite(test_sprite4, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 5: Direct number:number
+print("Test 5: Direct number:number")
+clear()
+define_sprite(test_sprite5, 40, 10)
+    plot(3, 5, 10:75, 100)         # red:75
+    draw_line(13, 2, 13, 8, 90:75, 100)    # blue:75
+    draw_rectangle(23, 2, 4, 6, 70:75, true, 100)   # green:75
+    draw_circle(35, 5, 3, 50:75, false, 100)   # yellow:75
+endsprite
+
+plot(v_plot_x, v_plot_y, 10:75)        # red:75
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, 90:75)   # blue:75
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, 70:75, true)   # green:75
+draw_circle(v_circle_x, v_circle_y, 5, 50:75, false)  # yellow:75
+show_sprite(test_sprite5, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+
+# Test 6: Variable:Variable
+print("Test 6: Variable:Variable")
+clear()
+define_sprite(test_sprite6, 40, 10)
+    plot(3, 5, {v_red}:{v_intensity}, 100)          # red:75
+    draw_line(13, 2, 13, 8, {v_blue}:{v_intensity}, 100)     # blue:75
+    draw_rectangle(23, 2, 4, 6, {v_green}:{v_intensity}, true, 100)    # green:75
+    draw_circle(35, 5, 3, {v_yellow}:{v_intensity}, false, 100)    # yellow:75
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red}:{v_intensity})         # red:75
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue}:{v_intensity})    # blue:75
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green}:{v_intensity}, true)    # green:75
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow}:{v_intensity}, false)   # yellow:75
+show_sprite(test_sprite6, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 7: Expression:Number
+print("Test 7: Expression:Number")
+clear()
+define_sprite(test_sprite7, 40, 10)
+    plot(3, 5, {v_red + 0}:75, 100)          # red
+    draw_line(13, 2, 13, 8, {v_blue + 0}:75, 100)     # blue
+    draw_rectangle(23, 2, 4, 6, {v_green + 0}:75, true, 100)    # green
+    draw_circle(35, 5, 3, {v_yellow + 0}:75, false, 100)    # yellow
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red + 0}:75)         # red
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue + 0}:75)    # blue
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green + 0}:75, true)    # green
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow + 0}:75, false)   # yellow
+show_sprite(test_sprite7, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+
+# Test 8: Color:Variable
+print("Test 8: Color:Variable")
+clear()
+define_sprite(test_sprite8, 40, 10)
+   plot(3, 5, red:{v_intensity}, 100)
+   draw_line(13, 2, 13, 8, blue:{v_intensity}, 100)
+   draw_rectangle(23, 2, 4, 6, green:{v_intensity}, true, 100)
+   draw_circle(35, 5, 3, yellow:{v_intensity}, false, 100)
+endsprite
+
+plot(v_plot_x, v_plot_y, red:{v_intensity})
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, blue:{v_intensity})
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, green:{v_intensity}, true)
+draw_circle(v_circle_x, v_circle_y, 5, yellow:{v_intensity}, false)
+show_sprite(test_sprite8, v_sprite_x, v_sprite_y)
+rest(v_delay)
+sync_queue()
+
+# Test 9: Expression:Expression
+print("Test 9: Expression:Expression")
+clear()
+define_sprite(test_sprite9, 40, 10)
+    plot(3, 5, {v_red + 0}:{v_intensity - 10}, 100)          # red with adjusted intensity
+    draw_line(13, 2, 13, 8, {v_blue + 0}:{v_intensity - 10}, 100)     # blue with adjusted intensity
+    draw_rectangle(23, 2, 4, 6, {v_green + 0}:{v_intensity - 10}, true, 100)    # green with adjusted intensity
+    draw_circle(35, 5, 3, {v_yellow + 0}:{v_intensity - 10}, false, 100)    # yellow with adjusted intensity
+endsprite
+
+plot(v_plot_x, v_plot_y, {v_red + 0}:{v_intensity - 10})         # red with adjusted intensity
+draw_line(v_line_x, v_line_y, v_line_x + 10, v_line_y + 10, {v_blue + 0}:{v_intensity - 10})    # blue with adjusted intensity
+draw_rectangle(v_rect_x, v_rect_y, 10, 10, {v_green + 0}:{v_intensity - 10}, true)    # green with adjusted intensity
+draw_circle(v_circle_x, v_circle_y, 5, {v_yellow + 0}:{v_intensity - 10}, false)   # yellow with adjusted intensity
+show_sprite(test_sprite9, v_sprite_x, v_sprite_y)
+rest(v_delay)
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 29: Polygons
+print("Test 29: Polygons")
+print("Expected: A red hexigon, a filled blue pentigon, and a green square all rotating.")
+
+# Create a rotating nested polygon animation
+clear()
+begin_frame
+
+v_center_x = 32
+v_center_y = 32
+v_base_radius = 20
+v_rotation = 0
+
+for v_i in (0, 360, 10)
+    begin_frame
+    clear()
+    
+    # Outer polygon
+    draw_polygon(v_center_x, v_center_y, v_base_radius, 6, red:80, v_i)
+
+    # Middle polygon
+    draw_polygon(v_center_x, v_center_y, v_base_radius, 5, blue:70, v_i * -1, true)
+
+    # Inner polygon
+    draw_polygon(v_center_x, v_center_y, v_base_radius, 3, green:90, v_i * 2)
+ 
+    end_frame
+    rest(0.1)
+endfor v_i
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+# Test 30: checks embedded inline parameter functions for commands 
+print("Test 30: Checks embedded inline parameter functions for commands.")
+print("Expected: Cirlces with random sizes should appear and no errors reported.")
+
+clear()
+dispose_all_sprites()
+
+# Test 1: Basic function calls
+draw_circle(32, 32, round(10.5), red, true, 1000)
+rest(1)
+draw_circle(32, 32, random(1, 20, 1), blue, true, 1000)
+rest(1)
+
+# Test 2: Nested functions
+draw_circle(32, 32, round(random(1, 20, 1)), green, true, 1000)
+rest(1)
+
+# Test 3: Math expressions with functions
+draw_circle(32, 32, (10 - random(1, 8, 1)) / 2, purple, true, 1000)
+rest(1)
+
+# Test 4: Multiple nested functions
+draw_circle(32, 32, round((10 - random(1, 5, 1)) / 2, 1), cyan, true, 1000)
+rest(1)
+
+# Test 5: Verify regular math still works
+draw_circle(32, 32, ((10 - 2) / 2), yellow, true, 1000)
+rest(1)
+
+# Test 6: Sprite with function parameters
+define_sprite(test_sprite, 10, 10)
+    draw_circle(5, 5, random(2, 4, 0), white, true)
+endsprite
+
+show_sprite(test_sprite, 20, 20)
+rest(1)
+
+# Test 7: Complex expression in sprite
+define_sprite(test_sprite2, 10, 10)
+    draw_circle(5, 5, round((8 - random(2, 4, 0)) / 2), blue, true)
+endsprite
+
+show_sprite(test_sprite2, 40, 40)
+rest(1)
+
+print("All tests completed")
+
+rest(2)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test 31: Validate variable assignments for COLOR and FILL.")
+print("Expected: A blue pentigon appears")
+
+v_color = "blue:40"
+v_color2 = v_color
+v_fill = true
+v_fill2 = v_fill
+
+draw_polygon(32, 32, 14, 5, v_color2, 1, v_fill, 1000)
+
+v_color = "blue"
+v_color2 = v_color
+v_fill = false
+v_fill2 = v_fill
+
+draw_polygon(32, 32, 14, 5, v_color2, 1, v_fill, 1000)
+
+rest(5)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test RGB Matrix Text Commands Regression Test")
+print("Test 32: Tests all text effects and modifiers")
+print("#1 - NORMAL effect (no modifier):      draw_text(10, 30, Test, FontName, 12, red, NORMAL)")
+print("#2 - TYPE effect - SLOW:              draw_text(10, 30, Test, FontName, 12, blue, TYPE, SLOW)")
+print("#3 - TYPE effect - MEDIUM (default):   draw_text(10, 30, Test, FontName, 12, blue, TYPE)")
+print("#4 - TYPE effect - FAST:              draw_text(10, 30, Test, FontName, 12, blue, TYPE, FAST)")
+print("#5 - SCAN effect (no modifier):        draw_text(10, 30, Test, FontName, 12, green, SCAN)")
+print("#6 - SLIDE effect - LEFT (default):    draw_text(10, 30, Test, FontName, 12, yellow, SLIDE)")
+print("#7 - SLIDE effect - RIGHT:            draw_text(10, 30, Test, FontName, 12, yellow, SLIDE, RIGHT)") 
+print("#8 - SLIDE effect - UP:               draw_text(10, 30, Test, FontName, 12, yellow, SLIDE, UP)")
+print("#9 - SLIDE effect - DOWN:             draw_text(10, 30, Test, FontName, 12, yellow, SLIDE, DOWN)")
+print("#10 - DISSOLVE effect - IN (default):  draw_text(10, 30, Test, FontName, 12, cyan, DISSOLVE)")
+print("#11 - DISSOLVE effect - OUT:          draw_text(10, 30, Test, FontName, 12, cyan, DISSOLVE, OUT)")
+print("#12 - WIPE effect - IN_LEFT (default): draw_text(10, 30, Test, FontName, 12, magenta, WIPE)")
+print("#13 - WIPE effect - IN_RIGHT:         draw_text(10, 30, Test, FontName, 12, magenta, WIPE, IN_RIGHT)")
+print("#14 - WIPE effect - IN_UP:            draw_text(10, 30, Test, FontName, 12, magenta, WIPE, IN_UP)")
+print("#15 - WIPE effect - IN_DOWN:          draw_text(10, 30, Test, FontName, 12, magenta, WIPE, IN_DOWN)")
+print("#16 - WIPE effect - OUT_LEFT:         draw_text(10, 30, Test, FontName, 12, magenta, WIPE, OUT_LEFT)")
+print("#17 - WIPE effect - OUT_RIGHT:        draw_text(10, 30, Test, FontName, 12, magenta, WIPE, OUT_RIGHT)")
+print("#18 - WIPE effect - OUT_UP:           draw_text(10, 30, Test, FontName, 12, magenta, WIPE, OUT_UP)")
+print("#19 - WIPE effect - OUT_DOWN:         draw_text(10, 30, Test, FontName, 12, magenta, WIPE, OUT_DOWN)")
+print("#20 - Color intensity test:           draw_text(10, 30, Test, FontName, 12, red:50, NORMAL)")
+print("#21 - Clear text test:                clear_text(10, 30)")
+print("")
+print("")
+
+```
+
+# Constants for the test
+v_delay = 3        # Delay between tests
+v_font = "piboto-light"     # Test font
+v_size = 12        # Test font size
+v_x = 10          # Base X position
+v_y = 30          # Base Y position
+v_message = "Test" # Test message
+
+# Test 1: Normal Effect (no modifier)
+print("Test 1: NORMAL effect")
+draw_text(v_x, v_y, v_message, v_font, v_size, red, NORMAL)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+# Test 2: TYPE effect with all modifiers
+print("Test 2: TYPE effect - SLOW")
+draw_text(v_x, v_y, v_message, v_font, v_size, blue, TYPE, SLOW)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+print("Test 2a: TYPE effect - MEDIUM (default)")
+draw_text(v_x, v_y, v_message, v_font, v_size, blue, TYPE)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+print("Test 2b: TYPE effect - FAST")
+draw_text(v_x, v_y, v_message, v_font, v_size, blue, TYPE, FAST)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+# Test 3: SCAN effect (no modifier)
+print("Test 3: SCAN effect")
+draw_text(v_x, v_y, v_message, v_font, v_size, green, SCAN)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+# Test 4: SLIDE effect with all modifiers
+print("Test 4: SLIDE effect - LEFT (default)")
+draw_text(v_x, v_y, v_message, v_font, v_size, yellow, SLIDE)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 4a: SLIDE effect - RIGHT")
+draw_text(v_x, v_y, v_message, v_font, v_size, yellow, SLIDE, RIGHT)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 4b: SLIDE effect - UP")
+draw_text(v_x, v_y, v_message, v_font, v_size, yellow, SLIDE, UP)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 4c: SLIDE effect - DOWN")
+draw_text(v_x, v_y, v_message, v_font, v_size, yellow, SLIDE, DOWN)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+# Test 5: DISSOLVE effect with all modifiers
+print("Test 5: DISSOLVE effect - IN (default)")
+draw_text(v_x, v_y, v_message, v_font, v_size, cyan, DISSOLVE, IN)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 5a: DISSOLVE effect - OUT")
+draw_text(v_x, v_y, v_message, v_font, v_size, cyan, DISSOLVE)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+# Test 6: WIPE effect with all modifiers
+print("Test 6: WIPE effect - IN_LEFT (default)")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, LEFT)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6a: WIPE effect - IN_RIGHT")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, IN_RIGHT)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6b: WIPE effect - IN_UP")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, IN_UP)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+
+print("Test 6c: WIPE effect - IN_DOWN")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, IN_DOWN)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6d: WIPE effect - OUT_LEFT")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, OUT_LEFT)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6e: WIPE effect - OUT_RIGHT")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, OUT_RIGHT)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6f: WIPE effect - OUT_UP")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, OUT_UP)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+print("Test 6g: WIPE effect - OUT_DOWN")
+draw_text(v_x, v_y, v_message, v_font, v_size, magenta, WIPE, OUT_DOWN)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+sync_queue()
+
+# Test color intensity with text
+print("Test 7: Color intensity")
+draw_text(v_x, v_y, v_message, v_font, v_size, red:50, NORMAL)
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test 33: Validate string concatenation with variable assignments and command argument expressions.")
+print("Expected: Blue text appears two times as cblue:40")
+
+# Constants for the test
+v_delay = 3        # Delay between tests
+v_font = "piboto-light"     # Test font
+v_size = 14        # Test font size
+v_x = 1          # Base X position
+v_y = 30          # Base Y position
+
+v_color = "blue"
+v_number = 40
+v_color2 = v_color & ":" & v_number
+v_message = "C" & v_color2
+
+draw_text(v_x, v_y, v_message, v_font, v_size, v_color2, NORMAL)
+
+rest(v_delay)
+clear_text(v_x, v_y)
+rest(1)
+
+draw_text(v_x, v_y - 20, "c" & v_color2, v_font, v_size, v_color2, NORMAL)
+    
+rest(v_delay)
+clear_text(v_x, v_y - 20)
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test 34:Test Suite: While Loops")
+print("Testing various while loop scenarios")
+rest(2)
+sync_queue()
+
+# Test 1: Simple numeric comparison
+print("Test 1: Simple numeric comparison")
+print("Expected: 4 red dots in a horizontal line at y=10")
+clear()
+v_x = 1
+while v_x < 5 then
+    plot(v_x, 10, red)
+    v_x = v_x + 1
+endwhile
+rest(3)
+sync_queue()
+
+# Test 2: Variable to variable comparison
+print("Test 2: Variable to variable comparison")
+print("Expected: 3 blue dots in a horizontal line at y=20")
+clear()
+v_x = 1
+v_y = 4
+while v_x < v_y then
+    plot(v_x, 20, blue)
+    v_x = v_x + 1
+endwhile
+rest(3)
+sync_queue()
+
+# Test 3: Boolean condition
+print("Test 3: Boolean condition")
+print("Expected: 3 green dots in a horizontal line at y=30")
+clear()
+v_running = true
+v_count = 1
+while v_running then
+    plot(v_count, 30, green)
+    v_count = v_count + 1
+    if v_count > 3 then
+        v_running = false
+    endif
+endwhile
+rest(3)
+sync_queue()
+
+# Test 4: Complex math expression
+print("Test 4: Complex math expression")
+print("Expected: 5 yellow dots in a horizontal line at y=40")
+clear()
+v_x = 1
+v_y = 10
+while v_x + 2 < v_y - 3 then
+    plot(v_x, 40, yellow)
+    v_x = v_x + 1
+endwhile
+rest(3)
+sync_queue()
+
+# Test 5: Nested while loops
+print("Test 5: Nested while loops")
+print("Expected: Triangle pattern of purple dots")
+print("1 dot at y=10, 2 dots at y=20, 3 dots at y=30")
+clear()
+v_i = 1
+while v_i <= 3 then
+    v_j = 1
+    while v_j <= v_i then
+        plot(v_i * 10, v_j * 10, purple)
+        v_j = v_j + 1
+    endwhile
+    v_i = v_i + 1
+endwhile
+rest(3)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test Suite: Extended While Loop Tests")
+print("Test #35: Testing various while loop integration scenarios")
+print("==================================================")
+
+# Test 35: While Loop Inside For Loop
+print("")
+print("Test 1: While Loop Inside For Loop")
+print("Expected: 3 sets of colored dots, moving down the display")
+clear()
+
+for v_row in (1, 3, 1) then
+    v_x = 1
+    while v_x <= 3 then
+        plot(v_x * 5, v_row * 10, red)
+        v_x = v_x + 1
+    endwhile
+endfor v_row
+
+rest(3)
+sync_queue()
+
+
+# Test 2: For Loop Inside While Loop
+print("")
+print("Test 2: For Loop Inside While Loop")
+print("Expected: Growing pattern of blue dots")
+clear()
+
+v_count = 1
+while v_count <= 3 then
+    for v_x in (1, v_count, 1) then
+        plot(v_x * 5, v_count * 10 + 20, blue)
+    endfor v_x
+    v_count = v_count + 1
+endwhile
+
+rest(3)
+sync_queue()
+
+
+# Test 3: While Loop in Procedure
+print("")
+print("Test 3: While Loop in Procedure")
+print("Expected: Vertical line of green dots")
+clear()Extended While Loop Tests
+
+def draw_vertical {
+    v_y = 1
+    while v_y <= 5 then
+        plot(25, v_y * 5, green)
+        v_y = v_y + 1
+    endwhile
+}
+
+call draw_vertical
+
+rest(3)
+sync_queue()
+
+
+# Test 4: While Loop in If Condition
+print("")
+print("Test 4: While Loop in If Condition")
+print("Expected: Diagonal line of yellow dots if v_start is true")
+clear()
+
+v_start = true
+if v_start then
+    v_pos = 1
+    while v_pos <= 5 then
+        plot(v_pos * 5, v_pos * 5, yellow)
+        v_pos = v_pos + 1
+    endwhile
+endif
+
+rest(2)
+clear()
+sync_queue()
+
+
+print("==================================================")
+print("Test Suite: Destory all sprites")
+print("Test #36: Testing the distruction and reuse of sprites")
+print("You should see a red rectangle, blue circle and a green circle appear")
+print("Pause")
+print("You should see a yellow polygon appear")
+print("==================================================")
+
+# Define and show first sprite
+define_sprite(sprite01, 10, 10)
+    draw_rectangle(0, 0, 5, 5, red, true)
+    draw_circle(7, 7, 2, blue, true)
+endsprite
+
+# Define and show second sprite
+define_sprite(sprite02, 8, 8)
+    draw_circle(4, 4, 3, green, true)
+endsprite
+
+# Show sprites at different positions
+show_sprite(sprite01, 10, 10)
+show_sprite(sprite02, 30, 30)
+
+# Wait to see the sprites
+rest(2)
+
+clear()
+# Dispose all sprites - Add parentheses here
+dispose_all_sprites()
+
+# Wait to see clean display
+rest(1)
+
+# Try creating new sprites after disposal
+define_sprite(sprite01, 12, 12)
+    draw_polygon(6, 6, 5, 5, yellow, 0, true)
+endsprite
+
+show_sprite(sprite01, 20, 20)
+
+# Wait to see final result
+rest(2)
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+print("Test RGB Matrix Array Commands Regression Test")
+print("Test 37: Tests array creation, access, and usage in commands")
+print("#1 - Array creation:                create_array(v_points, 5)")
+print("#2 - Direct value assignment:       v_points[0] = 10, RED circle at (10,10)")
+print("#3 - Expression assignment:         v_points[1] = v_points[0] + 5, GREEN circle at (10,10)")
+print("#4 - Variable index assignment:     v_points[v_i] = 30, BLUE circle at (10,10)")
+print("#5 - Math expression index:         v_points[v_i + 1] = 40, YELLOW circle at (10,10)")
+print("#6 - Array in circle command:       draw_circle using array values, MAGENTA circle at (10,10)")
+print("#7 - Array in math expression:      v_result = v_points[0] + v_points[1], CYAN circle at (10,10)")
+print("#8 - Array in drawing command:      draw_line using array points [0,1,2,3], WHITE line")
+print("#9 - Array + math in circle:        draw_circle(v_points[0] + 5, v_points[1] * 2), RED circle")
+print("#10 - Array + trig in circle:       draw_circle with cos/sin of array values, GREEN circle")
+print("#11 - Array + nested math:          draw_circle(v_points[v_i + 1] * 2, v_points[v_i] / 2), BLUE circle")
+print("#12 - Array values in line:         draw_line with array math expressions, YELLOW line")
+print("")
+print("")
+
+# Base constants
+v_delay = 2        # Delay between tests
+v_x = 10          # Fixed x position
+v_y = 10          # Fixed y position
+v_radius = 5      # Circle radius
+
+# Test 1: Create array and initialize
+print("Test 1: Array creation")
+create_array(v_points, 5)
+
+# Test 2: Direct assignment
+print("Test 2: Direct assignment - RED")
+v_points[0] = 10
+draw_circle(v_x, v_y, v_radius, red, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 3: Expression assignment
+print("Test 3: Expression assignment - GREEN")
+v_points[1] = v_points[0] + 5
+draw_circle(v_x, v_y, v_radius, green, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 4: Variable index
+print("Test 4: Variable index - BLUE")
+v_i = 2
+v_points[v_i] = 30
+draw_circle(v_x, v_y, v_radius, blue, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 5: Math expression index
+print("Test 5: Math expression index - YELLOW")
+v_points[v_i + 1] = 40
+draw_circle(v_x, v_y, v_radius, yellow, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 6: Array in circle command
+print("Test 6: Array in circle - MAGENTA")
+draw_circle(v_x, v_y, v_radius, magenta, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 7: Array in math
+print("Test 7: Array in math - CYAN")
+v_result = v_points[0] + v_points[1]
+draw_circle(v_x, v_y, v_radius, cyan, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 8: Array in drawing command
+print("Test 8: Array in drawing - WHITE LINE")
+draw_line(v_points[0], v_points[1], v_points[2], v_points[3], white)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 9: Array with inline math
+print("Test 9: Array with inline math - RED")
+clear()
+draw_circle(v_points[0] + 5, v_points[1] * 2, v_radius, red, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 10: Array with trig functions
+print("Test 10: Array with trig functions - GREEN")
+draw_circle(cos(v_points[0]) * 10 + 20, sin(v_points[1]) * 10 + 20, v_radius, green, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 11: Array with nested math
+print("Test 11: Array with nested math - BLUE")
+draw_circle(v_points[v_i + 1] * 1.3, v_points[v_i] / 2, v_radius, blue, true)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 12: Complex line with array math
+print("Test 12: Complex line with array math - YELLOW")
+draw_line(v_points[0] * 2, v_points[1] + 10, v_points[2] / 2, v_points[3] - 5, yellow)
+rest(v_delay)
+clear()
+# Cleanup before running next script
+clear()
+sync_queue()
+
+print("==================================================")
+
+print("Test RGB Matrix String Array Commands Regression Test")
+print("Test 38: String array creation, access, and usage in commands")
+print("#1 - String array creation:           create_array(v_words, 5, string)")
+print("#2 - Direct string assignment:        v_words[0] = 'Hello', WHITE text")
+print("#3 - Variable string assignment:      v_words[1] = v_message, RED text")
+print("#4 - Variable index assignment:       v_words[v_i] = 'Test', GREEN text")
+print("#5 - Array in draw_text:             draw_text using array value, BLUE text")
+print("#6 - String concatenation:           v_result = v_words[0] & ' ' & v_words[1], YELLOW text")
+print("#7 - Direct concatenation in text:    draw_text with direct concatenation, MAGENTA text")
+print("#8 - Multiple array elements:         Print multiple array elements, CYAN text")
+print("#9 - Complex string operations:       Array + variables + concat, WHITE text")
+print("#10 - String array in loop:          Loop through array elements, RED text")
+print("#11 - Mixed string/numeric arrays:    Test both types together, GREEN text")
+print("#12 - Array bounds and errors:        Test error conditions and bounds")
+print("")
+print("")
+
+# Base constants
+v_delay = 2            # Delay between tests
+v_x = 1              # Text X position
+v_y = 1              # Initial Y position
+v_size = 9           # Text size
+v_space = " "         # Space for concatenation
+v_message = "World"   # Test message
+
+# Test 1: Create string array
+print("Test 1: String array creation")
+print("Success: This command works without showing errors.")
+create_array(v_words, 5, string)
+create_array(v_number1, 5, numeric)
+create_array(v_number2, 5)
+rest(v_delay)
+
+# Test 2: Direct string assignment
+print("Test 2: Direct string assignment - WHITE 'Hello'")
+v_words[0] = "Hello"
+draw_text(v_x, v_y, v_words[0], piboto-regular, v_size, white)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 3: Variable string assignment
+print("Test 3: Variable string assignment - RED 'World'")
+v_words[1] = v_message
+draw_text(v_x, v_y, v_words[1], piboto-regular, v_size, red)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 4: Variable index assignment
+print("Test 4: Variable index assignment - GREEN 'Test'")
+v_i = 2
+v_words[v_i] = "Test"
+draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_size, green)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 5: Array in draw_text
+print("Test 5: Array in draw_text - BLUE 'Matrix'")
+v_words[3] = "Matrix"
+draw_text(v_x, v_y, v_words[3], piboto-regular, v_size, blue)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 6: String concatenation in variable
+print("Test 6: String concatenation - YELLOW 'Hello World'")
+v_result = v_words[0] & v_space & v_words[1]
+draw_text(v_x, v_y, v_result, piboto-regular, v_size, yellow)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 7: Direct concatenation in draw_text
+print("Test 7: Direct concatenation - MAGENTA 'Hello World'")
+draw_text(v_x, v_y, v_words[0] & v_space & v_words[1], piboto-regular, v_size, magenta)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 8: Multiple array elements
+print("Test 8: Multiple elements - CYAN - All words")
+v_words[4] = "!"
+v_y = 1
+for v_i in (0, 4, 1) then
+    draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_size, cyan)
+    v_y = v_y + 15
+    rest(0.5)
+endfor v_i
+v_y = 1
+
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 9: Complex string operations
+print("Test 9: Complex operations - WHITE all words")
+v_temp = v_words[0] & v_space & v_words[1]
+v_final = v_temp & v_space & v_words[2] & v_space & v_words[3] & v_words[4]
+draw_text(v_x, v_y, v_final, piboto-regular, v_size, white)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 10: String array in loop with print
+print("Test 10: Array loop - RED")
+print("Array contents:")
+v_i = 0
+while v_i < 5 then
+    print(f"v_words[{v_i}] = {v_words[v_i]}")
+    v_i = v_i + 1
+endwhile
+draw_text(v_x, v_y, "Loop Complete", piboto-regular, v_size, red)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 11: Mixed array types
+print("Test 11: Mixed arrays - GREEN")
+create_array(v_nums, 3, numeric)
+v_nums[0] = 100
+v_nums[1] = 200
+v_nums[2] = 300
+v_text = v_words[0] & ": " & v_nums[0]
+draw_text(v_x, v_y, v_text, piboto-regular, v_size, green)
+rest(v_delay)
+clear()
+sync_queue()
+
+# Test 12: Error conditions (these should print error messages)
+print("Test 12: Error conditions")
+print("Testing array bounds and type checking...")
+# Uncomment to test error conditions:
+#v_words[5] = "Error"    # Out of bounds
+#v_words[0] = 42         # Wrong type
+#v_words[-1] = "Error"   # Invalid index
+print("Error testing complete")
+rest(v_delay)
+clear()
+sync_queue()
+
+print("==================================================")
+print("Regression Test: If Then Else. if-then-else Conditionals with Sequential Steps")
+print("Expected: Test Steps 1-60 in sequence if all conditions work")
+
+def print_step {
+    print(f"Test Step {v_step}")
+}
+
+
+# Basic if/elseif/else - Test all branches
+print("Basic if/elseif/else")
+v_x = 2
+if v_x < 3 then
+    print("Test Step 1")
+elseif v_x < 7 then
+    print("WRONG!")
+elseif v_x < 12 then
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_x = 5
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    print("Test Step 2")
+elseif v_x < 12 then
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_x = 8
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    print("WRONG!")
+elseif v_x < 12 then
+    print("Test Step 3")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_x = 15
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    print("WRONG!")
+elseif v_x < 12 then
+    print("WRONG!")
+else
+    print("Test Step 4")
+endif
+sync_queue
+
+# If/elseif/elseif/else with math conditions
+print("If/elseif/elseif/else with math conditions")
+v_a = 15
+v_b = 3
+if v_a + 2 < v_b * 6 then    # 17 < 18 (true)
+    print("Test Step 5")
+elseif v_a - 3 < v_b + 5 then    # 12 < 8 (false)
+    print("WRONG!")
+elseif v_a * 2 < v_b + 20 then    # 30 < 23 (false)
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_a = 8
+v_b = 2
+if v_a + 8 < v_b * 6 then    # 10 < 12 (false)
+    print("WRONG!")
+elseif v_a - 3 < v_b + 5 then    # 5 < 7 (true)
+    print("Test Step 6")
+elseif v_a * 2 < v_b + 20 then    # 16 < 22 (true, skipped)
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_a = 10
+v_b = 2
+if v_a + 2 < v_b * 6 then    # 12 < 12 (false)
+    print("WRONG!")
+elseif v_a - 3 < v_b + 5 then    # 7 < 7 (false)
+    print("WRONG!")
+elseif v_a * 2 < v_b + 20 then    # 20 < 22 (true)
+    print("Test Step 7")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_a = 20
+v_b = 1
+if v_a + 2 < v_b * 6 then    # 22 < 6 (false)
+    print("WRONG!")
+elseif v_a - 3 < v_b + 5 then    # 17 < 6 (false)
+    print("WRONG!")
+elseif v_a * 2 < v_b + 20 then    # 40 < 21 (false)
+    print("WRONG!")
+else
+    print("Test Step 8")
+endif
+sync_queue
+
+# If statement inside for loop
+print("If statement inside for loop")
+for v_i in (0, 3, 1) then
+    if v_i == 0 then
+        print("Test Step 9")
+    elseif v_i == 1 then
+        print("Test Step 10")
+    elseif v_i == 2 then
+        print("Test Step 11")
+    else
+        print("Test Step 12")
+    endif
+endfor v_i
+sync_queue
+
+# If statement inside while loop
+print("If statement inside while loop")
+v_j = 0
+while v_j < 4 then
+    if v_j == 0 then
+        print("Test Step 13")
+    elseif v_j == 1 then
+        print("Test Step 14")
+    elseif v_j == 2 then
+        print("Test Step 15")
+    elseif v_j == 3 then
+        print("Test Step 16")
+    else
+        print("WRONG!")
+    endif
+    v_j = v_j + 1
+endwhile
+sync_queue
+
+
+# If statement with procedure calls
+print("If statement with procedure calls")
+
+v_x = 2
+if v_x < 3 then
+    v_step = 17
+    call print_step
+elseif v_x < 7 then
+    v_step = 18
+    call print_step
+elseif v_x < 12 then
+    v_step = 19
+    call print_step
+else
+    v_step = 20
+    call print_step
+endif
+sync_queue
+
+v_x = 5
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    v_step = 18
+    call print_step
+elseif v_x < 12 then
+    v_step = 19
+    call print_step
+else
+    v_step = 20
+    call print_step
+endif
+sync_queue
+
+v_x = 8
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    print("WRONG!")
+elseif v_x < 12 then
+    v_step = 19
+    call print_step
+else
+    v_step = 20
+    call print_step
+endif
+sync_queue
+
+v_x = 15
+if v_x < 3 then
+    print("WRONG!")
+elseif v_x < 7 then
+    print("WRONG!")
+elseif v_x < 12 then
+    print("WRONG!")
+else
+    v_step = 20
+    call print_step
+endif
+sync_queue
+
+v_j = 0
+while v_j < 4 then
+    if v_j == 0 then
+        v_step = 21
+        call print_step
+    elseif v_j == 1 then
+        v_step = 22
+        call print_step
+    elseif v_j == 2 then
+        v_step = 23
+        call print_step
+    elseif v_j == 3 then
+        v_step = 24
+        call print_step
+    else
+        print("WRONG!")
+    endif
+    v_j = v_j + 1
+endwhile
+sync_queue
+
+# For loop with if condition inside procedure
+print("For loop with if condition inside procedure")
+def check_step {
+    if v_i == 0 then
+        v_step = 25
+        print(f"Test Step {v_step}")
+    elseif v_i == 1 then
+        v_step = 26
+        print(f"Test Step {v_step}")
+    elseif v_i == 2 then
+        v_step = 27
+        print(f"Test Step {v_step}")
+    else
+        v_step = 28    
+        print(f"Test Step {v_step}")
+    endif
+}
+
+for v_i in (0, 3, 1) then
+    call check_step
+endfor v_i
+sync_queue
+
+# Nested if statements with math expressions
+print("Nested if statements with math expressions")
+v_x = 5
+v_y = 2
+if v_x * 2 > v_y + 3 then    # 10 > 5 (true)
+    if v_x - v_y < 4 then    # 3 < 4 (true)
+        print("Test Step 29")
+    else
+        print("WRONG!")
+    endif
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_x = 6
+v_y = 1
+if v_x * 2 > v_y + 3 then    # 12 > 4 (true)
+    if v_x - v_y < 4 then    # 5 < 4 (false)
+        print("WRONG!")
+    else
+        print("Test Step 30")
+    endif
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_x = 2
+v_y = 5
+if v_x * 2 > v_y + 3 then    # 4 > 8 (false)
+    if v_x - v_y < 4 then    # -3 < 4 (true, skipped)
+        print("WRONG!")
+    else
+        print("WRONG!")
+    endif
+else
+    if v_x + v_y < 8 then    # 7 < 8 (true)
+        print("Test Step 31")
+    else
+        print("WRONG!")
+    endif
+endif
+sync_queue
+
+v_x = 1
+v_y = 8
+if v_x * 2 > v_y + 3 then    # 2 > 11 (false)
+    if v_x - v_y < 4 then    # -7 < 4 (true, skipped)
+        print("WRONG!")
+    else
+        print("WRONG!")
+    endif
+else
+    if v_x + v_y < 8 then    # 9 < 8 (false)
+        print("WRONG!")
+    else
+        print("Test Step 32")
+    endif
+endif
+sync_queue
+
+# While loop with nested for loop and if
+print("While loop with nested for loop and if")
+v_outer = 0
+while v_outer < 2 then
+    for v_inner in (0, 1, 1) then
+        if v_outer == 0 then
+            if v_inner == 0 then
+                print("Test Step 33")
+            elseif v_inner == 1 then
+                print("Test Step 34")
+            else
+                print("WRONG!")
+            endif
+        else
+            if v_inner == 0 then
+                print("Test Step 35")
+            elseif v_inner == 1 then
+                print("Test Step 36")
+            else
+                print("WRONG!")
+            endif
+        endif
+    endfor v_inner
+    v_outer = v_outer + 1
+endwhile
+sync_queue
+
+# Procedure calling another procedure with if
+print("Procedure calling another procedure with if")
+def inner_check {
+    if v_y > 2 then
+        print("Test Step 38")
+    else
+        print("Test Step 40")
+    endif
+}
+
+def outer_check {
+    if v_x < 5 then
+        print("Test Step 37")
+    else
+        print("Test Step 39")
+    endif
+    call inner_check
+}
+
+v_x = 3
+v_y = 4
+call outer_check
+sync_queue
+
+v_x = 6
+v_y = 1
+call outer_check
+sync_queue
+
+
+# If with array access in conditions
+print("If with array access in conditions")
+create_array(v_arr, 4)
+v_arr[0] = 2
+v_arr[1] = 5
+v_arr[2] = 8
+v_arr[3] = 15
+
+v_i = 0
+if v_arr[v_i] < 3 then    # 2 < 3 (true)
+    print("Test Step 41")
+elseif v_arr[v_i] < 7 then    # 2 < 7 (true, skipped)
+    print("WRONG!")
+elseif v_arr[v_i] < 12 then    # 2 < 12 (true, skipped)
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_i = 1
+if v_arr[v_i] < 3 then    # 5 < 3 (false)
+    print("WRONG!")
+elseif v_arr[v_i] < 7 then    # 5 < 7 (true)
+    print("Test Step 42")
+elseif v_arr[v_i] < 12 then    # 5 < 12 (true, skipped)
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_i = 2
+if v_arr[v_i] < 3 then    # 8 < 3 (false)
+    print("WRONG!")
+elseif v_arr[v_i] < 7 then    # 8 < 7 (false)
+    print("WRONG!")
+elseif v_arr[v_i] < 12 then    # 8 < 12 (true)
+    print("Test Step 43")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_i = 3
+if v_arr[v_i] < 3 then    # 15 < 3 (false)
+    print("WRONG!")
+elseif v_arr[v_i] < 7 then    # 15 < 7 (false)
+    print("WRONG!")
+elseif v_arr[v_i] < 12 then    # 15 < 12 (false)
+    print("WRONG!")
+else
+    print("Test Step 44")
+endif
+sync_queue
+
+# For loop with math function in if
+print("For loop with math function in if")
+for v_i in (0, 3, 1) then
+    v_x = v_i - 2    # Values: -2, -1, 0, 1
+    if abs(v_x) > 1 then    # abs(-2) = 2 > 1 (true)
+        print("Test Step 45")
+    elseif abs(v_x) == 1 then    # abs(-1) = 1 (true), abs(1) = 1 (true)
+        if v_i == 1 then
+            print("Test Step 46")
+        else
+            print("Test Step 48")
+        endif
+    elseif abs(v_x) == 0 then    # abs(0) = 0 (true)
+        print("Test Step 47")
+    else
+        print("WRONG!")
+    endif
+endfor v_i
+sync_queue
+
+# If with string comparison
+print("If with string comparison")
+v_str = "red"
+if v_str == "blue" then
+    print("WRONG!")
+elseif v_str == "red" then
+    print("Test Step 49")
+elseif v_str == "green" then
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_str = "blue"
+if v_str == "blue" then
+    print("Test Step 50")
+elseif v_str == "red" then
+    print("WRONG!")
+elseif v_str == "green" then
+    print("WRONG!")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_str = "green"
+if v_str == "blue" then
+    print("WRONG!")
+elseif v_str == "red" then
+    print("WRONG!")
+elseif v_str == "green" then
+    print("Test Step 51")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_str = "yellow"
+if v_str == "blue" then
+    print("WRONG!")
+elseif v_str == "red" then
+    print("WRONG!")
+elseif v_str == "green" then
+    print("WRONG!")
+else
+    print("Test Step 52")
+endif
+sync_queue
+
+# While loop with break-like logic via variable
+print("While loop with break-like logic via variable")
+v_flag = 0
+v_count = 0
+while v_flag == 0 then
+    if v_count == 0 then
+        print("Test Step 53")
+    elseif v_count == 1 then
+        print("Test Step 54")
+    elseif v_count == 2 then
+        print("Test Step 55")
+    elseif v_count == 3 then
+        print("Test Step 56")
+        v_flag = 1    # Exit after 56
+    else
+        print("WRONG!")
+    endif
+    v_count = v_count + 1
+endwhile
+sync_queue
+
+# If with boolean variables
+print("If with boolean variables")
+v_bool = true
+if v_bool then
+    print("Test Step 57")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_bool = false
+if v_bool then
+    print("WRONG!")
+else
+    print("Test Step 58")
+endif
+sync_queue
+
+v_flag = true
+if v_flag then
+    print("Test Step 59")
+else
+    print("WRONG!")
+endif
+sync_queue
+
+v_flag = false
+if v_flag then
+    print("WRONG!")
+else
+    print("Test Step 60")
+endif
+sync_queue
+
+
+rest(10)
+clear()

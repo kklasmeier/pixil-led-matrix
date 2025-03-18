@@ -1,0 +1,84 @@
+# Pendulum Wave Animation with Dynamic Changes
+# Creates a mesmerizing wave pattern using multiple pendulums with different periods
+
+# Settings that will change each cycle
+v_cycle_time = 60          # Time before reset and new pattern
+v_min_pendulums = 5       # Minimum number of pendulums
+v_max_pendulums = 20      # Maximum number of pendulums
+
+# Constants
+v_amplitude = 50           # Swing amplitude
+v_center_x = 34           # Center point x
+v_center_y = 5            # Top mounting point y
+v_base_period = 1.0       # Base period for first pendulum
+
+# Create maximum size arrays to accommodate any number of pendulums
+create_array(v_positions_x, 20)    # Current x positions
+create_array(v_positions_y, 20)    # Current y positions
+create_array(v_periods, 20)        # Individual periods
+create_array(v_lengths, 20)        # Pendulum lengths
+
+# Initialize variables for dynamic changes
+v_num_pendulums = 15      # Will change each cycle
+v_ball_spacing = 4        # Will change each cycle
+v_base_color = 45         # Will change each cycle
+
+# Function to reset pendulums with new settings
+def reset_pendulums {
+    # Randomize number of pendulums (using a math expression to generate random number)
+    v_num_pendulums = floor(random(v_min_pendulums, v_max_pendulums, 0))
+    
+    # Adjust spacing based on number of pendulums
+    v_ball_spacing = floor(60 / v_num_pendulums)
+    
+    # Choose new base color
+    v_base_color = floor(random(20, 80, 0))
+    
+    # Calculate total width needed
+    v_total_width = (v_num_pendulums - 1) * v_ball_spacing
+    v_start_x = v_center_x - (v_total_width / 2)
+    
+    # Initialize pendulums
+    for v_i in (0, v_num_pendulums - 1, 1) then
+        v_periods[v_i] = v_base_period * (1 + (v_i * 0.025))
+        v_positions_x[v_i] = v_start_x + (v_i * v_ball_spacing)
+        v_positions_y[v_i] = v_center_y
+        v_lengths[v_i] = 20 + v_i * 2
+    endfor v_i
+}
+
+# Initial setup
+call reset_pendulums
+
+# Animation loop
+v_time = 0
+v_running = 1
+
+while v_running then
+    begin_frame
+    
+    # Draw thicker mounting bar (multiple parallel lines)
+    draw_line(0, v_center_y - 1, 63, v_center_y - 1, purple, 80)
+    draw_line(0, v_center_y, 63, v_center_y, purple, 100)
+    draw_line(0, v_center_y + 1, 63, v_center_y + 1, purple, 80)
+    
+    # Update and draw each pendulum
+    for v_i in (0, v_num_pendulums - 1, 1) then
+        v_angle = sin(v_time / v_periods[v_i] * 2 * pi) * 0.5
+        v_positions_x[v_i] = v_center_x + (v_i - (v_num_pendulums/2)) * v_ball_spacing + sin(v_angle) * v_amplitude
+        v_positions_y[v_i] = v_center_y + cos(v_angle) * v_amplitude
+        draw_line(v_center_x + (v_i - (v_num_pendulums/2)) * v_ball_spacing, v_center_y, v_positions_x[v_i], v_positions_y[v_i], silver, 40)
+        v_color_pos = abs(sin(v_angle) * 30) + v_base_color
+        draw_circle(v_positions_x[v_i], v_positions_y[v_i], 2, v_color_pos, 90, true)
+    endfor v_i
+    
+    end_frame
+    
+    v_time = v_time + 0.02
+    
+    # Reset with new settings when cycle completes
+    if v_time > v_cycle_time then
+        v_time = 0
+        call reset_pendulums
+    endif
+endwhile

@@ -1,0 +1,570 @@
+# Missile Command - Refactored with Procedures
+
+# Constants
+v_max_missiles = 3  # Increased from 2 to 3
+v_steps = 40  # Increased from 32 to have more room for the full path
+v_blast_radius = 5  # Explosion radius for proximity check
+v_screen_width = 64
+v_city_count = 5  # Reduced from 6
+v_city_width = 6  # Slightly wider for detail
+v_city_spacing = (v_screen_width - (v_city_count * v_city_width)) / (v_city_count + 1)  # Even spacing
+
+# hit rate of missiles
+v_destroy_rate = 20 # 95% of the time, the missle will be intercepted
+v_defance_active_rate = 98  # 98% of the time, the missile defence will detect the missile.
+
+
+# Define all arrays
+def initialize_arrays {
+    # Arrays for missile states
+    create_array(v_active, v_max_missiles, numeric)      # 0 = inactive, 1 = active
+    create_array(v_start_x, v_max_missiles, numeric)
+    create_array(v_end_x, v_max_missiles, numeric)
+    create_array(v_start_y, v_max_missiles, numeric)
+    create_array(v_end_y, v_max_missiles, numeric)
+    create_array(v_step, v_max_missiles, numeric)
+    create_array(v_prev_x, v_max_missiles, numeric)
+    create_array(v_prev_y, v_max_missiles, numeric)
+    create_array(v_dx, v_max_missiles, numeric)
+    create_array(v_dy, v_max_missiles, numeric)
+    create_array(v_intercept_step, v_max_missiles, numeric)
+    create_array(v_intercept_x, v_max_missiles, numeric)
+    create_array(v_intercept_y, v_max_missiles, numeric)
+    create_array(v_exploded, v_max_missiles, numeric)
+    create_array(v_explosion_frame, v_max_missiles, numeric)
+    create_array(v_path_xs, v_max_missiles * v_steps, numeric)
+    create_array(v_path_ys, v_max_missiles * v_steps, numeric)
+    create_array(v_targeting_city, v_max_missiles, numeric)  # Which city is targeted (-1 if none)
+    create_array(v_hit_city, v_max_missiles, numeric)  # Whether missile hit a city
+    create_array(v_max_step_reached, v_max_missiles, numeric)  # Track highest step for each missile
+
+    # Arrays for cities
+    create_array(v_city_x, v_city_count, numeric)  # X positions of cities
+    create_array(v_city_destroyed, v_city_count, numeric)  # 0 = intact, 1 = blown up
+    create_array(v_city_explosion_frame, v_city_count, numeric)  # For city explosion animation
+}
+
+# Define all sprite graphics
+def define_sprites {
+    # Ground Sprite (64x2)
+    define_sprite(ground, 64, 2)
+        draw_line(0, 1, 63, 1, green, 70)  # Darker green at bottom (relative y=1)
+        draw_line(0, 0, 63, 0, green, 50)  # Lighter green above (relative y=0)
+    endsprite
+
+    # Intact City Sprite (6x5)
+    define_sprite(city_intact, 6, 5)
+        # Base and walls
+        draw_line(0, 4, 5, 4, blue, 100)      # Base (relative y=4)
+        draw_line(0, 4, 0, 0, blue, 100)      # Left wall
+        draw_line(5, 4, 5, 0, blue, 100)      # Right wall
+        draw_line(0, 0, 5, 0, brown, 50)      # Roof (relative y=0)
+        # Fill interior (horizontal lines)
+        draw_line(1, 3, 4, 3, blue, 50)       # y=3
+        draw_line(1, 2, 4, 2, blue, 20)       # y=2
+        draw_line(1, 1, 4, 1, blue, 40)       # y=1
+        # Windows (white dots)
+        plot(2, 2, white, 70)
+        plot(3, 2, white, 70)
+    endsprite
+
+    # Destroyed City Sprite (6x5)
+    define_sprite(city_destroyed, 6, 5)
+        draw_line(0, 4, 5, 4, gray, 100)      # Rubble base (relative y=4)
+        draw_line(1, 3, 4, 3, gray, 100)      # Rubble middle (y=3)
+        draw_line(2, 2, 3, 2, gray, 100)      # Rubble top (y=2)
+        draw_line(0, 3, 1, 2, gray, 100)      # Jagged left
+        draw_line(4, 3, 5, 2, gray, 100)      # Jagged right
+    endsprite
+}
+
+# Reset missile state arrays
+def reset_missiles {
+    for v_i in (0, v_max_missiles - 1, 1)
+        v_active[v_i] = 0
+        v_hit_city[v_i] = 0
+        v_targeting_city[v_i] = -1  # Not targeting any city
+        v_max_step_reached[v_i] = 0  # Reset max step counter
+    endfor v_i
+}
+
+# Initialize and display ground and cities
+def setup_game_scene {
+    begin_frame(true)
+        # Show ground sprite at bottom of screen
+        show_sprite(ground, 0, 62)  # y=62 aligns bottom of 64x2 sprite with y=63
+
+        # Place cities evenly across the ground
+        for v_i in (0, v_city_count - 1, 1)
+            v_city_x[v_i] = v_city_spacing * (v_i + 1) + v_city_width * v_i
+            v_city_destroyed[v_i] = 0
+            v_city_explosion_frame[v_i] = 0
+            show_sprite(city_intact, v_city_x[v_i], 58, v_i)  # Instance ID = v_i, y=58 aligns bottom at y=62
+        endfor v_i
+    end_frame
+}
+
+# Create new missiles with trajectories targeting intact cities
+def start_new_missiles {
+    for v_i in (0, v_max_missiles - 1, 1)
+        if v_active[v_i] == 0 then
+            if random(0, 100, 0) < 20 then
+                v_active[v_i] = 1
+                v_start_x[v_i] = random(0, 63, 0)
+                v_start_y[v_i] = 0
+                
+                # Count intact cities
+                v_intact_count = 0
+                for v_j in (0, v_city_count - 1, 1)
+                    if v_city_destroyed[v_j] == 0 then
+                        v_intact_count = v_intact_count + 1
+                    endif
+                endfor v_j
+                
+                # Target intact city or random location if no cities remain
+                if v_intact_count > 0 then
+                    # Select random intact city to target
+                    v_target_idx = random(0, v_intact_count - 1, 0)
+                    v_current_intact = 0
+                    
+                    for v_j in (0, v_city_count - 1, 1)
+                        if v_city_destroyed[v_j] == 0 then
+                            if v_current_intact == v_target_idx then
+                                # Target this city with slight randomness (+/- 2 pixels)
+                                v_city_center_x = v_city_x[v_j] + 3  # Center of city
+                                v_end_x[v_i] = v_city_center_x + random(-2, 2, 0)
+                                v_targeting_city[v_i] = v_j  # Store which city is targeted
+                                break
+                            endif
+                            v_current_intact = v_current_intact + 1
+                        endif
+                    endfor v_j
+                else
+                    # No intact cities, choose random destination
+                    v_end_x[v_i] = random(0, 63, 0)
+                    v_targeting_city[v_i] = -1  # Not targeting any city
+                endif
+                
+                # City height location (ground level)
+                v_end_y[v_i] = 59  # City center Y position
+                
+                # Set other missile properties
+                v_step[v_i] = 0
+                v_max_step_reached[v_i] = 0  # Reset max step tracking
+                v_prev_x[v_i] = v_start_x[v_i]
+                v_prev_y[v_i] = v_start_y[v_i]
+                v_dx[v_i] = (v_end_x[v_i] - v_start_x[v_i]) / v_steps
+                v_dy[v_i] = (v_end_y[v_i] - v_start_y[v_i]) / v_steps
+                
+                # Increased chance missile will reach target (50%)
+                # This makes half of missiles miss interception
+                # RATE OF HITS IS HERE, 95% CHANCE, THE MISSILE WILL NOT HIT
+                if random(0, 100, 0) < v_destroy_rate then
+                    # Will be intercepted
+                    v_intercept_step[v_i] = random(10, v_steps - 10, 0)  # Ensure it's well within bounds
+                else
+                    # Will hit target if not intercepted by cascade
+                    v_intercept_step[v_i] = v_steps + 1  # Beyond path length so never triggers automatic interception
+                endif
+                
+                v_intercept_x[v_i] = v_start_x[v_i] + (v_dx[v_i] * v_intercept_step[v_i])
+                v_intercept_y[v_i] = v_start_y[v_i] + (v_dy[v_i] * v_intercept_step[v_i])
+                v_exploded[v_i] = 0
+                v_explosion_frame[v_i] = 0
+                v_hit_city[v_i] = 0
+            endif
+        endif
+    endfor v_i
+}
+
+
+# Find missile that needs to be intercepted
+def find_explosion_trigger {
+    v_explosion_triggered = -1
+    
+    # Randomize defense system effectiveness (allow some missiles to get through)
+    
+    # RATE OF HITS IS HERE, 98% CHANCE, THE MISSILE will be killed
+    v_defense_active = random(0, 100, 0) < v_defence_active_rate  # 70% chance defense system is active
+    
+    if v_defense_active then
+        for v_i in (0, v_max_missiles - 1, 1)
+            if v_active[v_i] == 1 and v_step[v_i] >= v_intercept_step[v_i] and v_exploded[v_i] == 0 then
+                v_explosion_triggered = v_i
+                break
+            endif
+        endfor v_i
+    endif
+}
+
+# Draw defensive line from city to missile
+def draw_city_defense {
+    if v_explosion_triggered >= 0 and v_hit_city[v_explosion_triggered] == 0 then
+        v_explosion_x = v_intercept_x[v_explosion_triggered]
+        v_explosion_y = v_intercept_y[v_explosion_triggered]
+        
+        # Select a random intact city and draw defensive line
+        v_intact_cities = 0
+        for v_j in (0, v_city_count - 1, 1)
+            if v_city_destroyed[v_j] == 0 then
+                v_intact_cities = v_intact_cities + 1
+            endif
+        endfor v_j
+        
+        if v_intact_cities > 0 then
+            v_random_city = random(0, v_intact_cities - 1, 0)
+            v_current_intact = 0
+            for v_j in (0, v_city_count - 1, 1)
+                if v_city_destroyed[v_j] == 0 then
+                    if v_current_intact == v_random_city then
+                        v_city_center_x = v_city_x[v_j] + 3  # Center of city (6 wide)
+                        v_city_center_y = 60  # Approx center height (y=58 + 2)
+                        draw_line(v_city_center_x, v_city_center_y, v_explosion_x, v_explosion_y, blue, 100, 500)
+                        v_drawing = 1
+                        break
+                    endif
+                    v_current_intact = v_current_intact + 1
+                endif
+            endfor v_j
+        endif
+    endif
+}
+
+# Check for impact of explosion on other missiles
+def check_missile_proximity {
+    if v_explosion_triggered >= 0 then
+        v_explosion_x = v_intercept_x[v_explosion_triggered]
+        v_explosion_y = v_intercept_y[v_explosion_triggered]
+        
+        for v_i in (0, v_max_missiles - 1, 1)
+            if v_active[v_i] == 1 and v_exploded[v_i] == 0 then
+                v_curr_x = v_start_x[v_i] + (v_dx[v_i] * v_step[v_i])
+                v_curr_y = v_start_y[v_i] + (v_dy[v_i] * v_step[v_i])
+                v_dx_diff = v_curr_x - v_explosion_x
+                v_dy_diff = v_curr_y - v_explosion_y
+                v_distance = sqrt(v_dx_diff * v_dx_diff + v_dy_diff * v_dy_diff)
+                if v_distance <= v_blast_radius then
+                    v_exploded[v_i] = 1
+                endif
+            endif
+        endfor v_i
+    endif
+}
+
+# Check for impact of explosion on cities
+def check_city_damage {
+    if v_explosion_triggered >= 0 then
+        v_explosion_x = v_intercept_x[v_explosion_triggered]
+        v_explosion_y = v_intercept_y[v_explosion_triggered]
+        
+        for v_j in (0, v_city_count - 1, 1)
+            if v_city_destroyed[v_j] == 0 then
+                v_city_center_x = v_city_x[v_j] + 3  # Center of city (6 wide)
+                v_city_center_y = 60  # Approx center height of city (y=58 + 2)
+                v_dx_diff = v_city_center_x - v_explosion_x
+                v_dy_diff = v_city_center_y - v_explosion_y
+                v_distance = sqrt(v_dx_diff * v_dx_diff + v_dy_diff * v_dy_diff)
+                if v_distance <= v_blast_radius + 2 then
+                    # City caught in explosion
+                    v_city_destroyed[v_j] = 1
+                    v_city_explosion_frame[v_j] = 0  # Start explosion animation
+                    hide_sprite(city_intact, v_j)    # Hide intact city
+                    v_drawing = 1
+                endif
+            endif
+        endfor v_j
+    endif
+}
+
+# Animate explosions - with fixed path clearing
+def animate_explosions {
+    for v_i in (0, v_max_missiles - 1, 1)
+        if v_active[v_i] == 1 and v_exploded[v_i] == 1 then
+            # Choose correct explosion location based on hit type
+            if v_hit_city[v_i] == 1 then
+                # For city hits, use the missile's final position
+                v_explosion_x = v_prev_x[v_i]
+                v_explosion_y = v_prev_y[v_i]
+            else
+                # For interceptions, use the intercept position
+                v_explosion_x = v_intercept_x[v_i]
+                v_explosion_y = v_intercept_y[v_i]
+            endif
+            
+            if v_explosion_frame[v_i] == 0 then
+                draw_circle(v_explosion_x, v_explosion_y, 5, yellow, 100, true)
+                v_drawing = 1
+            endif
+            if v_explosion_frame[v_i] == 1 then
+                draw_circle(v_explosion_x, v_explosion_y, 1, black, 100, true)
+                v_drawing = 1
+            endif
+            if v_explosion_frame[v_i] == 2 then
+                draw_circle(v_explosion_x, v_explosion_y, 2, black, 100, true)
+                v_drawing = 1
+            endif
+            if v_explosion_frame[v_i] == 3 then
+                draw_circle(v_explosion_x, v_explosion_y, 3, black, 100, true)
+                v_drawing = 1
+            endif
+            if v_explosion_frame[v_i] == 4 then
+                draw_circle(v_explosion_x, v_explosion_y, 4, black, 100, true)
+                v_drawing = 1
+            endif
+            if v_explosion_frame[v_i] == 5 then
+                draw_circle(v_explosion_x, v_explosion_y, 5, black, 100, true)
+                
+                # Clear missile trail for ALL missiles (removed the conditional)
+                v_path_start = v_i * v_steps
+                
+                # Only clear up to the actual steps the missile took
+                v_steps_to_clear = v_max_step_reached[v_i]
+                if v_steps_to_clear > 0 then
+                    for v_j in (1, v_steps_to_clear, 1)
+                        v_idx1 = v_path_start + v_j - 1
+                        v_idx2 = v_path_start + v_j
+                        
+                        # Only attempt to draw if indices are in bounds
+                        if v_idx1 < v_max_missiles * v_steps and v_idx2 < v_max_missiles * v_steps then
+                            draw_line(v_path_xs[v_idx1], v_path_ys[v_idx1], v_path_xs[v_idx2], v_path_ys[v_idx2], black, 100)
+                        endif
+                    endfor v_j
+                endif
+                
+                v_drawing = 1
+            endif
+            v_explosion_frame[v_i] = v_explosion_frame[v_i] + 1
+            if v_explosion_frame[v_i] >= 6 then
+                v_active[v_i] = 0
+                v_exploded[v_i] = 0
+                v_explosion_frame[v_i] = 0
+            endif
+        endif
+    endfor v_i
+}
+
+# Debug version of animate_city_explosions
+def animate_city_explosions {
+    for v_i in (0, v_city_count - 1, 1)
+        if v_city_destroyed[v_i] == 1 then
+            
+            if v_city_explosion_frame[v_i] < 8 then
+                v_city_center_x = v_city_x[v_i] + 3  # Center of city (6 wide)
+                v_city_center_y = 60  # Center height
+                
+                # City explosion animation sequence
+                if v_city_explosion_frame[v_i] == 0 then
+                    # Initial flash
+                    draw_circle(v_city_center_x, v_city_center_y, 4, yellow, 100, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 1 then
+                    # Expand yellow
+                    draw_circle(v_city_center_x, v_city_center_y, 5, yellow, 90, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 2 then
+                    # Change to orange
+                    draw_circle(v_city_center_x, v_city_center_y, 6, orange, 100, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 3 then
+                    # Change to red
+                    draw_circle(v_city_center_x, v_city_center_y, 6, red, 90, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 4 then
+                    # Dark red with smoke
+                    draw_circle(v_city_center_x, v_city_center_y, 5, red, 70, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 5 then
+                    # Fading red
+                    draw_circle(v_city_center_x, v_city_center_y, 4, red, 50, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 6 then
+                    # Smoke
+                    draw_circle(v_city_center_x, v_city_center_y, 3, gray, 70, true)
+                    v_drawing = 1
+                endif
+                if v_city_explosion_frame[v_i] == 7 then
+                    # Final clearing and show destroyed city
+                    draw_circle(v_city_center_x, v_city_center_y, 6, black, 100, true)
+                    hide_sprite(city_intact, v_i)
+                    show_sprite(city_destroyed, v_city_x[v_i], 58, v_i)
+                    v_drawing = 1
+                endif
+                
+                v_city_explosion_frame[v_i] = v_city_explosion_frame[v_i] + 1
+            endif
+        endif
+    endfor v_i
+}
+
+# Also add this at the end of the main loop to track general status
+# Place this right before end_frame in the main loop
+def debug_game_state {
+    if v_frame_count % 100 == 0 then
+        print("--------- Game Status ---------")
+        v_intact_cities = 0
+        for v_i in (0, v_city_count - 1, 1)
+            if v_city_destroyed[v_i] == 0 then
+                v_intact_cities = v_intact_cities + 1
+            endif
+        endfor v_i
+        print(f"Frame: {v_frame_count}, Intact cities: {v_intact_cities}/{v_city_count}")
+        
+        v_active_missiles = 0
+        for v_i in (0, v_max_missiles - 1, 1)
+            if v_active[v_i] == 1 then
+                v_active_missiles = v_active_missiles + 1
+            endif
+        endfor v_i
+        print(f"Active missiles: {v_active_missiles}/{v_max_missiles}")
+    endif
+}
+
+
+# Update missile paths and check for city impacts - with fix for hitting destroyed cities
+def update_missile_paths {
+    if v_frame_count % 1 == 0 then
+        for v_i in (0, v_max_missiles - 1, 1)
+            if v_active[v_i] == 1 and v_exploded[v_i] == 0 then
+                # Check if we're at maximum step but haven't reached target height
+                if v_step[v_i] >= v_steps - 1 then
+                    # Force missile to continue moving down to reach city height
+                    v_missile_x = v_start_x[v_i] + (v_dx[v_i] * v_step[v_i])
+                    v_missile_y = v_start_y[v_i] + (v_dy[v_i] * v_step[v_i]) + 0.5
+                    print(f"Boosting missile {v_i} from y={v_start_y[v_i] + (v_dy[v_i] * v_step[v_i])} to y={v_missile_y}")
+                else
+                    # Normal position calculation
+                    v_missile_x = v_start_x[v_i] + (v_dx[v_i] * v_step[v_i])
+                    v_missile_y = v_start_y[v_i] + (v_dy[v_i] * v_step[v_i])
+                endif
+                
+                # Draw the missile trail
+                draw_line(v_prev_x[v_i], v_prev_y[v_i], v_missile_x, v_missile_y, red, 100)
+                
+                # Store path for later clean-up - use safe indexing
+                v_path_index = v_i * v_steps + v_step[v_i]
+                
+                # Store only if we're within array bounds
+                if v_path_index < v_max_missiles * v_steps then
+                    v_path_xs[v_path_index] = v_missile_x
+                    v_path_ys[v_path_index] = v_missile_y
+                    
+                    # Track maximum step reached for cleanup
+                    if v_step[v_i] > v_max_step_reached[v_i] then
+                        v_max_step_reached[v_i] = v_step[v_i]
+                    endif
+                endif
+                
+                v_prev_x[v_i] = v_missile_x
+                v_prev_y[v_i] = v_missile_y
+                
+                # Check if missile reached ground level (has reached city height)
+                if v_missile_y >= 58 then
+                    v_target_city = v_targeting_city[v_i]
+                    v_hit_detected = 0
+                    
+                    # Check if we hit the intended target city (even if already destroyed)
+                    if v_target_city >= 0 then
+                        v_city_center_x = v_city_x[v_target_city] + 3
+                        
+                        # Check if we're within hit range of the city
+                        if abs(v_missile_x - v_city_center_x) <= 4 then
+                            # Record hit (whether city was already destroyed or not)
+                            #print(f"HIT DETECTED! Missile {v_i} hit city {v_target_city} (destroyed={v_city_destroyed[v_target_city]})")
+                            
+                            # Mark the city as destroyed if not already
+                            if v_city_destroyed[v_target_city] == 0 then
+                                v_city_destroyed[v_target_city] = 1
+                                v_city_explosion_frame[v_target_city] = 0
+                                hide_sprite(city_intact, v_target_city)
+                            endif
+                            
+                            # Mark the missile as hit and exploded regardless
+                            v_hit_city[v_i] = 1
+                            v_exploded[v_i] = 1
+                            v_explosion_frame[v_i] = 0
+                            v_hit_detected = 1
+                            v_drawing = 1
+                        endif
+                    endif
+                    
+                    # If no hit on target city, check all other cities
+                    if v_hit_detected == 0 then
+                        for v_j in (0, v_city_count - 1, 1)
+                            if v_j != v_target_city then  # Don't recheck target city
+                                v_city_center_x = v_city_x[v_j] + 3
+                                
+                                if abs(v_missile_x - v_city_center_x) <= 4 then
+                                    # Mark city as destroyed if not already
+                                    if v_city_destroyed[v_j] == 0 then
+                                        v_city_destroyed[v_j] = 1
+                                        v_city_explosion_frame[v_j] = 0
+                                        hide_sprite(city_intact, v_j)
+                                    endif
+                                    
+                                    # Mark missile as hit and exploded regardless
+                                    v_hit_city[v_i] = 1
+                                    v_exploded[v_i] = 1
+                                    v_explosion_frame[v_i] = 0
+                                    v_hit_detected = 1
+                                    v_drawing = 1
+                                    break
+                                endif
+                            endif
+                        endfor v_j
+                    endif
+                    
+                    # If missile reached ground level but didn't hit any cities, it explodes on ground
+                    if v_hit_detected == 0 and v_missile_y >= 59 then
+                        v_exploded[v_i] = 1
+                        v_explosion_frame[v_i] = 0
+                        v_drawing = 1
+                    endif
+                endif
+                
+                # Update step if the missile is still flying
+                if v_hit_city[v_i] == 0 and v_exploded[v_i] == 0 then
+                    # Still increment step, but keep within bounds
+                    if v_step[v_i] < v_steps - 1 then
+                        v_step[v_i] = v_step[v_i] + 1
+                    endif
+                endif
+            endif
+        endfor v_i
+    endif
+}
+
+
+# ---- Main Program ----
+# Game setup
+v_frame_count = 0
+call initialize_arrays
+call define_sprites
+call reset_missiles
+call setup_game_scene
+
+# Main game loop
+while true then
+    begin_frame(true)
+    v_drawing = 0  # Set to 1 when something is drawn
+    
+    # Game mechanics
+    call start_new_missiles
+    call update_missile_paths
+    call find_explosion_trigger
+    call draw_city_defense
+    call check_missile_proximity
+    call check_city_damage
+    call animate_explosions
+    call animate_city_explosions
+    
+    end_frame
+    sync_queue
+    v_frame_count = v_frame_count + 1
+    rest(0.01)  # 20ms frame rate (50 FPS)
+endwhile

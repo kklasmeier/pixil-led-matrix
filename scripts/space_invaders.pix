@@ -1,0 +1,383 @@
+# Space Invaders Simulation
+# Using sprite indexing for multiple invaders and projectiles
+
+# Set throttle to optimize performance
+throttle(0.2)
+
+# Define the player ship sprite
+define_sprite(ship, 10, 5)
+    draw_rectangle(0, 4, 10, 1, green, 100, true)
+    draw_rectangle(4, 0, 2, 4, green, 100, true)
+    draw_rectangle(1, 3, 8, 1, green, 100, true)
+endsprite
+
+# Define the invader sprite
+define_sprite(invader, 8, 8)
+    draw_rectangle(0, 0, 8, 8, red, 100, false)
+    draw_rectangle(1, 1, 6, 6, red, 100, false)
+    draw_rectangle(2, 2, 4, 4, red, 100, true)
+    plot(1, 3, red, 100)
+    plot(6, 3, red, 100)
+    plot(1, 5, red, 100)
+    plot(6, 5, red, 100)
+endsprite
+
+# Define laser sprite
+define_sprite(laser, 1, 4)
+    draw_line(0, 0, 0, 3, green, 100)
+endsprite
+
+# Define enemy laser sprite
+define_sprite(enemy_laser, 1, 4)
+    draw_line(0, 0, 0, 3, red, 100)
+endsprite
+
+# Define explosion sprite
+define_sprite(explosion, 8, 8)
+    draw_circle(4, 4, 3, yellow, 100, false)
+    draw_line(2, 2, 6, 6, yellow, 100)
+    draw_line(2, 6, 6, 2, yellow, 100)
+    draw_line(1, 4, 7, 4, yellow, 100)
+    draw_line(4, 1, 4, 7, yellow, 100)
+endsprite
+
+# Define game parameters
+v_explosion_timer = 0
+v_invader_rows = 1
+v_invader_cols = 6
+v_invader_margin = 4
+v_invader_spacing = 9
+v_invader_count = v_invader_rows * v_invader_cols
+v_player_x = 32
+v_player_y = 58
+v_game_over = 0
+v_score = 0
+v_move_dir = 1
+v_move_down = 0
+v_move_timer = 0
+v_laser_active = 0
+v_laser_x = 0
+v_laser_y = 0
+v_enemy_laser_active = 0
+v_enemy_laser_x = 0
+v_enemy_laser_y = 0
+v_enemy_laser_timer = 0
+v_player_move_counter = 0
+v_player_direction = random(-1, 1, 0)  # Random initial direction
+
+# Create arrays for invader positions and states
+create_array(v_invader_x, v_invader_count)
+create_array(v_invader_y, v_invader_count)
+create_array(v_invader_alive, v_invader_count)
+
+# Initialize invader positions and states
+v_index = 0
+for v_row in (0, v_invader_rows - 1, 1) then
+    for v_col in (0, v_invader_cols - 1, 1) then
+        v_invader_x[v_index] = v_col * v_invader_spacing + v_invader_margin
+        v_invader_y[v_index] = v_row * v_invader_spacing + v_invader_margin
+        v_invader_alive[v_index] = 1
+        v_index = v_index + 1
+    endfor v_col
+endfor v_row
+
+# Draw game background
+draw_rectangle(0, 0, 64, 64, black, 100, true)
+
+# Show player ship
+show_sprite(ship, v_player_x, v_player_y)
+
+# Show all invaders using sprite instances
+for v_i in (0, v_invader_count - 1, 1) then
+    if v_invader_alive[v_i] == 1 then
+        show_sprite(invader, v_invader_x[v_i], v_invader_y[v_i], v_i + 1)
+    endif
+endfor v_i
+
+# Display initial score
+draw_text(2, 2, "Score: 0", piboto-regular, 8, green, 100)
+sync_queue
+
+# Main game loop
+v_frame = 0
+while v_game_over == 0 then
+    # Keep track of frames
+    v_frame = v_frame + 1
+    
+    # Player movement (more random but strategic)
+    v_player_move_counter = v_player_move_counter + 1
+    
+    # Every 5-15 frames, make a movement decision
+    if v_player_move_counter >= random(5, 15, 0) then
+        v_player_move_counter = 0
+        
+        # Only avoid laser if it's directly threatening the ship
+        v_avoid_laser = 0
+        if v_enemy_laser_active == 1 and v_enemy_laser_y > 40 then
+            # Check if laser will hit the ship
+            if abs(v_enemy_laser_x - (v_player_x + 5)) < 6 then
+                v_avoid_laser = 1
+                # Choose random direction to dodge
+                if random(0, 1, 0) == 0 then
+                    v_player_x = v_player_x - random(3, 6, 0)  # Dodge left
+                else
+                    v_player_x = v_player_x + random(3, 6, 0)  # Dodge right
+                endif
+            endif
+        endif
+        
+        # If not avoiding laser, move more freely
+        if v_avoid_laser == 0 then
+            # Occasionally change direction
+            if random(0, 10, 0) < 3 then
+                v_player_direction = random(-1, 1, 0)
+                # If zero, pick a non-zero direction
+                if v_player_direction == 0 then
+                    v_player_direction = 1
+                endif
+            endif
+            
+            # Move in current direction with random acceleration
+            v_player_x = v_player_x + (v_player_direction * random(1, 3, 0))
+            
+            # Occasionally move to track an invader
+            if random(0, 10, 0) < 4 then
+                # Find a random active invader
+                v_target_count = 0
+                for v_i in (0, v_invader_count - 1, 1) then
+                    if v_invader_alive[v_i] == 1 then
+                        v_target_count = v_target_count + 1
+                    endif
+                endfor v_i
+                
+                if v_target_count > 0 then
+                    v_target_index = random(0, v_target_count - 1, 0)
+                    v_count = 0
+                    
+                    for v_i in (0, v_invader_count - 1, 1) then
+                        if v_invader_alive[v_i] == 1 then
+                            if v_count == v_target_index then
+                                # Target this invader
+                                if v_invader_x[v_i] < v_player_x then
+                                    v_player_x = v_player_x - random(1, 2, 0)
+                                else
+                                    v_player_x = v_player_x + random(1, 2, 0)
+                                endif
+                            endif
+                            v_count = v_count + 1
+                        endif
+                    endfor v_i
+                endif
+            endif
+        endif
+        
+        # Ensure player stays on screen
+        if v_player_x < 5 then
+            v_player_x = 5
+            v_player_direction = 1  # Bounce off left edge
+        endif
+        if v_player_x > 54 then
+            v_player_x = 54
+            v_player_direction = -1  # Bounce off right edge
+        endif
+    endif
+    
+    # Update player position
+    move_sprite(ship, v_player_x, v_player_y)
+    
+    # Handle player laser
+    if v_laser_active == 0 and v_frame % 20 == 0 then
+        # Fire a new laser
+        v_laser_active = 1
+        v_laser_x = v_player_x + 5
+        v_laser_y = v_player_y - 5
+        show_sprite(laser, v_laser_x, v_laser_y, 1)
+    endif
+    
+    # Move active laser up
+    if v_laser_active == 1 then
+        v_laser_y = v_laser_y - 2
+        move_sprite(laser, v_laser_x, v_laser_y, 1)
+        
+        # Check if laser is off screen
+        if v_laser_y < 0 then
+            hide_sprite(laser, 1)
+            v_laser_active = 0
+        endif
+        
+        # Check laser collision with invaders
+        for v_i in (0, v_invader_count - 1, 1) then
+            if v_invader_alive[v_i] == 1 then
+                # Simple collision check (could be improved)
+                if abs(v_laser_x - v_invader_x[v_i]) < 4 and abs(v_laser_y - v_invader_y[v_i]) < 4 then
+                    # Hit! Remove invader and laser
+                    v_invader_alive[v_i] = 0
+                    hide_sprite(invader, v_i + 1)
+                    
+                    # Show explosion
+                    show_sprite(explosion, v_invader_x[v_i], v_invader_y[v_i], v_i + 1)
+                    
+                    # Hide laser
+                    hide_sprite(laser, 1)
+                    v_laser_active = 0
+                    
+                    # Update score
+                    v_score = v_score + 10
+                    draw_text(2, 2, "Score: " & v_score, piboto-regular, 8, green, 100)
+                    
+                    # Set up delayed explosion removal
+                    v_explosion_timer = v_frame + 5
+                endif
+            endif
+        endfor v_i
+    endif
+    
+    # Remove explosions after delay
+    if v_frame == v_explosion_timer then
+        for v_i in (0, v_invader_count - 1, 1) then
+            if v_invader_alive[v_i] == 0 then
+                hide_sprite(explosion, v_i + 1)
+            endif
+        endfor v_i
+    endif
+    
+    # Enemy movement (every 15 frames)
+    if v_frame % 15 == 0 then
+        v_leftmost = 64
+        v_rightmost = 0
+        v_lowest = 0
+        
+        # Find edges of invader formation
+        for v_i in (0, v_invader_count - 1, 1) then
+            if v_invader_alive[v_i] == 1 then
+                if v_invader_x[v_i] < v_leftmost then
+                    v_leftmost = v_invader_x[v_i]
+                endif
+                
+                if v_invader_x[v_i] > v_rightmost then
+                    v_rightmost = v_invader_x[v_i]
+                endif
+                
+                if v_invader_y[v_i] > v_lowest then
+                    v_lowest = v_invader_y[v_i]
+                endif
+            endif
+        endfor v_i
+        
+        # Check if invaders need to change direction
+        if v_rightmost > 56 and v_move_dir > 0 then
+            v_move_dir = -1
+            v_move_down = 1
+        elseif v_leftmost < 8 and v_move_dir < 0 then
+            v_move_dir = 1
+            v_move_down = 1
+        endif
+        
+        # Move all active invaders inside a frame
+        begin_frame(true)
+        for v_i in (0, v_invader_count - 1, 1) then
+            if v_invader_alive[v_i] == 1 then
+                # Update invader position
+                v_invader_x[v_i] = v_invader_x[v_i] + v_move_dir
+                
+                if v_move_down == 1 then
+                    v_invader_y[v_i] = v_invader_y[v_i] + 1
+                endif
+                
+                # Move sprite to new position
+                move_sprite(invader, v_invader_x[v_i], v_invader_y[v_i], v_i + 1)
+                
+                # Check if invaders reached bottom - Game Over
+                if v_invader_y[v_i] > 50 then
+                    v_game_over = 1
+                endif
+            endif
+        endfor v_i
+        end_frame
+        
+        # Reset move_down flag
+        v_move_down = 0
+    endif
+    
+    # Enemy shooting (random)
+    if v_enemy_laser_active == 0 and v_frame % 25 == 0 then
+        # Choose a random active invader to shoot
+        v_shooters = 0
+        for v_i in (0, v_invader_count - 1, 1) then
+            if v_invader_alive[v_i] == 1 then
+                v_shooters = v_shooters + 1
+            endif
+        endfor v_i
+        
+        if v_shooters > 0 then
+            v_shooter_index = random(0, v_shooters - 1, 0)
+            v_count = 0
+            
+            for v_i in (0, v_invader_count - 1, 1) then
+                if v_invader_alive[v_i] == 1 then
+                    if v_count == v_shooter_index then
+                        # This invader shoots
+                        v_enemy_laser_active = 1
+                        v_enemy_laser_x = v_invader_x[v_i] + 4
+                        v_enemy_laser_y = v_invader_y[v_i] + 8
+                        show_sprite(enemy_laser, v_enemy_laser_x, v_enemy_laser_y, 1)
+                    endif
+                    v_count = v_count + 1
+                endif
+            endfor v_i
+        endif
+    endif
+    
+    # Move enemy laser
+    if v_enemy_laser_active == 1 then
+        v_enemy_laser_y = v_enemy_laser_y + 2
+        move_sprite(enemy_laser, v_enemy_laser_x, v_enemy_laser_y, 1)
+        
+        # Check if enemy laser is off screen
+        if v_enemy_laser_y > 63 then
+            hide_sprite(enemy_laser, 1)
+            v_enemy_laser_active = 0
+        endif
+        
+        # Check collision with player
+        if abs(v_enemy_laser_x - v_player_x - 5) < 5 and abs(v_enemy_laser_y - v_player_y) < 3 then
+            # Player hit! Game over
+            hide_sprite(enemy_laser, 1)
+            v_enemy_laser_active = 0
+            v_game_over = 1
+            
+            # Show explosion at player position
+            show_sprite(explosion, v_player_x + 5, v_player_y, 100)
+            hide_sprite(ship)
+        endif
+    endif
+    
+    # Check win condition - all invaders destroyed
+    v_remaining = 0
+    for v_i in (0, v_invader_count - 1, 1) then
+        if v_invader_alive[v_i] == 1 then
+            v_remaining = v_remaining + 1
+        endif
+    endfor v_i
+    
+    if v_remaining == 0 then
+        v_game_over = 2  # Win state
+    endif
+    
+    # Sync queue at the end of each loop
+    sync_queue
+endwhile
+
+# Game over message
+if v_game_over == 1 then
+    draw_text(12, 30, "GAME OVER", piboto-regular, 12, red, 100)
+else
+    draw_text(20, 30, "YOU WIN!", piboto-regular, 12, green, 100)
+endif
+
+draw_text(10, 45, "Final Score: " & v_score, piboto-regular, 10, white, 100)
+
+# Cleanup
+dispose_all_sprites()
+clear()
+sync_queue

@@ -1,0 +1,62 @@
+# Number of particles
+throttle(1.3)
+v_num_particles = 25    
+
+# Create arrays for particle properties
+create_array(v_x, v_num_particles)
+create_array(v_y, v_num_particles)
+create_array(v_vx, v_num_particles)
+create_array(v_vy, v_num_particles)
+create_array(v_life, v_num_particles)
+
+# Initialize particles from true bottom of screen
+v_i = 0
+while v_i < v_num_particles then
+    v_x[v_i] = 32         # Start at center x
+    v_y[v_i] = 63         # Start at true bottom row
+    v_vx[v_i] = random(-2, 2, 1)  # Random horizontal velocity
+    v_vy[v_i] = random(-8, -4, 1)  # Upward velocity (negative because y increases downward)
+    v_life[v_i] = random(20, 50, 0)  # Random lifetime
+    v_i = v_i + 1
+endwhile
+
+# Main animation loop
+while true then
+    begin_frame
+    
+    v_i = 0
+    while v_i < v_num_particles then
+        # Update particle position
+        v_x[v_i] = v_x[v_i] + v_vx[v_i]
+        v_y[v_i] = v_y[v_i] + v_vy[v_i]
+        
+        # Apply gravity
+        v_vy[v_i] = v_vy[v_i] + 0.2
+        
+        # Update lifetime
+        v_life[v_i] = v_life[v_i] - 1
+        
+        # Calculate brightness based on life
+        v_bright = (v_life[v_i] / 50) * 98 + 1
+        
+        # Draw particle if alive and on screen
+        if v_life[v_i] > 0 then
+            # Only draw if within screen bounds using compound condition
+            if v_x[v_i] >= 0 and v_x[v_i] < 64 and v_y[v_i] >= 0 and v_y[v_i] < 64 then
+                plot(v_x[v_i], v_y[v_i], orange, v_bright)  # Updated: separate color and intensity
+            endif
+        else
+            # Reset dead particle
+            v_x[v_i] = 32
+            v_y[v_i] = 68  # Reset to true bottom row
+            v_vx[v_i] = random(-2, 2, 1)
+            v_vy[v_i] = random(-8, -4, 1)
+            v_life[v_i] = random(20, 50, 0)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    end_frame
+
+endwhile

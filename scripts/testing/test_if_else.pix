@@ -1,0 +1,23 @@
+# Test if-then-else
+v_x = 4
+v_y = 10
+
+if v_x > 5 then
+    plot(5, 5, red, 2)
+    plot(10, 10, blue, 3)
+else
+    draw_rectangle(5, 5, 20, 20, green, true, 5)
+endif
+
+if v_y > 8 then
+    draw_circle(15, 15, 5, yellow, false, 3)
+endif
+
+
+for v_1 in (1, 10, 1)
+    if v_1 < 5 then
+        draw_rectangle(v_1, v_1, 2, 2, green, false)
+    else
+        draw_circle(v_1, v_1, 5, blue, false)
+    endif
+endloop v_1

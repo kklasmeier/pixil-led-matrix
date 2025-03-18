@@ -1,0 +1,70 @@
+# Color array setup
+create_array(v_colors, 3, string)
+v_colors[0] = "red"
+v_colors[1] = "green"
+v_colors[2] = "blue"
+
+# Shockwave tracking (up to 3 active shockwaves)
+create_array(v_shock_x, 3)      # X position of shockwave center
+create_array(v_shock_y, 3)      # Y position of shockwave center
+create_array(v_shock_radius, 3) # Current radius of shockwave
+create_array(v_shock_active, 3) # 1 if active, 0 if inactive
+
+# Initialize all shockwaves as inactive
+for v_i in (0, 2, 1) then
+    v_shock_x[v_i] = 0
+    v_shock_y[v_i] = 0
+    v_shock_radius[v_i] = 0
+    v_shock_active[v_i] = 0
+endfor v_i
+
+# Timing control
+v_spawn_timer = 0
+v_spawn_interval = 0.8  # Seconds between new shockwaves
+
+# Main animation loop
+while true then
+    begin_frame
+    
+    # Update spawn timer and create new shockwave if needed
+    v_spawn_timer = v_spawn_timer + 0.025
+    if v_spawn_timer >= v_spawn_interval then
+        # Find an inactive shockwave slot
+        for v_i in (0, 2, 1) then
+            if v_shock_active[v_i] == 0 then
+                v_shock_x[v_i] = random(20, 44, 0)      # Center-ish spawn
+                v_shock_y[v_i] = random(20, 44, 0)
+                v_shock_radius[v_i] = 5                 # Starting radius
+                v_shock_active[v_i] = 1                 # Activate it
+                v_spawn_timer = 0                       # Reset timer
+                break  # Pixil doesn’t support break, so we’ll simulate it later
+            endif
+        endfor v_i
+    endif
+    
+    # Update and draw all active shockwaves
+    for v_i in (0, 2, 1) then
+        if v_shock_active[v_i] == 1 then
+            v_r = v_shock_radius[v_i]
+            v_color_idx = v_r / 10  # Shift color every 10 units of radius
+            v_intensity = 100 - (v_r * 3)  # Fade as radius grows
+            if v_intensity < 10 then
+                v_intensity = 10  # Minimum intensity
+            endif
+            
+            # Draw the ring
+            draw_circle(v_shock_x[v_i], v_shock_y[v_i], v_r, v_colors[v_color_idx % 3], v_intensity, false, 150)
+            
+            # Grow the radius
+            v_shock_radius[v_i] = v_r + 2
+            
+            # Deactivate if too large
+            if v_shock_radius[v_i] > 30 then
+                v_shock_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    
+    end_frame
+    rest(0.025)  # ~40 FPS
+endwhile
