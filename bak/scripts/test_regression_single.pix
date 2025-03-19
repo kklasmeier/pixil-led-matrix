@@ -1,8 +1,0 @@
-
-v_color = 50
-v_intensity = 99
-plot(10, 20, {v_color}:99)
-rest(5)
-
-# Cleanup before running next script
-clear()
