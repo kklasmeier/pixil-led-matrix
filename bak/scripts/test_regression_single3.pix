@@ -1,8 +1,0 @@
-v_a = 10.0
-
-plot(30, 5, v_a)          # red
-plot(29, 15, v_a)          # red
-plot(28, 35, v_a)          # red
-rest(10)
-clear
-sync_queue
