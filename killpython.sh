@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Us this script to kill off python running Pixil. 
+# usage: sudo ./killpython.sh
+
 # Check if running as sudo
 if [ "$EUID" -ne 0 ]; then 
     echo "Please run with sudo"
