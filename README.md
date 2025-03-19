@@ -4,9 +4,24 @@ A Python-based scripting language for controlling 64x64 LED matrix displays with
 
 ## Overview
 
-Pixil is a custom scripting language designed to make creating animations and visualizations on RGB LED matrix displays intuitive and accessible. The language abstracts away the complexities of controlling LED matrices directly, providing simple commands for drawing, animation, and interactive content.
+Pixil is a custom scripting language designed to make creating animations and visualizations on RGB LED matrix displays easily, intuitive and accessible. The language abstracts away the complexities of controlling LED matrices directly, providing simple commands for drawing, animation, and content.
 
 The project uses a producer/consumer architecture with a command queue to manage LED matrix operations, making it efficient for complex animations while maintaining synchronization when needed.
+
+## About this project
+This project has been built entirely by AI. I am a product owner by trade, not a developer. Using incremental implementation asking AI to make enhancements. This project has achieved this current level through full AI development. I mostly used Claude.ai, but sometimes i use grok.com. 
+
+In addition, AI has produced all of the Pixil animation scripts using the same approach. I simply drop the AI_Instructions.txt into AI and i ask AI for ideas on new Pixil scripts. It comes up with some new ideas and then I work with AI to generate and improve the script, recieving the script, testing it and giving feedback until I am satisified with the lightshow it produced.
+
+I am not sure if anyone will ever see this project, care about this project or want to use it. If you do, give me a shout out as I am interested to know if this was at all interesting to you.
+
+## SCripting language documentation
+References are here in this document. Easiest way to generate script is through a GPT AI. 
+
+To get a good set of docuemtation of command references, drop the docs/AI_Instructions.txt into your AI and ask it to give you a command reference with examples. 
+
+AI_Instructions.txt is human readable too, but AI does a better job.
+
 
 ## Features
 
@@ -23,6 +38,9 @@ The project uses a producer/consumer architecture with a command queue to manage
 - **Procedures**: Define reusable code blocks
 - **Performance Controls**: Throttle and sync_queue commands for animation tuning
 
+## Features
+
+
 ## Reference
 For detailed installation instructions, see [INSTALL.md](docs/INSTALL.md).
 
@@ -30,7 +48,7 @@ For complete language documentation, see [AI_Instructions.txt](docs/AI_Instructi
 
 ## Example Scripts
 
-The project includes over 70 example scripts demonstrating various animations and effects:
+The project includes over 70 scripts demonstrating various animations and effects:
 
 - **Visual Effects**: Aurora Borealis, Electric Arcs, Fireworks, Lightning
 - **Animations**: Bouncing Ball, Digital Rain, Fireflies, Particle Fountain
@@ -62,8 +80,18 @@ The project includes over 70 example scripts demonstrating various animations an
 
 3. Run a sample script:
    ```
-   python Pixil.py scripts/examples/bouncing_ball.txt
+   sudo python Pixil.py main/bouncing_ball.pix
    ```
+
+    Command for executing: 
+
+    sudo python Pixil.py main/* -q -t 5:00
+
+    -q = mean show the number of commands in the queue awating exeuction
+    -t 5:00 = means show the script for 5 minutes, then go to the next.
+
+    You can use a named script instead of a wildcard to run a specific script. The options are, well optional.
+
 
 ## Language Reference
 
