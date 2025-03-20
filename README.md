@@ -36,6 +36,8 @@ Whether you're building an interactive art installation, creating signage, or ju
 
 If you find this project interesting or decide to use it, please reach out! I'd love to hear about your experience and see what you create with Pixil.
 
+This entire project was created from AI. Since I am not a develoepr, i would like a deverlop opinion of solution. Is the code strucutred well? Readable? Properly designed using sensable coding structures?
+
 ## Getting Started
 
 ### Documentation
