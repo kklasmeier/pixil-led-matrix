@@ -5,11 +5,11 @@ This guide will help you set up Pixil to run on your Raspberry Pi with an RGB LE
 ## Hardware Requirements
 
 - **Raspberry Pi**: Model 4 recommended (Model 3B+ also works well)
-- **RGB LED Matrix**: 64x64, 64x32 RGB LED matrix panel or other matrix configuration
+- **RGB LED Matrix**: 64x64 RGB LED matrix panel (other sizes like 64x32 will work but may require configuration adjustments)
 - **Power Supply**: 5V power supply with sufficient amperage for your matrix
-  - For a 64x64 matrix at full brightness, a 4-5A supply is recommended
-- **Cables & Connectors**: As required by your specific matrix
-- **Adafruit RGB Matrix Bonnet for Raspberry Pi**: Optimal, but makes it a whole lot easier to connect your matrix to your raspberry pi. It has an easy setup process to install the underlying RGBMatrix lib.
+  - For a 64x64 matrix at full brightness, a 5A supply is recommended
+- **Adafruit RGB Matrix Bonnet** (Recommended): Makes connecting your matrix to the Raspberry Pi simple and reliable
+- **Optional**: IDC cable if your matrix isn't directly attachable to the bonnet
 
 ## Software Requirements
 
@@ -34,9 +34,34 @@ sudo apt install -y libatlas-base-dev
 sudo apt install -y git
 ```
 
-## Step 2: Install the RGB Matrix Library
+## Step 2: Hardware Setup with Adafruit RGB Matrix Bonnet (Recommended)
 
-Pixil depends on the rpi-rgb-led-matrix library by Henner Zeller:
+The Adafruit RGB Matrix Bonnet provides the most reliable connection method for driving RGB LED matrices.
+
+1. **Power off your Raspberry Pi before connecting any hardware**
+
+2. **Install the Adafruit RGB Matrix Bonnet**
+   - Attach the bonnet to your Raspberry Pi's GPIO pins (you may need a header extender if you have a cooling fan)
+   - Connect your matrix to the HUB75 connector on the bonnet
+   - Connect the 5V power supply to the bonnet's power terminals (NOT to the Raspberry Pi's USB port)
+
+3. **Install Adafruit's RGB Matrix software**
+   ```bash
+   curl -O https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/rgb-matrix.sh
+   sudo bash rgb-matrix.sh
+   ```
+
+4. **During installation:**
+   - Select "Configure options manually" when prompted
+   - Choose "Adafruit RGB Matrix Bonnet" when asked about your hardware
+   - Select quality vs. convenience based on your preference (quality recommended for best visual results)
+   - Reboot when prompted
+
+For detailed wiring instructions, see [Adafruit's official guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/).
+
+## Step 3: Install the RGB Matrix Library
+
+Pixil depends on the rpi-rgb-led-matrix library by Henner Zeller. The Adafruit installer from Step 2 should have installed this already, but if you need to install it manually:
 
 ```bash
 # Clone the library
@@ -50,7 +75,7 @@ make build
 sudo make install
 ```
 
-## Step 3: Install Pixil
+## Step 4: Install Pixil
 
 Clone the Pixil repository:
 
@@ -73,45 +98,7 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-## Step 4: Connect Your Hardware
-
-Pixil supports multiple hardware connection methods for your RGB LED matrix. Choose the option that matches your setup:
-
-### Option A: Adafruit RGB Matrix Bonnet (Recommended)
-
-The Adafruit RGB Matrix Bonnet is an easy, low-cost way to drive RGB LED matrices from a Raspberry Pi.
-
-https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/
-
-1. **Power off your Raspberry Pi before connecting any hardware**
-
-2. **Install the Adafruit RGB Matrix Bonnet**
-   - Attach the bonnet to your Raspberry Pi's GPIO pins. You might need a raiser pin if you have a fan.
-   - Connect your matrix to the HUB75 connector on the bonnet
-   - Connect power to the bonnet's power terminals (not to the Raspberry Pi's USB)
-
-3. **Install Adafruit's software**
-   ```bash
-   curl -O https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/rgb-matrix.sh
-   sudo bash rgb-matrix.sh
-   ```
-
-4. **During installation:**
-   - Select "Configure options manually" when prompted
-   - Choose "Adafruit RGB Matrix Bonnet" when asked about your hardware
-   - Select quality vs. convenience based on your preference
-   - Reboot when prompted
-
-For more detailed instructions, see Adafruit's guide: https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/
-
-### Option B: Direct GPIO Connection
-
-1. **Power off your Raspberry Pi before connecting the LED matrix**
-2. Connect your LED matrix to the Raspberry Pi GPIO pins
-   - Follow the pinout diagram for your specific matrix
-   - Generally, the matrix will connect to the GPIO pins for data and clock signals
-
-### Configuration
+## Step 5: Configure Pixil
 
 Create a configuration file (if one doesn't exist):
 
@@ -125,30 +112,9 @@ Edit the configuration to match your matrix specifications:
 nano config.json
 ```
 
-Example configuration:
+### For Adafruit RGB Matrix Bonnet (Recommended)
 
-```json
-{
-  "hardware": {
-    "rows": 64,
-    "cols": 64,
-    "chain_length": 1,
-    "parallel": 1,
-    "pwm_bits": 11,
-    "brightness": 50,
-    "hardware_mapping": "regular",
-    "gpio_slowdown": 2
-  },
-  "program": {
-    "default_script_path": "scripts/examples",
-    "debug_level": 1
-  }
-}
-```
-
-#### Configuration for Adafruit RGB Matrix Bonnet
-
-If you're using the Adafruit RGB Matrix Bonnet, use these settings:
+Use these settings if you're using the Adafruit RGB Matrix Bonnet:
 
 ```json
 {
@@ -160,7 +126,7 @@ If you're using the Adafruit RGB Matrix Bonnet, use these settings:
     "pwm_bits": 11,
     "brightness": 50,
     "hardware_mapping": "adafruit-hat",
-    "gpio_slowdown": 2
+    "gpio_slowdown": 3
   },
   "program": {
     "default_script_path": "scripts/examples",
@@ -169,17 +135,20 @@ If you're using the Adafruit RGB Matrix Bonnet, use these settings:
 }
 ```
 
-Note the `"hardware_mapping": "adafruit-hat"` setting, which is important for the bonnet to work correctly.
+Important settings:
+- `"hardware_mapping": "adafruit-hat"` - Critical for the bonnet to work correctly
+- `"gpio_slowdown": 3` - Recommended for Raspberry Pi 4 (use 2 for Pi 3, 1 for older models)
+- `"brightness": 50` - Adjust between 0-100 based on your power supply capacity
 
-Adjust these settings based on your specific matrix. The `gpio_slowdown` parameter may need adjustment depending on your Raspberry Pi model (use higher values like 3 or 4 for Raspberry Pi 4).
-
-## Step 5: Test Your Installation
+## Step 6: Test Your Installation
 
 Run one of the example scripts to verify everything is working:
 
 ```bash
-python Pixil.py scripts/examples/bouncing_ball.txt
+sudo python Pixil.py scripts/examples/bouncing_ball
 ```
+
+Note: The `.pix` extension is optional when running scripts.
 
 If successful, you should see a bouncing ball animation on your LED matrix.
 
@@ -187,44 +156,35 @@ If successful, you should see a bouncing ball animation on your LED matrix.
 
 ### Permission Issues
 
-If you encounter permission errors when accessing the GPIO, run Pixil with sudo:
+For the best experience, run Pixil with sudo:
 
 ```bash
-sudo python Pixil.py scripts/examples/bouncing_ball.txt
+sudo python Pixil.py scripts/examples/bouncing_ball
 ```
 
-For a more permanent solution, add your user to the gpio group:
+For a more permanent solution, add your user to the required groups:
 
 ```bash
-sudo usermod -a -G gpio $USER
-sudo usermod -a -G spi $USER
-```
-
-#### Adafruit RGB Matrix Bonnet Permissions
-
-If you're using the Adafruit RGB Matrix Bonnet, the installer should have already set up the necessary permissions. If you still encounter permission issues:
-
-```bash
-# Make sure you have access to the device
-sudo chmod a+rw /dev/spidev0.0
-sudo chmod a+rw /dev/spidev0.1
+sudo usermod -a -G gpio,spi $USER
+# Log out and back in for changes to take effect
 ```
 
 ### Display Problems
 
 If the display looks distorted or flickering:
 
-1. Try adjusting the `gpio_slowdown` parameter in your config
-2. Check all physical connections
-3. Ensure adequate power is supplied to both Raspberry Pi and LED matrix
+1. Check your power supply - insufficient power is the most common cause of display issues
+2. Try adjusting the `gpio_slowdown` parameter in your config (increase for Pi 4, decrease for older models)
+3. Verify all physical connections between the bonnet and matrix
+4. Lower the brightness setting in the config file
 
 ### Command Queue Backlog
 
-If animations become sluggish due to command queue backlog:
+If animations become sluggish:
 
-1. Use the `throttle` command in your scripts
-2. Reduce animation complexity
-3. Add occasional `sync_queue` commands
+1. Use the `throttle` command in your scripts to adjust animation speed
+2. Add occasional `sync_queue` commands to prevent queue overruns
+3. Reduce animation complexity in high-activity scenes
 
 ## Starting Pixil on Boot
 
@@ -244,15 +204,17 @@ Description=Pixil LED Matrix Service
 After=network.target
 
 [Service]
-User=pi
+User=root
 WorkingDirectory=/home/pi/pixil-led-matrix
-ExecStart=/home/pi/pixil-led-matrix/python_venv/bin/python Pixil.py scripts/examples/starfield.txt
+ExecStart=/home/pi/pixil-led-matrix/python_venv/bin/python Pixil.py scripts/examples/starfield
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+Note: Using `User=root` avoids permission issues with GPIO access.
 
 3. Enable and start the service:
 
@@ -264,7 +226,11 @@ sudo systemctl start pixil.service
 ## Next Steps
 
 - Explore the example scripts in the `scripts/examples/` directory
-- Create your own scripts in the `scripts/user/` directory
+- Create your own scripts using the Pixil scripting language
 - Read the full language reference in the README.md file
 
-For more information, check out the project documentation and examples.
+For more information, check out the [project documentation](https://github.com/kklasmeier/pixil-led-matrix) and examples.
+
+## Support
+
+If you encounter issues not covered in this guide, please file an issue on the GitHub repository.
