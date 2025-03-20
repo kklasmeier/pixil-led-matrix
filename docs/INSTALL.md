@@ -145,7 +145,7 @@ Important settings:
 Run one of the example scripts to verify everything is working:
 
 ```bash
-sudo python Pixil.py scripts/examples/bouncing_ball
+sudo python Pixil.py main/Color_Blend
 ```
 
 Note: The `.pix` extension is optional when running scripts.
@@ -159,7 +159,7 @@ If successful, you should see a bouncing ball animation on your LED matrix.
 For the best experience, run Pixil with sudo:
 
 ```bash
-sudo python Pixil.py scripts/examples/bouncing_ball
+sudo python Pixil.py main/Color_Blend
 ```
 
 For a more permanent solution, add your user to the required groups:
