@@ -6,6 +6,8 @@ A Python-based scripting language for creating stunning animations on 64x64 RGB 
 
 Pixil is a custom scripting language designed to make creating animations and visualizations on RGB LED matrix displays easy, intuitive, and accessible. The language abstracts away the complexities of controlling LED matrices directly, providing simple commands for drawing, animation, and interactive content.
 
+<img src="docs/example_images/20250320_123949.jpg" width="400" alt="Pixil LED Matrix Animation Example">
+
 The project uses a producer/consumer architecture with a command queue to manage LED matrix operations, making it efficient for complex animations while maintaining synchronization when needed.
 
 ## AI Built
@@ -14,6 +16,10 @@ This project has been built entirely through AI collaboration. As a product owne
 
 All 75+ Pixil animation scripts were also created using the same approach. I simply provide the AI_Instructions.txt to AI, ask for animation ideas, and then collaborate to generate, test, and refine each script until the lightshow meets my expectations.
 
+<div align="center">
+  <img src="docs/example_images/20250320_125455.jpg" width="350" alt="LED Matrix Display in Action">
+</div>
+
 ## About this project
 
 Pixil is a custom Python-based framework designed to simplify creating vibrant animations on RGB LED matrices using a Raspberry Pi. It introduces a streamlined scripting language that makes LED programming accessible to creators of all skill levels.
@@ -21,6 +27,8 @@ Pixil is a custom Python-based framework designed to simplify creating vibrant a
 The project was born from a desire to unlock the creative potential of LED matrices without requiring deep programming knowledge. Pixil abstracts away the complexities of direct hardware manipulation, letting you focus on your artistic vision through intuitive commands for shapes, text, sprites, and animations.
 
 Featuring a producer/consumer architecture with command queuing, Pixil efficiently manages resources while maintaining smooth animations. The framework comes with 75+ ready-to-use scripts demonstrating various effects from simple bouncing balls to complex particle simulations and classic arcade games.
+
+<img src="docs/example_images/20250320_140644.jpg" width="400" alt="Complex Animation Pattern">
 
 Whether you're building an interactive art installation, creating signage, or just exploring LED programming, Pixil provides both the simplicity beginners need and the power advanced users demand.
 
@@ -88,6 +96,10 @@ Options:
 - **Color Control**: Named colors and intensity customization
 - **Procedures**: Define reusable code blocks
 - **Performance Controls**: Throttle and sync_queue commands for animation tuning
+
+<div align="center">
+  <img src="docs/example_images/20250320_144630.jpg" width="350" alt="Advanced LED Animation Example">
+</div>
 
 ## Example Scripts
 
