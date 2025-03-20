@@ -1,27 +1,78 @@
 # Pixil LED Matrix
 
-A Python-based scripting language for controlling 64x64 LED matrix displays with Raspberry Pi.
+A Python-based scripting language for creating stunning animations on 64x64 RGB LED matrix displays with Raspberry Pi.
 
 ## Overview
 
-Pixil is a custom scripting language designed to make creating animations and visualizations on RGB LED matrix displays easily, intuitive and accessible. The language abstracts away the complexities of controlling LED matrices directly, providing simple commands for drawing, animation, and content.
+Pixil is a custom scripting language designed to make creating animations and visualizations on RGB LED matrix displays easy, intuitive, and accessible. The language abstracts away the complexities of controlling LED matrices directly, providing simple commands for drawing, animation, and interactive content.
 
 The project uses a producer/consumer architecture with a command queue to manage LED matrix operations, making it efficient for complex animations while maintaining synchronization when needed.
 
+## AI Built
+
+This project has been built entirely through AI collaboration. As a product owner by trade (not a developer), I created Pixil using incremental implementation by working with AI to make enhancements. The entire codebase has been developed through conversations with AI, primarily using Claude.ai and Grok 3.
+
+All 75+ Pixil animation scripts were also created using the same approach. I simply provide the AI_Instructions.txt to AI, ask for animation ideas, and then collaborate to generate, test, and refine each script until the lightshow meets my expectations.
+
 ## About this project
-This project has been built entirely by AI. I am a product owner by trade, not a developer. Using incremental implementation asking AI to make enhancements. This project has achieved this current level through full AI development. I mostly used Claude.ai, but sometimes i use grok.com. 
 
-In addition, AI has produced all of the Pixil animation scripts using the same approach. I simply drop the AI_Instructions.txt into AI and i ask AI for ideas on new Pixil scripts. It comes up with some new ideas and then I work with AI to generate and improve the script, recieving the script, testing it and giving feedback until I am satisified with the lightshow it produced.
+Pixil is a custom Python-based framework designed to simplify creating vibrant animations on RGB LED matrices using a Raspberry Pi. It introduces a streamlined scripting language that makes LED programming accessible to creators of all skill levels.
 
-I am not sure if anyone will ever see this project, care about this project or want to use it. If you do, give me a shout out as I am interested to know if this was at all interesting to you.
+The project was born from a desire to unlock the creative potential of LED matrices without requiring deep programming knowledge. Pixil abstracts away the complexities of direct hardware manipulation, letting you focus on your artistic vision through intuitive commands for shapes, text, sprites, and animations.
 
-## SCripting language documentation
-References are here in this document. Easiest way to generate script is through a GPT AI. 
+Featuring a producer/consumer architecture with command queuing, Pixil efficiently manages resources while maintaining smooth animations. The framework comes with 75+ ready-to-use scripts demonstrating various effects from simple bouncing balls to complex particle simulations and classic arcade games.
 
-To get a good set of docuemtation of command references, drop the docs/AI_Instructions.txt into your AI and ask it to give you a command reference with examples. 
+Whether you're building an interactive art installation, creating signage, or just exploring LED programming, Pixil provides both the simplicity beginners need and the power advanced users demand.
 
-AI_Instructions.txt is human readable too, but AI does a better job.
+## Interest
 
+If you find this project interesting or decide to use it, please reach out! I'd love to hear about your experience and see what you create with Pixil.
+
+## Getting Started
+
+### Documentation
+
+The easiest way to understand Pixil is to:
+
+1. Read the [Installation Guide](docs/INSTALL.md) to set up your hardware
+2. Look at example scripts in the `scripts/` directory
+3. Use an AI assistant with the `docs/AI_Instructions.txt` file to generate custom scripts
+
+For complete documentation:
+- Use `docs/AI_Instructions.txt` with your favorite AI assistant and ask for a command reference
+- The AI_Instructions.txt file is also human-readable but AI can create better examples and explanations. Give AI Pixil.py for even more detail.
+
+### Installation
+
+For detailed installation instructions, see [INSTALL.md](docs/INSTALL.md).
+
+Basic setup:
+```bash
+# Clone the repository
+git clone https://github.com/kklasmeier/pixil-led-matrix.git
+cd pixil-led-matrix
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run a sample script
+sudo python Pixil.py scripts/3D_perspective -q
+```
+
+### Running Scripts
+
+```bash
+# Run a single script
+sudo python Pixil.py scripts/3D_perspective
+
+# Run all scripts in a directory with queue monitoring and 5-minute timer
+sudo python Pixil.py scripts/* -q -t 5:00
+```
+
+Options:
+- `-q` - Show the command queue depth (useful for performance monitoring)
+- `-t 5:00` - Run each script for 5 minutes before moving to the next
+- `-d DEBUG_LEVEL` - Set debug level (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE)
 
 ## Features
 
@@ -38,17 +89,9 @@ AI_Instructions.txt is human readable too, but AI does a better job.
 - **Procedures**: Define reusable code blocks
 - **Performance Controls**: Throttle and sync_queue commands for animation tuning
 
-## Features
-
-
-## Reference
-For detailed installation instructions, see [INSTALL.md](docs/INSTALL.md).
-
-For complete language documentation, see [AI_Instructions.txt](docs/AI_Instructions.txt).
-
 ## Example Scripts
 
-The project includes over 70 scripts demonstrating various animations and effects:
+The project includes 75+ scripts demonstrating various animations and effects:
 
 - **Visual Effects**: Aurora Borealis, Electric Arcs, Fireworks, Lightning
 - **Animations**: Bouncing Ball, Digital Rain, Fireflies, Particle Fountain
@@ -56,42 +99,6 @@ The project includes over 70 scripts demonstrating various animations and effect
 - **Games**: Missile Command, Pong, Snake, Space Invaders
 - **Patterns**: Fractals, Spirograph, Kaleidoscope, Lissajous Curves
 - **3D Effects**: Wormhole, 3D Perspective, Psychedelic Tunnel
-
-## Installation
-
-### Hardware Requirements
-
-- Raspberry Pi (Model 3 or 4 recommended)
-- 64x64 RGB LED Matrix Display
-- Appropriate power supply for your matrix
-
-### Software Setup
-
-1. Clone this repository:
-   ```
-   git clone https://github.com/kklasmeier/pixil-led-matrix.git
-   cd pixil-led-matrix
-   ```
-
-2. Install required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Run a sample script:
-   ```
-   sudo python Pixil.py main/bouncing_ball.pix
-   ```
-
-    Command for executing: 
-
-    sudo python Pixil.py main/* -q -t 5:00
-
-    -q = mean show the number of commands in the queue awating exeuction
-    -t 5:00 = means show the script for 5 minutes, then go to the next.
-
-    You can use a named script instead of a wildcard to run a specific script. The options are, well optional.
-
 
 ## Language Reference
 
@@ -180,17 +187,12 @@ clear_text(10, 20)
 - **shared/**: Queue system for command execution
 - **scripts/**: Example Pixil scripts demonstrating various animations
 
-## Contributing
-
-Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit issues, feature requests, and code.
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Special thanks to the [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) library
+- Special thanks to the [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) library by Henner Zeller
 - Inspired by various LED art projects in the maker community
-
-
+- Thanks to the Adafruit team for their RGB Matrix Bonnet and installation scripts

@@ -1,0 +1,16 @@
+# Core dependencies
+numpy>=1.21.0
+pillow>=8.0.0
+rpi-rgb-led-matrix>=0.0.5
+
+# Hardware interface
+RPi.GPIO>=0.7.0
+
+# Multiprocessing/Threading
+multiprocessing>=0.70.13
+queue>=0.0.0
+
+# Optional development tools
+pytest>=6.0.0
+flake8>=3.9.0
+mypy>=0.812
