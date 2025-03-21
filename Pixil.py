@@ -128,6 +128,7 @@ class SpriteContext:
 def process_script(filename, execute_func=None):
     if execute_func is None:
         raise ValueError("execute_func must be provided")
+    normal_exit = True
 
     global current_command, variables, frame_commands, in_frame_mode
     current_command = None  # Reset at script start
@@ -557,6 +558,7 @@ def process_script(filename, execute_func=None):
 
     # Generator-based line processing logic
     def process_lines(line_generator):
+        nonlocal normal_exit  # Track script exit status
         global current_command, _metrics
         for line_number, line in enumerate(line_generator, 1):
             # Increment line counter
@@ -568,9 +570,11 @@ def process_script(filename, execute_func=None):
             if check_spacebar():
                 print("Spacebar pressed, skipping to next script...")
                 force_timer_expired()
+                normal_exit = False
                 break       
             if is_time_expired():
                 debug_print("Script duration expired", DEBUG_CONCISE)
+                normal_exit = False
                 break            
             debug_print(f"\n--------------------------------------", DEBUG_VERBOSE)
             debug_print(f"Processing line {line_number}: {line}", DEBUG_VERBOSE)
@@ -914,6 +918,12 @@ def process_script(filename, execute_func=None):
     try:
         processed_lines = preprocess_lines(filename)
         process_lines(iter(processed_lines))
+        if normal_exit:
+            print("Script completed normally - sync queue run")
+            debug_print("Script completed normally, adding sync_queue", DEBUG_SUMMARY)
+            execute_command('sync_queue')
+            queue.wait_until_empty()       # Wait for queue to empty
+            queue.last_command_time = time.time() * 1000  # Reset timing after sync
     finally:
         debug_print("\n1. Starting cleanup sequence...", DEBUG_CONCISE)
         

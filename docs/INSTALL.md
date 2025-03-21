@@ -4,7 +4,7 @@ This guide will help you set up Pixil to run on your Raspberry Pi with an RGB LE
 
 ## Hardware Requirements
 
-- **Raspberry Pi**: Model 4 recommended (Model 3B+ also works well)
+- **Raspberry Pi**: Model 4 recommended (Model 3B+ also works well) - I have not tried the Raspberry Pi 5 because the the hzeller libaray which teh Adafruit RGB Matrix Bonnet is based upon doesn't yet have support. 
 - **RGB LED Matrix**: 64x64 RGB LED matrix panel (other sizes like 64x32 will work but may require configuration adjustments)
 - **Power Supply**: 5V power supply with sufficient amperage for your matrix
   - For a 64x64 matrix at full brightness, a 5A supply is recommended

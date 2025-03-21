@@ -1,227 +1,168 @@
-# Spirograph Sequence Generator
-# Creates truly randomized spirograph patterns with alternating burnout effect
-
-# Configuration variables
-v_center_x = 32          # Center X of the display (64x64)
-v_center_y = 32          # Center Y of the display
-v_color_num = 1          # Starting color number
-v_intensity = 100        # Default intensity
-v_point_delay = 0.001    # Delay between points to control drawing speed
-v_max_points = 2000      # Safety limit to prevent infinite loops
-v_view_time = 3          # Fixed viewing time of 3 seconds between patterns
-v_pattern_count = 0      # Counter to track even/odd patterns for burnout effect
-
-# Seed values for pseudo-random generation
-v_seed1 = 42
-v_seed2 = 17
-v_seed3 = 31
-
-# Create arrays for storing x,y coordinates
-create_array(v_x_coords, v_max_points)
-create_array(v_y_coords, v_max_points)
-
-# Generate a better pseudo-random value
-def better_random {
-    # Mix multiple values for improved randomness
-    v_seed1 = (v_seed1 * 75 + 13) % 100
-    v_seed2 = (v_seed2 * 69 + 23) % 100
-    v_seed3 = (v_seed3 * 61 + 39) % 100
+# Procedure to draw a rainbow sweep from upper right to lower left
+def draw_rainbow_sweep_down_right {
+    begin_frame(true)  # Preserve mode to layer over previous content
+    # Subtle static background
+    draw_rectangle(0, 0, 64, 64, dark_gray, 20, true)
     
-    # Combine the seeds
-    v_random_val = (v_seed1 + v_seed2 + v_seed3) % 100
-}
-
-# Get random value in range min to max
-def random_in_range {
-    call better_random
-    v_range_size = v_max - v_min + 1
-    v_result = v_min + (v_random_val % v_range_size)
-}
-
-# Drawing function
-def draw_spirograph {
-    # Draw the pattern point by point
-    # Use different drawing commands based on pattern number
-    if v_pattern_count % 2 == 1 then
-        # Odd patterns - use burnout of 500ms
-        #print("** Using 500ms burnout for this pattern **")
-        
-        for v_i in (1, v_points_needed - 1, 1) then
-            v_x1 = v_x_coords[v_i - 1]
-            v_y1 = v_y_coords[v_i - 1]
-            v_x2 = v_x_coords[v_i]
-            v_y2 = v_y_coords[v_i]
-            
-            # With 500ms burnout
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color_num, v_intensity, 500)
-            rest(v_point_delay)
-        endfor v_i
-        
-        # Connect last point to first point
-        draw_line(v_x_coords[v_points_needed - 1], v_y_coords[v_points_needed - 1], v_x_coords[0], v_y_coords[0], v_color_num, v_intensity, 500)
-    else
-        # Even patterns - no burnout
-        for v_i in (1, v_points_needed - 1, 1) then
-            v_x1 = v_x_coords[v_i - 1]
-            v_y1 = v_y_coords[v_i - 1]
-            v_x2 = v_x_coords[v_i]
-            v_y2 = v_y_coords[v_i]
-            
-            # Without burnout
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color_num, v_intensity)
-            rest(v_point_delay)
-        endfor v_i
-        
-        # Connect last point to first point
-        draw_line(v_x_coords[v_points_needed - 1], v_y_coords[v_points_needed - 1], v_x_coords[0], v_y_coords[0], v_color_num, v_intensity)
-    endif
-}
-
-# Function to create truly random patterns
-def change_pattern {
-    # Increment pattern counter
-    v_pattern_count = v_pattern_count + 1
-    
-    # Clear existing pattern (only if previous pattern didn't have burnout)
-    if v_pattern_count % 2 == 1 then
-        clear()
-    endif
-    
-    # Randomize outer radius (25-31)
-    v_min = 25
-    v_max = 31
-    call random_in_range
-    v_outer_radius = v_result
-    
-    # Use prime number differences for inner radius to create more variation
-    v_min = 5
-    v_max = 23
-    call random_in_range
-    v_inner_radius = v_result
-    
-    # Make sure inner radius is never equal or too close to outer radius
-    if v_inner_radius >= v_outer_radius - 2 then
-        v_inner_radius = v_outer_radius - 5
-        if v_inner_radius < 5 then
-            v_inner_radius = 5
+    # Draw diagonal rainbow lines from upper right to lower left
+    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
+        v_x_start = v_i - v_t + 128  # Increased offset to ensure lines start fully off-screen
+        v_color = (v_t + v_i) % 100  # Smooth color cycle
+        # Only draw lines within or entering the visible area
+        if v_x_start <= 64 and v_x_start + 64 >= 0 then
+            v_x1 = max(0, v_x_start)
+            v_y1 = max(0, 64 - (v_x_start + 64))
+            v_x2 = min(64, v_x_start + 64)
+            v_y2 = min(64, 64 - v_x_start)
+            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
         endif
-    endif
-    
-    # Randomize pen distance with wider range
-    v_min = 3
-    v_max = v_inner_radius - 1
-    if v_max < v_min then
-        v_max = v_min + 1
-    endif
-    call random_in_range
-    v_pen_distance = v_result
-    
-    # Randomize color with bigger jumps
-    v_min = 1
-    v_max = 99
-    call random_in_range
-    v_color_num = v_result
-    
-    # Add a small random offset to the center for more variation
-    v_min = -2
-    v_max = 2
-    call random_in_range
-    v_center_x_offset = v_result
-    
-    call random_in_range
-    v_center_y_offset = v_result
-    
-    v_center_x = 32 + v_center_x_offset
-    v_center_y = 32 + v_center_y_offset
-    
-    # Recalculate GCD and points - using co-prime ratios creates more interesting patterns
-    v_a = v_outer_radius
-    v_b = v_inner_radius
-    v_temp = 0
-    
-    # Euclidean algorithm for GCD
-    while v_b != 0 then
-        v_temp = v_b
-        v_b = v_a % v_b
-        v_a = v_temp
-    endwhile
-    
-    v_gcd = v_a
-    
-    # Handle case where GCD is 0
-    if v_gcd == 0 then
-        v_gcd = 1
-    endif
-    
-    # Sometimes force a small GCD for more complex patterns
-    v_min = 1
-    v_max = 10
-    call random_in_range
-    if v_result <= 3 then
-        # Force a prime-number ratio by slightly adjusting inner radius
-        v_inner_radius = v_inner_radius + 1
-        
-        # Recalculate GCD
-        v_a = v_outer_radius
-        v_b = v_inner_radius
-        
-        while v_b != 0 then
-            v_temp = v_b
-            v_b = v_a % v_b
-            v_a = v_temp
-        endwhile
-        
-        v_gcd = v_a
-    endif
-    
-    v_lcm = (v_outer_radius * v_inner_radius) / v_gcd
-    v_num_rotations = v_inner_radius / v_gcd
-    
-    # Calculate points needed and adjust for smoother drawing
-    v_points_needed = v_lcm * 120
-    if v_points_needed > v_max_points then
-        v_points_needed = v_max_points
-    endif
-    
-    # Calculate theta step based on points
-    v_theta_step = (2 * pi) / 120
-    
-    # Regenerate points
-    for v_i in (0, v_points_needed - 1, 1) then
-        v_theta = v_i * v_theta_step
-        
-        # Standard hypotrochoid equations
-        v_x = v_center_x + (v_outer_radius - v_inner_radius) * cos(v_theta) + v_pen_distance * cos((v_outer_radius - v_inner_radius) * v_theta / v_inner_radius)
-        v_y = v_center_y + (v_outer_radius - v_inner_radius) * sin(v_theta) - v_pen_distance * sin((v_outer_radius - v_inner_radius) * v_theta / v_inner_radius)
-        
-        v_x_coords[v_i] = v_x
-        v_y_coords[v_i] = v_y
     endfor v_i
-    
-    # Draw reference circle
-    draw_circle(v_center_x, v_center_y, v_outer_radius, 50, 15, false)
-    
-    # Display pattern information
-    #print(f"Pattern #{v_pattern_count}: R={v_outer_radius}, r={v_inner_radius}, d={v_pen_distance}, color={v_color_num}")
-    #print(f"Complete in {v_num_rotations} rotations with {v_points_needed} points")
-    
-    # Adjust seeds for next pattern
-    v_seed1 = v_seed1 + v_outer_radius
-    v_seed2 = v_seed2 + v_inner_radius 
-    v_seed3 = v_seed3 + v_color_num
+    end_frame
 }
 
-# Initial clear
-clear()
+# Procedure to draw a rainbow sweep from lower right to upper left
+def draw_rainbow_sweep_up_right {
+    begin_frame(true)  # Preserve mode to layer over previous content
+    # Subtle static background
+    draw_rectangle(0, 0, 64, 64, dark_gray, 20, true)
+    
+    # Draw diagonal rainbow lines from lower right to upper left
+    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
+        v_x_start = v_i - v_t + 128  # Offset to start from lower right
+        v_color = (v_t + v_i) % 100  # Smooth color cycle
+        # Only draw lines within or entering the visible area
+        if v_x_start <= 64 and v_x_start + 64 >= 0 then
+            # Reverse the y-coordinates to go from bottom to top
+            v_x1 = max(0, v_x_start)
+            v_y1 = min(64, v_x_start + 64)  # Reversed y calculation
+            v_x2 = min(64, v_x_start + 64)
+            v_y2 = max(0, v_x_start)        # Reversed y calculation
+            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
+        endif
+    endfor v_i
+    end_frame
+}
 
-# Infinite loop to keep generating patterns
-while 1 == 1 then
-    call change_pattern
-    call draw_spirograph
-    rest(v_view_time)  # Display each pattern for fixed time (3 seconds)
-    clear()
-    # Force seed change even more
-    v_seed1 = v_seed1 + 13
-    v_seed2 = v_seed2 + 7 
-    v_seed3 = v_seed3 + 23
+# Procedure to draw a rainbow sweep from lower left to upper right
+def draw_rainbow_sweep_up_left {
+    begin_frame(true)  # Preserve mode to layer over previous content
+    # Subtle static background
+    draw_rectangle(0, 0, 64, 64, dark_gray, 20, true)
+    
+    # Draw diagonal rainbow lines from lower left to upper right
+    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
+        v_pos = v_i - v_t + 128  # Offset for position
+        v_color = (v_t + v_i) % 100  # Smooth color cycle
+        
+        # Starting at the bottom-left, we need diagonals that move up-right
+        # The positions should be like (0,63), (1,62), (2,61), etc.
+        # For lines, we need to calculate the slope and starting points
+        
+        # This line starts at (v_pos-64, 63) and goes to (v_pos, 63-(v_pos))
+        v_start_x = v_pos - 64
+        v_start_y = 63
+        v_end_x = v_pos
+        v_end_y = 63 - (v_pos - (v_pos - 64))  # Ensures proper diagonal slope
+        
+        # Only draw if any part of the line is in the visible region
+        if (v_start_x >= 0 and v_start_x < 64 and v_start_y >= 0 and v_start_y < 64) or
+           (v_end_x >= 0 and v_end_x < 64 and v_end_y >= 0 and v_end_y < 64) then
+            
+            # Clamp values to visible region
+            v_start_x = max(0, min(63, v_start_x))
+            v_start_y = max(0, min(63, v_start_y))
+            v_end_x = max(0, min(63, v_end_x))
+            v_end_y = max(0, min(63, v_end_y))
+            
+            draw_line(v_start_x, v_start_y, v_end_x, v_end_y, v_color, 100)
+        endif
+    endfor v_i
+    end_frame
+}
+
+# Procedure to draw a rainbow sweep from upper left to lower right
+def draw_rainbow_sweep_down_left {
+    begin_frame(true)  # Preserve mode to layer over previous content
+    # Subtle static background
+    draw_rectangle(0, 0, 64, 64, dark_gray, 20, true)
+    
+    # Draw diagonal rainbow lines from upper left to lower right
+    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
+        v_pos = v_i - v_t + 128  # Offset for position
+        v_color = (v_t + v_i) % 100  # Smooth color cycle
+        
+        # Starting at the upper-left, we need diagonals that move down-right
+        # The positions should be like (0,0), (1,1), (2,2), etc.
+        # For lines, we need to calculate the slope and starting points
+        
+        # This line starts at (v_pos-64, 0) and goes to (v_pos, v_pos-(v_pos-64))
+        v_start_x = v_pos - 64
+        v_start_y = 0
+        v_end_x = v_pos
+        v_end_y = v_pos - (v_pos - 64)  # Ensures proper diagonal slope
+        
+        # Only draw if any part of the line is in the visible region
+        if (v_start_x >= 0 and v_start_x < 64 and v_start_y >= 0 and v_start_y < 64) or
+           (v_end_x >= 0 and v_end_x < 64 and v_end_y >= 0 and v_end_y < 64) then
+            
+            # Clamp values to visible region
+            v_start_x = max(0, min(63, v_start_x))
+            v_start_y = max(0, min(63, v_start_y))
+            v_end_x = max(0, min(63, v_end_x))
+            v_end_y = max(0, min(63, v_end_y))
+            
+            draw_line(v_start_x, v_start_y, v_end_x, v_end_y, v_color, 100)
+        endif
+    endfor v_i
+    end_frame
+}
+
+# Main script
+
+# First animation: upper right to lower left
+v_t = 0
+while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
+    call draw_rainbow_sweep_down_right
+    v_t = v_t + 2  # Slower increment for smoother motion
+    throttle(0.8)  # Slightly faster execution to prevent backlog
+    rest(0.04)     # ~25 FPS for smooth animation
+endwhile
+
+# Move to next animation
+clear()
+rest(0.5)  # Short pause between animations
+
+# Second animation: lower right to upper left
+v_t = 0
+while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
+    call draw_rainbow_sweep_up_right
+    v_t = v_t + 2
+    throttle(0.8)
+    rest(0.04)
+endwhile
+
+# Move to next animation
+clear()
+rest(0.5)
+
+# Third animation: lower left to upper right
+v_t = 0
+while v_t < 384 then
+    call draw_rainbow_sweep_up_left
+    v_t = v_t + 2
+    throttle(0.8)
+    rest(0.04)
+endwhile
+
+# Move to next animation
+clear()
+rest(0.5)
+
+# Fourth animation: upper left to lower right
+v_t = 0
+while v_t < 384 then
+    call draw_rainbow_sweep_down_left
+    v_t = v_t + 2
+    throttle(0.8)
+    rest(0.04)
 endwhile
