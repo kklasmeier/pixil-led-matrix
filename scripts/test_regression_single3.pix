@@ -1,122 +1,139 @@
-throttle(.1)
-# Procedure to draw a rainbow sweep from upper right to lower left
-def draw_rainbow_sweep_down_right_to_left {
-    begin_frame(true)  # Preserve mode to layer over previous content
-    # Subtle static background
-    draw_rectangle(0, 0, 64, 64, dark_gray, 10, true)
+# Initialize variables
+v_running = 1
+v_center_x = 32
+v_center_y = 32
+
+# Configuration for polygon rotation probabilities (0-100%)
+v_tilt_chance = 20         # Chance for overall tilt (20%)
+v_ccw_twist_chance = 10    # Chance for counterclockwise twist (10%)
+v_cw_twist_chance = 10     # Chance for clockwise twist (10%)
+v_tilt_min = 1             # Minimum tilt angle
+v_tilt_max = 360           # Maximum tilt angle
+v_twist_amount = 1         # Degrees to twist per step (clockwise or counterclockwise)
+
+# Configuration for polygon burnout duration (0-100%)
+v_long_burnout_chance = 20 # Chance for 3000ms burnout (20%)
+v_short_burnout = 100      # Short burnout duration (ms)
+v_long_burnout = 3000      # Long burnout duration (ms)
+
+# Configuration for ripple echoes (0-100%)
+v_echo_chance = 100        # Chance for echo (100% for now, adjust as needed)
+v_echo_size_offset = 5     # Extra size for echo start
+v_echo_flicker_count = 2   # Number of flickers
+v_echo_intensity_mult = 0.5 # Initial intensity multiplier for echo
+v_echo_flicker_decay = 0.7 # Intensity decay per flicker
+v_echo_flicker_rest = 0.07 # Rest between flickers (seconds)
+
+# Color array
+create_array(v_colors, 8, string)
+v_colors[0] = "red"
+v_colors[1] = "orange"
+v_colors[2] = "yellow"
+v_colors[3] = "green"
+v_colors[4] = "cyan"
+v_colors[5] = "blue"
+v_colors[6] = "purple"
+v_colors[7] = "magenta"
+
+# Procedure to draw a single ripple with random attributes
+def draw_ripple {
+    v_shape = random(0, 4, 0)         # 0: circle, 1: square, 2: triangle, 3: pentagram, 4: hexagon
+    v_speed = random(1, 3, 0)         # Step size for expansion
+    v_max_size = random(20, 35, 0)    # Maximum ripple size
+    v_color_mode = random(0, 1, 0)    # 0: solid color, 1: rainbow
+    v_base_color = random(0, 7, 0)    # Index for solid color
+    v_intensity = random(50, 100, 0)  # Random intensity (higher base for visibility)
+    v_rotation = 0                    # Default rotation
+    v_rotation_mode = 0               # 0: none, 1: tilt, 2: ccw twist, 3: cw twist
+    v_burnout = v_short_burnout       # Default burnout duration
     
-    # Draw diagonal rainbow lines from upper right to lower left
-    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
-        v_x_start = v_i - v_t + 128  # Increased offset to ensure lines start fully off-screen
-        v_color = (v_t + v_i) % 100  # Smooth color cycle
-        # Only draw lines within or entering the visible area
-        if v_x_start <= 64 and v_x_start + 64 >= 0 then
-            v_x1 = max(0, v_x_start)
-            v_y1 = max(0, 64 - (v_x_start + 64))
-            v_x2 = min(64, v_x_start + 64)
-            v_y2 = min(64, 64 - v_x_start)
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
+    # Determine rotation mode and burnout for polygons (v_shape 2, 3, 4)
+    if v_shape > 1 then
+        v_rand = random(0, 99, 0)     # 0-99 for percentage checks
+        if v_rand < v_tilt_chance then
+            v_rotation_mode = 1       # 20% chance for tilt
+            v_rotation = random(v_tilt_min, v_tilt_max, 0)  # Set initial tilt
+        elseif v_rand < v_tilt_chance + v_ccw_twist_chance then
+            v_rotation_mode = 2       # 10% chance for counterclockwise twist
+        elseif v_rand < v_tilt_chance + v_ccw_twist_chance + v_cw_twist_chance then
+            v_rotation_mode = 3       # 10% chance for clockwise twist
         endif
-    endfor v_i
-    end_frame
+        
+        # Determine burnout duration for polygons
+        v_burnout_rand = random(0, 99, 0)
+        if v_burnout_rand < v_long_burnout_chance then
+            v_burnout = v_long_burnout  # 20% chance for 3000ms
+        else
+            v_burnout = v_short_burnout # 80% chance for 100ms
+        endif
+    endif
+    
+    # Expansion loop
+    for v_size in (5, v_max_size, v_speed)
+        v_current_intensity = v_intensity - (v_size * 2)  # Fade as it expands
+        if v_current_intensity < 20 then
+            v_current_intensity = 20
+        endif
+        
+        # Rainbow mode: cycle colors; Solid mode: use base color
+        if v_color_mode == 1 then
+            v_color_idx = (v_size / 5) % 8
+        else
+            v_color_idx = v_base_color
+        endif
+        
+        # Update rotation for twisting modes
+        if v_rotation_mode == 2 then
+            v_rotation = v_rotation - v_twist_amount  # Counterclockwise twist
+        elseif v_rotation_mode == 3 then
+            v_rotation = v_rotation + v_twist_amount  # Clockwise twist
+        endif
+        
+        # Draw main shape
+        if v_shape == 0 then
+            draw_circle(v_center_x, v_center_y, v_size, v_colors[v_color_idx], v_current_intensity, false, 100)
+        elseif v_shape == 1 then
+            draw_rectangle(v_center_x - v_size, v_center_y - v_size, v_size * 2, v_size * 2, v_colors[v_color_idx], v_current_intensity, false, 100)
+        elseif v_shape == 2 then
+            draw_polygon(v_center_x, v_center_y, v_size, 3, v_colors[v_color_idx], v_current_intensity, v_rotation, false, v_burnout)
+        elseif v_shape == 3 then
+            draw_polygon(v_center_x, v_center_y, v_size, 5, v_colors[v_color_idx], v_current_intensity, v_rotation, false, v_burnout)
+        else
+            draw_polygon(v_center_x, v_center_y, v_size, 6, v_colors[v_color_idx], v_current_intensity, v_rotation, false, v_burnout)
+        endif
+        
+        # Ripple echo with flicker at max size
+        if v_size >= v_max_size then
+            v_echo_rand = random(0, 99, 0)
+            if v_echo_rand < v_echo_chance then
+                v_echo_size = v_max_size + v_echo_size_offset
+                v_echo_intensity = v_current_intensity * v_echo_intensity_mult
+                for v_flicker in (0, v_echo_flicker_count, 1)
+                    if v_shape == 0 then
+                        draw_circle(v_center_x, v_center_y, v_echo_size, v_colors[v_color_idx], v_echo_intensity, false, 50)
+                    elseif v_shape == 1 then
+                        draw_rectangle(v_center_x - v_echo_size, v_center_y - v_echo_size, v_echo_size * 2, v_echo_size * 2, v_colors[v_color_idx], v_echo_intensity, false, 50)
+                    elseif v_shape == 2 then
+                        draw_polygon(v_center_x, v_center_y, v_echo_size, 3, v_colors[v_color_idx], v_echo_intensity, v_rotation, false, 50)
+                    elseif v_shape == 3 then
+                        draw_polygon(v_center_x, v_center_y, v_size, 5, v_colors[v_color_idx], v_echo_intensity, v_rotation, false, 50)
+                    else
+                        draw_polygon(v_center_x, v_center_y, v_echo_size, 6, v_colors[v_color_idx], v_echo_intensity, v_rotation, false, 50)
+                    endif
+                    v_echo_intensity = v_echo_intensity * v_echo_flicker_decay  # Fade each flicker
+                    rest(v_echo_flicker_rest)
+                endfor v_flicker
+            endif
+        endif
+        
+        # Short rest for smooth ripple effect
+        rest(0.03)
+    endfor v_size
 }
 
-# Procedure to draw a rainbow sweep from lower right to upper left
-def draw_rainbow_sweep_up_right_to_left {
-    begin_frame(true)  # Preserve mode to layer over previous content
-    # Subtle static background
-    draw_rectangle(0, 0, 64, 64, dark_gray, 10, true)
-    
-    # Draw diagonal rainbow lines from lower right to upper left
-    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
-        v_x_start = v_i - v_t + 128  # Offset to start from lower right
-        v_color = (v_t + v_i) % 100  # Smooth color cycle
-        # Only draw lines within or entering the visible area
-        if v_x_start <= 64 and v_x_start + 64 >= 0 then
-            # Reverse the y-coordinates to go from bottom to top
-            v_x1 = max(0, v_x_start)
-            v_y1 = min(64, v_x_start + 64)  # Reversed y calculation
-            v_x2 = min(64, v_x_start + 64)
-            v_y2 = max(0, v_x_start)        # Reversed y calculation
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
-        endif
-    endfor v_i
-    end_frame
-}
-
-# Procedure to draw a rainbow sweep from lower left to upper right
-def draw_rainbow_sweep_up_left_to_right {
-    begin_frame(true)  # Preserve mode to layer over previous content
-    # Subtle static background
-    draw_rectangle(0, 0, 64, 64, dark_gray, 10, true)
-    
-    # Draw diagonal rainbow lines from upper right to lower left
-    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
-        v_x_start = v_i - v_t + 128  # Increased offset to ensure lines start fully off-screen
-        v_color = (v_t + v_i) % 100  # Smooth color cycle
-        # Only draw lines within or entering the visible area
-        if v_x_start <= 64 and v_x_start + 64 >= 0 then
-            v_x1 = max(0, 64 - (v_x_start + 64))
-            v_y1 = max(0, v_x_start)
-            v_x2 = min(64, 64 - v_x_start)
-            v_y2 = min(64, v_x_start + 64)
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
-        endif
-    endfor v_i
-    end_frame
-}
-
-# Procedure to draw a rainbow sweep from upper left to lower right
-def draw_rainbow_sweep_down_left_to_right {
-    begin_frame(true)  # Preserve mode to layer over previous content
-    # Subtle static background
-    draw_rectangle(0, 0, 64, 64, dark_gray, 10, true)
-    
-    # Draw diagonal rainbow lines from upper left to lower right
-    for v_i in (0, 128, 4)  # 128 covers full sweep across grid
-        v_x_start = v_i + v_t - 128  # Using -128 to match other procedures
-        v_color = (v_t + v_i) % 100  # Smooth color cycle
-        # Only draw lines within or entering the visible area
-        if v_x_start <= 128 and v_x_start >= -64 then
-            v_x1 = min(63, max(0, v_x_start))
-            v_y1 = max(0, v_x_start - 63)
-            v_x2 = max(0, v_x_start - 63)
-            v_y2 = min(63, max(0, v_x_start))
-            draw_line(v_x1, v_y1, v_x2, v_y2, v_color, 100)
-        endif
-    endfor v_i
-    end_frame
-}
-
-
-# Main script
-while true then
-    v_x = 1
-    # Fourth animation: Upper right to lower left
-    v_t = 0
-    while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
-        call draw_rainbow_sweep_down_left_to_right
-        v_t = v_t + 1
-    endwhile
-
-    # First animation: upper right to lower left
-    v_t = 0
-    while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
-        call draw_rainbow_sweep_down_right_to_left
-        v_t = v_t + 1  # Slower increment for smoother motion
-    endwhile
-
-    # Second animation: lower right to upper left
-    v_t = 0
-    while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
-        call draw_rainbow_sweep_up_right_to_left
-        v_t = v_t + 1
-    endwhile
-
-    # Third animation: lower left to upper right
-    v_t = 0
-    while v_t < 384 then  # Ensures full sweep from off-screen to off-screen
-        call draw_rainbow_sweep_up_left_to_right
-        v_t = v_t + 1
-    endwhile
+# Main infinite loop
+throttle(0.5)  # Faster execution for continuous ripples
+while v_running == 1 then
+    call draw_ripple
+    rest(0.1)  # Brief pause between ripples
 endwhile
