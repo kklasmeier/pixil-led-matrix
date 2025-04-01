@@ -926,3 +926,4 @@ Here are descriptive titles for your Pixil scripts:
 74. Wave Grid - Undulating coordinate mesh animation
 75. Wormhole - Space-time tunnel visualization
 76. Rainbow Sweep - Sweeps in rainbows diangnally across the matrix from all 4 corners
+78. Polygon Zoom - Differnet centered polygon shapes sooming out at you.
