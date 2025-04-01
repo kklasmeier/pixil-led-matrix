@@ -255,7 +255,5 @@ while 1 == 1 then
     
     # Display the frame
     end_frame
-    
-    # Control animation speed
-    rest(0.03)
+
 endwhile
