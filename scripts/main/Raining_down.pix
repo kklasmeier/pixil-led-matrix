@@ -1,11 +1,11 @@
-# Raindrop simulation (top-down view with extended depth)
-# Drops fall with subtle tapering, then fade slowly at the end
-
+# Raindrop simulation (top-down view with subtle tapering and logarithmic fade)
+# Drops spawn randomly, taper slightly inward, and fade with a slowing taper
+throttle(0)
 # Initialize variables
 v_max_drops = 20          # Number of simultaneous raindrops
-v_drop_height = 12         # Steps for drop to "fall" (original fast rate)
+v_drop_height = 6         # Steps for drop to "fall" (keeps natural rate)
 v_base_intensity = 100    # Starting intensity (closest to viewer)
-v_fade_step = 10          # Intensity decrease per step during fall
+v_min_intensity = 0       # Target minimum intensity
 v_spawn_rate = 0.15       # Seconds between frame updates
 v_center_x = 32           # Reference x-coordinate for subtle tapering
 v_center_y = 32           # Reference y-coordinate for subtle tapering
@@ -16,7 +16,6 @@ create_array(v_drop_y, v_max_drops)       # Current Y coordinates
 create_array(v_start_x, v_max_drops)      # Starting X coordinates
 create_array(v_start_y, v_max_drops)      # Starting Y coordinates
 create_array(v_drop_z, v_max_drops)       # Current "height" of drop
-create_array(v_intensity, v_max_drops)    # Current intensity (for fading phase)
 create_array(v_drop_active, v_max_drops)  # 1 = active, 0 = inactive
 
 # Initialize all drops as inactive
@@ -29,7 +28,8 @@ while true then
     
     # Begin frame in standard mode (false) to clear previous content
     begin_frame(false)
-    draw_rectangle(0,0, 63, 63, blue, 1)
+    draw_rectangle(0, 0, 64, 64, blue, 2, true)
+
     # Attempt to spawn a new raindrop
     v_spawned = 0
     for v_i in (0, v_max_drops - 1, 1)
@@ -39,7 +39,6 @@ while true then
             v_drop_x[v_i] = v_start_x[v_i]        # Current X starts at spawn point
             v_drop_y[v_i] = v_start_y[v_i]        # Current Y starts at spawn point
             v_drop_z[v_i] = v_drop_height         # Start at max height
-            v_intensity[v_i] = v_base_intensity   # Start at full intensity
             v_drop_active[v_i] = 1                # Activate drop
             v_spawned = 1                         # Mark that we spawned one
         endif
@@ -48,33 +47,36 @@ while true then
     # Update and draw all active drops
     for v_i in (0, v_max_drops - 1, 1)
         if v_drop_active[v_i] == 1 then
-            # Falling phase (z > 1): taper and reduce intensity
-            if v_drop_z[v_i] > 1 then
-                # Calculate current intensity based on height
-                v_intensity[v_i] = v_base_intensity - (v_drop_height - v_drop_z[v_i]) * v_fade_step
-                
-                # Subtle tapering toward center (reduced effect)
-                v_step = v_drop_height - v_drop_z[v_i]  # Current step (0 to v_drop_height - 1)
-                v_x_diff = (v_center_x - v_start_x[v_i]) * v_step / (v_drop_height * 3)
-                v_y_diff = (v_center_y - v_start_y[v_i]) * v_step / (v_drop_height * 3)
-                v_drop_x[v_i] = v_start_x[v_i] + v_x_diff  # Move slightly toward center X
-                v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
-                
-                # Update height
-                v_drop_z[v_i] = v_drop_z[v_i] - 1
-            else
-                # Fading phase (z <= 1): hold position, reduce intensity by 1
-                if v_intensity[v_i] > 0 then
-                    v_intensity[v_i] = v_intensity[v_i] - 1
-                endif
-                # Deactivate when intensity reaches 0
-                if v_intensity[v_i] <= 0 then
-                    v_drop_active[v_i] = 0
-                endif
+            # Logarithmic fade: faster drop from 100 to 40, slower from 40 to 0
+            v_progress = (v_drop_height - v_drop_z[v_i]) / v_drop_height  # 0 to 1 as it falls
+            v_log_factor = log(v_progress + 1) / log(2)  # Normalized log (0 to 1)
+            v_intensity = v_base_intensity - (v_base_intensity - v_min_intensity) * v_log_factor
+            
+            # Ensure intensity stays within bounds (0-100)
+            if v_intensity < 0 then
+                v_intensity = 0
+            endif
+            if v_intensity > 100 then
+                v_intensity = 100
             endif
             
+            # Subtle tapering toward center (reduced effect)
+            v_step = v_drop_height - v_drop_z[v_i]  # Current step (0 to v_drop_height)
+            v_x_diff = (v_center_x - v_start_x[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper
+            v_y_diff = (v_center_y - v_start_y[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper
+            v_drop_x[v_i] = v_start_x[v_i] + v_x_diff  # Move slightly toward center X
+            v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
+            
             # Draw the drop as a single pixel without burnout
-            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity[v_i])
+            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity)
+            
+            # Update drop height
+            v_drop_z[v_i] = v_drop_z[v_i] - 1
+            
+            # Deactivate drop when it reaches the "ground"
+            if v_drop_z[v_i] <= 0 then
+                v_drop_active[v_i] = 0
+            endif
         endif
     endfor v_i
     

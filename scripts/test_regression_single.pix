@@ -1,261 +1,78 @@
-# 3D Rotating Asterisk
-# A 3D star with 6 spokes that rotates through different patterns
+# Raindrop simulation (top-down view with subtle tapering)
+# Drops spawn randomly, taper slightly inward, and fade as they fall using plots
 
-# Constants for center of display
-v_center_x = 32
-v_center_y = 32
+# Initialize variables
+v_max_drops = 20          # Number of simultaneous raindrops
+v_drop_height = 6         # Steps for drop to "fall"
+v_base_intensity = 100    # Starting intensity (closest to viewer)
+v_fade_step = 15          # Intensity decrease per step
+v_spawn_rate = 0.15       # Seconds between frame updates
+v_center_x = 32           # Reference x-coordinate for subtle tapering
+v_center_y = 32           # Reference y-coordinate for subtle tapering
 
-# Star properties 
-v_num_spokes = 6 
-v_base_spoke_length = 25 
-v_min_spoke_length = 10  # More noticeable minimum 
-v_max_spoke_length = 25  # More noticeable maximum 
-v_spoke_length = v_base_spoke_length 
-v_pulse_rate = 0.1     # Faster pulse rate 
-v_pulse_angle = 0
-v_pulse_active = 0     # Flag to track if pulsing is active (0=off, 1=on)
+# Create arrays to track drop positions and states
+create_array(v_drop_x, v_max_drops)       # Current X coordinates
+create_array(v_drop_y, v_max_drops)       # Current Y coordinates
+create_array(v_start_x, v_max_drops)      # Starting X coordinates
+create_array(v_start_y, v_max_drops)      # Starting Y coordinates
+create_array(v_drop_z, v_max_drops)       # Current "height" of drop
+create_array(v_drop_active, v_max_drops)  # 1 = active, 0 = inactive
 
-# Rotation variables
-v_angle_x = 0
-v_angle_y = 0
-v_angle_z = 0
-v_speed_x = 0.05
-v_speed_y = 0.05
-v_rotation_mode = 1
-v_mode_timer = 0
-v_mode_duration = 200
-v_transition = 0
-v_transition_length = 20
-v_prev_mode = 1
+# Initialize all drops as inactive
+for v_i in (0, v_max_drops - 1, 1)
+    v_drop_active[v_i] = 0
+endfor v_i
 
-# Target angles for smooth transitioning
-v_target_speed_x = v_speed_x
-v_target_speed_y = 0
-v_current_speed_x = v_target_speed_x
-v_current_speed_y = v_target_speed_y
-
-# Color variables
-v_base_color = 50
-v_color_timer = 0
-v_color_change_rate = 150
-
-# Create arrays for 3D points
-create_array(v_x_3d, v_num_spokes * 2)
-create_array(v_y_3d, v_num_spokes * 2)
-create_array(v_z_3d, v_num_spokes * 2)
-create_array(v_x_2d, v_num_spokes * 2)
-create_array(v_y_2d, v_num_spokes * 2)
-create_array(v_z_2d, v_num_spokes * 2)
-
-# Generate the initial star points in 3D space
-# We create points at both ends of each spoke
-v_angle_step = 2 * pi / v_num_spokes
-v_angle = 0
-
-# Regenerate 3D points for each frame to apply pulsing
-def regenerate_points {
-    v_angle = 0
-    for v_i in (0, v_num_spokes - 1, 1)
-        # First point of spoke (positive direction)
-        v_x_3d[v_i * 2] = cos(v_angle) * v_spoke_length
-        v_y_3d[v_i * 2] = sin(v_angle) * v_spoke_length
-        # We alternate Z axis position for more interesting 3D effect
-        v_z_3d[v_i * 2] = sin(v_angle * 2) * v_spoke_length
-        
-        # Second point of spoke (negative direction)
-        v_x_3d[v_i * 2 + 1] = -v_x_3d[v_i * 2]
-        v_y_3d[v_i * 2 + 1] = -v_y_3d[v_i * 2]
-        v_z_3d[v_i * 2 + 1] = -v_z_3d[v_i * 2]
-        
-        v_angle = v_angle + v_angle_step
+# Main loop (runs forever)
+while true then
+    
+    # Begin frame in preserve mode to layer drops
+    begin_frame(false)
+    
+    # Attempt to spawn a new raindrop
+    v_spawned = 0
+    for v_i in (0, v_max_drops - 1, 1)
+        if v_drop_active[v_i] == 0 and v_spawned == 0 and random(0, 1, 1) > 0.7 then
+            v_start_x[v_i] = random(0, 63, 0)    # Random starting X
+            v_start_y[v_i] = random(0, 63, 0)    # Random starting Y
+            v_drop_x[v_i] = v_start_x[v_i]        # Current X starts at spawn point
+            v_drop_y[v_i] = v_start_y[v_i]        # Current Y starts at spawn point
+            v_drop_z[v_i] = v_drop_height         # Start at max height
+            v_drop_active[v_i] = 1                # Activate drop
+            v_spawned = 1                         # Mark that we spawned one
+        endif
     endfor v_i
-}
 
-# Initialize the 3D points
-call regenerate_points
+    # Update and draw all active drops
+    for v_i in (0, v_max_drops - 1, 1)
 
-# Main animation loop
-while 1 == 1 then
-    # Clear the display for this frame
-    begin_frame
-    
-    # Update color cycling
-    v_color_timer = v_color_timer + 1
-    if v_color_timer >= v_color_change_rate then
-        v_base_color = v_base_color + 10
-        if v_base_color > 90 then
-            v_base_color = 10
-        endif
-        v_color_timer = 0
-    endif
-    
-    # Update spoke length for pulse effect (only if pulsing is active)
-    if v_pulse_active == 1 then
-        v_pulse_angle = v_pulse_angle + v_pulse_rate
-        if v_pulse_angle >= 2 * pi then
-            v_pulse_angle = v_pulse_angle - 2 * pi
-        endif
-        v_pulse_factor = (sin(v_pulse_angle) + 1) / 2  # Normalized to 0-1 range
-        v_spoke_length = v_min_spoke_length + (v_max_spoke_length - v_min_spoke_length) * v_pulse_factor
-        
-        # Regenerate 3D points with updated spoke length
-        call regenerate_points
-    endif
-    
-    # Update rotation mode
-    v_mode_timer = v_mode_timer + 1
-    if v_mode_timer >= v_mode_duration then
-        v_prev_mode = v_rotation_mode
-        v_rotation_mode = v_rotation_mode + 1
-        if v_rotation_mode > 4 then
-            v_rotation_mode = 1
-        endif
-        v_mode_timer = 0
-        v_transition = v_transition_length
-        
-        # Determine if pulsing should be active for this mode
-        # Pulsing is active only for mode 3 (every 3rd mode)
-        if v_rotation_mode == 3 then
-            v_pulse_active = 1
-        else
-            v_pulse_active = 0
-            # Reset to base spoke length when turning off pulsing
-            v_spoke_length = v_base_spoke_length
-            call regenerate_points
-        endif
-    endif
-    
-    # Handle smooth transitions between modes
-    if v_transition > 0 then
-        v_transition = v_transition - 1
-        
-        # Set target speeds based on new mode
-        if v_rotation_mode == 1 then
-            # X axis rotation only
-            v_target_speed_x = v_speed_x
-            v_target_speed_y = 0
-        elseif v_rotation_mode == 2 then
-            # Y axis rotation only
-            v_target_speed_x = 0
-            v_target_speed_y = v_speed_y
-        elseif v_rotation_mode == 3 then
-            # Both axes, X faster
-            v_target_speed_x = v_speed_x * 1.5
-            v_target_speed_y = v_speed_y * 0.7
-        else
-            # Both axes, Y faster
-            v_target_speed_x = v_speed_x * 0.7
-            v_target_speed_y = v_speed_y * 1.5
-        endif
-        
-        # Gradually adjust current speeds toward target speeds
-        v_transition_factor = v_transition / v_transition_length
-        v_current_speed_x = v_target_speed_x * (1 - v_transition_factor)
-        
-        # Use previous mode's speeds weighted by transition factor
-        if v_prev_mode == 1 then
-            v_current_speed_x = v_current_speed_x + v_speed_x * v_transition_factor
-            v_current_speed_y = v_target_speed_y * (1 - v_transition_factor)
-        elseif v_prev_mode == 2 then
-            v_current_speed_x = v_current_speed_x
-            v_current_speed_y = v_target_speed_y * (1 - v_transition_factor) + v_speed_y * v_transition_factor
-        elseif v_prev_mode == 3 then
-            v_current_speed_x = v_current_speed_x + (v_speed_x * 1.5) * v_transition_factor
-            v_current_speed_y = v_target_speed_y * (1 - v_transition_factor) + (v_speed_y * 0.7) * v_transition_factor
-        else
-            v_current_speed_x = v_current_speed_x + (v_speed_x * 0.7) * v_transition_factor
-            v_current_speed_y = v_target_speed_y * (1 - v_transition_factor) + (v_speed_y * 1.5) * v_transition_factor
-        endif
-    else
-        # Not in transition, use target speeds directly
-        v_current_speed_x = v_target_speed_x
-        v_current_speed_y = v_target_speed_y
-    endif
-    
-    # Update rotation angles using current speeds
-    v_angle_x = v_angle_x + v_current_speed_x
-    v_angle_y = v_angle_y + v_current_speed_y
-    
-    # Apply 3D rotations and perspective projection
-    for v_i in (0, v_num_spokes * 2 - 1, 1)
-        # Get the original 3D point
-        v_x = v_x_3d[v_i]
-        v_y = v_y_3d[v_i]
-        v_z = v_z_3d[v_i]
-        
-        # Apply X-axis rotation
-        v_y2 = v_y * cos(v_angle_x) - v_z * sin(v_angle_x)
-        v_z2 = v_y * sin(v_angle_x) + v_z * cos(v_angle_x)
-        v_y = v_y2
-        v_z = v_z2
-        
-        # Apply Y-axis rotation
-        v_x2 = v_x * cos(v_angle_y) + v_z * sin(v_angle_y)
-        v_z2 = -v_x * sin(v_angle_y) + v_z * cos(v_angle_y)
-        v_x = v_x2
-        v_z = v_z2
-        
-        # Store the rotated 3D points
-        v_x_2d[v_i] = v_x
-        v_y_2d[v_i] = v_y
-        v_z_2d[v_i] = v_z
-    endfor v_i
-    
-    # Create arrays for storing Z-order and indices
-    create_array(v_z_order, v_num_spokes * 2)
-    create_array(v_indices, v_num_spokes * 2)
-    
-    # Initialize arrays for Z-ordering
-    for v_i in (0, v_num_spokes * 2 - 1, 1)
-        v_z_order[v_i] = v_z_2d[v_i]
-        v_indices[v_i] = v_i
-    endfor v_i
-    
-    # Simple bubble sort to order spokes by Z value (back to front)
-    for v_i in (0, v_num_spokes * 2 - 2, 1)
-        for v_j in (v_i + 1, v_num_spokes * 2 - 1, 1)
-            if v_z_order[v_i] > v_z_order[v_j] then
-                # Swap Z values
-                v_temp = v_z_order[v_i]
-                v_z_order[v_i] = v_z_order[v_j]
-                v_z_order[v_j] = v_temp
-                
-                # Swap indices
-                v_temp = v_indices[v_i]
-                v_indices[v_i] = v_indices[v_j]
-                v_indices[v_j] = v_temp
+        if v_drop_active[v_i] == 1 then
+            # Calculate current intensity based on height
+            v_intensity = v_base_intensity - (v_drop_height - v_drop_z[v_i]) * v_fade_step
+            
+            # Subtle tapering toward center (reduced effect)
+            v_step = v_drop_height - v_drop_z[v_i]  # Current step (0 to v_drop_height)
+            v_x_diff = (v_center_x - v_start_x[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper (div by 3)
+            v_y_diff = (v_center_y - v_start_y[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper (div by 3)
+            v_drop_x[v_i] = v_start_x[v_i] + v_x_diff  # Move slightly toward center X
+            v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
+            
+            # Draw the drop as a single pixel
+            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity)
+            
+            # Update drop height
+            v_drop_z[v_i] = v_drop_z[v_i] - 1
+            
+            # Deactivate drop when it reaches the "ground"
+            if v_drop_z[v_i] <= 0 then
+                v_drop_active[v_i] = 0
             endif
-        endfor v_j
+        endif
     endfor v_i
     
-    # Draw lines for each spoke in sorted order (back to front)
-    for v_idx in (0, v_num_spokes * 2 - 1, 1)
-        # Get the actual index from our sorted array
-        v_i = v_indices[v_idx]
-        
-        # Calculate color intensity based on Z position - enhanced for stronger 3D effect
-        # Points with positive Z are in front (brighter), negative Z are behind (dimmer)
-        v_intensity = 30 + (v_z_2d[v_i]) * 70 / v_spoke_length
-        
-        # Ensure intensity stays within valid range (1-100)
-        if v_intensity < 10 then
-            v_intensity = 10
-        elseif v_intensity > 100 then
-            v_intensity = 100
-        endif
-        
-        # Apply perspective projection for this endpoint
-        v_perspective = 200 / (200 + v_z_2d[v_i])
-        v_x = v_center_x + v_x_2d[v_i] * v_perspective
-        v_y = v_center_y + v_y_2d[v_i] * v_perspective
-        
-        # Draw line from center to endpoint
-        draw_line(v_center_x, v_center_y, v_x, v_y, v_base_color, v_intensity)
-    endfor v_idx
-    
-    # Display the frame
+    # End frame to display all drops at once
     end_frame
     
-    # Control animation speed
-    rest(0.03)
+    # Control frame rate
+    #rest(v_spawn_rate)
 endwhile
