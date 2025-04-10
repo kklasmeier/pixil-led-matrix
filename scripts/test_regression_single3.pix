@@ -1,86 +1,126 @@
-# Raindrop simulation (top-down view with extended depth)
-# Drops fall with subtle tapering, then fade slowly at the end
+# Wobbling Cylinder Animation with Color Transitions and Rotation
+# Displays a 3D wireframe cylinder with the top wobbling in a counter-clockwise motion
+# Colors transition smoothly over time for the entire shape
+# The entire shape slowly rotates counter-clockwise
+# Runs infinitely until stopped
 
-# Initialize variables
-v_max_drops = 20          # Number of simultaneous raindrops
-v_drop_height = 12         # Steps for drop to "fall" (original fast rate)
-v_base_intensity = 100    # Starting intensity (closest to viewer)
-v_fade_step = 10          # Intensity decrease per step during fall
-v_spawn_rate = 0.15       # Seconds between frame updates
-v_center_x = 32           # Reference x-coordinate for subtle tapering
-v_center_y = 32           # Reference y-coordinate for subtle tapering
+# Clear display at the start
+clear()
 
-# Create arrays to track drop positions and states
-create_array(v_drop_x, v_max_drops)       # Current X coordinates
-create_array(v_drop_y, v_max_drops)       # Current Y coordinates
-create_array(v_start_x, v_max_drops)      # Starting X coordinates
-create_array(v_start_y, v_max_drops)      # Starting Y coordinates
-create_array(v_drop_z, v_max_drops)       # Current "height" of drop
-create_array(v_intensity, v_max_drops)    # Current intensity (for fading phase)
-create_array(v_drop_active, v_max_drops)  # 1 = active, 0 = inactive
+# Set up variables for cylinder position and dimensions
+v_center_x = 32       # Center X position
+v_center_y = 50       # Center Y position
+v_radius = 15         # Radius of the cylinder
+v_base_height = 40    # Base height of the cylinder
+v_sides = 5           # Number of sides for our polygon cylinder
+v_top_squish = 0.4    # Vertical squish factor for perspective (top ellipse)
+v_base_rotation = 20  # Initial rotation in degrees
+v_shade_rotation = 90 # Additional rotation for shading calculation
 
-# Initialize all drops as inactive
-for v_i in (0, v_max_drops - 1, 1)
-    v_drop_active[v_i] = 0
-endfor v_i
+# Animation parameters
+v_wobble_amount = 8   # Maximum height variation amount (consistent for all sides)
+v_wobble_speed = 3    # Speed of the wobbling animation (degrees per frame)
+v_color_speed = 0.5   # Speed of color transition
+v_rot_speed = 0.05    # Speed of overall rotation (degrees per frame) - reduced for smoother motion
+v_frame = 0           # Frame counter for infinite animation
 
-# Main loop (runs forever)
-while true then
+# Create arrays to store the polygon points and depths
+create_array(v_top_x, v_sides)
+create_array(v_top_y, v_sides)
+create_array(v_bottom_x, v_sides)
+create_array(v_bottom_y, v_sides)
+create_array(v_heights, v_sides)    # Array to store current height of each side
+create_array(v_depth, v_sides)      # For storing depth values
+create_array(v_draw_order, v_sides) # For storing draw order
+
+# Set bottom Y position (remains constant)
+v_bottom_y_pos = v_center_y + v_base_height/4  # Positioned more toward bottom of screen
+
+# Main animation loop - runs infinitely
+while 1 == 1 then
+    # Calculate current wobble phase (counter-clockwise rotation)
+    v_phase = v_frame * v_wobble_speed
     
-    # Begin frame in standard mode (false) to clear previous content
-    begin_frame(false)
-    draw_rectangle(0,0, 63, 63, blue, 1)
-    # Attempt to spawn a new raindrop
-    v_spawned = 0
-    for v_i in (0, v_max_drops - 1, 1)
-        if v_drop_active[v_i] == 0 and v_spawned == 0 and random(0, 1, 1) > 0.7 then
-            v_start_x[v_i] = random(0, 63, 0)    # Random starting X
-            v_start_y[v_i] = random(0, 63, 0)    # Random starting Y
-            v_drop_x[v_i] = v_start_x[v_i]        # Current X starts at spawn point
-            v_drop_y[v_i] = v_start_y[v_i]        # Current Y starts at spawn point
-            v_drop_z[v_i] = v_drop_height         # Start at max height
-            v_intensity[v_i] = v_base_intensity   # Start at full intensity
-            v_drop_active[v_i] = 1                # Activate drop
-            v_spawned = 1                         # Mark that we spawned one
-        endif
+    # Calculate overall rotation of the shape (counter-clockwise)
+    v_rotation = v_base_rotation - v_frame * v_rot_speed  # Negative for counter-clockwise
+    
+    # Calculate color for this frame (cycling through 10-90)
+    v_color_value = 10 + (sin(radians(v_frame * v_color_speed)) * 0.5 + 0.5) * 80
+    
+    # Calculate the polygon points for this frame
+    for v_i in (0, v_sides - 1, 1)
+        # Calculate the angle for this vertex (including rotation)
+        v_angle = v_i * (360 / v_sides) + v_rotation
+        
+        # Convert angle to radians for the trig functions
+        v_rad = radians(v_angle)
+        
+        # Calculate wobble effect for this side (counter-clockwise)
+        v_wobble_phase = radians(v_angle - v_phase)
+        v_height_mod = v_wobble_amount * (cos(v_wobble_phase) - 0.5) * 2 
+        v_heights[v_i] = v_base_height + v_height_mod
+        
+        # Calculate coordinates for bottom face (fixed, never moves)
+        v_bottom_x[v_i] = v_center_x + cos(v_rad) * v_radius
+        v_bottom_y[v_i] = v_bottom_y_pos  # Fixed Y position for bottom
+        
+        # Calculate coordinates for top face with wobble effect
+        v_top_x[v_i] = v_center_x + cos(v_rad) * v_radius
+        # Top y position changes based on the current height of this side
+        v_top_y[v_i] = v_bottom_y[v_i] - v_heights[v_i] + sin(v_rad) * v_radius * v_top_squish
+        
+        # Calculate depth value using the shading rotation angle
+        v_shade_angle = v_i * (360 / v_sides) + v_rotation + v_shade_rotation
+        v_shade_rad = radians(v_shade_angle)
+        v_depth[v_i] = sin(v_shade_rad + radians(90)) * 0.5 + 0.5
+        
+        # Store original index for sorting
+        v_draw_order[v_i] = v_i
     endfor v_i
     
-    # Update and draw all active drops
-    for v_i in (0, v_max_drops - 1, 1)
-        if v_drop_active[v_i] == 1 then
-            # Falling phase (z > 1): taper and reduce intensity
-            if v_drop_z[v_i] > 1 then
-                # Calculate current intensity based on height
-                v_intensity[v_i] = v_base_intensity - (v_drop_height - v_drop_z[v_i]) * v_fade_step
-                
-                # Subtle tapering toward center (reduced effect)
-                v_step = v_drop_height - v_drop_z[v_i]  # Current step (0 to v_drop_height - 1)
-                v_x_diff = (v_center_x - v_start_x[v_i]) * v_step / (v_drop_height * 3)
-                v_y_diff = (v_center_y - v_start_y[v_i]) * v_step / (v_drop_height * 3)
-                v_drop_x[v_i] = v_start_x[v_i] + v_x_diff  # Move slightly toward center X
-                v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
-                
-                # Update height
-                v_drop_z[v_i] = v_drop_z[v_i] - 1
-            else
-                # Fading phase (z <= 1): hold position, reduce intensity by 1
-                if v_intensity[v_i] > 0 then
-                    v_intensity[v_i] = v_intensity[v_i] - 1
-                endif
-                # Deactivate when intensity reaches 0
-                if v_intensity[v_i] <= 0 then
-                    v_drop_active[v_i] = 0
-                endif
+    # Sort sides from back to front based on depth
+    for v_i in (0, v_sides - 2, 1)
+        for v_j in (0, v_sides - 2 - v_i, 1)
+            if v_depth[v_draw_order[v_j]] > v_depth[v_draw_order[v_j + 1]] then
+                # Swap
+                v_temp = v_draw_order[v_j]
+                v_draw_order[v_j] = v_draw_order[v_j + 1]
+                v_draw_order[v_j + 1] = v_temp
             endif
-            
-            # Draw the drop as a single pixel without burnout
-            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity[v_i])
-        endif
+        endfor v_j
     endfor v_i
     
-    # End frame to display all drops at once
+    # Begin drawing this frame
+    begin_frame
+        
+        # Draw from back to front based on sorted order
+        for v_idx in (0, v_sides - 1, 1)
+            # Get the actual side index
+            v_i = v_draw_order[v_idx]
+            v_next = (v_i + 1) % v_sides
+            
+            # Calculate intensity based on depth
+            v_intensity = 30 + v_depth[v_i] * 70
+            
+            # Draw vertical line for this side
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_i], v_bottom_y[v_i], v_color_value, v_intensity)
+            
+            # Draw top and bottom edges for this side
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_color_value, v_intensity)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_color_value, v_intensity)
+        endfor v_idx
+        
     end_frame
     
-    # Control frame rate
-    #rest(v_spawn_rate)
+    # Increment frame counter
+    v_frame = v_frame + 1
+    
+    # Reset frame counter if it gets too large to prevent overflow
+    if v_frame > 10000 then
+        v_frame = 0
+    endif
+    
 endwhile
+
+# This point is never reached due to infinite loop
+clear()

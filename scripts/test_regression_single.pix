@@ -1,78 +1,94 @@
-# Raindrop simulation (top-down view with subtle tapering)
-# Drops spawn randomly, taper slightly inward, and fade as they fall using plots
+# 3D Wireframe Cylinder Script
+# Displays a wireframe cylinder (as a 5-sided polygon) from a desk viewing angle
+# With 20-degree rotation and depth-based intensity from front perspective
+# Appears for 10 seconds then vanishes
 
-# Initialize variables
-v_max_drops = 20          # Number of simultaneous raindrops
-v_drop_height = 6         # Steps for drop to "fall"
-v_base_intensity = 100    # Starting intensity (closest to viewer)
-v_fade_step = 15          # Intensity decrease per step
-v_spawn_rate = 0.15       # Seconds between frame updates
-v_center_x = 32           # Reference x-coordinate for subtle tapering
-v_center_y = 32           # Reference y-coordinate for subtle tapering
+# Clear display
+clear()
 
-# Create arrays to track drop positions and states
-create_array(v_drop_x, v_max_drops)       # Current X coordinates
-create_array(v_drop_y, v_max_drops)       # Current Y coordinates
-create_array(v_start_x, v_max_drops)      # Starting X coordinates
-create_array(v_start_y, v_max_drops)      # Starting Y coordinates
-create_array(v_drop_z, v_max_drops)       # Current "height" of drop
-create_array(v_drop_active, v_max_drops)  # 1 = active, 0 = inactive
+# Set up variables for cylinder position and dimensions
+v_center_x = 32   # Center X position
+v_center_y = 30   # Center Y position (slightly above center for desk view)
+v_radius = 15     # Radius of the cylinder
+v_height = 25     # Height of the cylinder
+v_sides = 5       # Number of sides for our polygon cylinder
+v_top_squish = 0.4  # Vertical squish factor for perspective (top ellipse)
+v_color = "cyan"  # Color of the wireframe
+v_rotation = 20   # Rotation in degrees (clockwise) - shape rotation
+v_shade_rotation = 90  # Additional rotation for shading calculation only
 
-# Initialize all drops as inactive
-for v_i in (0, v_max_drops - 1, 1)
-    v_drop_active[v_i] = 0
+# Create arrays to store the polygon points and depth values
+create_array(v_top_x, v_sides)
+create_array(v_top_y, v_sides)
+create_array(v_bottom_x, v_sides)
+create_array(v_bottom_y, v_sides)
+create_array(v_depth, v_sides)  # For storing depth values
+create_array(v_draw_order, v_sides)  # For storing draw order
+
+# Calculate the polygon points for top and bottom faces with rotation
+for v_i in (0, v_sides - 1, 1)
+    # Calculate the angle for this vertex (including rotation)
+    v_angle = v_i * (360 / v_sides) + v_rotation
+    
+    # Convert angle to radians for the trig functions
+    v_rad = radians(v_angle)
+    
+    # Calculate coordinates for top face (ellipse due to perspective)
+    v_top_x[v_i] = v_center_x + cos(v_rad) * v_radius
+    v_top_y[v_i] = v_center_y - v_height/2 + sin(v_rad) * v_radius * v_top_squish
+    
+    # Calculate coordinates for bottom face (circle with slight perspective)
+    v_bottom_x[v_i] = v_center_x + cos(v_rad) * v_radius
+    v_bottom_y[v_i] = v_center_y + v_height/2 + sin(v_rad) * v_radius * 0.2
+    
+    # Calculate depth value using the shading rotation angle (not the shape rotation)
+    # This separates the visual rotation from the shading rotation
+    v_shade_angle = v_i * (360 / v_sides) + v_rotation + v_shade_rotation
+    v_shade_rad = radians(v_shade_angle)
+    
+    # Using sine function to get depth based on shading angle
+    v_depth[v_i] = sin(v_shade_rad + radians(90)) * 0.5 + 0.5  # Normalize to 0-1 range
+    
+    # Store original index for sorting
+    v_draw_order[v_i] = v_i
 endfor v_i
 
-# Main loop (runs forever)
-while true then
-    
-    # Begin frame in preserve mode to layer drops
-    begin_frame(false)
-    
-    # Attempt to spawn a new raindrop
-    v_spawned = 0
-    for v_i in (0, v_max_drops - 1, 1)
-        if v_drop_active[v_i] == 0 and v_spawned == 0 and random(0, 1, 1) > 0.7 then
-            v_start_x[v_i] = random(0, 63, 0)    # Random starting X
-            v_start_y[v_i] = random(0, 63, 0)    # Random starting Y
-            v_drop_x[v_i] = v_start_x[v_i]        # Current X starts at spawn point
-            v_drop_y[v_i] = v_start_y[v_i]        # Current Y starts at spawn point
-            v_drop_z[v_i] = v_drop_height         # Start at max height
-            v_drop_active[v_i] = 1                # Activate drop
-            v_spawned = 1                         # Mark that we spawned one
+# Simple bubble sort to order sides from back to front by depth
+for v_i in (0, v_sides - 2, 1)
+    for v_j in (0, v_sides - 2 - v_i, 1)
+        if v_depth[v_draw_order[v_j]] > v_depth[v_draw_order[v_j + 1]] then
+            # Swap
+            v_temp = v_draw_order[v_j]
+            v_draw_order[v_j] = v_draw_order[v_j + 1]
+            v_draw_order[v_j + 1] = v_temp
         endif
-    endfor v_i
+    endfor v_j
+endfor v_i
 
-    # Update and draw all active drops
-    for v_i in (0, v_max_drops - 1, 1)
+# Begin drawing the cylinder in a single frame
+begin_frame
 
-        if v_drop_active[v_i] == 1 then
-            # Calculate current intensity based on height
-            v_intensity = v_base_intensity - (v_drop_height - v_drop_z[v_i]) * v_fade_step
-            
-            # Subtle tapering toward center (reduced effect)
-            v_step = v_drop_height - v_drop_z[v_i]  # Current step (0 to v_drop_height)
-            v_x_diff = (v_center_x - v_start_x[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper (div by 3)
-            v_y_diff = (v_center_y - v_start_y[v_i]) * v_step / (v_drop_height * 3)  # Reduced taper (div by 3)
-            v_drop_x[v_i] = v_start_x[v_i] + v_x_diff  # Move slightly toward center X
-            v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
-            
-            # Draw the drop as a single pixel
-            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity)
-            
-            # Update drop height
-            v_drop_z[v_i] = v_drop_z[v_i] - 1
-            
-            # Deactivate drop when it reaches the "ground"
-            if v_drop_z[v_i] <= 0 then
-                v_drop_active[v_i] = 0
-            endif
-        endif
-    endfor v_i
-    
-    # End frame to display all drops at once
-    end_frame
-    
-    # Control frame rate
-    #rest(v_spawn_rate)
-endwhile
+    # Draw from back to front based on sorted order
+    for v_idx in (0, v_sides - 1, 1)
+        # Get the actual side index
+        v_i = v_draw_order[v_idx]
+        v_next = (v_i + 1) % v_sides
+        
+        # Calculate intensity based on depth (farther = dimmer)
+        v_intensity = 30 + v_depth[v_i] * 70  # Scale to 30-100 range
+        
+        # Draw vertical line for this side
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_i], v_bottom_y[v_i], v_color, v_intensity)
+        
+        # Draw top and bottom edges for this side
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_color, v_intensity)
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_color, v_intensity)
+    endfor v_idx
+
+end_frame
+
+# Wait for 10 seconds
+rest(10)
+
+# Clear the display
+clear()
