@@ -1,48 +1,217 @@
-# Step 1: Standalone ellipse with literal values
-print("Step 1: Drawing a red outline ellipse at (32, 32) with burnout after 2 seconds")
-draw_ellipse(32, 32, 10, 5, red, 100, false, 0, 2000)
-sync_queue
-rest(3)
+# Bouncing Squish Circle - Animation using ellipses for squish effect
+# Uses ellipses to create a circle that deforms when it hits walls
 
-# Step 2: Standalone ellipse with variables and expressions
-print("Step 2: Drawing a blue filled ellipse with variables and expressions")
+# Constants for display boundaries
+v_min_x = 0
+v_max_x = 63
+v_min_y = 0
+v_max_y = 63
+
+# Circle properties
+v_radius = 10
 v_x = 32
-v_y = 40
-v_color = "blue"
-draw_ellipse(v_x + 5, v_y - 5, 15, 8, v_color, 75, true, v_x * 1.5, 3000)
-sync_queue
-rest(4)
+v_y = 32
+v_speed_x = 2.5
+v_speed_y = 1.8
 
-# Step 3: Sprite with ellipse
-print("Step 3: Defining and showing a green filled ellipse sprite at (20, 20)")
-define_sprite(ellipse_sprite, 20, 20)
-    draw_ellipse(10, 10, 8, 4, green, 100, true, 45.5, 2000)  # burnout ignored in sprite
-endsprite
-show_sprite(ellipse_sprite, 20, 20)
-sync_queue
-rest(3)
-hide_sprite(ellipse_sprite)
-sync_queue
+# Squish properties
+v_squish_factor = 0.6  # How much the ball compresses when hitting a wall
+v_squish_recovery_rate = 0.15  # Rate at which the ball recovers from squish (0-1)
+v_is_squished = 0
+v_x_radius = v_radius
+v_y_radius = v_radius
+v_bounce_phase = 0  # 0=normal movement, 1=impact+squish, 2=recovery+bounce
+v_color = "cyan"
+v_wall_hit = 0  # 0=none, 1=right, 2=left, 3=bottom, 4=top
+v_original_speed_x = 0  # Store original speed for natural squish
+v_original_speed_y = 0  # Store original speed for natural squish
+v_max_squish = 0        # Track max squish achieved
 
-# Step 4: Sprite movement across matrix
-print("Step 4: Moving the ellipse sprite from x=10 to x=50")
-show_sprite(ellipse_sprite, 10, 20)  # Initial position
-sync_queue
-for v_x in (10, 50, 2)  # Move from x=10 to x=50 in steps of 2
-    move_sprite(ellipse_sprite, v_x, 20)
-    rest(0.1)  # 100ms delay for smooth movement
-endfor v_x
-sync_queue
-hide_sprite(ellipse_sprite)
-sync_queue
-rest(1)
-
-# Step 5: Frame-buffered ellipse
-print("Step 5: Drawing a yellow outline ellipse in a frame buffer")
-begin_frame
-    draw_ellipse(32, 32, 12, 6, yellow, 100, false, 90.0, 2000)
-end_frame
-sync_queue
-rest(3)
-
-print("Test complete")
+# Main animation loop
+while 1 then
+    # Normal movement phase
+    if v_bounce_phase == 0 then
+        v_x = v_x + v_speed_x
+        v_y = v_y + v_speed_y
+        
+        # Detect collision with walls
+        # Right wall collision (1)
+        if v_x + v_radius > v_max_x and v_speed_x > 0 then
+            v_wall_hit = 1
+            v_bounce_phase = 1
+            # Store original speeds for realistic physics
+            v_original_speed_x = v_speed_x
+            v_original_speed_y = v_speed_y
+            # Calculate maximum squish based on speed
+            v_max_squish = v_squish_factor + (abs(v_speed_x) * 0.05)
+            # Initialize squish - will progressively get more squished
+            v_x_radius = v_radius * 0.9
+            v_y_radius = v_radius * 1.1
+        endif
+        
+        # Left wall collision (2)
+        if v_x - v_radius < v_min_x and v_speed_x < 0 then
+            v_wall_hit = 2
+            v_bounce_phase = 1
+            # Store original speeds for realistic physics
+            v_original_speed_x = v_speed_x
+            v_original_speed_y = v_speed_y
+            # Calculate maximum squish based on speed
+            v_max_squish = v_squish_factor + (abs(v_speed_x) * 0.05)
+            # Initialize squish - will progressively get more squished
+            v_x_radius = v_radius * 0.9
+            v_y_radius = v_radius * 1.1
+        endif
+        
+        # Bottom wall collision (3)
+        if v_y + v_radius > v_max_y and v_speed_y > 0 then
+            v_wall_hit = 3
+            v_bounce_phase = 1
+            # Store original speeds for realistic physics
+            v_original_speed_x = v_speed_x
+            v_original_speed_y = v_speed_y
+            # Calculate maximum squish based on speed
+            v_max_squish = v_squish_factor + (abs(v_speed_y) * 0.05)
+            # Initialize squish - will progressively get more squished
+            v_y_radius = v_radius * 0.9
+            v_x_radius = v_radius * 1.1
+        endif
+        
+        # Top wall collision (4)
+        if v_y - v_radius < v_min_y and v_speed_y < 0 then
+            v_wall_hit = 4
+            v_bounce_phase = 1
+            # Store original speeds for realistic physics
+            v_original_speed_x = v_speed_x
+            v_original_speed_y = v_speed_y
+            # Calculate maximum squish based on speed
+            v_max_squish = v_squish_factor + (abs(v_speed_y) * 0.05)
+            # Initialize squish - will progressively get more squished
+            v_y_radius = v_radius * 0.9
+            v_x_radius = v_radius * 1.1
+        endif
+    endif
+    
+    # Impact & progressive squish phase - continue movement with decreasing speed
+    if v_bounce_phase == 1 then
+        # Continue movement with decreasing velocity to simulate impact
+        if v_wall_hit == 1 or v_wall_hit == 2 then
+            # Horizontal wall impacts - gradually reduce X velocity
+            v_speed_x = v_speed_x * 0.8
+            v_x = v_x + v_speed_x
+            v_y = v_y + v_original_speed_y  # Maintain Y velocity
+            
+            # Progressive squish based on remaining speed
+            v_x_radius = v_x_radius - (abs(v_speed_x) * 0.3)
+            v_y_radius = v_y_radius + (abs(v_speed_x) * 0.3)
+            
+            # Check for maximum squish or stop
+            if v_x_radius <= v_radius * v_max_squish or abs(v_speed_x) < 0.1 then
+                v_bounce_phase = 2  # Move to recovery/bounce phase
+                # Reverse direction for bounce
+                v_speed_x = v_original_speed_x * -0.3  # Start with small bounce-back
+            endif
+        endif
+        
+        if v_wall_hit == 3 or v_wall_hit == 4 then
+            # Vertical wall impacts - gradually reduce Y velocity
+            v_speed_y = v_speed_y * 0.8
+            v_x = v_x + v_original_speed_x  # Maintain X velocity
+            v_y = v_y + v_speed_y
+            
+            # Progressive squish based on remaining speed
+            v_y_radius = v_y_radius - (abs(v_speed_y) * 0.3)
+            v_x_radius = v_x_radius + (abs(v_speed_y) * 0.3)
+            
+            # Check for maximum squish or stop
+            if v_y_radius <= v_radius * v_max_squish or abs(v_speed_y) < 0.1 then
+                v_bounce_phase = 2  # Move to recovery/bounce phase
+                # Reverse direction for bounce
+                v_speed_y = v_original_speed_y * -0.3  # Start with small bounce-back
+            endif
+        endif
+    endif
+    
+    # Recovery phase - gradually return to normal and accelerate in new direction
+    if v_bounce_phase == 2 then
+        # Handle recovery for horizontal walls
+        if v_wall_hit == 1 or v_wall_hit == 2 then
+            # Gradually restore shape
+            v_x_radius = v_x_radius + (v_radius - v_x_radius) * v_squish_recovery_rate
+            v_y_radius = v_y_radius - (v_y_radius - v_radius) * v_squish_recovery_rate
+            
+            # Gradually accelerate in new direction
+            v_speed_x = v_speed_x * 1.15  # Accelerate in new direction
+            if abs(v_speed_x) > abs(v_original_speed_x) then
+                v_speed_x = v_original_speed_x * -1  # Cap at original speed
+            endif
+            
+            # Continue movement with new velocities
+            v_x = v_x + v_speed_x
+            v_y = v_y + v_original_speed_y
+            
+            # Recovery complete
+            if abs(v_x_radius - v_radius) < 0.2 then
+                v_x_radius = v_radius
+                v_y_radius = v_radius
+                v_bounce_phase = 0
+                v_wall_hit = 0
+                v_speed_x = v_original_speed_x * -1  # Full speed in new direction
+                v_speed_y = v_original_speed_y       # Maintain Y speed
+            endif
+        endif
+        
+        # Handle recovery for vertical walls
+        if v_wall_hit == 3 or v_wall_hit == 4 then
+            # Gradually restore shape
+            v_y_radius = v_y_radius + (v_radius - v_y_radius) * v_squish_recovery_rate
+            v_x_radius = v_x_radius - (v_x_radius - v_radius) * v_squish_recovery_rate
+            
+            # Gradually accelerate in new direction
+            v_speed_y = v_speed_y * 1.15  # Accelerate in new direction
+            if abs(v_speed_y) > abs(v_original_speed_y) then
+                v_speed_y = v_original_speed_y * -1  # Cap at original speed
+            endif
+            
+            # Continue movement with new velocities
+            v_x = v_x + v_original_speed_x
+            v_y = v_y + v_speed_y
+            
+            # Recovery complete
+            if abs(v_y_radius - v_radius) < 0.2 then
+                v_x_radius = v_radius
+                v_y_radius = v_radius
+                v_bounce_phase = 0
+                v_wall_hit = 0
+                v_speed_x = v_original_speed_x       # Maintain X speed
+                v_speed_y = v_original_speed_y * -1  # Full speed in new direction
+            endif
+        endif
+    endif
+    
+    # Change colors occasionally for visual interest
+    v_rand = random(0, 100, 0)
+    if v_rand < 2 then
+        if v_color == "cyan" then
+            v_color = "magenta"
+        elseif v_color == "magenta" then
+            v_color = "yellow"
+        elseif v_color == "yellow" then
+            v_color = "green"
+        elseif v_color == "green" then
+            v_color = "cyan"
+        endif
+    endif
+    
+    # Draw the circle/ellipse
+    begin_frame
+        # Draw a boundary to show the walls
+        draw_rectangle(0, 0, 64, 64, blue, 15, false)
+        
+        # Draw the ball as an ellipse with current deformation
+        draw_ellipse(v_x, v_y, v_x_radius, v_y_radius, v_color, 75, true, 0)
+    end_frame
+    
+    # Control animation speed
+    rest(0.03)
+endwhile
