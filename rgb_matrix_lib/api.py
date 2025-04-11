@@ -3,6 +3,7 @@
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from PIL import Image, ImageDraw, ImageFont
 import time
+import math
 from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager
 from .utils import get_color_rgb, polygon_vertices, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells  # Added get_grid_cells
 from typing import Optional, List, Tuple, Union, Any
@@ -345,6 +346,170 @@ class RGB_Api:
                 ShapeType.POLYGON, (x_center, y_center, radius), list(burnout_points), burnout
             )
 
+    def draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, color: Union[str, int], 
+                    intensity: int = 100, fill: bool = False, rotation: float = 0, burnout: Optional[int] = None):
+        """Draw an ellipse with optional rotation."""
+        rgb_color = self._get_color(color, intensity)
+        points = set()
+        
+        # Pre-compute sin/cos for rotation
+        rotation_rad = math.radians(rotation)
+        cos_rot = math.cos(rotation_rad)
+        sin_rot = math.sin(rotation_rad)
+        
+        # Helper function to rotate a point around the origin
+        def rotate_point(x: int, y: int) -> Tuple[int, int]:
+            rx = round(x * cos_rot - y * sin_rot)
+            ry = round(x * sin_rot + y * cos_rot)
+            return rx, ry
+        
+        # Helper function to plot a pixel if it's within bounds
+        def plot_pixel(x: int, y: int):
+            if 0 <= x < self.matrix.width and 0 <= y < self.matrix.height:
+                self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
+                points.add((x, y))
+        
+        # Special cases: point, horizontal/vertical line
+        if x_radius == 0 or y_radius == 0:
+            if x_radius == 0 and y_radius == 0:
+                # Single point
+                plot_pixel(x_center, y_center)
+            elif x_radius == 0:
+                # Vertical line
+                for y in range(-y_radius, y_radius + 1):
+                    rx, ry = rotate_point(0, y)
+                    plot_pixel(x_center + rx, y_center + ry)
+            else:  # y_radius == 0
+                # Horizontal line
+                for x in range(-x_radius, x_radius + 1):
+                    rx, ry = rotate_point(x, 0)
+                    plot_pixel(x_center + rx, y_center + ry)
+            
+            self._maybe_swap_buffer()
+            
+            if burnout is not None:
+                self.burnout_manager.add_object(
+                    ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
+                    list(points), burnout
+                )
+            return
+        
+        # For filled ellipses, use a pixel-by-pixel approach
+        if fill:
+            # Determine a safe bounding box that will contain the rotated ellipse
+            max_radius = max(x_radius, y_radius)
+            min_x = max(0, x_center - max_radius - 1)
+            max_x = min(self.matrix.width - 1, x_center + max_radius + 1)
+            min_y = max(0, y_center - max_radius - 1)
+            max_y = min(self.matrix.height - 1, y_center + max_radius + 1)
+            
+            # Check each pixel in the bounding box
+            x_radius_sq = x_radius * x_radius
+            y_radius_sq = y_radius * y_radius
+            
+            for y in range(min_y, max_y + 1):
+                for x in range(min_x, max_x + 1):
+                    # Transform back to ellipse coordinate system
+                    dx = x - x_center
+                    dy = y - y_center
+                    
+                    # Apply inverse rotation to check if point is inside unrotated ellipse
+                    rx = dx * cos_rot + dy * sin_rot
+                    ry = -dx * sin_rot + dy * cos_rot
+                    
+                    # Check ellipse equation: (x/a)² + (y/b)² <= 1
+                    if (rx * rx / x_radius_sq + ry * ry / y_radius_sq) <= 1.0:
+                        plot_pixel(x, y)
+        else:
+            # For outlines, use the midpoint algorithm
+            a_squared = x_radius * x_radius
+            b_squared = y_radius * y_radius
+            
+            # First region of the first quadrant
+            x = 0
+            y = y_radius
+            
+            # Initial decision parameter for region 1
+            d1 = b_squared - a_squared * y_radius + (a_squared // 4)
+            dx = 2 * b_squared * x
+            dy = 2 * a_squared * y
+            
+            # Plot initial points in all four quadrants
+            rx, ry = rotate_point(x, y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(-x, y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(x, -y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(-x, -y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            # Region 1
+            while dx < dy:
+                x += 1
+                dx += 2 * b_squared
+                
+                if d1 < 0:
+                    d1 += dx + b_squared
+                else:
+                    y -= 1
+                    dy -= 2 * a_squared
+                    d1 += dx + b_squared - dy
+                
+                # Plot points in all four quadrants
+                rx, ry = rotate_point(x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+            
+            # Decision parameter for region 2
+            d2 = (b_squared * (x + 0.5) * (x + 0.5) + 
+                a_squared * (y - 1) * (y - 1) - 
+                a_squared * b_squared)
+            
+            # Region 2
+            while y >= 0:
+                y -= 1
+                dy -= 2 * a_squared
+                
+                if d2 > 0:
+                    d2 += a_squared - dy
+                else:
+                    x += 1
+                    dx += 2 * b_squared
+                    d2 += a_squared - dy + dx
+                
+                # Plot points in all four quadrants
+                rx, ry = rotate_point(x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+        
+        self._maybe_swap_buffer()
+        
+        if burnout is not None:
+            self.burnout_manager.add_object(
+                ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
+                list(points), burnout
+            )
+
     def draw_text(self, x: int, y: int, text: Any, font_name: str, font_size: int, 
                 color: Union[str, int], intensity: int = 100, effect: Union[str, TextEffect] = "NORMAL",
                 modifier: Optional[Union[str, EffectModifier]] = None) -> None:
@@ -570,6 +735,13 @@ class RGB_Api:
                 rotation = float(args[6]) if len(args) > 6 else 0
                 fill = bool(args[7]) if len(args) > 7 else False
                 sprite.draw_polygon(int(x), int(y), int(radius), int(sides), color, intensity, rotation, fill)
+            elif command == 'draw_ellipse' and len(args) >= 5:
+                x, y, x_radius, y_radius, color = args[:5]
+                intensity = int(args[5]) if len(args) > 5 else 100
+                fill = bool(args[6]) if len(args) > 6 else False
+                rotation = float(args[7]) if len(args) > 7 else 0
+                sprite.draw_ellipse(int(x), int(y), int(x_radius), int(y_radius), 
+                                color, intensity, fill, rotation)
             elif command == 'clear':
                 sprite.clear()
             else:

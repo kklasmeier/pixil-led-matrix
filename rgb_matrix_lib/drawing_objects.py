@@ -17,6 +17,7 @@ class ShapeType(Enum):
     RECTANGLE = "rectangle"
     CIRCLE = "circle"
     POLYGON = "polygon"
+    ELLIPSE = "ellipse"
 
 class Region:
     """Represents a geometric region on the display."""

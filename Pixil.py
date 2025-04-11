@@ -439,6 +439,10 @@ def process_script(filename, execute_func=None):
         command_match = COMMAND_PATTERN.match(line)
         if command_match:
             cmd_name = command_match.group(1)
+            valid_commands = ['plot', 'draw_line', 'draw_rectangle', 'draw_circle', 'draw_polygon', 'draw_text', 'draw_ellipse']
+            if cmd_name not in valid_commands:
+                debug_print(f"Warning: '{cmd_name}' is not a valid drawing command for sprite definition", DEBUG_CONCISE)
+                return
             try:
                 args = validate_command_params(cmd_name, command_match.group(2))
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -450,7 +454,10 @@ def process_script(filename, execute_func=None):
                     for position, arg in enumerate(args)
                 ]
                 
-                # No need to filter intensity anymore - pass all parameters
+                # Exclude burnout for draw_ellipse in sprites
+                if cmd_name == 'draw_ellipse' and len(parsed_args) > 8:
+                    parsed_args = parsed_args[:8]  # Keep only x_center to rotation
+                
                 sprite_cmd = f"sprite_draw({sprite_context.current_sprite}, {cmd_name}, {', '.join(parsed_args)})"
                 execute_command(sprite_cmd)
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
