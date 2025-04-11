@@ -19,6 +19,7 @@ class CommandExecutor:
             'draw_rectangle': self._handle_draw_rectangle,
             'draw_circle': self._handle_draw_circle,
             'draw_polygon': self._handle_draw_polygon,
+            'draw_ellipse': self._handle_draw_ellipse,
             'define_sprite': self._handle_define_sprite,
             'sprite_draw': self._handle_sprite_draw,
             'show_sprite': self._handle_show_sprite,
@@ -199,6 +200,17 @@ class CommandExecutor:
             Level.DEBUG, Component.COMMAND)
         self.api.draw_polygon(x_center, y_center, radius, sides, color, intensity, rotation, fill, burnout)
 
+    def _handle_draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, 
+                        color: Union[str, int], intensity: int = 100, fill: bool = False, 
+                        rotation: float = 0, burnout: Optional[int] = None):
+        """Handle draw_ellipse command."""
+        debug(f"Handling draw_ellipse command: center({x_center}, {y_center}), radii=({x_radius}, {y_radius}), "
+            f"rotation={rotation}° in {color} at {intensity}%, fill={fill}, "
+            f"burnout {burnout if burnout is not None else 'None (permanent)'}", 
+            Level.DEBUG, Component.COMMAND)
+        self.api.draw_ellipse(x_center, y_center, x_radius, y_radius, color, 
+                            intensity, fill, rotation, burnout)
+        
     def _handle_define_sprite(self, name: str, width: int, height: int):
         """Handle define_sprite command."""
         debug(f"Handling define_sprite command: '{name}' {width}x{height}", 
@@ -233,6 +245,12 @@ class CommandExecutor:
             rotation = args[6] if len(args) > 6 else 0
             fill = args[7] if len(args) > 7 else False
             self.api.draw_to_sprite(name, cmd, x, y, radius, sides, color, intensity, rotation, fill)
+        elif cmd == 'draw_ellipse' and len(args) >= 5:
+            x, y, x_radius, y_radius, color = args[:5]
+            intensity = int(args[5]) if len(args) > 5 else 100
+            fill = args[6] if len(args) > 6 else False
+            rotation = float(args[7]) if len(args) > 7 else 0
+            self.api.draw_to_sprite(name, cmd, x, y, x_radius, y_radius, color, intensity, fill, rotation)
         elif cmd == 'clear':
             self.api.draw_to_sprite(name, cmd)
         else:

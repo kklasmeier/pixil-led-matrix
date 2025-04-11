@@ -119,12 +119,13 @@ The project includes 75+ scripts demonstrating various animations and effects:
 ### Drawing Commands
 
 ```
-draw_line(x1, y1, x2, y2, color, intensity, duration)
-plot(x, y, color, intensity, duration)
-draw_rectangle(x, y, width, height, color, intensity, filled, duration)
-draw_circle(x, y, radius, color, intensity, filled, duration)
+draw_line(x1, y1, x2, y2, color, [intensity], [duration])
+plot(x, y, color, [intensity], [duration])
+draw_rectangle(x, y, width, height, color, [intensity], [filled], [duration])
+draw_circle(x, y, radius, color, [intensity], [filled], [duration])
 clear()
-draw_polygon(x, y, radius, sides, color, intensity, rotation, filled, duration)
+draw_polygon(x, y, radius, sides, color, [intensity], [rotation], [filled], [duration])
+draw_ellipse(x_center, y_center, x_radius, y_radius, color, [intensity], [fill], [rotation], [burnout])
 ```
 
 ### Variables and Expressions

@@ -239,6 +239,169 @@ class MatrixSprite:
         debug(f"Polygon complete on sprite '{self.name}', {points_drawn} points drawn", 
               Level.TRACE, Component.SPRITE)
 
+    def draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, 
+                    color: Union[str, int, Tuple[int, int, int]], intensity: int = 100, 
+                    fill: bool = False, rotation: float = 0):
+        """Draw an ellipse in the sprite buffer with intensity and optional rotation."""
+        debug(f"Drawing {'filled' if fill else 'outline'} ellipse on sprite '{self.name}' "
+            f"at ({x_center},{y_center}) radii ({x_radius},{y_radius}), rotation {rotation} "
+            f"with color {color} at {intensity}%", 
+            Level.DEBUG, Component.SPRITE)
+        
+        intensity = max(0, min(100, intensity))
+        from .utils import get_color_rgb
+        rgb_color = get_color_rgb(color, 100)  # Full brightness
+        points_drawn = 0
+        
+        # Pre-compute sin/cos for rotation
+        import math
+        rotation_rad = math.radians(rotation)
+        cos_rot = math.cos(rotation_rad)
+        sin_rot = math.sin(rotation_rad)
+        
+        # Helper function to rotate a point around the origin
+        def rotate_point(x, y):
+            rx = round(x * cos_rot - y * sin_rot)
+            ry = round(x * sin_rot + y * cos_rot)
+            return rx, ry
+        
+        # Helper function to plot a pixel if it's within bounds
+        def plot_pixel(x, y):
+            nonlocal points_drawn
+            if 0 <= x < self.width and 0 <= y < self.height:
+                self.buffer[y, x] = rgb_color
+                self.intensity_buffer[y, x] = intensity
+                points_drawn += 1
+        
+        # Special cases: point, horizontal/vertical line
+        if x_radius == 0 or y_radius == 0:
+            if x_radius == 0 and y_radius == 0:
+                # Single point
+                plot_pixel(x_center, y_center)
+            elif x_radius == 0:
+                # Vertical line
+                for y in range(-y_radius, y_radius + 1):
+                    rx, ry = rotate_point(0, y)
+                    plot_pixel(x_center + rx, y_center + ry)
+            else:  # y_radius == 0
+                # Horizontal line
+                for x in range(-x_radius, x_radius + 1):
+                    rx, ry = rotate_point(x, 0)
+                    plot_pixel(x_center + rx, y_center + ry)
+            
+            return
+        
+        # For filled ellipses, use a pixel-by-pixel approach
+        if fill:
+            # Determine a safe bounding box that will contain the rotated ellipse
+            max_radius = max(x_radius, y_radius)
+            min_x = max(0, x_center - max_radius - 1)
+            max_x = min(self.width - 1, x_center + max_radius + 1)
+            min_y = max(0, y_center - max_radius - 1)
+            max_y = min(self.height - 1, y_center + max_radius + 1)
+            
+            # Check each pixel in the bounding box
+            x_radius_sq = x_radius * x_radius
+            y_radius_sq = y_radius * y_radius
+            
+            for y in range(min_y, max_y + 1):
+                for x in range(min_x, max_x + 1):
+                    # Transform back to ellipse coordinate system
+                    dx = x - x_center
+                    dy = y - y_center
+                    
+                    # Apply inverse rotation to check if point is inside unrotated ellipse
+                    rx = dx * cos_rot + dy * sin_rot
+                    ry = -dx * sin_rot + dy * cos_rot
+                    
+                    # Check ellipse equation: (x/a)² + (y/b)² <= 1
+                    if (rx * rx / x_radius_sq + ry * ry / y_radius_sq) <= 1.0:
+                        plot_pixel(x, y)
+        else:
+            # For outlines, use the midpoint algorithm
+            a_squared = x_radius * x_radius
+            b_squared = y_radius * y_radius
+            
+            # First region of the first quadrant
+            x = 0
+            y = y_radius
+            
+            # Initial decision parameter for region 1
+            d1 = b_squared - a_squared * y_radius + (a_squared // 4)
+            dx = 2 * b_squared * x
+            dy = 2 * a_squared * y
+            
+            # Plot initial points in all four quadrants
+            rx, ry = rotate_point(x, y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(-x, y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(x, -y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            rx, ry = rotate_point(-x, -y)
+            plot_pixel(x_center + rx, y_center + ry)
+            
+            # Region 1
+            while dx < dy:
+                x += 1
+                dx += 2 * b_squared
+                
+                if d1 < 0:
+                    d1 += dx + b_squared
+                else:
+                    y -= 1
+                    dy -= 2 * a_squared
+                    d1 += dx + b_squared - dy
+                
+                # Plot points in all four quadrants
+                rx, ry = rotate_point(x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+            
+            # Decision parameter for region 2
+            d2 = (b_squared * (x + 0.5) * (x + 0.5) + 
+                a_squared * (y - 1) * (y - 1) - 
+                a_squared * b_squared)
+            
+            # Region 2
+            while y >= 0:
+                y -= 1
+                dy -= 2 * a_squared
+                
+                if d2 > 0:
+                    d2 += a_squared - dy
+                else:
+                    x += 1
+                    dx += 2 * b_squared
+                    d2 += a_squared - dy + dx
+                
+                # Plot points in all four quadrants
+                rx, ry = rotate_point(x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+                
+                rx, ry = rotate_point(-x, -y)
+                plot_pixel(x_center + rx, y_center + ry)
+        
+        debug(f"Ellipse complete on sprite '{self.name}', {points_drawn} points drawn", 
+            Level.TRACE, Component.SPRITE)
+
     def clear(self):
         """Clear sprite buffer with transparent color."""
         self.buffer[:, :] = TRANSPARENT_COLOR

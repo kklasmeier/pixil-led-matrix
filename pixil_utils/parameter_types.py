@@ -87,6 +87,17 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'filled', 'type': 'bool', 'position': 7, 'optional': True, 'default': 'false'},
         {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True}
     ],
+    'draw_ellipse': [
+        {'name': 'x_center', 'type': 'int', 'position': 0},
+        {'name': 'y_center', 'type': 'int', 'position': 1},
+        {'name': 'x_radius', 'type': 'int', 'position': 2},
+        {'name': 'y_radius', 'type': 'int', 'position': 3},
+        {'name': 'color', 'type': 'color', 'position': 4},
+        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True, 'default': '100'},
+        {'name': 'fill', 'type': 'bool', 'position': 6, 'optional': True, 'default': 'false'},
+        {'name': 'rotation', 'type': 'float', 'position': 7, 'optional': True, 'default': '0'},
+        {'name': 'burnout', 'type': 'float', 'position': 8, 'optional': True}
+    ],
     'draw_text': [
         {'name': 'x', 'type': 'int', 'position': 0},
         {'name': 'y', 'type': 'int', 'position': 1},

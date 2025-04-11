@@ -1,154 +1,48 @@
-# Balancing Disk - A simulation of a disk wobbling and rotating on a center pin
-# For 64x64 RGB LED Matrix display
+# Step 1: Standalone ellipse with literal values
+print("Step 1: Drawing a red outline ellipse at (32, 32) with burnout after 2 seconds")
+draw_ellipse(32, 32, 10, 5, red, 100, false, 0, 2000)
+sync_queue
+rest(3)
 
-# Initialize variables
-v_center_x = 32        # Center X position (middle of display)
-v_center_y = 32        # Center Y position (middle of display)
-v_disk_radius = 20     # Size of the disk
-v_pin_height = 8       # Height of the center pin
+# Step 2: Standalone ellipse with variables and expressions
+print("Step 2: Drawing a blue filled ellipse with variables and expressions")
+v_x = 32
+v_y = 40
+v_color = "blue"
+draw_ellipse(v_x + 5, v_y - 5, 15, 8, v_color, 75, true, v_x * 1.5, 3000)
+sync_queue
+rest(4)
 
-v_wobble_angle = 0     # Current wobble angle
-v_wobble_speed = 0.2   # How fast the disk wobbles
-v_wobble_max = 0.3     # Maximum wobble amount (in radians)
-v_wobble_decay = 0.995 # How quickly wobble decreases (simulating friction)
+# Step 3: Sprite with ellipse
+print("Step 3: Defining and showing a green filled ellipse sprite at (20, 20)")
+define_sprite(ellipse_sprite, 20, 20)
+    draw_ellipse(10, 10, 8, 4, green, 100, true, 45.5, 2000)  # burnout ignored in sprite
+endsprite
+show_sprite(ellipse_sprite, 20, 20)
+sync_queue
+rest(3)
+hide_sprite(ellipse_sprite)
+sync_queue
 
-v_rotation = 0         # Current rotation angle of the disk
-v_rotation_speed = 0.1 # How fast the disk rotates
+# Step 4: Sprite movement across matrix
+print("Step 4: Moving the ellipse sprite from x=10 to x=50")
+show_sprite(ellipse_sprite, 10, 20)  # Initial position
+sync_queue
+for v_x in (10, 50, 2)  # Move from x=10 to x=50 in steps of 2
+    move_sprite(ellipse_sprite, v_x, 20)
+    rest(0.1)  # 100ms delay for smooth movement
+endfor v_x
+sync_queue
+hide_sprite(ellipse_sprite)
+sync_queue
+rest(1)
 
-v_gravity = 0.002      # Gravity simulation factor
-v_momentum_x = 0.01    # Initial momentum in X direction
-v_momentum_y = 0.005   # Initial momentum in Y direction
+# Step 5: Frame-buffered ellipse
+print("Step 5: Drawing a yellow outline ellipse in a frame buffer")
+begin_frame
+    draw_ellipse(32, 32, 12, 6, yellow, 100, false, 90.0, 2000)
+end_frame
+sync_queue
+rest(3)
 
-# Colors
-v_disk_color = "azure"       # Color of the disk
-v_disk_highlight = "white"   # Highlight color on the disk
-v_disk_edge = "royal_blue"   # Edge color for better definition
-v_pin_color = "silver"       # Color of the center pin
-v_shadow_color = "dark_gray" # Shadow color
-
-# Create arrays for storing points around the edge of the disk
-create_array(v_disk_x, 36)   # X coordinates of disk edge points
-create_array(v_disk_y, 36)   # Y coordinates of disk edge points
-create_array(v_pattern_x, 8) # X coordinates for pattern on disk
-create_array(v_pattern_y, 8) # Y coordinates for pattern on disk
-
-# Initialize throttle to optimize animation performance
-throttle(0.7)
-
-# Main animation loop
-while 1 == 1 then
-    # Calculate wobble factors based on momentum
-    v_wobble_x = sin(v_wobble_angle) * v_wobble_max
-    v_wobble_y = cos(v_wobble_angle * 1.3) * v_wobble_max
-    
-    # Apply gravity to momentum
-    v_momentum_x = v_momentum_x + v_wobble_x * v_gravity
-    v_momentum_y = v_momentum_y + v_wobble_y * v_gravity
-    
-    # Update wobble angle based on momentum
-    v_wobble_angle = v_wobble_angle + v_wobble_speed + (v_momentum_x + v_momentum_y) * 0.5
-    
-    # Apply decay factors (simulating friction)
-    v_wobble_max = v_wobble_max * v_wobble_decay
-    v_momentum_x = v_momentum_x * 0.99
-    v_momentum_y = v_momentum_y * 0.99
-    
-    # If wobble gets too small, add a random impulse to keep animation interesting
-    if v_wobble_max < 0.05 then
-        v_wobble_max = v_wobble_max + random(0, 0.2, 3)
-        v_momentum_x = v_momentum_x + random(-0.02, 0.02, 3)
-        v_momentum_y = v_momentum_y + random(-0.02, 0.02, 3)
-    endif
-    
-    # Keep wobble within reasonable bounds
-    if v_wobble_max > 0.8 then
-        v_wobble_max = 0.8
-    endif
-    
-    # Calculate apparent disk radius based on wobble (perspective effect)
-    v_apparent_radius = v_disk_radius * (1 - abs(v_wobble_x * v_wobble_y) * 0.3)
-    
-    # Update rotation
-    v_rotation = v_rotation + v_rotation_speed + v_momentum_x * 0.1
-    
-    # Start a new frame (clear previous frame)
-    begin_frame
-    
-    # Draw the pin base
-    draw_circle(v_center_x, v_center_y + v_pin_height, 3, v_pin_color, 80, true)
-    
-    # Calculate center of disk based on wobble
-    v_disk_center_x = v_center_x + v_wobble_x * 10
-    v_disk_center_y = v_center_y + v_wobble_y * 6
-    
-    # Draw shadow of disk on the ground
-    v_shadow_x = v_center_x + v_wobble_x * 15
-    v_shadow_y = v_center_y + v_pin_height + 2
-    v_shadow_size = v_apparent_radius * (0.7 + v_wobble_y * 0.2)
-    draw_circle(v_shadow_x, v_shadow_y, v_shadow_size, v_shadow_color, 50, true)
-    
-    # Calculate all points around the edge of the disk for the current frame
-    for v_i in (0, 35, 1)
-        v_angle = v_i * 0.1745 + v_rotation  # 0.1745 rad ≈ 10 degrees
-        v_disk_x[v_i] = v_disk_center_x + cos(v_angle) * v_apparent_radius
-        v_disk_y[v_i] = v_disk_center_y + sin(v_angle) * v_apparent_radius * (1 - abs(v_wobble_x) * 0.5)  # Elliptical effect
-    endfor v_i
-    
-    # Draw the disk by connecting points around the edge
-    for v_i in (0, 34, 1)
-        v_next = v_i + 1
-        draw_line(v_disk_x[v_i], v_disk_y[v_i], v_disk_x[v_next], v_disk_y[v_next], v_disk_color, 80)
-    endfor v_i
-    # Close the disk shape by connecting the last point to the first
-    draw_line(v_disk_x[35], v_disk_y[35], v_disk_x[0], v_disk_y[0], v_disk_color, 80)
-    
-    # Fill the disk with a slightly less intense color
-    draw_circle(v_disk_center_x, v_disk_center_y, v_apparent_radius - 1, v_disk_color, 60, true)
-    
-    # Calculate and draw a pattern on the disk to visualize rotation
-    for v_i in (0, 7, 1)
-        v_angle = v_i * 0.7854 + v_rotation  # 0.7854 rad = 45 degrees
-        v_dist = v_apparent_radius * 0.7
-        v_pattern_x[v_i] = v_disk_center_x + cos(v_angle) * v_dist
-        v_pattern_y[v_i] = v_disk_center_y + sin(v_angle) * v_dist * (1 - abs(v_wobble_x) * 0.5)
-        
-        # Draw pattern elements
-        if v_i % 2 == 0 then
-            # Draw circles at even indices
-            draw_circle(v_pattern_x[v_i], v_pattern_y[v_i], 2, v_disk_highlight, 90, true)
-        else
-            # Draw small lines at odd indices for additional texture
-            v_angle2 = v_angle + 0.3
-            v_end_x = v_pattern_x[v_i] + cos(v_angle2) * 3
-            v_end_y = v_pattern_y[v_i] + sin(v_angle2) * 3
-            draw_line(v_pattern_x[v_i], v_pattern_y[v_i], v_end_x, v_end_y, v_disk_highlight, 90)
-        endif
-    endfor v_i
-    
-    # Draw center of disk (where it connects to the pin)
-    draw_circle(v_disk_center_x, v_disk_center_y, 2, v_disk_highlight, 90, true)
-    
-    # Draw the pin (connecting from base to disk)
-    v_pin_bottom_x = v_center_x
-    v_pin_bottom_y = v_center_y + v_pin_height
-    draw_line(v_pin_bottom_x, v_pin_bottom_y, v_disk_center_x, v_disk_center_y, v_pin_color, 90)
-    
-    # Display the frame
-    end_frame
-    
-    # Brief pause for animation timing
-    rest(0.03)
-    
-    # Occasionally print status for debugging
-    if random(0, 100, 0) < 2 then
-        print(f"Wobble: {v_wobble_max}, Momentum: {v_momentum_x}, {v_momentum_y}")
-    endif
-    
-    # Reset disk if it gets too stable (to keep the animation interesting)
-    if v_wobble_max < 0.01 and abs(v_momentum_x) < 0.005 and abs(v_momentum_y) < 0.005 then
-        print("Resetting disk with new impulse")
-        v_wobble_max = 0.3
-        v_momentum_x = random(-0.03, 0.03, 3)
-        v_momentum_y = random(-0.03, 0.03, 3)
-    endif
-endwhile
+print("Test complete")
