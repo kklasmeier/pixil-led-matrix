@@ -1,72 +1,367 @@
-# Cosmic Orbit Display
-# A mesmerizing animation with rotating ellipses and orbiting sprites
+# RGB Color Cube - With Pre-calculated Animation Frames
+# Optimized for Raspberry Pi 4 performance using flattened arrays
 
-# Initialize variables
-v_center_x = 32    # Center of the matrix (assuming 64x64)
+# Set aggressive throttle to improve performance
+throttle(0.8)
+
+# Define constants
+v_center_x = 32
 v_center_y = 32
-v_orbit_speed = 0.05  # Speed of orbit animation (seconds)
-v_angle = 0        # Starting angle for rotation
-v_color_red = "red"
-v_color_blue = "blue"
-v_color_green = "green"
-v_color_yellow = "yellow"
+v_size = 20
+v_total_frames = 360  # Total number of frames in the animation cycle
+v_vertices_per_frame = 8  # 8 vertices per frame
 
-# Step 1: Pulsing background ellipse
-print("Step 1: Pulsing background ellipse")
-for v_pulse in (50, 100, 10)  # Intensity from 50 to 100, step 10
-    draw_ellipse(v_center_x, v_center_y, 20, 10, v_color_blue, v_pulse, false, 0, 2000)
-    sync_queue
-    rest(v_orbit_speed * 2)
-endfor v_pulse
-sync_queue
+# Define arrays for cube vertices (8 corners in 3D space)
+create_array(v_vertices_x, 8)
+create_array(v_vertices_y, 8)
+create_array(v_vertices_z, 8)
+create_array(v_colors, 8, string)
 
-# Step 2: Define orbiting sprite with ellipse
-print("Step 2: Defining orbiting satellite sprite")
-define_sprite(satellite, 10, 10)
-    draw_ellipse(5, 5, 4, 2, v_color_red, 100, true, 45)
-endsprite
+# Define cube vertices in 3D space
+# Format: (x, y, z) where each component is either -1 or 1
+v_vertices_x[0] = -1
+v_vertices_y[0] = -1
+v_vertices_z[0] = -1
+v_colors[0] = "gray"    # Black (as gray)
 
-# Step 3: Orbiting satellites with elliptical paths
-print("Step 3: Two satellites orbiting in elliptical paths")
-v_orbit_radius_x = 25  # Horizontal radius of orbit
-v_orbit_radius_y = 15  # Vertical radius of orbit
-for v_angle in (0, 360, 15)  # Full circle, 15-degree steps
-    # Calculate positions using sine and cosine (approximated via math functions)
-    v_x1 = v_center_x + v_orbit_radius_x * cos(v_angle)
-    v_y1 = v_center_y + v_orbit_radius_y * sin(v_angle)
-    v_x2 = v_center_x - v_orbit_radius_x * cos(v_angle)  # Opposite direction
-    v_y2 = v_center_y - v_orbit_radius_y * sin(v_angle)
+v_vertices_x[1] = 1
+v_vertices_y[1] = -1
+v_vertices_z[1] = -1
+v_colors[1] = "red"     # Red
 
-    # Show two satellites
-    show_sprite(satellite, v_x1, v_y1)
-    show_sprite(satellite, v_x2, v_y2)
-    sync_queue
-    rest(v_orbit_speed)
-    hide_sprite(satellite)  # Hide both instances
-    hide_sprite(satellite)
-    sync_queue
-endfor v_angle
+v_vertices_x[2] = -1
+v_vertices_y[2] = 1
+v_vertices_z[2] = -1
+v_colors[2] = "green"   # Green
 
-# Step 4: Rotating filled ellipse in frame buffer
-print("Step 4: Rotating yellow filled ellipse")
-begin_frame
-    for v_rotate in (0, 360, 30)  # Rotate 360 degrees, 30-degree steps
-        draw_ellipse(v_center_x, v_center_y, 15, 8, v_color_yellow, 100, true, v_rotate, 3000)
-        sync_queue
-        rest(v_orbit_speed * 3)
-    endfor v_rotate
-end_frame
-sync_queue
+v_vertices_x[3] = 1
+v_vertices_y[3] = 1
+v_vertices_z[3] = -1
+v_colors[3] = "yellow"  # Yellow
 
-# Step 5: Grand finale - expanding elliptical ring
-print("Step 5: Expanding green elliptical ring")
-for v_size in (5, 30, 5)  # Expand from radius 5 to 30
-    draw_ellipse(v_center_x, v_center_y, v_size, v_size / 2, v_color_green, 100, false, v_angle, 1000)
-    v_angle = v_angle + 30  # Rotate as it expands
-    sync_queue
-    rest(v_orbit_speed * 2)
-endfor v_size
-sync_queue
+v_vertices_x[4] = -1
+v_vertices_y[4] = -1
+v_vertices_z[4] = 1
+v_colors[4] = "blue"    # Blue
 
-print("Cosmic Orbit complete")
-rest(2)
+v_vertices_x[5] = 1
+v_vertices_y[5] = -1
+v_vertices_z[5] = 1
+v_colors[5] = "magenta" # Magenta
+
+v_vertices_x[6] = -1
+v_vertices_y[6] = 1
+v_vertices_z[6] = 1
+v_colors[6] = "cyan"    # Cyan
+
+v_vertices_x[7] = 1
+v_vertices_y[7] = 1
+v_vertices_z[7] = 1
+v_colors[7] = "white"   # White
+
+# Define edges of the cube (12 edges connecting 8 vertices)
+create_array(v_edge_start, 12)
+create_array(v_edge_end, 12)
+create_array(v_edge_colors, 12, string)
+
+# Bottom face edges
+v_edge_start[0] = 0
+v_edge_end[0] = 1
+v_edge_colors[0] = "red"
+
+v_edge_start[1] = 1
+v_edge_end[1] = 3
+v_edge_colors[1] = "yellow"
+
+v_edge_start[2] = 3
+v_edge_end[2] = 2
+v_edge_colors[2] = "green"
+
+v_edge_start[3] = 2
+v_edge_end[3] = 0
+v_edge_colors[3] = "gray"
+
+# Top face edges
+v_edge_start[4] = 4
+v_edge_end[4] = 5
+v_edge_colors[4] = "magenta"
+
+v_edge_start[5] = 5
+v_edge_end[5] = 7
+v_edge_colors[5] = "white"
+
+v_edge_start[6] = 7
+v_edge_end[6] = 6
+v_edge_colors[6] = "cyan"
+
+v_edge_start[7] = 6
+v_edge_end[7] = 4
+v_edge_colors[7] = "blue"
+
+# Connecting edges
+v_edge_start[8] = 0
+v_edge_end[8] = 4
+v_edge_colors[8] = "blue"
+
+v_edge_start[9] = 1
+v_edge_end[9] = 5
+v_edge_colors[9] = "magenta"
+
+v_edge_start[10] = 2
+v_edge_end[10] = 6
+v_edge_colors[10] = "cyan"
+
+v_edge_start[11] = 3
+v_edge_end[11] = 7
+v_edge_colors[11] = "white"
+
+# Create background dots grid (16 dots)
+v_dot_size = 16
+create_array(v_dot_x, v_dot_size)
+create_array(v_dot_y, v_dot_size)
+create_array(v_dot_color, v_dot_size, string)
+
+# Pre-fill dot arrays - 16 dots (4x4 grid)
+v_dot_x[0] = 0
+v_dot_y[0] = 0
+v_dot_color[0] = "red"
+
+v_dot_x[1] = 0
+v_dot_y[1] = 21
+v_dot_color[1] = "magenta"
+
+v_dot_x[2] = 0
+v_dot_y[2] = 42
+v_dot_color[2] = "magenta"
+
+v_dot_x[3] = 0
+v_dot_y[3] = 63
+v_dot_color[3] = "magenta"
+
+v_dot_x[4] = 21
+v_dot_y[4] = 0
+v_dot_color[4] = "red"
+
+v_dot_x[5] = 21
+v_dot_y[5] = 21
+v_dot_color[5] = "red"
+
+v_dot_x[6] = 21
+v_dot_y[6] = 42
+v_dot_color[6] = "magenta"
+
+v_dot_x[7] = 21
+v_dot_y[7] = 63
+v_dot_color[7] = "magenta"
+
+v_dot_x[8] = 42
+v_dot_y[8] = 0
+v_dot_color[8] = "green"
+
+v_dot_x[9] = 42
+v_dot_y[9] = 21
+v_dot_color[9] = "green"
+
+v_dot_x[10] = 42
+v_dot_y[10] = 42
+v_dot_color[10] = "yellow"
+
+v_dot_x[11] = 42
+v_dot_y[11] = 63
+v_dot_color[11] = "yellow"
+
+v_dot_x[12] = 63
+v_dot_y[12] = 0
+v_dot_color[12] = "green"
+
+v_dot_x[13] = 63
+v_dot_y[13] = 21
+v_dot_color[13] = "green"
+
+v_dot_x[14] = 63
+v_dot_y[14] = 42
+v_dot_color[14] = "yellow"
+
+v_dot_x[15] = 63
+v_dot_y[15] = 63
+v_dot_color[15] = "yellow"
+
+# Create flattened arrays to store pre-calculated frame data (360 frames × 8 vertices = 2880 elements)
+create_array(v_cached_x, 2880)      # x-coordinates 
+create_array(v_cached_y, 2880)      # y-coordinates
+create_array(v_cached_depth, 2880)  # depth values
+
+print("Pre-calculating animation frames...")
+
+# Calculate all frames in advance
+v_rot_speed_x = 2 * pi / 180  # X completes in 180 frames
+v_rot_speed_y = 2 * pi / 120  # Y completes in 120 frames
+v_rot_speed_z = 2 * pi / 90   # Z completes in 90 frames
+
+# Pre-calculate all animation frames
+v_frame = 0
+while v_frame < v_total_frames then
+    # Calculate rotation angles for this frame
+    v_rot_x = v_frame * v_rot_speed_x
+    v_rot_y = v_frame * v_rot_speed_y
+    v_rot_z = v_frame * v_rot_speed_z
+    
+    # Precompute trigonometric values
+    v_cos_x = cos(v_rot_x)
+    v_sin_x = sin(v_rot_x)
+    v_cos_y = cos(v_rot_y)
+    v_sin_y = sin(v_rot_y)
+    v_cos_z = cos(v_rot_z)
+    v_sin_z = sin(v_rot_z)
+    
+    # Project 3D points to 2D for all vertices in this frame
+    v_i = 0
+    while v_i < 8 then
+        # Calculate array index for this vertex in this frame
+        v_index = v_frame * v_vertices_per_frame + v_i
+        
+        # Get 3D coordinates
+        v_x = v_vertices_x[v_i]
+        v_y = v_vertices_y[v_i]
+        v_z = v_vertices_z[v_i]
+        
+        # X-axis rotation
+        v_y2 = v_y * v_cos_x - v_z * v_sin_x
+        v_z2 = v_y * v_sin_x + v_z * v_cos_x
+        
+        # Y-axis rotation
+        v_x2 = v_x * v_cos_y + v_z2 * v_sin_y
+        v_z3 = -v_x * v_sin_y + v_z2 * v_cos_y
+        
+        # Z-axis rotation
+        v_x3 = v_x2 * v_cos_z - v_y2 * v_sin_z
+        v_y3 = v_x2 * v_sin_z + v_y2 * v_cos_z
+        
+        # Perspective projection
+        v_scale = 1.5 / (4 + v_z3)
+        v_px = v_x3 * v_scale * v_size + v_center_x
+        v_py = v_y3 * v_scale * v_size + v_center_y
+        
+        # Store normalized depth for intensity
+        v_d = v_z3
+        
+        # Store calculated values in flattened arrays
+        v_cached_x[v_index] = v_px
+        v_cached_y[v_index] = v_py
+        v_cached_depth[v_index] = v_d
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Progress indicator (every 45 frames = 8 indicators total)
+    if v_frame % 45 == 0 then
+        print(f"Pre-calculating... {v_frame / 3.6}% complete")
+    endif
+    
+    v_frame = v_frame + 1
+endwhile
+
+print("Calculation complete. Starting animation...")
+
+# Animation loop - just play back pre-calculated frames
+v_current_frame = 0
+while 1 == 1 then
+    begin_frame
+    
+    # Calculate base index for current frame
+    v_base_index = v_current_frame * v_vertices_per_frame
+    
+    # Draw background dots
+    v_i = 0
+    while v_i < v_dot_size then
+        plot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 30)
+        v_i = v_i + 1
+    endwhile
+    
+    # Draw back edges
+    v_i = 0
+    while v_i < 12 then  
+        # Get indices for these vertices in the current frame
+        v_start_index = v_base_index + v_edge_start[v_i]
+        v_end_index = v_base_index + v_edge_end[v_i]
+        
+        # Calculate average depth
+        v_avg_depth = (v_cached_depth[v_start_index] + v_cached_depth[v_end_index]) / 2
+        
+        # Draw back edges first
+        if v_avg_depth < 0 then           
+            # Draw the edge
+            draw_line(v_cached_x[v_start_index], v_cached_y[v_start_index], v_cached_x[v_end_index], v_cached_y[v_end_index], v_edge_colors[v_i], 40 + ((v_avg_depth + 1) / 2) * 60)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Draw back vertices
+    v_i = 0
+    while v_i < 8 then
+        # Get index for this vertex in the current frame
+        v_vertex_index = v_base_index + v_i
+        
+        # Get pre-calculated depth
+        v_depth = v_cached_depth[v_vertex_index]
+        
+        if v_depth < 0 then          
+            # Draw vertex
+            draw_circle(v_cached_x[v_vertex_index], v_cached_y[v_vertex_index], 2, v_colors[v_i], 40 + ((v_depth + 1) / 2) * 60, true)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Draw front edges
+    v_i = 0
+    while v_i < 12 then    
+        # Get indices for these vertices in the current frame
+        v_start_index = v_base_index + v_edge_start[v_i]
+        v_end_index = v_base_index + v_edge_end[v_i]
+        
+        # Calculate average depth
+        v_avg_depth = (v_cached_depth[v_start_index] + v_cached_depth[v_end_index]) / 2
+        
+        # Draw front edges
+        if v_avg_depth >= 0 then       
+            # Draw the edge
+            draw_line(v_cached_x[v_start_index], v_cached_y[v_start_index], v_cached_x[v_end_index], v_cached_y[v_end_index], v_edge_colors[v_i], min(40 + ((v_avg_depth + 1) / 2) * 60, 100) )
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Draw front vertices
+    v_i = 0
+    while v_i < 8 then
+        # Get index for this vertex in the current frame
+        v_vertex_index = v_base_index + v_i
+        
+        # Get pre-calculated depth
+        v_depth = v_cached_depth[v_vertex_index]
+        
+        if v_depth >= 0 then
+            # Map depth to intensity (front vertices are brighter)
+            v_intensity = 40 + ((v_depth + 1) / 2) * 60
+            if v_intensity > 100 then
+                v_intensity = 100
+            endif
+            
+            # Draw vertex
+            draw_circle(v_cached_x[v_vertex_index], v_cached_y[v_vertex_index], 2, v_colors[v_i], v_intensity, true)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Update frame counter (with wrap-around)
+    v_current_frame = v_current_frame + 1
+    if v_current_frame >= v_total_frames then
+        v_current_frame = 0
+    endif
+    
+    # Display frame
+    end_frame
+endwhile
