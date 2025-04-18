@@ -1,8 +1,8 @@
-# RGB Color Cube - Highly Optimized Version (Fixed)
-# Pre-calculated frames with visibility optimization and edge sorting
+# RGB Color Cube - With Pre-calculated Animation Frames
+# Optimized for Raspberry Pi 4 performance using flattened arrays
 
 # Set aggressive throttle to improve performance
-throttle(0.5)
+throttle(0.8)
 
 # Define constants
 v_center_x = 32
@@ -10,7 +10,6 @@ v_center_y = 32
 v_size = 20
 v_total_frames = 360  # Total number of frames in the animation cycle
 v_vertices_per_frame = 8  # 8 vertices per frame
-v_edges_per_frame = 12    # 12 edges per frame
 
 # Define arrays for cube vertices (8 corners in 3D space)
 create_array(v_vertices_x, 8)
@@ -187,23 +186,19 @@ v_dot_x[15] = 63
 v_dot_y[15] = 63
 v_dot_color[15] = "yellow"
 
-# Create flattened arrays to store pre-calculated frame data
-create_array(v_cached_x, 2880)      # x-coordinates (360 frames × 8 vertices)
+# Create flattened arrays to store pre-calculated frame data (360 frames × 8 vertices = 2880 elements)
+create_array(v_cached_x, 2880)      # x-coordinates 
 create_array(v_cached_y, 2880)      # y-coordinates
 create_array(v_cached_depth, 2880)  # depth values
 
-# Create arrays to store visibility and sorting data
-create_array(v_vertex_visible, 2880)   # 1 if vertex is front-facing (visible), 0 if back-facing
-create_array(v_edge_sort_order, 4320)  # Sorted edge indices (360 frames × 12 edges)
-create_array(v_edge_depths, 4320)      # Edge depths for sorting (360 frames × 12 edges)
-
-print("Pre-calculating animation frames with optimizations...")
+print("Pre-calculating animation frames...")
 
 # Calculate all frames in advance
 v_rot_speed_x = 2 * pi / 180  # X completes in 180 frames
 v_rot_speed_y = 2 * pi / 120  # Y completes in 120 frames
 v_rot_speed_z = 2 * pi / 90   # Z completes in 90 frames
 
+        
 # Pre-calculate all animation frames
 v_frame = 0
 while v_frame < v_total_frames then
@@ -248,74 +243,30 @@ while v_frame < v_total_frames then
         v_px = v_x3 * v_scale * v_size + v_center_x
         v_py = v_y3 * v_scale * v_size + v_center_y
         
+        # Store normalized depth for intensity
+        v_d = v_z3
+        
         # Store calculated values in flattened arrays
         v_cached_x[v_index] = v_px
         v_cached_y[v_index] = v_py
-        v_cached_depth[v_index] = v_z3
+        v_cached_depth[v_index] = v_d
         
-        # Determine visibility (1 = front-facing/visible, 0 = back-facing)
-        if v_z3 >= 0 then
-            v_vertex_visible[v_index] = 1
-        else
-            v_vertex_visible[v_index] = 0
-        endif
-        
-        v_i = v_i + 1
-    endwhile
-    
-    # Calculate edge depths for this frame
-    v_i = 0
-    while v_i < 12 then
-        # Calculate array index for this edge in this frame
-        v_edge_index = v_frame * v_edges_per_frame + v_i
-        
-        # Get vertices for this edge - store as temporary integers to ensure correct indexing
-        v_start_idx = v_edge_start[v_i]
-        v_end_idx = v_edge_end[v_i]
-        
-        # Get vertex indices in the current frame
-        v_start_frame_idx = v_frame * v_vertices_per_frame + v_start_idx
-        v_end_frame_idx = v_frame * v_vertices_per_frame + v_end_idx
-        
-        # Calculate average depth for the edge
-        v_edge_depths[v_edge_index] = (v_cached_depth[v_start_frame_idx] + v_cached_depth[v_end_frame_idx]) / 2
-        
-        # Store the original edge index for sorting
-        v_edge_sort_order[v_edge_index] = v_i
-        
-        v_i = v_i + 1
-    endwhile
-    
-    # Sort edges by depth for this frame (bubble sort)
-    v_base_edge_index = v_frame * v_edges_per_frame
-    v_i = 0
-    while v_i < 11 then
-        v_j = 0
-        while v_j < 11 - v_i then
-            v_idx1 = v_base_edge_index + v_j
-            v_idx2 = v_base_edge_index + v_j + 1
-            
-            # Compare depths and swap if needed (back-to-front sorting)
-            if v_edge_depths[v_idx1] > v_edge_depths[v_idx2] then
-                # Swap depths
-                v_temp_depth = v_edge_depths[v_idx1]
-                v_edge_depths[v_idx1] = v_edge_depths[v_idx2]
-                v_edge_depths[v_idx2] = v_temp_depth
-                
-                # Swap edge indices
-                v_temp_edge = v_edge_sort_order[v_idx1]
-                v_edge_sort_order[v_idx1] = v_edge_sort_order[v_idx2]
-                v_edge_sort_order[v_idx2] = v_temp_edge
-            endif
-            
-            v_j = v_j + 1
-        endwhile
         v_i = v_i + 1
     endwhile
     
     # Progress indicator (every 45 frames = 8 indicators total)
     if v_frame % 45 == 0 then
         print(f"Pre-calculating... {v_frame / 3.6}% complete")
+        # Draw background dots
+        begin_frame
+        v_i = 0
+        while v_i < v_dot_size then
+            if random(1, 3, 0) % 3 == 0 then
+                plot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 80)
+                v_i = v_i + 1
+            endif
+        endwhile 
+        end_frame
     endif
     
     v_frame = v_frame + 1
@@ -323,14 +274,13 @@ endwhile
 
 print("Calculation complete. Starting animation...")
 
-# Animation loop - play back pre-calculated frames with optimizations
+# Animation loop - just play back pre-calculated frames
 v_current_frame = 0
 while 1 == 1 then
     begin_frame
     
-    # Calculate base indices for current frame
-    v_vertex_base = v_current_frame * v_vertices_per_frame
-    v_edge_base = v_current_frame * v_edges_per_frame
+    # Calculate base index for current frame
+    v_base_index = v_current_frame * v_vertices_per_frame
     
     # Draw background dots
     v_i = 0
@@ -339,52 +289,85 @@ while 1 == 1 then
         v_i = v_i + 1
     endwhile
     
-    # Draw edges in sorted order (back-to-front)
+    # Draw back edges
     v_i = 0
-    while v_i < 12 then
-        # Get the pre-sorted edge index - ensure it's an integer
-        v_edge_idx = v_edge_base + v_i
-        v_edge_sorted_idx = v_edge_sort_order[v_edge_idx]
-        
-        # Get vertices for this edge - ensure all indices are integers
-        v_start_idx = v_edge_start[v_edge_sorted_idx]
-        v_end_idx = v_edge_end[v_edge_sorted_idx]
-        
+    while v_i < 12 then  
         # Get indices for these vertices in the current frame
-        v_start_frame_idx = v_vertex_base + v_start_idx
-        v_end_frame_idx = v_vertex_base + v_end_idx
+        v_start_index = v_base_index + v_edge_start[v_i]
+        v_end_index = v_base_index + v_edge_end[v_i]
         
-        # Calculate depth for intensity
-        v_depth = v_edge_depths[v_edge_idx]
+        # Calculate average depth
+        v_avg_depth = (v_cached_depth[v_start_index] + v_cached_depth[v_end_index]) / 2
         
-        # Map depth to intensity (0.0 = back/dim, 1.0 = front/bright)
-        v_intensity = max(40 + ((v_depth + 1) / 2) * 60, 100)
-             
-        # Draw the edge with depth-based intensity
-        draw_line(v_cached_x[v_start_frame_idx], v_cached_y[v_start_frame_idx], v_cached_x[v_end_frame_idx], v_cached_y[v_end_frame_idx], v_edge_colors[v_edge_sorted_idx], v_intensity)
+        # Draw back edges first
+        if v_avg_depth < 0 then           
+            # Draw the edge
+            draw_line(v_cached_x[v_start_index], v_cached_y[v_start_index], v_cached_x[v_end_index], v_cached_y[v_end_index], v_edge_colors[v_i], 40 + ((v_avg_depth + 1) / 2) * 60)
+        endif
         
         v_i = v_i + 1
     endwhile
     
-    # Draw vertices based on visibility
+    # Draw back vertices
     v_i = 0
     while v_i < 8 then
         # Get index for this vertex in the current frame
-        v_vertex_idx = v_vertex_base + v_i
+        v_vertex_index = v_base_index + v_i
         
-        # Calculate depth for intensity
-        v_depth = v_cached_depth[v_vertex_idx]
+        # Get pre-calculated depth
+        v_depth = v_cached_depth[v_vertex_index]
         
-        # Map depth to intensity (0.0 = back/dim, 1.0 = front/bright)
-        v_intensity = max(40 + ((v_depth + 1) / 2) * 60, 100)
-        
-        # Draw the vertex with appropriate intensity
-        draw_circle(v_cached_x[v_vertex_idx], v_cached_y[v_vertex_idx], 2, v_colors[v_i], v_intensity, true)
+        if v_depth < 0 then          
+            # Draw vertex
+            draw_circle(v_cached_x[v_vertex_index], v_cached_y[v_vertex_index], 2, v_colors[v_i], 40 + ((v_depth + 1) / 2) * 60, true)
+        endif
         
         v_i = v_i + 1
     endwhile
     
-    # Update frame counter with wrap-around
+    # Draw front edges
+    v_i = 0
+    while v_i < 12 then    
+        # Get indices for these vertices in the current frame
+        v_start_index = v_base_index + v_edge_start[v_i]
+        v_end_index = v_base_index + v_edge_end[v_i]
+        
+        # Calculate average depth
+        v_avg_depth = (v_cached_depth[v_start_index] + v_cached_depth[v_end_index]) / 2
+        
+        # Draw front edges
+        if v_avg_depth >= 0 then       
+            # Draw the edge
+            draw_line(v_cached_x[v_start_index], v_cached_y[v_start_index], v_cached_x[v_end_index], v_cached_y[v_end_index], v_edge_colors[v_i], min(40 + ((v_avg_depth + 1) / 2) * 60, 100) )
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Draw front vertices
+    v_i = 0
+    while v_i < 8 then
+        # Get index for this vertex in the current frame
+        v_vertex_index = v_base_index + v_i
+        
+        # Get pre-calculated depth
+        v_depth = v_cached_depth[v_vertex_index]
+        
+        if v_depth >= 0 then
+            # Map depth to intensity (front vertices are brighter)
+            v_intensity = 40 + ((v_depth + 1) / 2) * 60
+            if v_intensity > 100 then
+                v_intensity = 100
+            endif
+            
+            # Draw vertex
+            draw_circle(v_cached_x[v_vertex_index], v_cached_y[v_vertex_index], 2, v_colors[v_i], v_intensity, true)
+        endif
+        
+        v_i = v_i + 1
+    endwhile
+    
+    # Update frame counter (with wrap-around)
     v_current_frame = v_current_frame + 1
     if v_current_frame >= v_total_frames then
         v_current_frame = 0
