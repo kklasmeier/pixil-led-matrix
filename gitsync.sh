@@ -1,28 +1,24 @@
 #!/bin/bash
-
 # Interactive Git script for managing GitHub pushes
 # Run from the root of your Git repository
-
 # Ensure we're in a Git repository
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     echo "Error: This directory is not a Git repository. Please navigate to your project root."
     exit 1
 fi
-
 echo "=== GitHub Interaction Script ==="
 echo "Current directory: $(pwd)"
 echo "Repository: $(git remote -v | grep fetch | awk '{print $2}')"
 echo "Current branch: $(git branch --show-current)"
 echo ""
-
 # Step 1: Show current Git status
 echo "=== Checking Git Status ==="
 git status
 echo ""
-
 # Step 2: Stage changes interactively
 echo "=== Staging Changes ==="
-read -p "Do you want to stage all changes? (y/n): " stage_all
+read -p "Do you want to stage all changes? (Y/n): " stage_all
+stage_all=${stage_all:-y}
 if [ "$stage_all" = "y" ] || [ "$stage_all" = "Y" ]; then
     echo "Staging all changes..."
     git add .
@@ -41,13 +37,11 @@ else
     fi
 fi
 echo ""
-
-# Step 3: Check if there’s anything to commit
+# Step 3: Check if there's anything to commit
 if git diff --cached --quiet; then
     echo "Nothing staged to commit. Exiting."
     exit 0
 fi
-
 # Step 4: Commit changes
 echo "=== Committing Changes ==="
 echo "Current staged changes:"
@@ -63,11 +57,11 @@ git commit -m "$commit_message"
 echo "Commit complete:"
 git log -1 --oneline
 echo ""
-
 # Step 5: Push to GitHub
 echo "=== Pushing to GitHub ==="
 current_branch=$(git branch --show-current)
-read -p "Push to 'origin $current_branch'? (y/n): " push_confirm
+read -p "Push to 'origin $current_branch'? (Y/n): " push_confirm
+push_confirm=${push_confirm:-y}
 if [ "$push_confirm" = "y" ] || [ "$push_confirm" = "Y" ]; then
     echo "Pushing to 'origin/$current_branch'..."
     git push origin "$current_branch"
@@ -81,16 +75,15 @@ else
     echo "Push skipped. Your changes are committed locally but not on GitHub."
 fi
 echo ""
-
 # Step 6: Final status check
 echo "=== Final Check ==="
-read -p "Would you like to see the current Git status? (y/n): " status_confirm
+read -p "Would you like to see the current Git status? (Y/n): " status_confirm
+status_confirm=${status_confirm:-y}
 if [ "$status_confirm" = "y" ] || [ "$status_confirm" = "Y" ]; then
     echo "Running 'git status'..."
     git status
 else
     echo "Skipping status check."
 fi
-
 echo ""
 echo "=== Done! ==="
