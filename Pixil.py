@@ -22,6 +22,27 @@ from pixil_utils import (ScriptManager, parse_args,
 from pixil_utils.array_manager import PixilArray
 from collections import OrderedDict  # Make sure this is imported
 
+def is_headless():
+    """Detect if running in a headless/non-interactive environment"""
+    import os
+    try:
+        # Check if stdin is connected to a terminal
+        return not os.isatty(sys.stdin.fileno())
+    except:
+        # If checking fails, assume headless
+        return True
+    
+# Override terminal functions if in headless mode
+if is_headless():
+    print("Detected headless mode - disabling terminal interactions")
+    # These overrides need to happen before the functions are imported elsewhere
+    from pixil_utils import terminal_handler
+    # Replace functions with no-op versions
+    terminal_handler.initialize_terminal = lambda: None
+    terminal_handler.start_terminal = lambda: None
+    terminal_handler.stop_terminal = lambda: None
+    terminal_handler.check_spacebar = lambda: False
+
 # Performance metrics tracking
 _metrics = {
     'commands_processed': 0,      # Total drawing commands processed
@@ -988,6 +1009,20 @@ def signal_handler(signum, frame):
     print("\nInitiating graceful shutdown sequence...")
     # Report metrics with "interrupted" reason
     report_metrics("interrupted")
+
+    # Check if in headless mode
+    if is_headless():
+        print("\nHeadless mode shutdown initiated...")
+        # Simplified, non-interactive cleanup
+        report_metrics("interrupted")
+        if queue_instance:
+            queue_instance.put_command('clear', force_instant=True)
+            queue_instance.stop_consumer()
+        sys.exit(0)
+    else:
+        # Your existing interactive cleanup code
+        print("\nInitiating graceful shutdown sequence...")
+        # Rest of your existing function...
 
     try:
         if queue_instance:
