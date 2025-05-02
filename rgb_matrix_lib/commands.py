@@ -81,33 +81,49 @@ class CommandExecutor:
         return cmd_name, params
 
     def _parse_parameters(self, params_str: str) -> List[Any]:
-        """Parse parameter string into typed values."""
+        """
+        Parse parameter string into typed values with robust quote and escape handling.
+        Properly handles:
+        - Quoted strings with commas and special characters
+        - Escaped quotes within quoted strings
+        - Nested quotes with proper escaping
+        """
         if not params_str:
             return []
                 
         params = []
         current_param = ""
         in_quotes = False
+        escape_next = False
         i = 0
         
         while i < len(params_str):
             char = params_str[i]
             
+            # Handle escape sequences
+            if escape_next:
+                # Add the escaped character as-is
+                current_param += char
+                escape_next = False
+                i += 1
+                continue
+                
+            # Check for escape character
+            if char == '\\':
+                current_param += char  # Keep the escape character in the parameter
+                escape_next = True
+                i += 1
+                continue
+                
+            # Handle quotes
             if char == '"':
-                if in_quotes:
-                    if i + 1 < len(params_str) and params_str[i + 1] == '"':
-                        current_param += '"'
-                        i += 2
-                        continue
-                    else:
-                        in_quotes = False
-                        i += 1
-                        continue
-                else:
-                    in_quotes = True
-                    i += 1
-                    continue
+                current_param += char  # Keep the quote character in the parameter
+                if not escape_next:  # Only toggle quote state if not escaped
+                    in_quotes = not in_quotes
+                i += 1
+                continue
                     
+            # Handle parameter separation (only outside quotes)
             if char == ',' and not in_quotes:
                 param = current_param.strip()
                 if param:
@@ -116,16 +132,21 @@ class CommandExecutor:
                 i += 1
                 continue
                 
+            # Default: add character to current parameter
             current_param += char
             i += 1
         
+        # Add the last parameter
         if current_param.strip():
             params.append(self._convert_parameter(current_param.strip()))
         
+        # Debug output
+        debug(f"Parsed parameters: {params}", Level.DEBUG, Component.COMMAND)
+        
         return params
-
+    
     def _convert_parameter(self, param: str) -> Any:
-        """Convert a parameter string to its appropriate type."""
+        """Convert a parameter string to its appropriate type with escape handling."""
         # Handle boolean values
         if param.lower() == 'true':
             return True
@@ -140,8 +161,31 @@ class CommandExecutor:
         except ValueError:
             # Return as string for named colors, text, etc.
             if param.startswith('"') and param.endswith('"'):
-                inner_text = param[1:-1].replace('""', '"')
-                return inner_text
+                # Extract quoted string content and process escape sequences
+                inner_text = param[1:-1]
+                
+                # Process escape sequences
+                i = 0
+                result = ""
+                while i < len(inner_text):
+                    if inner_text[i] == '\\' and i + 1 < len(inner_text):
+                        # Handle various escape sequences
+                        if inner_text[i+1] in ['"', '\\', 'n', 't', 'r']:
+                            if inner_text[i+1] == 'n':
+                                result += '\n'
+                            elif inner_text[i+1] == 't':
+                                result += '\t'
+                            elif inner_text[i+1] == 'r':
+                                result += '\r'
+                            else:  # " or \
+                                result += inner_text[i+1]
+                            i += 2
+                            continue
+                    # Normal character
+                    result += inner_text[i]
+                    i += 1
+                    
+                return result
             return param
 
     def _execute_parsed_command(self, cmd_name: str, params: List[Any]) -> None:

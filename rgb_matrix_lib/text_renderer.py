@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw
 from typing import Dict, Tuple, Optional
 from .fonts import get_font_manager, FontError
 from .text_effects import TextEffect, EffectModifier, validate_effect_modifier
+from .bitmap_font import BitmapFontAdapter
 import time
 import math
 import random
@@ -35,6 +36,22 @@ class TextRenderer:
         """Get bounds of text at specific coordinates"""
         return self._text_bounds.get((x, y))
 
+
+    def _render_normal(self, img: Image.Image, x: int, y: int, color: Tuple[int, int, int]) -> None:
+        """Render text normally (all at once)."""
+        pixels = img.load()
+        matrix_width = self._api.matrix.width
+        matrix_height = self._api.matrix.height
+        self._api.begin_frame(True)
+        for y_offset in range(img.height):
+            plot_y = y + y_offset
+            if 0 <= plot_y < matrix_height:
+                for x_offset in range(img.width):
+                    plot_x = x + x_offset
+                    if 0 <= plot_x < matrix_width and pixels[x_offset, y_offset] != (0, 0, 0):
+                        self._api.plot(plot_x, plot_y, color)
+        self._api.end_frame()
+        
     def render_text(self, x: int, y: int, text: str, font_name: str, font_size: int, 
                     color: Tuple[int, int, int], effect: TextEffect = TextEffect.NORMAL,
                     modifier: Optional[EffectModifier] = None) -> None:
@@ -51,22 +68,48 @@ class TextRenderer:
             effect: Text effect to apply
             modifier: Effect modifier (if applicable)
         """
+        # Get font from the manager
         font = get_font_manager().get_font(font_name, font_size)
-        text_width, text_height = font.getsize(text)
         
-        img = Image.new('RGB', (text_width, text_height), color=(0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        draw.text((0, 0), text, font=font, fill=(255, 255, 255))
+        # Check if we're using the bitmap font
+        using_bitmap_font = isinstance(font, BitmapFontAdapter)
         
+        if using_bitmap_font:
+            # Get text dimensions from bitmap font
+            text_width, text_height = font.getsize(text)
+            
+            # Get bitmap font image
+            bitmap_manager = font.font_manager
+            img = bitmap_manager.create_text_image(text)
+            if img is None:
+                # Handle error - create minimal image
+                img = Image.new('RGB', (1, 5), color=(0, 0, 0))
+                text_width, text_height = 1, 5
+        else:
+            # Existing code for PIL fonts
+            text_width, text_height = font.getsize(text)
+            
+            img = Image.new('RGB', (text_width, text_height), color=(0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.text((0, 0), text, font=font, fill=(255, 255, 255))
+        
+        # Update text bounds tracking
         self._text_bounds[(x, y)] = TextBounds(x, y, text_width, text_height)
         
+        # Apply the selected effect (existing code continues)
         if effect == TextEffect.NORMAL:
             self._render_normal(img, x, y, color)
         elif effect == TextEffect.TYPE:
             if modifier is None:
                 modifier = EffectModifier.MEDIUM
             validate_effect_modifier(effect, modifier)
-            self._render_type(img, x, y, text, color, modifier, font_name, font_size)
+            
+            if using_bitmap_font:
+                # For bitmap fonts, we use a direct rendering approach for TYPE
+                self._render_bitmap_type(text, x, y, color, modifier, font)
+            else:
+                # Use existing implementation for PIL fonts
+                self._render_type(img, x, y, text, color, modifier, font_name, font_size)
         elif effect == TextEffect.SCAN:
             self._render_scan(img, x, y, color)
         elif effect == TextEffect.SLIDE:
@@ -81,6 +124,78 @@ class TextRenderer:
         else:
             raise NotImplementedError(f"Effect {effect.name} not yet implemented")
 
+    def _render_bitmap_type(self, text: str, x: int, y: int, color: Tuple[int, int, int], 
+                        modifier: EffectModifier, font_adapter: BitmapFontAdapter) -> None:
+        """
+        Render bitmap font text with typewriter effect.
+        This is optimized for bitmap fonts to avoid recreating images.
+        
+        Args:
+            text: Text to display
+            x: X coordinate
+            y: Y coordinate
+            color: RGB color
+            modifier: Speed modifier
+            font_adapter: BitmapFontAdapter instance
+        """
+        bitmap_manager = font_adapter.font_manager
+        
+        # Determine typing speed
+        if modifier == EffectModifier.SLOW:
+            char_delay = 0.2
+        elif modifier == EffectModifier.FAST:
+            char_delay = 0.05
+        else:  # MEDIUM
+            char_delay = 0.1
+        
+        current_x = x
+        cursor_rgb = (0, 255, 255)  # Cyan cursor
+        
+        for i, char in enumerate(text):
+            # Get character bitmap
+            bitmap = bitmap_manager.get_char_bitmap(char)
+            if not bitmap:
+                # Skip unknown characters
+                current_x += 2  # Default width + spacing
+                continue
+            
+            # Use actual width from bitmap
+            char_width = len(bitmap[0])
+            char_height = len(bitmap)
+            
+            # Determine if this character has a descender
+            is_descender = char in bitmap_manager.descenders
+            
+            # Calculate vertical offset for descenders
+            y_offset = 0
+            if is_descender:
+                # No vertical offset needed in our implementation
+                # since descenders just have an extra row at the bottom
+                pass
+            
+            # Draw the character
+            self._api.begin_frame(True)
+            for py, row in enumerate(bitmap):
+                for px, pixel in enumerate(row):
+                    if pixel == '1':
+                        self._api.plot(current_x + px, y + y_offset + py, color)
+                        
+            # Draw cursor after character
+            for cy in range(char_height):
+                self._api.plot(current_x + char_width, y + y_offset + cy, cursor_rgb)
+                
+            self._api.end_frame()
+            time.sleep(char_delay)
+            
+            # Clear cursor
+            self._api.begin_frame(True)
+            for cy in range(char_height):
+                self._api.plot(current_x + char_width, y + y_offset + cy, (0, 0, 0))
+            self._api.end_frame()
+            
+            # Move to next character position
+            current_x += char_width + 1  # Add spacing
+            
     def clear_text(self, x: int, y: int) -> None:
         """
         Clear text at the specified coordinates.
@@ -94,7 +209,7 @@ class TextRenderer:
             matrix_width = self._api.matrix.width
             matrix_height = self._api.matrix.height
             
-            self._api.execute_command("begin_frame(true)")
+            self._api.begin_frame(True)
             for py in range(bounds.height):
                 plot_y = bounds.y + py
                 if 0 <= plot_y < matrix_height:
@@ -102,24 +217,9 @@ class TextRenderer:
                         plot_x = bounds.x + px
                         if 0 <= plot_x < matrix_width:
                             self._api.plot(plot_x, plot_y, (0, 0, 0))  # Black to clear
-            self._api.execute_command("end_frame")
+            self._api.end_frame()
             
             self._clear_tracking(x, y)
-
-    def _render_normal(self, img: Image.Image, x: int, y: int, color: Tuple[int, int, int]) -> None:
-        """Render text normally (all at once)."""
-        pixels = img.load()
-        matrix_width = self._api.matrix.width
-        matrix_height = self._api.matrix.height
-        self._api.begin_frame(True)
-        for y_offset in range(img.height):
-            plot_y = y + y_offset
-            if 0 <= plot_y < matrix_height:
-                for x_offset in range(img.width):
-                    plot_x = x + x_offset
-                    if 0 <= plot_x < matrix_width and pixels[x_offset, y_offset] != (0, 0, 0):
-                        self._api.plot(plot_x, plot_y, color)
-        self._api.end_frame()
 
     def _render_type(self, img: Image.Image, x: int, y: int, text: str, color: Tuple[int, int, int], 
                      modifier: EffectModifier, font_name: str, font_size: int) -> None:
