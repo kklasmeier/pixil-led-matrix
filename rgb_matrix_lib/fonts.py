@@ -1,7 +1,8 @@
 # fonts.py
 import os
 from PIL import ImageFont
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union
+from .bitmap_font import BitmapFontAdapter  # Import our new adapter
 
 class FontError(Exception):
     """
@@ -18,9 +19,20 @@ class FontError(Exception):
 class FontManager:
     """Manages font discovery and caching"""
     
+    _instance = None  # Singleton instance
+
+    @classmethod
+    def get_instance(cls) -> 'FontManager':
+        """Get or create the singleton instance of FontManager"""
+        if cls._instance is None:
+            cls._instance = FontManager()
+        return cls._instance
+
     def __init__(self):
         # Cache of found font paths (name -> path)
         self._font_paths: Dict[str, str] = {}
+        # Cache of loaded fonts (name, size) -> font object
+        self._loaded_fonts: Dict[tuple, Any] = {}
         # Flag to track if we've scanned for fonts
         self._initialized = False
         
@@ -67,7 +79,7 @@ class FontManager:
         except Exception:
             return False
 
-    def get_font(self, font_name: str, size: int) -> ImageFont.ImageFont:
+    def get_font(self, font_name: str, size: int) -> Union[ImageFont.ImageFont, BitmapFontAdapter]:
         """
         Get a font by name and size.
         
@@ -76,17 +88,35 @@ class FontManager:
             size: Font size in pixels
             
         Returns:
-            PIL.ImageFont.ImageFont object
+            PIL.ImageFont.ImageFont object or BitmapFontAdapter
             
         Raises:
             FontError if font not found or can't be loaded
         """
+        # Special case for our bitmap font
+        if font_name.lower() == "tiny64_font":
+            # Check if we've already loaded this font
+            cache_key = ("tiny64_font", size)
+            if cache_key in self._loaded_fonts:
+                return self._loaded_fonts[cache_key]
+                
+            # Create a new adapter
+            bitmap_adapter = BitmapFontAdapter(size)
+            self._loaded_fonts[cache_key] = bitmap_adapter
+            return bitmap_adapter
+            
+        # Normal font loading process
         # Initialize if needed
         if not self._initialized:
             self._scan_font_directories()
 
         # Convert font name to lowercase for case-insensitive matching
         font_name = font_name.lower()
+        
+        # Check if we've already loaded this font/size
+        cache_key = (font_name, size)
+        if cache_key in self._loaded_fonts:
+            return self._loaded_fonts[cache_key]
 
         # Check if font exists
         if font_name not in self._font_paths:
@@ -101,7 +131,10 @@ class FontManager:
             raise FontError(f"Font file '{font_path}' exists but cannot be loaded")
 
         try:
-            return ImageFont.truetype(font_path, size)
+            font = ImageFont.truetype(font_path, size)
+            # Cache this font
+            self._loaded_fonts[cache_key] = font
+            return font
         except Exception as e:
             raise FontError(f"Error loading font '{font_name}': {str(e)}")
 
@@ -116,8 +149,12 @@ class FontManager:
         if not self._initialized:
             self._scan_font_directories()
             
+        # Add our bitmap font to the list
+        fonts = list(sorted(self._font_paths.keys()))
+        fonts.append("tiny64_font")
+        
         # Return sorted list of font names
-        return sorted(self._font_paths.keys())
+        return sorted(fonts)
 
 # Global font manager instance
 _font_manager: Optional[FontManager] = None

@@ -20,6 +20,25 @@ def validate_color_value(value: Union[str, int, float]) -> int:
     except (ValueError, TypeError):
         raise ValueError(f"Cannot convert {value} to valid integer")
 
+def escape_string(s: str) -> str:
+    """
+    Escape special characters in a string for use in commands.
+    
+    Args:
+        s: The string to escape
+        
+    Returns:
+        Escaped string with proper backslash sequences
+    """
+    if not isinstance(s, str):
+        return s
+        
+    # Replace backslashes first to avoid double-escaping
+    result = s.replace('\\', '\\\\')
+    # Then escape quotes
+    result = result.replace('"', '\\"')
+    return result
+
 def format_parameter(value: Any, command: str, position: int, variables: dict) -> str:
     """Format parameter value for command string construction."""
     try:
@@ -27,6 +46,32 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
         param_name = PARAMETER_TYPES[command][position]['name']
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Formatting parameter: {value} (type: {target_type}, name: {param_name})", DEBUG_VERBOSE)
+
+        # Special handling for text content in draw_text command
+        if command == 'draw_text' and position == 2 and target_type == 'str':
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Special handling for draw_text text content: {value}", DEBUG_VERBOSE)
+            
+            # If it's already a quoted string, extract and re-escape it
+            if isinstance(value, str) and value.startswith('"') and value.endswith('"'):
+                inner_text = value[1:-1]  # Remove existing quotes
+                escaped_text = escape_string(inner_text)
+                return f'"{escaped_text}"'
+            
+            # For variables or expressions that evaluate to strings
+            if isinstance(value, str) and (has_math_expression(value) or value.startswith('v_')):
+                try:
+                    result = evaluate_math_expression(value, variables)
+                    if isinstance(result, str):
+                        escaped_text = escape_string(result)
+                        return f'"{escaped_text}"'
+                except Exception as e:
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Error evaluating expression for text: {e}", DEBUG_VERBOSE)
+            
+            # Direct string value
+            escaped_text = escape_string(str(value))
+            return f'"{escaped_text}"'
 
         # Handle direct quoted strings
         if isinstance(value, str) and value.startswith('"') and value.endswith('"'):
@@ -74,5 +119,5 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
 
     except Exception as e:
         raise ValueError(f"Error formatting parameter '{value}' for {command} position {position}: {str(e)}")
-            
+                
 __all__ = ['format_parameter']

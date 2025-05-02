@@ -148,7 +148,8 @@ def get_parameter_type(command: str, position: int) -> ParamType:
 
 def split_command_parameters(param_string: str) -> List[str]:
     """
-    Split command parameters while preserving nested function calls and expressions.
+    Split command parameters while preserving nested function calls, expressions,
+    and quoted strings with special characters.
     
     Args:
         param_string: Raw parameter string from command
@@ -157,21 +158,43 @@ def split_command_parameters(param_string: str) -> List[str]:
         List of individual parameter strings
         
     Example:
-        "32, round(10 - random(1, 5, 1), 2), red" ->
-        ["32", "round(10 - random(1, 5, 1), 2)", "red"]
+        '32, round(10 - random(1, 5, 1), 2), "Hello, World!"' ->
+        ["32", "round(10 - random(1, 5, 1), 2)", '"Hello, World!"']
     """
     params = []
     current_param = ""
     paren_level = 0
+    in_quotes = False
+    escape_next = False
     
     for char in param_string:
-        if char == '(':
+        # Handle escape sequences
+        if escape_next:
+            current_param += char
+            escape_next = False
+            continue
+            
+        # Check for escape character
+        if char == '\\':
+            current_param += char
+            escape_next = True
+            continue
+        
+        # Handle quotes
+        if char == '"' and not escape_next:
+            in_quotes = not in_quotes
+            current_param += char
+            continue
+            
+        # Handle parentheses for nested expressions
+        if char == '(' and not in_quotes:
             paren_level += 1
             current_param += char
-        elif char == ')':
+        elif char == ')' and not in_quotes:
             paren_level -= 1
             current_param += char
-        elif char == ',' and paren_level == 0:
+        # Only split on commas that are not in quotes and not in parentheses
+        elif char == ',' and paren_level == 0 and not in_quotes:
             params.append(current_param.strip())
             current_param = ""
         else:
