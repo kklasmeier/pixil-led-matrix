@@ -4,7 +4,7 @@
 # Different burnout modes cycle randomly
 
 # Initialize variables
-throttle(0)
+throttle(0.1)
 v_cycle = 0            # Current cycle counter
 v_path_length = 126    # Full path length (63 steps forward + 63 steps back)
 v_delay = 0.00         # Delay between frames (can be set to 0 for maximum speed)
@@ -92,42 +92,121 @@ v_dot8_start_y = 63
 v_dot8_end_x = 16
 v_dot8_end_y = 0
 
-# Precalculate all path positions for each dot
+# Precalculate all path positions for each dot using the same curved path pattern
 # First half: start to end (0-63)
 for v_step in (0, 63, 1)
     v_progress = v_step / 63
     
-    # Dot 1 path
-    v_dot1_x[v_step] = v_dot1_start_x + (v_dot1_end_x - v_dot1_start_x) * v_progress
-    v_dot1_y[v_step] = v_dot1_start_y + (v_dot1_end_y - v_dot1_start_y) * v_progress
+    # Use a consistent curve pattern for all dots
+    # We'll use a single-direction curve that only bends one way
     
-    # Dot 2 path
-    v_dot2_x[v_step] = v_dot2_start_x + (v_dot2_end_x - v_dot2_start_x) * v_progress
-    v_dot2_y[v_step] = v_dot2_start_y + (v_dot2_end_y - v_dot2_start_y) * v_progress
+    # Calculate position along the straight line path
+    v_straight_x1 = v_dot1_start_x + (v_dot1_end_x - v_dot1_start_x) * v_progress
+    v_straight_y1 = v_dot1_start_y + (v_dot1_end_y - v_dot1_start_y) * v_progress
     
-    # Dot 3 path
-    v_dot3_x[v_step] = v_dot3_start_x + (v_dot3_end_x - v_dot3_start_x) * v_progress
-    v_dot3_y[v_step] = v_dot3_start_y + (v_dot3_end_y - v_dot3_start_y) * v_progress
+    v_straight_x2 = v_dot2_start_x + (v_dot2_end_x - v_dot2_start_x) * v_progress
+    v_straight_y2 = v_dot2_start_y + (v_dot2_end_y - v_dot2_start_y) * v_progress
     
-    # Dot 4 path
-    v_dot4_x[v_step] = v_dot4_start_x + (v_dot4_end_x - v_dot4_start_x) * v_progress
-    v_dot4_y[v_step] = v_dot4_start_y + (v_dot4_end_y - v_dot4_start_y) * v_progress
+    v_straight_x3 = v_dot3_start_x + (v_dot3_end_x - v_dot3_start_x) * v_progress
+    v_straight_y3 = v_dot3_start_y + (v_dot3_end_y - v_dot3_start_y) * v_progress
     
-    # Dot 5 path
-    v_dot5_x[v_step] = v_dot5_start_x + (v_dot5_end_x - v_dot5_start_x) * v_progress
-    v_dot5_y[v_step] = v_dot5_start_y + (v_dot5_end_y - v_dot5_start_y) * v_progress
+    v_straight_x4 = v_dot4_start_x + (v_dot4_end_x - v_dot4_start_x) * v_progress
+    v_straight_y4 = v_dot4_start_y + (v_dot4_end_y - v_dot4_start_y) * v_progress
     
-    # Dot 6 path
-    v_dot6_x[v_step] = v_dot6_start_x + (v_dot6_end_x - v_dot6_start_x) * v_progress
-    v_dot6_y[v_step] = v_dot6_start_y + (v_dot6_end_y - v_dot6_start_y) * v_progress
+    v_straight_x5 = v_dot5_start_x + (v_dot5_end_x - v_dot5_start_x) * v_progress
+    v_straight_y5 = v_dot5_start_y + (v_dot5_end_y - v_dot5_start_y) * v_progress
     
-    # Dot 7 path
-    v_dot7_x[v_step] = v_dot7_start_x + (v_dot7_end_x - v_dot7_start_x) * v_progress
-    v_dot7_y[v_step] = v_dot7_start_y + (v_dot7_end_y - v_dot7_start_y) * v_progress
+    v_straight_x6 = v_dot6_start_x + (v_dot6_end_x - v_dot6_start_x) * v_progress
+    v_straight_y6 = v_dot6_start_y + (v_dot6_end_y - v_dot6_start_y) * v_progress
     
-    # Dot 8 path
-    v_dot8_x[v_step] = v_dot8_start_x + (v_dot8_end_x - v_dot8_start_x) * v_progress
-    v_dot8_y[v_step] = v_dot8_start_y + (v_dot8_end_y - v_dot8_start_y) * v_progress
+    v_straight_x7 = v_dot7_start_x + (v_dot7_end_x - v_dot7_start_x) * v_progress
+    v_straight_y7 = v_dot7_start_y + (v_dot7_end_y - v_dot7_start_y) * v_progress
+    
+    v_straight_x8 = v_dot8_start_x + (v_dot8_end_x - v_dot8_start_x) * v_progress
+    v_straight_y8 = v_dot8_start_y + (v_dot8_end_y - v_dot8_start_y) * v_progress
+    
+    # Calculate perpendicular offsets for the curve
+    # For each dot, we need to find the perpendicular direction to its path
+    
+    # Dot 1: Vertical path, so perpendicular is horizontal
+    v_perp_x1 = 1
+    v_perp_y1 = 0
+    
+    # Dot 2: Calculate perpendicular to diagonal path
+    v_dir_x2 = v_dot2_end_x - v_dot2_start_x
+    v_dir_y2 = v_dot2_end_y - v_dot2_start_y
+    v_len2 = sqrt(v_dir_x2 * v_dir_x2 + v_dir_y2 * v_dir_y2)
+    v_perp_x2 = -v_dir_y2 / v_len2
+    v_perp_y2 = v_dir_x2 / v_len2
+    
+    # Dot 3: Calculate perpendicular to diagonal path
+    v_dir_x3 = v_dot3_end_x - v_dot3_start_x
+    v_dir_y3 = v_dot3_end_y - v_dot3_start_y
+    v_len3 = sqrt(v_dir_x3 * v_dir_x3 + v_dir_y3 * v_dir_y3)
+    v_perp_x3 = -v_dir_y3 / v_len3
+    v_perp_y3 = v_dir_x3 / v_len3
+    
+    # Dot 4: Calculate perpendicular to diagonal path
+    v_dir_x4 = v_dot4_end_x - v_dot4_start_x
+    v_dir_y4 = v_dot4_end_y - v_dot4_start_y
+    v_len4 = sqrt(v_dir_x4 * v_dir_x4 + v_dir_y4 * v_dir_y4)
+    v_perp_x4 = -v_dir_y4 / v_len4
+    v_perp_y4 = v_dir_x4 / v_len4
+    
+    # Dot 5: Horizontal path, so perpendicular is vertical
+    v_perp_x5 = 0
+    v_perp_y5 = 1
+    
+    # Dot 6: Calculate perpendicular to diagonal path
+    v_dir_x6 = v_dot6_end_x - v_dot6_start_x
+    v_dir_y6 = v_dot6_end_y - v_dot6_start_y
+    v_len6 = sqrt(v_dir_x6 * v_dir_x6 + v_dir_y6 * v_dir_y6)
+    v_perp_x6 = -v_dir_y6 / v_len6
+    v_perp_y6 = v_dir_x6 / v_len6
+    
+    # Dot 7: Calculate perpendicular to diagonal path
+    v_dir_x7 = v_dot7_end_x - v_dot7_start_x
+    v_dir_y7 = v_dot7_end_y - v_dot7_start_y
+    v_len7 = sqrt(v_dir_x7 * v_dir_x7 + v_dir_y7 * v_dir_y7)
+    v_perp_x7 = -v_dir_y7 / v_len7
+    v_perp_y7 = v_dir_x7 / v_len7
+    
+    # Dot 8: Calculate perpendicular to diagonal path
+    v_dir_x8 = v_dot8_end_x - v_dot8_start_x
+    v_dir_y8 = v_dot8_end_y - v_dot8_start_y
+    v_len8 = sqrt(v_dir_x8 * v_dir_x8 + v_dir_y8 * v_dir_y8)
+    v_perp_x8 = -v_dir_y8 / v_len8
+    v_perp_y8 = v_dir_x8 / v_len8
+    
+    # For an even more dramatic curve 
+    v_curve_amplitude = 48  # Very pronounced curve
+    v_offset = v_curve_amplitude * v_progress * (1 - v_progress)
+
+
+    # Apply the offset perpendicular to the path direction
+    v_dot1_x[v_step] = v_straight_x1 + v_perp_x1 * v_offset
+    v_dot1_y[v_step] = v_straight_y1 + v_perp_y1 * v_offset
+    
+    v_dot2_x[v_step] = v_straight_x2 + v_perp_x2 * v_offset
+    v_dot2_y[v_step] = v_straight_y2 + v_perp_y2 * v_offset
+    
+    v_dot3_x[v_step] = v_straight_x3 + v_perp_x3 * v_offset
+    v_dot3_y[v_step] = v_straight_y3 + v_perp_y3 * v_offset
+    
+    v_dot4_x[v_step] = v_straight_x4 + v_perp_x4 * v_offset
+    v_dot4_y[v_step] = v_straight_y4 + v_perp_y4 * v_offset
+    
+    v_dot5_x[v_step] = v_straight_x5 + v_perp_x5 * v_offset
+    v_dot5_y[v_step] = v_straight_y5 + v_perp_y5 * v_offset
+    
+    v_dot6_x[v_step] = v_straight_x6 + v_perp_x6 * v_offset
+    v_dot6_y[v_step] = v_straight_y6 + v_perp_y6 * v_offset
+    
+    v_dot7_x[v_step] = v_straight_x7 + v_perp_x7 * v_offset 
+    v_dot7_y[v_step] = v_straight_y7 + v_perp_y7 * v_offset
+    
+    v_dot8_x[v_step] = v_straight_x8 + v_perp_x8 * v_offset
+    v_dot8_y[v_step] = v_straight_y8 + v_perp_y8 * v_offset
 endfor v_step
 
 # Second half: end to start (64-125)
@@ -135,35 +214,21 @@ for v_step in (0, 61, 1)
     v_idx = v_step + 64
     v_src = 63 - v_step
     
-    # Dot 1 path return
+    # Copy the return path from the first half
     v_dot1_x[v_idx] = v_dot1_x[v_src]
     v_dot1_y[v_idx] = v_dot1_y[v_src]
-    
-    # Dot 2 path return
     v_dot2_x[v_idx] = v_dot2_x[v_src]
     v_dot2_y[v_idx] = v_dot2_y[v_src]
-    
-    # Dot 3 path return
     v_dot3_x[v_idx] = v_dot3_x[v_src]
     v_dot3_y[v_idx] = v_dot3_y[v_src]
-    
-    # Dot 4 path return
     v_dot4_x[v_idx] = v_dot4_x[v_src]
     v_dot4_y[v_idx] = v_dot4_y[v_src]
-    
-    # Dot 5 path return
     v_dot5_x[v_idx] = v_dot5_x[v_src]
     v_dot5_y[v_idx] = v_dot5_y[v_src]
-    
-    # Dot 6 path return
     v_dot6_x[v_idx] = v_dot6_x[v_src]
     v_dot6_y[v_idx] = v_dot6_y[v_src]
-    
-    # Dot 7 path return
     v_dot7_x[v_idx] = v_dot7_x[v_src]
     v_dot7_y[v_idx] = v_dot7_y[v_src]
-    
-    # Dot 8 path return
     v_dot8_x[v_idx] = v_dot8_x[v_src]
     v_dot8_y[v_idx] = v_dot8_y[v_src]
 endfor v_step
