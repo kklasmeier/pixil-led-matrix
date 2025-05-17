@@ -4,7 +4,7 @@
 # Different burnout modes cycle randomly
 
 # Initialize variables
-throttle(0)
+throttle(0.1)
 v_cycle = 0            # Current cycle counter
 v_path_length = 126    # Full path length (63 steps forward + 63 steps back)
 v_delay = 0.00         # Delay between frames (can be set to 0 for maximum speed)

@@ -48,31 +48,38 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
             debug_print(f"Formatting parameter: {value} (type: {target_type}, name: {param_name})", DEBUG_VERBOSE)
 
         # Special handling for text content in draw_text command
+        # This is the key change that addresses the variable resolution issue
         if command == 'draw_text' and position == 2 and target_type == 'str':
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Special handling for draw_text text content: {value}", DEBUG_VERBOSE)
             
-            # If it's already a quoted string, extract and re-escape it
+            # If it's already a quoted string, return as is
             if isinstance(value, str) and value.startswith('"') and value.endswith('"'):
-                inner_text = value[1:-1]  # Remove existing quotes
-                escaped_text = escape_string(inner_text)
-                return f'"{escaped_text}"'
-            
-            # For variables or expressions that evaluate to strings
-            if isinstance(value, str) and (has_math_expression(value) or value.startswith('v_')):
+                return value
+                
+            # For non-string values (like numbers), convert to string and quote
+            if not isinstance(value, str):
+                return f'"{str(value)}"'
+                
+            # For variables, evaluate them first
+            if isinstance(value, str) and value.startswith('v_'):
+                if value in variables:
+                    var_value = variables[value]
+                    return f'"{str(var_value)}"'
+                
+            # For expressions, evaluate then quote
+            if isinstance(value, str) and has_math_expression(value):
                 try:
                     result = evaluate_math_expression(value, variables)
-                    if isinstance(result, str):
-                        escaped_text = escape_string(result)
-                        return f'"{escaped_text}"'
+                    return f'"{str(result)}"'
                 except Exception as e:
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Error evaluating expression for text: {e}", DEBUG_VERBOSE)
             
-            # Direct string value
-            escaped_text = escape_string(str(value))
-            return f'"{escaped_text}"'
+            # For any other string, simply quote it
+            return f'"{value}"'
 
+        # Rest of the function remains the same as in the older version
         # Handle direct quoted strings
         if isinstance(value, str) and value.startswith('"') and value.endswith('"'):
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -83,7 +90,7 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
                 converted = convert_to_type(stripped, target_type)
                 return str(converted) if target_type != 'bool' else str(converted).lower()
             return value
-
+            
         # Handle math expressions or variables
         if isinstance(value, str) and (has_math_expression(value) or value.startswith('v_')):
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -104,7 +111,7 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
                 if is_optional:
                     return ''
                 raise
-
+                
         # Direct values
         if target_type == 'color':
             if isinstance(value, (int, float)):
@@ -116,7 +123,6 @@ def format_parameter(value: Any, command: str, position: int, variables: dict) -
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Converted to {target_type}: {converted}", DEBUG_VERBOSE)
         return str(converted) if target_type != 'bool' else str(converted).lower()
-
     except Exception as e:
         raise ValueError(f"Error formatting parameter '{value}' for {command} position {position}: {str(e)}")
                 
