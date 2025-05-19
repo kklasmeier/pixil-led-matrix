@@ -550,8 +550,9 @@ class RGB_Api:
             
             # Check if it's time for a display refresh
             if current_time - last_refresh_time >= refresh_interval:
-                # Only refresh if not in frame mode
-                if not self.frame_mode:
+                # Only refresh if not in frame mode AND burnouts have made changes
+                if not self.frame_mode and self.burnout_manager.check_and_reset_changes():
+                    debug("Refreshing display due to burnout changes", Level.TRACE, Component.SYSTEM)
                     self._maybe_swap_buffer()
                     self.refresh_display()
                 last_refresh_time = current_time

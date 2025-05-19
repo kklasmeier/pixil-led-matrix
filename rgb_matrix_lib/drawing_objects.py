@@ -45,6 +45,7 @@ class ThreadedBurnoutManager:
         self.running = True
         self.pixel_index = {}  # (x, y) -> [(DrawingObject, removal_time), ...]
         self.index_lock = Lock()
+        self.changes_made = False  # Flag to track if burnouts have made changes
 
     def start(self):
         if self.burnout_thread is None:
@@ -82,19 +83,30 @@ class ThreadedBurnoutManager:
                 self.pixel_index[(x, y)].append((obj, removal_time))
 
     def _clear_object(self, obj: DrawingObject):
+        """
+        Clear an expired drawing object by setting its pixels to black.
+        If other objects use the same pixels with later expiry times, preserve those pixels.
+        """
         current_time = time.time()
         points_to_clear = obj.get_points()
+        pixels_changed = False  # Track if any pixels were actually changed
+        
         with self.index_lock:
             for x, y in points_to_clear:
                 entries = self.pixel_index.get((x, y), [])
                 if not entries or max(t for _, t in entries) <= current_time:
                     self.api._draw_to_buffers(x, y, 0, 0, 0)
+                    pixels_changed = True  # Mark that pixels were changed
+        
         with self.index_lock:
             for x, y in points_to_clear:
                 if (x, y) in self.pixel_index:
                     self.pixel_index[(x, y)] = [(o, t) for o, t in self.pixel_index[(x, y)] if o != obj]
                     if not self.pixel_index[(x, y)]:
                         del self.pixel_index[(x, y)]
+
+        if pixels_changed:
+            self.changes_made = True  # Set the flag if any pixels were changed
 
     def clear_all(self):
         while not self.burnout_queue.empty():
@@ -106,3 +118,10 @@ class ThreadedBurnoutManager:
         self.running = False
         if self.burnout_thread:
             self.burnout_thread.join()
+
+    def check_and_reset_changes(self):
+        """Check if changes have been made and reset the flag."""
+        with self.index_lock:  # Use lock for thread safety
+            changes = self.changes_made
+            self.changes_made = False
+            return changes
