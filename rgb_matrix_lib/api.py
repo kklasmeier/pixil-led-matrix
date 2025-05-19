@@ -118,7 +118,7 @@ class RGB_Api:
         self.frame_mode = True
         self.preserve_frame_changes = preserve_changes
         if not preserve_changes:
-            self.canvas.Fill(0, 0, 0)
+            self.canvas.Fill(0, 0, 0) # Clears the current canvas if not preserving
 
     def end_frame(self):
         if self.frame_mode:

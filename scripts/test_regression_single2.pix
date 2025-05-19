@@ -1,387 +1,230 @@
-# Traveling Dots Pattern with Burnout Variations
-# 8 dots moving in a clockwise pattern around the display
-# Pre-calculated path stored in arrays
-# Different burnout modes cycle randomly
+# Text Rendering Frame Awareness Test Script
 
-# Initialize variables
-throttle(0.1)
-v_cycle = 0            # Current cycle counter
-v_path_length = 126    # Full path length (63 steps forward + 63 steps back)
-v_delay = 0.00         # Delay between frames (can be set to 0 for maximum speed)
-v_stagger = 8          # Steps between dot starts
-v_complete_cycle = v_path_length * 4  # 4 complete iterations = 1 cycle
-v_burnout_mode = 0     # Current burnout mode (0=standard, 1=short, 2=long)
-v_mode_counter = 0     # Counter for current mode duration
-v_color = 0
-v_color_mode = 0
+# 1. Initialize
+clear()
+rest(1)
 
-# Create arrays for dot coordinates (x and y for each dot)
-create_array(v_dot1_x, 126)
-create_array(v_dot1_y, 126)
-create_array(v_dot2_x, 126)
-create_array(v_dot2_y, 126)
-create_array(v_dot3_x, 126)
-create_array(v_dot3_y, 126)
-create_array(v_dot4_x, 126)
-create_array(v_dot4_y, 126)
-create_array(v_dot5_x, 126)
-create_array(v_dot5_y, 126)
-create_array(v_dot6_x, 126)
-create_array(v_dot6_y, 126)
-create_array(v_dot7_x, 126)
-create_array(v_dot7_y, 126)
-create_array(v_dot8_x, 126)
-create_array(v_dot8_y, 126)
+# 2. Basic text rendering (no frames)
+print("Testing basic text rendering without frames")
+draw_text(5, 5, "No frame", piboto-regular, 10, cyan, 100)
+rest(2)
+clear()
+sync_queue
 
-# Define dot colors
-v_color1 = "red"
-v_color2 = "orange"
-v_color3 = "yellow"
-v_color4 = "green"
-v_color5 = "cyan"
-v_color6 = "blue"
-v_color7 = "purple"
-v_color8 = "magenta"
+# 3. Test text with each effect (no frames)
+print("Testing text effects without frames")
 
-# Define dot start and end points (clockwise around matrix)
-# Dot 1: Top center to bottom center
-v_dot1_start_x = 32
-v_dot1_start_y = 0
-v_dot1_end_x = 32
-v_dot1_end_y = 63
+# Normal
+draw_text(5, 5, "Normal", piboto-regular, 10, white, 100, NORMAL)
+rest(2)
+sync_queue
 
-# Dot 2: Top-right quadrant to bottom-left quadrant
-v_dot2_start_x = 48
-v_dot2_start_y = 0
-v_dot2_end_x = 16
-v_dot2_end_y = 63
+# Type
+draw_text(5, 15, "Type", piboto-regular, 10, yellow, 100, TYPE, MEDIUM)
+rest(2)
+sync_queue
 
-# Dot 3: Top-right corner to bottom-left corner
-v_dot3_start_x = 63
-v_dot3_start_y = 0
-v_dot3_end_x = 0
-v_dot3_end_y = 63
+# Scan
+draw_text(5, 25, "Scan", piboto-regular, 10, green, 100, SCAN)
+rest(2)
+sync_queue
 
-# Dot 4: Right-top quadrant to left-bottom quadrant
-v_dot4_start_x = 63
-v_dot4_start_y = 16
-v_dot4_end_x = 0
-v_dot4_end_y = 48
+# Slide
+draw_text(5, 35, "Slide", piboto-regular, 10, blue, 100, SLIDE, LEFT)
+rest(2)
+sync_queue
 
-# Dot 5: Right-center to left-center
-v_dot5_start_x = 63
-v_dot5_start_y = 32
-v_dot5_end_x = 0
-v_dot5_end_y = 32
+# Dissolve
+draw_text(5, 45, "Dissolve", piboto-regular, 10, magenta, 100, DISSOLVE, IN)
+rest(2)
+sync_queue
 
-# Dot 6: Right-bottom quadrant to left-top quadrant
-v_dot6_start_x = 63
-v_dot6_start_y = 48
-v_dot6_end_x = 0
-v_dot6_end_y = 16
+# Wipe
+draw_text(5, 55, "Wipe", piboto-regular, 10, red, 100, WIPE, IN_LEFT)
+rest(3)
+clear()
+sync_queue
 
-# Dot 7: Bottom-right corner to top-left corner
-v_dot7_start_x = 63
-v_dot7_start_y = 63
-v_dot7_end_x = 0
-v_dot7_end_y = 0
+# 4. Test non-preserved frames with text (should override to NORMAL)
+print("Testing non-preserved frames with text (should override to NORMAL)")
 
-# Dot 8: Bottom-right quadrant to top-left quadrant
-v_dot8_start_x = 48
-v_dot8_start_y = 63
-v_dot8_end_x = 16
-v_dot8_end_y = 0
+# Draw a background
+draw_rectangle(0, 0, 64, 64, blue, 20, true)
+rest(1)
+sync_queue
 
-# Precalculate all path positions for each dot using the same curved path pattern
-# First half: start to end (0-63)
-for v_step in (0, 63, 1)
-    v_progress = v_step / 63
-    
-    # Use a consistent curve pattern for all dots
-    # We'll use a single-direction curve that only bends one way
-    
-    # Calculate position along the straight line path
-    v_straight_x1 = v_dot1_start_x + (v_dot1_end_x - v_dot1_start_x) * v_progress
-    v_straight_y1 = v_dot1_start_y + (v_dot1_end_y - v_dot1_start_y) * v_progress
-    
-    v_straight_x2 = v_dot2_start_x + (v_dot2_end_x - v_dot2_start_x) * v_progress
-    v_straight_y2 = v_dot2_start_y + (v_dot2_end_y - v_dot2_start_y) * v_progress
-    
-    v_straight_x3 = v_dot3_start_x + (v_dot3_end_x - v_dot3_start_x) * v_progress
-    v_straight_y3 = v_dot3_start_y + (v_dot3_end_y - v_dot3_start_y) * v_progress
-    
-    v_straight_x4 = v_dot4_start_x + (v_dot4_end_x - v_dot4_start_x) * v_progress
-    v_straight_y4 = v_dot4_start_y + (v_dot4_end_y - v_dot4_start_y) * v_progress
-    
-    v_straight_x5 = v_dot5_start_x + (v_dot5_end_x - v_dot5_start_x) * v_progress
-    v_straight_y5 = v_dot5_start_y + (v_dot5_end_y - v_dot5_start_y) * v_progress
-    
-    v_straight_x6 = v_dot6_start_x + (v_dot6_end_x - v_dot6_start_x) * v_progress
-    v_straight_y6 = v_dot6_start_y + (v_dot6_end_y - v_dot6_start_y) * v_progress
-    
-    v_straight_x7 = v_dot7_start_x + (v_dot7_end_x - v_dot7_start_x) * v_progress
-    v_straight_y7 = v_dot7_start_y + (v_dot7_end_y - v_dot7_start_y) * v_progress
-    
-    v_straight_x8 = v_dot8_start_x + (v_dot8_end_x - v_dot8_start_x) * v_progress
-    v_straight_y8 = v_dot8_start_y + (v_dot8_end_y - v_dot8_start_y) * v_progress
-    
-    # Calculate perpendicular offsets for the curve
-    # For each dot, we need to find the perpendicular direction to its path
-    
-    # Dot 1: Vertical path, so perpendicular is horizontal
-    v_perp_x1 = 1
-    v_perp_y1 = 0
-    
-    # Dot 2: Calculate perpendicular to diagonal path
-    v_dir_x2 = v_dot2_end_x - v_dot2_start_x
-    v_dir_y2 = v_dot2_end_y - v_dot2_start_y
-    v_len2 = sqrt(v_dir_x2 * v_dir_x2 + v_dir_y2 * v_dir_y2)
-    v_perp_x2 = -v_dir_y2 / v_len2
-    v_perp_y2 = v_dir_x2 / v_len2
-    
-    # Dot 3: Calculate perpendicular to diagonal path
-    v_dir_x3 = v_dot3_end_x - v_dot3_start_x
-    v_dir_y3 = v_dot3_end_y - v_dot3_start_y
-    v_len3 = sqrt(v_dir_x3 * v_dir_x3 + v_dir_y3 * v_dir_y3)
-    v_perp_x3 = -v_dir_y3 / v_len3
-    v_perp_y3 = v_dir_x3 / v_len3
-    
-    # Dot 4: Calculate perpendicular to diagonal path
-    v_dir_x4 = v_dot4_end_x - v_dot4_start_x
-    v_dir_y4 = v_dot4_end_y - v_dot4_start_y
-    v_len4 = sqrt(v_dir_x4 * v_dir_x4 + v_dir_y4 * v_dir_y4)
-    v_perp_x4 = -v_dir_y4 / v_len4
-    v_perp_y4 = v_dir_x4 / v_len4
-    
-    # Dot 5: Horizontal path, so perpendicular is vertical
-    v_perp_x5 = 0
-    v_perp_y5 = 1
-    
-    # Dot 6: Calculate perpendicular to diagonal path
-    v_dir_x6 = v_dot6_end_x - v_dot6_start_x
-    v_dir_y6 = v_dot6_end_y - v_dot6_start_y
-    v_len6 = sqrt(v_dir_x6 * v_dir_x6 + v_dir_y6 * v_dir_y6)
-    v_perp_x6 = -v_dir_y6 / v_len6
-    v_perp_y6 = v_dir_x6 / v_len6
-    
-    # Dot 7: Calculate perpendicular to diagonal path
-    v_dir_x7 = v_dot7_end_x - v_dot7_start_x
-    v_dir_y7 = v_dot7_end_y - v_dot7_start_y
-    v_len7 = sqrt(v_dir_x7 * v_dir_x7 + v_dir_y7 * v_dir_y7)
-    v_perp_x7 = -v_dir_y7 / v_len7
-    v_perp_y7 = v_dir_x7 / v_len7
-    
-    # Dot 8: Calculate perpendicular to diagonal path
-    v_dir_x8 = v_dot8_end_x - v_dot8_start_x
-    v_dir_y8 = v_dot8_end_y - v_dot8_start_y
-    v_len8 = sqrt(v_dir_x8 * v_dir_x8 + v_dir_y8 * v_dir_y8)
-    v_perp_x8 = -v_dir_y8 / v_len8
-    v_perp_y8 = v_dir_x8 / v_len8
-    
-    # For an even more dramatic curve 
-    v_curve_amplitude = 48  # Very pronounced curve
-    v_offset = v_curve_amplitude * v_progress * (1 - v_progress)
+# Begin non-preserved frame
+begin_frame(false)
+draw_circle(32, 32, 20, red, 100, false)
+draw_polygon(32, 32, 15, 6, yellow, 100, 0, false)
 
+# Draw text with different effects - all should render normally without clearing the frame
+draw_text(10, 10, "Normal", piboto-regular, 10, white, 100, NORMAL)
+draw_text(10, 20, "Type", piboto-regular, 10, white, 100, TYPE, MEDIUM)
+draw_text(10, 30, "Slide", piboto-regular, 10, white, 100, SLIDE, LEFT)
+draw_text(10, 40, "Dissolve", piboto-regular, 10, white, 100, DISSOLVE, IN)
+draw_text(10, 50, "Wipe", piboto-regular, 10, white, 100, WIPE, IN_LEFT)
 
-    # Apply the offset perpendicular to the path direction
-    v_dot1_x[v_step] = v_straight_x1 + v_perp_x1 * v_offset
-    v_dot1_y[v_step] = v_straight_y1 + v_perp_y1 * v_offset
-    
-    v_dot2_x[v_step] = v_straight_x2 + v_perp_x2 * v_offset
-    v_dot2_y[v_step] = v_straight_y2 + v_perp_y2 * v_offset
-    
-    v_dot3_x[v_step] = v_straight_x3 + v_perp_x3 * v_offset
-    v_dot3_y[v_step] = v_straight_y3 + v_perp_y3 * v_offset
-    
-    v_dot4_x[v_step] = v_straight_x4 + v_perp_x4 * v_offset
-    v_dot4_y[v_step] = v_straight_y4 + v_perp_y4 * v_offset
-    
-    v_dot5_x[v_step] = v_straight_x5 + v_perp_x5 * v_offset
-    v_dot5_y[v_step] = v_straight_y5 + v_perp_y5 * v_offset
-    
-    v_dot6_x[v_step] = v_straight_x6 + v_perp_x6 * v_offset
-    v_dot6_y[v_step] = v_straight_y6 + v_perp_y6 * v_offset
-    
-    v_dot7_x[v_step] = v_straight_x7 + v_perp_x7 * v_offset 
-    v_dot7_y[v_step] = v_straight_y7 + v_perp_y7 * v_offset
-    
-    v_dot8_x[v_step] = v_straight_x8 + v_perp_x8 * v_offset
-    v_dot8_y[v_step] = v_straight_y8 + v_perp_y8 * v_offset
-endfor v_step
+# End frame
+end_frame()
 
-# Second half: end to start (64-125)
-for v_step in (0, 61, 1)
-    v_idx = v_step + 64
-    v_src = 63 - v_step
-    
-    # Copy the return path from the first half
-    v_dot1_x[v_idx] = v_dot1_x[v_src]
-    v_dot1_y[v_idx] = v_dot1_y[v_src]
-    v_dot2_x[v_idx] = v_dot2_x[v_src]
-    v_dot2_y[v_idx] = v_dot2_y[v_src]
-    v_dot3_x[v_idx] = v_dot3_x[v_src]
-    v_dot3_y[v_idx] = v_dot3_y[v_src]
-    v_dot4_x[v_idx] = v_dot4_x[v_src]
-    v_dot4_y[v_idx] = v_dot4_y[v_src]
-    v_dot5_x[v_idx] = v_dot5_x[v_src]
-    v_dot5_y[v_idx] = v_dot5_y[v_src]
-    v_dot6_x[v_idx] = v_dot6_x[v_src]
-    v_dot6_y[v_idx] = v_dot6_y[v_src]
-    v_dot7_x[v_idx] = v_dot7_x[v_src]
-    v_dot7_y[v_idx] = v_dot7_y[v_src]
-    v_dot8_x[v_idx] = v_dot8_x[v_src]
-    v_dot8_y[v_idx] = v_dot8_y[v_src]
-endfor v_step
+print("All text should render normally in a non-preserved frame")
+rest(5)
+clear()
+sync_queue
 
-# Burnout durations
-v_short_burnout = 150
-v_long_burnout = 700
+# 5. Test preserved frames with text effects (should work with effects)
+print("Testing preserved frames with text effects (effects should work)")
 
-# Main animation loop - runs until canceled
-while 1 == 1 then
-    # Check if it's time to change the burnout mode
-    if v_mode_counter >= v_complete_cycle then
-        # Generate a random number between 1 and 100
-        v_rand = random(1, 100, 0)
-        
-        # Select burnout mode based on probability
-        if v_rand <= 40 then
-            v_burnout_mode = 0  # Standard mode (40% chance)
-        elseif v_rand <= 70 then
-            v_burnout_mode = 1  # Short burnout (30% chance)
-        else
-            v_burnout_mode = 2  # Long burnout (30% chance)
-        endif
-        
-        # Select burnout mode based on probability
-        if v_rand <= 30 then
-            v_color_mode = 0  # Standard mode (30% chance)
-        elseif v_rand <= 60 then
-            v_color_mode = 1  # Single Color (30% chance)
-            v_color_increment = 0
-            v_color = v_rand
-            print
-        else # Shifting Color (30% chance)
-            v_color_mode = 2
-            v_color_increment = 1
-        endif
+# Draw a background
+draw_rectangle(0, 0, 64, 64, purple, 20, true)
+rest(1)
 
-        # Reset mode counter
-        v_mode_counter = 0
-        
-        # print(f"Switching modes: v_rand = {v_rand}, v_burnout_mode = {v_burnout_mode}, v_color_mode = {v_color_mode}, v_color_increment = {v_color_increment}")
+# Begin preserved frame
+begin_frame(true)
+draw_circle(32, 32, 20, green, 100, false)
 
-        # Print debug message about mode change
-        if v_burnout_mode == 1 then
-            if v_prev_burnout_mode == 0 or v_prev_burnout_mode == 2 then
-                clear()
-            endif
-        else
-            if v_prev_burnout_mode <= 1 then
-                clear()
-            endif
-        endif
-    endif
+# Test NORMAL effect
+draw_text(10, 10, "Normal", piboto-regular, 8, white, 100, NORMAL)
+rest(1)
 
-    v_prev_burnout_mode = v_burnout_mode
+# Test TYPE effect in preserved frame
+draw_text(10, 20, "Type", piboto-regular, 8, white, 100, TYPE, MEDIUM)
+rest(1)
 
-    v_color = v_color + v_color_increment
-    if v_color == 100 then
-        v_color = 1
-    endif
+# Test SLIDE effect in preserved frame
+draw_text(10, 30, "Slide", piboto-regular, 8, white, 100, SLIDE, LEFT)
+rest(1)
 
-    # Calculate positions for each dot with staggered offsets
-    v_pos1 = v_cycle % v_path_length
-    v_pos2 = (v_cycle + v_stagger) % v_path_length
-    v_pos3 = (v_cycle + v_stagger * 2) % v_path_length
-    v_pos4 = (v_cycle + v_stagger * 3) % v_path_length
-    v_pos5 = (v_cycle + v_stagger * 4) % v_path_length
-    v_pos6 = (v_cycle + v_stagger * 5) % v_path_length
-    v_pos7 = (v_cycle + v_stagger * 6) % v_path_length
-    v_pos8 = (v_cycle + v_stagger * 7) % v_path_length
-    
-    # Plot all dots at their current positions with appropriate burnout
-    if v_burnout_mode == 0 and v_color_mode == 0 then
-        # Standard mode - no burnout, clear screen each frame
-        begin_frame
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color1, 100)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color2, 100)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color3, 100)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color4, 100)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color5, 100)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color6, 100)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color7, 100)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color8, 100)
-    elseif v_burnout_mode == 1 and v_color_mode == 0 then
-        # Short burnout mode
-        # Burnout mode - preserve existing content
-        begin_frame(true)
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color1, 100, v_short_burnout)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color2, 100, v_short_burnout)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color3, 100, v_short_burnout)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color4, 100, v_short_burnout)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color5, 100, v_short_burnout)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color6, 100, v_short_burnout)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color7, 100, v_short_burnout)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color8, 100, v_short_burnout)
-    elseif v_burnout_mode == 2 and v_color_mode == 0 then
-        # Long burnout mode
-        # Burnout mode - preserve existing content
-        begin_frame(true)
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color1, 100, v_long_burnout)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color2, 100, v_long_burnout)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color3, 100, v_long_burnout)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color4, 100, v_long_burnout)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color5, 100, v_long_burnout)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color6, 100, v_long_burnout)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color7, 100, v_long_burnout)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color8, 100, v_long_burnout)
-    elseif v_burnout_mode == 0 and v_color_mode > 0 then
-        # Standard mode - no burnout, clear screen each frame
-        begin_frame
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color, 100)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color, 100)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color, 100)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color, 100)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color, 100)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color, 100)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color, 100)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color, 100)
-    elseif v_burnout_mode == 1 and v_color_mode > 0 then
-        # Short burnout mode
-        # Burnout mode - preserve existing content
-        begin_frame(true)
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color, 100, v_short_burnout)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color, 100, v_short_burnout)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color, 100, v_short_burnout)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color, 100, v_short_burnout)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color, 100, v_short_burnout)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color, 100, v_short_burnout)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color, 100, v_short_burnout)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color, 100, v_short_burnout)
-    elseif v_burnout_mode == 2 and v_color_mode > 0 then
-        # Long burnout mode
-        # Burnout mode - preserve existing content
-        begin_frame(true)
-        plot(v_dot1_x[v_pos1], v_dot1_y[v_pos1], v_color, 100, v_long_burnout)
-        plot(v_dot2_x[v_pos2], v_dot2_y[v_pos2], v_color, 100, v_long_burnout)
-        plot(v_dot3_x[v_pos3], v_dot3_y[v_pos3], v_color, 100, v_long_burnout)
-        plot(v_dot4_x[v_pos4], v_dot4_y[v_pos4], v_color, 100, v_long_burnout)
-        plot(v_dot5_x[v_pos5], v_dot5_y[v_pos5], v_color, 100, v_long_burnout)
-        plot(v_dot6_x[v_pos6], v_dot6_y[v_pos6], v_color, 100, v_long_burnout)
-        plot(v_dot7_x[v_pos7], v_dot7_y[v_pos7], v_color, 100, v_long_burnout)
-        plot(v_dot8_x[v_pos8], v_dot8_y[v_pos8], v_color, 100, v_long_burnout)
-    else
-        print("Error, no conditions met")
-    endif
-    
-    # Display frame
-    end_frame
-    
-    # Increment counters
-    v_cycle = v_cycle + 1
-    v_mode_counter = v_mode_counter + 1
-    
-    # Add a small delay
-    rest(v_delay)
-endwhile
+# Test DISSOLVE effect in preserved frame
+draw_text(10, 40, "Dissolve", piboto-regular, 8, white, 100, DISSOLVE, IN)
+rest(1)
+
+# Test WIPE effect in preserved frame
+draw_text(10, 50, "Wipe", piboto-regular, 8, white, 100, WIPE, IN_LEFT)
+
+# End frame
+end_frame()
+
+print("All text effects should work in a preserved frame")
+rest(5)
+clear()
+
+# 6. Test clear_text functionality in frames
+print("Testing clear_text functionality in frames")
+
+# Draw background
+draw_rectangle(0, 0, 64, 64, cyan, 30, true)
+rest(1)
+
+# Draw initial text
+draw_text(5, 20, "Clear me!", piboto-regular, 12, white, 100)
+rest(2)
+
+# Test clear_text outside frames
+clear_text(5, 20)
+rest(1)
+
+# Draw new text
+draw_text(5, 20, "Test 1 OK", piboto-regular, 12, yellow, 100)
+rest(2)
+
+# Test in non-preserved frame
+begin_frame(false)
+draw_circle(32, 32, 15, red, 100, false)
+draw_text(5, 40, "Clear me too!", piboto-regular, 12, white, 100)
+end_frame()
+rest(2)
+
+# Clear in non-preserved frame
+begin_frame(false)
+draw_circle(32, 32, 15, red, 100, false)
+clear_text(5, 40)
+draw_text(5, 40, "Test 2 OK", piboto-regular, 12, green, 100)
+end_frame()
+rest(2)
+
+# Test in preserved frame
+begin_frame(true)
+draw_text(5, 60, "And me!", piboto-regular, 12, white, 100)
+end_frame()
+rest(2)
+
+# Clear in preserved frame
+begin_frame(true)
+clear_text(5, 60)
+draw_text(5, 60, "Test 3 OK", piboto-regular, 12, magenta, 100)
+end_frame()
+rest(2)
+
+print("Clear text tests complete")
+rest(2)
+clear()
+
+# 7. Test bitmap font with frame awareness
+print("Testing bitmap font with frame awareness")
+
+# Draw background
+draw_rectangle(0, 0, 64, 64, lavender, 20, true)
+rest(1)
+
+# Test bitmap font without frames
+draw_text(5, 10, "BITMAP", tiny64_font, 5, white, 100)
+rest(1)
+
+# Test bitmap font with effects
+draw_text(5, 20, "TYPE", tiny64_font, 5, yellow, 100, TYPE, MEDIUM)
+rest(2)
+
+# Test in non-preserved frame
+begin_frame(false)
+draw_circle(32, 32, 15, blue, 100, false)
+draw_text(5, 30, "NO EFFECT", tiny64_font, 5, white, 100, TYPE, MEDIUM)
+end_frame()
+rest(2)
+
+# Test in preserved frame
+begin_frame(true)
+draw_text(5, 40, "WITH EFFECT", tiny64_font, 5, green, 100, TYPE, MEDIUM)
+end_frame()
+rest(2)
+
+print("Bitmap font tests complete")
+rest(2)
+clear()
+
+# 8. Test nested frames with text (complex case)
+print("Testing nested frame-like scenarios")
+
+# Draw background
+draw_rectangle(0, 0, 64, 64, dark_gray, 40, true)
+rest(1)
+
+# Start outer frame (preserved)
+begin_frame(true)
+draw_circle(20, 20, 15, red, 100, false)
+
+# Draw text in preserved frame
+draw_text(5, 40, "Text 1", piboto-regular, 10, white, 100, SLIDE, LEFT)
+rest(2)
+
+# Draw more objects
+draw_circle(40, 40, 10, yellow, 100, false)
+
+# Draw more text
+draw_text(5, 50, "Text 2", piboto-regular, 10, white, 100, DISSOLVE, IN)
+rest(2)
+
+# End outer frame
+end_frame()
+rest(2)
+
+print("Nested frame tests complete")
+rest(1)
+clear()
+
+# Final message
+draw_text(5, 20, "All tests", piboto-regular, 10, green, 100)
+draw_text(5, 32, "complete!", piboto-regular, 10, green, 100)
+rest(3)
+clear()

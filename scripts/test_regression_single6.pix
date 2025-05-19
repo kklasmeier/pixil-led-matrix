@@ -1,0 +1,29 @@
+# Frame and Text Rendering Test Script
+
+# Initialize
+clear()
+print("Starting Frame and Text Effects Test Script")
+print("Each test will be clearly labeled")
+rest(2)
+sync_queue
+
+# ---------------------------------------------------
+# Test 1: Non-preserved frame baseline (fixed flickering)
+# ---------------------------------------------------
+print("Test 1: Non-preserved frame (should NOT flicker)")
+rest(1)
+sync_queue
+
+begin_frame(false)
+draw_circle(32, 32, 20, red, 100, false)
+draw_polygon(32, 32, 15, 6, yellow, 100, 0, false)
+plot(10, 10, green, 100)
+plot(50, 50, magenta, 100)
+end_frame()
+
+print("Observe for 5 seconds - there should be NO flickering")
+rest(5)
+sync_queue
+clear()
+rest(1)
+sync_queue
