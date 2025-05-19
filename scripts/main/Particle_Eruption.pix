@@ -1,0 +1,160 @@
+# Particle System with Physics
+# Enhanced with bottom explosion/air puff
+
+# Number of particles - reduced for performance
+v_num_particles = 10
+
+# Create arrays with correct types
+create_array(v_px, v_num_particles)
+create_array(v_py, v_num_particles)
+create_array(v_vx, v_num_particles)
+create_array(v_vy, v_num_particles)
+create_array(v_color, v_num_particles, string)
+create_array(v_size, v_num_particles)
+create_array(v_settled, v_num_particles)  # Track if particles are settled
+
+# Set throttle for maximum speed
+throttle(0)
+
+# Initialize particles
+for v_i in (0, v_num_particles - 1, 1)
+    v_px[v_i] = random(5, 58, 0)
+    v_py[v_i] = random(5, 30, 0)  # Start higher up
+    v_vx[v_i] = random(-20, 20, 10) / 10
+    v_vy[v_i] = random(-5, 5, 10) / 10
+    v_settled[v_i] = 0  # Not settled initially
+    
+    # Assign color based on position in array (cycle through colors)
+    v_color_idx = v_i % 3
+    if v_color_idx == 0 then
+        v_color[v_i] = "red"
+    elseif v_color_idx == 1 then
+        v_color[v_i] = "green"
+    else
+        v_color[v_i] = "blue"
+    endif
+    
+    v_size[v_i] = random(1, 3, 0)
+endfor v_i
+
+# Physics settings
+v_gravity = 0.1
+v_friction = 0.98
+v_bounce = 0.8
+v_settled_threshold = 0.3  # Speed below which a particle is considered settled
+v_settled_count = 0  # Counter for settled particles
+v_explosion_timer = 0  # Timer for periodic explosions
+v_max_explosion_interval = 100  # Maximum frames between explosions
+v_min_explosion_interval = 15   # Minimum frames between explosions
+v_next_explosion_interval = 100  # Current interval (will be randomized)
+v_exploding = 0  # Flag for active explosion
+v_explosion_force = 2.5  # Explosion force
+
+# Animation loop
+v_frame_counter = 0
+
+while true then
+    v_frame_counter = v_frame_counter + 1
+    
+    begin_frame
+        # Clear with fade effect
+        draw_rectangle(0, 0, 64, 64, black, 20, true)
+        
+        # Check if we need an explosion
+        v_settled_count = 0
+        for v_i in (0, v_num_particles - 1, 1)
+            if abs(v_vx[v_i]) < v_settled_threshold and abs(v_vy[v_i]) < v_settled_threshold and v_py[v_i] > 50 then
+                v_settled_count = v_settled_count + 1
+                v_settled[v_i] = 1
+            endif
+        endfor v_i
+        
+        # Explosion logic
+        if v_settled_count > v_num_particles / 2 and v_frame_counter > v_explosion_timer + v_min_explosion_interval then
+            v_exploding = 1
+            v_explosion_timer = v_frame_counter
+            
+            # Set a new random interval for the next explosion
+            v_next_explosion_interval = random(v_min_explosion_interval, v_max_explosion_interval, 0)
+            
+            # Draw explosion effect with longer durations
+            draw_circle(32, 63, 10, yellow, 80, true, 100)
+            draw_circle(32, 63, 15, orange, 60, false, 150)
+            draw_circle(32, 63, 20, red, 40, false, 200)
+            
+            # Apply explosion force to particles
+            for v_i in (0, v_num_particles - 1, 1)
+                if v_settled[v_i] == 1 or v_py[v_i] > 45 then
+                    # Calculate distance from explosion center
+                    v_dx = v_px[v_i] - 32
+                    v_dy = v_py[v_i] - 63
+                    v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+                    
+                    # Normalize direction and scale by force and distance
+                    if v_distance < 0.1 then
+                        v_distance = 0.1
+                    endif
+                    
+                    v_force_scale = v_explosion_force * (30 / (v_distance + 5))
+                    
+                    # Apply force vector away from explosion
+                    v_vx[v_i] = v_vx[v_i] + (v_dx / v_distance) * v_force_scale
+                    v_vy[v_i] = v_vy[v_i] + (v_dy / v_distance) * v_force_scale
+                    
+                    # Reset settled state
+                    v_settled[v_i] = 0
+                endif
+            endfor v_i
+        else
+            v_exploding = 0
+        endif
+        
+        # Update and draw particles
+        for v_i in (0, v_num_particles - 1, 1)
+            # Apply gravity
+            v_vy[v_i] = v_vy[v_i] + v_gravity
+            
+            # Update position
+            v_px[v_i] = v_px[v_i] + v_vx[v_i]
+            v_py[v_i] = v_py[v_i] + v_vy[v_i]
+            
+            # Boundary collisions
+            if v_px[v_i] < v_size[v_i] then
+                v_px[v_i] = v_size[v_i]
+                v_vx[v_i] = -v_vx[v_i] * v_bounce
+            endif
+            
+            if v_px[v_i] > 64 - v_size[v_i] then
+                v_px[v_i] = 64 - v_size[v_i]
+                v_vx[v_i] = -v_vx[v_i] * v_bounce
+            endif
+            
+            if v_py[v_i] < v_size[v_i] then
+                v_py[v_i] = v_size[v_i]
+                v_vy[v_i] = -v_vy[v_i] * v_bounce
+            endif
+            
+            if v_py[v_i] > 64 - v_size[v_i] then
+                v_py[v_i] = 64 - v_size[v_i]
+                v_vy[v_i] = -v_vy[v_i] * v_bounce
+            endif
+            
+            # Apply friction
+            v_vx[v_i] = v_vx[v_i] * v_friction
+            v_vy[v_i] = v_vy[v_i] * v_friction
+            
+            # Draw particle
+            if v_settled[v_i] == 1 and not v_exploding then
+                # Draw settled particles dimmer
+                draw_circle(v_px[v_i], v_py[v_i], v_size[v_i], v_color[v_i], 70, true)
+            else
+                # Draw active particles brighter with glow
+                draw_circle(v_px[v_i], v_py[v_i], v_size[v_i], v_color[v_i], 100, true)
+                draw_circle(v_px[v_i], v_py[v_i], v_size[v_i] + 1, v_color[v_i], 50, false)
+            endif
+        endfor v_i
+        
+        # Draw floor line as reference
+        draw_line(0, 63, 63, 63, white, 30)
+    end_frame
+endwhile
