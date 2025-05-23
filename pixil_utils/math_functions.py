@@ -24,6 +24,10 @@ _EXPR_CACHE_HITS = 0
 _EXPR_CACHE_MISSES = 0
 _FAST_MATH_HITS = 0
 _FAST_MATH_TOTAL = 0
+_EXPRESSION_RESULT_CACHE = {}
+_CACHE_HITS = 0
+_CACHE_MISSES = 0
+_CACHE_MAX_SIZE = 500 
 
 # Phase 2: Pre-compiled regex patterns for fast math expressions
 SIMPLE_ADD_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
@@ -37,6 +41,58 @@ NUMBER_PATTERN = re.compile(r'^-?\d*\.?\d+$')
 # Two variable patterns
 VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
 VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
+
+def create_cache_key(expr: str, variables: Dict[str, Any]) -> Optional[tuple]:
+    """
+    Create a cache key for expression + relevant variable values.
+    Returns None if expression shouldn't be cached.
+    """
+    if not isinstance(expr, str) or len(expr) > 100:
+        return None  # Don't cache very long expressions
+    
+    # Find variables used in this expression
+    import re
+    var_matches = re.findall(r'v_\w+', expr)
+    
+    if not var_matches:
+        return None  # No variables, probably a constant
+    
+    # Create key with only relevant variable values
+    relevant_vars = []
+    for var in var_matches:
+        if var in variables:
+            value = variables[var]
+            # Only cache if value is simple (number or short string)
+            if isinstance(value, (int, float, str)) and (not isinstance(value, str) or len(str(value)) < 20):
+                relevant_vars.append((var, value))
+            else:
+                return None  # Contains complex values, don't cache
+    
+    return (expr, tuple(sorted(relevant_vars)))
+
+def get_cached_result(cache_key) -> Optional[Any]:
+    """Get cached result if available."""
+    global _CACHE_HITS, _CACHE_MISSES
+    
+    if cache_key in _EXPRESSION_RESULT_CACHE:
+        _CACHE_HITS += 1
+        return _EXPRESSION_RESULT_CACHE[cache_key]
+    else:
+        _CACHE_MISSES += 1
+        return None
+
+def cache_result(cache_key, result):
+    """Cache expression result with size limiting."""
+    global _EXPRESSION_RESULT_CACHE
+    
+    # Limit cache size to prevent memory growth
+    if len(_EXPRESSION_RESULT_CACHE) >= _CACHE_MAX_SIZE:
+        # Remove oldest entries (simple FIFO eviction)
+        keys_to_remove = list(_EXPRESSION_RESULT_CACHE.keys())[:50]
+        for key in keys_to_remove:
+            del _EXPRESSION_RESULT_CACHE[key]
+    
+    _EXPRESSION_RESULT_CACHE[cache_key] = result
 
 def report_fast_math_stats():
     """Report fast math path performance statistics."""
@@ -63,6 +119,35 @@ def reset_fast_math_stats():
     global _FAST_MATH_HITS, _FAST_MATH_TOTAL
     _FAST_MATH_HITS = 0
     _FAST_MATH_TOTAL = 0
+
+def report_expression_cache_stats():
+    """Report expression caching statistics."""
+    global _CACHE_HITS, _CACHE_MISSES, _EXPRESSION_RESULT_CACHE
+    
+    total_attempts = _CACHE_HITS + _CACHE_MISSES
+    if total_attempts > 0:
+        hit_rate = (_CACHE_HITS / total_attempts) * 100
+        cache_size = len(_EXPRESSION_RESULT_CACHE)
+        
+        print(f"Expression Cache Statistics:")
+        print(f"  Cache attempts: {total_attempts:,}")
+        print(f"  Cache hits: {_CACHE_HITS:,} ({hit_rate:.1f}%)")
+        print(f"  Cache misses: {_CACHE_MISSES:,}")
+        print(f"  Cache size: {cache_size} entries")
+        
+        if _CACHE_HITS > 0:
+            # Estimate time savings (each cache hit saves ~30 microseconds)
+            estimated_savings = (_CACHE_HITS * 30) / 1000000
+            print(f"  Estimated time saved: {estimated_savings:.3f} seconds")
+    else:
+        print("Expression Cache: No cacheable expressions found")
+
+def reset_expression_cache_stats():
+    """Reset cache statistics."""
+    global _CACHE_HITS, _CACHE_MISSES, _EXPRESSION_RESULT_CACHE
+    _CACHE_HITS = 0
+    _CACHE_MISSES = 0
+    _EXPRESSION_RESULT_CACHE.clear()
 
 def try_fast_number(expr: str) -> Optional[Union[int, float]]:
     """
@@ -351,9 +436,30 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"After substitution: {parsed_expr}", DEBUG_VERBOSE)
         
-        # Try evaluating as math expression
+        # ===== EXPRESSION RESULT CACHING =====
+        # Try to get cached result first
+        cache_key = create_cache_key(expr, variables)
+        if cache_key is not None:
+            cached_result = get_cached_result(cache_key)
+            if cached_result is not None:
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Expression cache hit: {expr}", DEBUG_VERBOSE)
+                return cached_result
+
+        # Parse remaining variables (existing code)
+        parsed_expr = substitute_variables(expr, variables)
+
+        # Try evaluating as math expression (existing code)
         eval_env = {**MATH_FUNCTIONS, '__builtins__': None}
         result = eval(parsed_expr, {"__builtins__": None}, eval_env)
+
+        # Cache the result if we have a cache key
+        if cache_key is not None:
+            cache_result(cache_key, result)
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Expression cached: {expr} = {result}", DEBUG_VERBOSE)
+        # ===== END EXPRESSION RESULT CACHING =====
+
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Evaluation result: {result}", DEBUG_VERBOSE)
         
