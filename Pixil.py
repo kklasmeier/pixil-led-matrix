@@ -153,7 +153,13 @@ def report_metrics(reason="complete"):
             print(f"  Estimated time saved: {estimated_savings:.3f} seconds")
     else:
         print("Phase 1 Fast Path: No simple variable lookups detected")
+    print("--")
+    from pixil_utils.math_functions import report_fast_math_stats
+    report_fast_math_stats()  
+
     print("--------------------------------------------")
+
+
 
 def on_queue_pause():
     """Called when the command queue becomes full."""
@@ -189,6 +195,8 @@ def process_script(filename, execute_func=None):
     # Initialize metrics
     initialize_metrics()
     reset_fast_path_stats()
+    from pixil_utils.math_functions import reset_fast_math_stats
+    reset_fast_math_stats()
 
     # Get queue instance
     queue = QueueManager.get_instance()

@@ -6,7 +6,7 @@ Provides safe math operations without variable state dependencies.
 import math
 import random
 import re
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional, Tuple
 from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print)
 from .array_manager import validate_array_access
 from collections import OrderedDict
@@ -22,7 +22,205 @@ _EXPR_CACHE = OrderedDict()
 _EXPR_CACHE_SIZE = 128 # Adjust based on typical script complexity
 _EXPR_CACHE_HITS = 0
 _EXPR_CACHE_MISSES = 0
+_FAST_MATH_HITS = 0
+_FAST_MATH_TOTAL = 0
 
+# Phase 2: Pre-compiled regex patterns for fast math expressions
+SIMPLE_ADD_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
+SIMPLE_SUB_PATTERN = re.compile(r'^(v_\w+)\s*-\s*(-?\d*\.?\d+)$')  
+SIMPLE_MUL_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
+SIMPLE_DIV_PATTERN = re.compile(r'^(v_\w+)\s*/\s*(-?\d*\.?\d+)$')
+SIMPLE_MOD_PATTERN = re.compile(r'^(v_\w+)\s*%\s*(-?\d*\.?\d+)$')
+SIMPLE_ARRAY_ACCESS_PATTERN = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
+NUMBER_PATTERN = re.compile(r'^-?\d*\.?\d+$')
+
+# Two variable patterns
+VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
+VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
+
+def report_fast_math_stats():
+    """Report fast math path performance statistics."""
+    global _FAST_MATH_HITS, _FAST_MATH_TOTAL
+    
+    if _FAST_MATH_TOTAL > 0:
+        hit_rate = (_FAST_MATH_HITS / _FAST_MATH_TOTAL) * 100
+        miss_count = _FAST_MATH_TOTAL - _FAST_MATH_HITS
+        
+        print(f"Phase 2 Fast Math Statistics:")
+        print(f"  Math expressions attempted: {_FAST_MATH_TOTAL:,}")
+        print(f"  Fast math hits: {_FAST_MATH_HITS:,} ({hit_rate:.1f}%)")
+        print(f"  Fast math misses: {miss_count:,} ({100-hit_rate:.1f}%)")
+        
+        if _FAST_MATH_HITS > 0:
+            # Estimate time savings (assuming 8x speedup for fast path vs eval)
+            estimated_savings = (_FAST_MATH_HITS * 35) / 1000000  # 35 microseconds saved per hit
+            print(f"  Estimated time saved: {estimated_savings:.3f} seconds")
+    else:
+        print("Phase 2 Fast Math: No math expressions detected")
+
+def reset_fast_math_stats():
+    """Reset fast math statistics for new script."""
+    global _FAST_MATH_HITS, _FAST_MATH_TOTAL
+    _FAST_MATH_HITS = 0
+    _FAST_MATH_TOTAL = 0
+
+def try_fast_number(expr: str) -> Optional[Union[int, float]]:
+    """
+    Handle simple numeric values without any processing.
+    """
+    if NUMBER_PATTERN.match(expr):
+        try:
+            # Try integer first, then float
+            if '.' in expr:
+                result = float(expr)
+            else:
+                result = int(expr)
+            
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Fast number: {expr} = {result}", DEBUG_VERBOSE)
+            return result
+        except (ValueError, TypeError):
+            pass
+    return None
+
+def try_fast_array_access(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float, str]]:
+    """
+    Handle simple array access like v_array[v_index] without complex parsing.
+    """
+    match = SIMPLE_ARRAY_ACCESS_PATTERN.match(expr)
+    if match:
+        array_name, index_var = match.groups()
+        
+        if array_name in variables and index_var in variables:
+            try:
+                array = variables[array_name]
+                index_value = variables[index_var]
+                
+                # Ensure index is numeric
+                if isinstance(index_value, (int, float)):
+                    index = int(index_value)
+                    
+                    # Check if it's a PixilArray or regular array
+                    if hasattr(array, '__getitem__'):
+                        # For PixilArray, use the optimized access
+                        if hasattr(array, 'data') and 0 <= index < len(array.data):
+                            result = array[index]
+                        # For regular Python arrays/lists
+                        elif isinstance(array, (list, tuple)) and 0 <= index < len(array):
+                            result = array[index]
+                        else:
+                            return None  # Out of bounds or invalid
+                            
+                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                            debug_print(f"Fast array access: {array_name}[{index_var}] = {array_name}[{index}] = {result}", DEBUG_VERBOSE)
+                        return result
+                        
+            except (ValueError, TypeError, IndexError, AttributeError):
+                pass
+    return None
+
+def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float]]:
+    """
+    Try to evaluate simple arithmetic expressions without using eval().
+    Returns None if the expression doesn't match supported patterns.
+    """
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Trying fast arithmetic for: {expr}", DEBUG_VERBOSE)
+    
+    # Simple variable + number
+    match = SIMPLE_ADD_PATTERN.match(expr)
+    if match:
+        var_name, number = match.groups()
+        if var_name in variables:
+            try:
+                result = float(variables[var_name]) + float(number)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast add: {var_name} + {number} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+    
+    # Simple variable - number  
+    match = SIMPLE_SUB_PATTERN.match(expr)
+    if match:
+        var_name, number = match.groups()
+        if var_name in variables:
+            try:
+                result = float(variables[var_name]) - float(number)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast sub: {var_name} - {number} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+    
+    # Simple variable * number
+    match = SIMPLE_MUL_PATTERN.match(expr)
+    if match:
+        var_name, number = match.groups()
+        if var_name in variables:
+            try:
+                result = float(variables[var_name]) * float(number)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast mul: {var_name} * {number} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+    
+    # Simple variable / number
+    match = SIMPLE_DIV_PATTERN.match(expr)
+    if match:
+        var_name, number = match.groups()
+        if var_name in variables:
+            try:
+                divisor = float(number)
+                if divisor != 0:
+                    result = float(variables[var_name]) / divisor
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast div: {var_name} / {number} = {result}", DEBUG_VERBOSE)
+                    return result
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+    
+    # Simple variable % number (very common for array indexing)
+    match = SIMPLE_MOD_PATTERN.match(expr)
+    if match:
+        var_name, number = match.groups()
+        if var_name in variables:
+            try:
+                modulus = float(number)
+                if modulus != 0:
+                    result = float(variables[var_name]) % modulus
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast mod: {var_name} % {number} = {result}", DEBUG_VERBOSE)
+                    return result
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+    
+    # Two variables: var1 + var2
+    match = VAR_ADD_VAR_PATTERN.match(expr)
+    if match:
+        var1, var2 = match.groups()
+        if var1 in variables and var2 in variables:
+            try:
+                result = float(variables[var1]) + float(variables[var2])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast var add: {var1} + {var2} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+    
+    # Two variables: var1 * var2
+    match = VAR_MUL_VAR_PATTERN.match(expr)
+    if match:
+        var1, var2 = match.groups()
+        if var1 in variables and var2 in variables:
+            try:
+                result = float(variables[var1]) * float(variables[var2])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast var mul: {var1} * {var2} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
 
 def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int, float, str]:
     """
@@ -40,7 +238,38 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         return expr
     if expr.startswith('v_') and expr in variables:
         return variables[expr]
-    
+
+    # ===== PHASE 2 + 2.5 OPTIMIZATION: EXPANDED FAST PATHS =====
+    if isinstance(expr, str) and not ('&' in expr or '"' in expr or "'" in expr):
+        global _FAST_MATH_HITS, _FAST_MATH_TOTAL
+        _FAST_MATH_TOTAL += 1
+        
+        # NEW: Try simple numbers first (HUGE opportunity)
+        fast_result = try_fast_number(expr)
+        if fast_result is not None:
+            _FAST_MATH_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Fast number hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+            return fast_result
+        
+        # NEW: Try simple array access (v_array[v_index])
+        if '[' in expr and ']' in expr and expr.count('[') == 1:
+            fast_result = try_fast_array_access(expr, variables)
+            if fast_result is not None:
+                _FAST_MATH_HITS += 1
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                return fast_result
+        
+        # EXISTING: Try simple arithmetic
+        fast_result = try_fast_arithmetic(expr, variables)
+        if fast_result is not None:
+            _FAST_MATH_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Fast arithmetic hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+            return fast_result
+    # ===== END PHASE 2.5 OPTIMIZATION =====
+
     # Cache key and tracking remain the same
     cache_key = None
     
