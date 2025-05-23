@@ -54,11 +54,16 @@ _metrics = {
     'enabled': True               # Toggle for enabling/disabling metrics
 }
 
+
+
 #Variable cache
 _VAR_FORMAT_CACHE = OrderedDict()
-_VAR_CACHE_SIZE = 256
+_VAR_CACHE_SIZE = 1024
 _VAR_CACHE_HITS = 0
 _VAR_CACHE_MISSES = 0
+_FAST_PATH_HITS = 0
+_FAST_PATH_TOTAL = 0
+_FAST_PATH_ENABLED = True 
 
 set_debug_level(DEBUG_OFF)  # Default debug level
 
@@ -78,6 +83,12 @@ RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*
 
 # Initialize file manager
 file_manager = PixilFileManager()
+
+def reset_fast_path_stats():
+    """Reset fast path statistics for new script."""
+    global _FAST_PATH_HITS, _FAST_PATH_TOTAL
+    _FAST_PATH_HITS = 0
+    _FAST_PATH_TOTAL = 0
 
 def initialize_metrics():
     """Reset metrics at start of script."""
@@ -124,6 +135,25 @@ def report_metrics(reason="complete"):
     print(f"Performance: {commands_per_second:.2f} commands/second")
     print(f"Script processing: {lines_per_second:.2f} lines/second")
     print("--------------------------------------------")
+    print("Fast Path Optimization Statistics")
+    global _FAST_PATH_HITS, _FAST_PATH_TOTAL
+    
+    if _FAST_PATH_TOTAL > 0:
+        hit_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL) * 100
+        miss_count = _FAST_PATH_TOTAL - _FAST_PATH_HITS
+        
+        print(f"Phase 1 Fast Path Statistics:")
+        print(f"  Simple variable lookups attempted: {_FAST_PATH_TOTAL:,}")
+        print(f"  Fast path hits: {_FAST_PATH_HITS:,} ({hit_rate:.1f}%)")
+        print(f"  Fast path misses: {miss_count:,} ({100-hit_rate:.1f}%)")
+        
+        if _FAST_PATH_HITS > 0:
+            # Estimate time savings (assuming 10x speedup for fast path)
+            estimated_savings = (_FAST_PATH_HITS * 30) / 1000000  # 30 microseconds saved per hit
+            print(f"  Estimated time saved: {estimated_savings:.3f} seconds")
+    else:
+        print("Phase 1 Fast Path: No simple variable lookups detected")
+    print("--------------------------------------------")
 
 def on_queue_pause():
     """Called when the command queue becomes full."""
@@ -158,6 +188,7 @@ def process_script(filename, execute_func=None):
 
     # Initialize metrics
     initialize_metrics()
+    reset_fast_path_stats()
 
     # Get queue instance
     queue = QueueManager.get_instance()
@@ -244,7 +275,37 @@ def process_script(filename, execute_func=None):
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Quoted string detected: {value}", DEBUG_VERBOSE)
             return format_parameter(value, command_name, param_position, variables)
-        
+
+        # ===== PHASE 1 OPTIMIZATION: FAST PATH FOR SIMPLE VARIABLES =====
+        if (isinstance(value, str) and 
+            value.startswith('v_') and 
+            len(value) > 2 and
+            not any(c in value for c in '+-*/()[]&')):
+            
+            # Track that we attempted the fast path
+            global _FAST_PATH_HITS, _FAST_PATH_TOTAL, _FAST_PATH_ENABLED
+            
+            if _FAST_PATH_ENABLED:
+                _FAST_PATH_TOTAL += 1
+                
+                # This is a simple variable reference like "v_x" or "v_color"
+                if value in variables:
+                    _FAST_PATH_HITS += 1
+                    var_value = variables[value]
+                    
+                    # Use format_parameter for proper type conversion and formatting
+                    result = format_parameter(var_value, command_name, param_position, variables)
+                    
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast path variable lookup: {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
+                    
+                    return result
+                else:
+                    # Variable not found - let the normal path handle the error
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Variable {value} not found, falling back to normal path", DEBUG_VERBOSE)
+        # ===== END PHASE 1 OPTIMIZATION =====    
+
         # Fast path for variable references (very common in scripts)
         if value.startswith('v_') and not has_math_expression(value):
             # Create cache key: (variable_name, command, position)
