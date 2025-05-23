@@ -1,0 +1,58 @@
+# Metaballs - organic, blob-like shapes
+v_num_balls = 5
+create_array(v_pos_x, v_num_balls)
+create_array(v_pos_y, v_num_balls)
+create_array(v_vel_x, v_num_balls)
+create_array(v_vel_y, v_num_balls)
+create_array(v_radius, v_num_balls)
+
+# Initialize metaballs
+for v_i in (0, v_num_balls - 1, 1)
+    v_pos_x[v_i] = random(10, 54, 0)
+    v_pos_y[v_i] = random(10, 54, 0)
+    v_vel_x[v_i] = random(-20, 20, 10) / 10
+    v_vel_y[v_i] = random(-20, 20, 10) / 10
+    v_radius[v_i] = random(8, 16, 0)
+endfor v_i
+
+# Main animation loop
+for v_frame in (0, 300, 1)
+    # For every pixel on the display
+    for v_y in (0, 63, 1)
+        begin_frame(true)
+        for v_x in (0, 63, 1)
+            v_sum = 0
+            
+            # Calculate metaball field
+            for v_i in (0, v_num_balls - 1, 1)
+                v_dx = v_x - v_pos_x[v_i]
+                v_dy = v_y - v_pos_y[v_i]
+                #v_dist_sq = v_dx * v_dx + v_dy * v_dy
+                v_sum = v_sum + (v_radius[v_i] * v_radius[v_i]) / (v_dx * v_dx + v_dy * v_dy)
+            endfor v_i
+            
+            # Determine color based on field strength
+            if v_sum > 1 then
+                v_color = min(v_sum * 15, 95)
+                plot(v_x, v_y, v_color, 75)
+            endif
+        endfor v_x
+        end_frame
+    endfor v_y
+    
+    # Update metaball positions
+    for v_i in (0, v_num_balls - 1, 1)
+        v_pos_x[v_i] = v_pos_x[v_i] + v_vel_x[v_i]
+        v_pos_y[v_i] = v_pos_y[v_i] + v_vel_y[v_i]
+        
+        # Bounce off walls
+        if v_pos_x[v_i] < 5 or v_pos_x[v_i] > 59 then
+            v_vel_x[v_i] = -v_vel_x[v_i]
+        endif
+        
+        if v_pos_y[v_i] < 5 or v_pos_y[v_i] > 59 then
+            v_vel_y[v_i] = -v_vel_y[v_i]
+        endif
+    endfor v_i
+    
+endfor v_frame

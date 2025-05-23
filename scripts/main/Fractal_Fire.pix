@@ -1,0 +1,98 @@
+# Fractal fire simulation
+v_width = 64
+v_height = 64
+create_array(v_heat, v_width * v_height)
+
+# Initialize heat array
+for v_i in (0, v_width * v_height - 1, 1)
+    v_heat[v_i] = 0
+endfor v_i
+
+# Main animation loop
+for v_frame in (0, 300, 1)
+   
+    # Add random heat at the bottom
+    for v_x in (0, v_width - 1, 1)
+        v_idx = (v_height - 1) * v_width + v_x
+        v_heat[v_idx] = random(50, 100, 0)
+    endfor v_x
+    
+    # Add occasional bursts of extreme heat
+    if v_frame % 10 == 0 then
+        for v_burst in (0, 5, 1)
+            v_x = random(10, v_width - 10, 0)
+            v_idx = (v_height - 1) * v_width + v_x
+            v_heat[v_idx] = 150
+            v_heat[v_idx - 1] = 130
+            v_heat[v_idx + 1] = 130
+        endfor v_burst
+    endif
+    
+    # Process fire propagation
+    for v_y in (0, v_height - 2, 1)
+        for v_x in (0, v_width - 1, 1)
+            v_below_idx = (v_height - 1 - v_y) * v_width + v_x
+            v_above_idx = (v_height - 2 - v_y) * v_width + v_x
+            
+            # Fire cools as it rises
+            v_cooling = random(0, 4, 0)
+            
+            # Average the heat from pixels below
+            v_total = v_heat[v_below_idx]
+            v_count = 1
+            
+            # Add left and right if possible
+            if v_x > 0 then
+                v_total = v_total + v_heat[v_below_idx - 1]
+                v_count = v_count + 1
+            endif
+            
+            if v_x < v_width - 1 then
+                v_total = v_total + v_heat[v_below_idx + 1]
+                v_count = v_count + 1
+            endif
+            
+            v_new_heat = (v_total / v_count) - v_cooling
+            if v_new_heat < 0 then
+                v_new_heat = 0
+            endif
+            
+            v_heat[v_above_idx] = v_new_heat
+        endfor v_x
+    endfor v_y
+    
+    # Render the fire
+    for v_y in (0, v_height - 1, 1)
+        begin_frame(true)
+        for v_x in (0, v_width - 1, 1)
+            v_idx = v_y * v_width + v_x
+            v_heat_val = v_heat[v_idx]
+            
+            if v_heat_val > 0 then
+                # Map heat value to color
+                if v_heat_val < 20 then
+                    # Black/very dark red
+                    v_color = 0
+                    v_intensity = v_heat_val * 3
+                elseif v_heat_val < 40 then
+                    # Dark red
+                    v_color = red
+                    v_intensity = (v_heat_val - 20) * 3 + 20
+                elseif v_heat_val < 70 then
+                    # Orange/yellow
+                    v_color = orange
+                    v_intensity = (v_heat_val - 40) * 2 + 40
+                else
+                    # White/yellow
+                    v_color = yellow
+                    v_intensity = min(v_heat_val, 100)
+                endif
+                
+                plot(v_x, v_y, v_color, v_intensity)
+            endif
+        endfor v_x
+        end_frame
+    endfor v_y
+    
+    rest(0.03)
+endfor v_frame

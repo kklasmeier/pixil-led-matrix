@@ -867,80 +867,94 @@ I will need your help with extending it this software and with creating scripts.
 My current list of scripts are:
 Here are descriptive titles for your Pixil scripts:
 
-1. 3D Perspective - Dynamic 3D depth perception visualization
-2. 3D Shapes - Animated three-dimensional geometric objects
-3. Aurora Borealis - Northern lights simulation with flowing colors
-4. Blob - Organic amorphous shape movement
-5. Boids Flocking Simulation - Simulated bird or fish group behavior
-6. Bouncing Ball - Physics-based ball bounce animation
-7. Bouncing Pixels - Multiple pixel particles with rebound effects
-8. Bubble Pop - Expanding and bursting bubble animation
-9. Circles - Geometric circle patterns and transformations
-10. Clock Wave - Time-based waveform visualization
-11. Color Blend - Smooth transitioning between color palettes
-12. Color Mandala - Symmetrical radial color patterns
-13. Cosmic Nebula - Space gas cloud formation simulation
-14. Cosmic Pulse - Rhythmic space energy visualization
-15. Crystal Growth - Geometric crystalline formation simulation
-16. Dancing Squares - Choreographed square movement patterns
-17. Digital Rain - Matrix-style falling character effect
-18. Drone Show - Coordinated drone light show formation patterns
-19. Dropped Ball - Physics-based falling object simulation
-20. Electric Arcs - Lightning-like electrical discharge effects
-21. Electric Web - Interconnected electrical network visualization
-22. Embers - Glowing particle effect simulation
-23. Etch-a-Sketch - Classic drawing toy simulation
-24. Expanding Rings - Concentric circle growth patterns
-25. Fireflies - Random illuminating light particles
-26. Fireworks - Explosive particle burst patterns
-27. Fish Tank - Aquatic life simulation
-28. Fractal Trees - Recursive branching structure growth
-29. Fractured Mirror - Fragmented reflection patterns
-30. Geometric Kaleidoscope - Symmetrical geometric pattern rotation
-31. Gravity Wells - Orbital motion around gravity points
-32. Hypnosis - Mesmerizing spiral pattern animation
-33. Icicle Drop - Falling and forming ice crystal simulation
-34. Kaleidoscope - Symmetrical mirrored pattern animation
-35. Kinetic Rainbow - Motion-based color spectrum display
-36. Laser Show - Beam-based light performance simulation
-37. Lightning - Electric discharge branching patterns
-38. Liquid Starfield - Flowing star-like particle movement
-39. Lissajous Curves - Mathematical curve pattern generation
-40. Magic Carpets - Undulating textile-like pattern movement
-41. Missile Command - Classic arcade game simulation
-42. Moire Patterns - Overlapping pattern interference effects
-43. Morphing Prism - Shape-shifting color separation effect
-44. Mouse Escape - Interactive chase sequence
-45. Paint Drops - Liquid color diffusion simulation
-46. Particle Fountain - Upward streaming particle emission
-47. Particle Tumbler - Rotating particle containment simulation
-48. Pathfinder - Route-finding algorithm visualization
-49. Pendulum Wave - Physics-based harmonic oscillation patterns
-50. Photon - Light particle simulation
-51. Plasma Ball - Energy field touch response simulation
-52. Pong - Classic paddle and ball arcade game
-53. Prayers - Contemplative animation sequence
-54. Psychedelic Tunnel - Immersive optical illusion animation
-55. Qix - Geometric area capture game simulation
-56. Rainbow Wave Collapse - Spectrum-based wave interference pattern
-57. Rain Drops - Water droplet impact simulation
-58. Rain - Falling water particle simulation
-59. Sand Drop - Granular material physics simulation
-60. Sine Wave Color Flow - Mathematical color wave propagation
-61. Snake - Classic growing-tail game simulation
-62. Solar System - Planetary orbital simulation
-63. Sort Visualizer - Algorithm comparison visualization
-64. Space Invaders - Classic arcade shooter game simulation
-65. Spiral2 - Enhanced spiral pattern generation
-66. Spirograph Sequence - Geometric drawing tool patterns
-67. Sprite With Grid - Character movement on coordinate system
-68. Squares2 - Advanced square pattern generation
-69. Starburst - Radial light explosion effect
-70. Starfield - Space star simulation with depth
-71. Swarm - Collective movement behavior simulation
-72. The Matrix - Digital reality simulation effect
-73. Vortex Spiral - Spinning funnel pattern animation
-74. Wave Grid - Undulating coordinate mesh animation
-75. Wormhole - Space-time tunnel visualization
-76. Rainbow Sweep - Sweeps in rainbows diangnally across the matrix from all 4 corners
-78. Polygon Zoom - Differnet centered polygon shapes sooming out at you.
+1. 3D Asterisk - Three-dimensional asterisk pattern animation
+2. 3D Perspective - Dynamic 3D depth perception visualization
+3. 3D Shapes - Animated three-dimensional geometric objects
+4. Aurora Borealis - Northern lights simulation with flowing colors
+5. Blob - Organic amorphous shape movement
+6. Boids Flocking Simulation - Simulated bird or fish group behavior
+7. Bouncing Ball - Physics-based ball bounce animation
+8. Bouncing Pixels - Multiple pixel particles with rebound effects
+9. Bubble Pop - Expanding and bursting bubble animation
+10. Circles - Geometric circle patterns and transformations
+11. Clock Wave - Time-based waveform visualization
+12. Color Blend - Smooth transitioning between color palettes
+13. Color Mandala - Symmetrical radial color patterns
+14. Cosmic Nebula - Space gas cloud formation simulation
+15. Cosmic Pulse - Rhythmic space energy visualization
+16. Crystal Growth - Geometric crystalline formation simulation
+17. Dancing Squares - Choreographed square movement patterns
+18. Digital Rain - Matrix-style falling character effect
+19. Drone Show - Coordinated drone light show formation patterns
+20. Dropped Ball - Physics-based falling object simulation
+21. Electric Arcs - Lightning-like electrical discharge effects
+22. Electric Web - Interconnected electrical network visualization
+23. Embers - Glowing particle effect simulation
+24. Etch-a-Sketch - Classic drawing toy simulation
+25. Expanding Circles - Circular growth pattern animation
+26. Expanding Rings - Concentric circle growth patterns
+27. Fireflies - Random illuminating light particles
+28. Fireworks - Explosive particle burst patterns
+29. Fish Tank - Aquatic life simulation
+30. Fractal Fire - Burning fractal pattern simulation
+31. Fractal Trees - Recursive branching structure growth
+32. Fractured Mirror - Fragmented reflection patterns
+33. Game of Life - Conway's cellular automaton simulation
+34. Geometric Kaleidoscope - Symmetrical geometric pattern rotation
+35. Gravity Wells - Orbital motion around gravity points
+36. Hypnosis - Mesmerizing spiral pattern animation
+37. Icicle Drop - Falling and forming ice crystal simulation
+38. Kaleidoscope - Symmetrical mirrored pattern animation
+39. Kinetic Rainbow - Motion-based color spectrum display
+40. Laser Show - Beam-based light performance simulation
+41. Lightning - Electric discharge branching patterns
+42. Liquid Starfield - Flowing star-like particle movement
+43. Lissajous Curves - Mathematical curve pattern generation
+44. Magic Carpets - Undulating textile-like pattern movement
+45. Metaballs Effect - Organic blob interaction simulation
+46. Missile Command - Classic arcade game simulation
+47. Moire Patterns - Overlapping pattern interference effects
+48. Morphing Prism - Shape-shifting color separation effect
+49. Mouse Escape - Interactive chase sequence
+50. Paint Drops - Liquid color diffusion simulation
+51. Particle Eruption - Volcanic-style particle emission
+52. Particle Fountain - Upward streaming particle emission
+53. Particle Tumbler - Rotating particle containment simulation
+54. Pathfinder - Route-finding algorithm visualization
+55. Pendulum Wave - Physics-based harmonic oscillation patterns
+56. Photon - Light particle simulation
+57. Plasma Ball - Energy field touch response simulation
+58. Polygon Zoom - Different centered polygon shapes zooming outward
+59. PolyWobble - Undulating polygon deformation animation
+60. Pong - Classic paddle and ball arcade game
+61. Prayers - Contemplative animation sequence
+62. Psychedelic Tunnel - Immersive optical illusion animation
+63. Pulse Matrix - Rhythmic grid pulsation effect
+64. Qix - Geometric area capture game simulation
+65. Quantum Particle Collision - Subatomic particle interaction simulation
+66. Rainbow Sweep - Sweeps in rainbows diagonally across matrix from all corners
+67. Rainbow Wave Collapse - Spectrum-based wave interference pattern
+68. Rain Drops - Water droplet impact simulation
+69. Rain - Falling water particle simulation
+70. Raining Down - Enhanced precipitation effect
+71. RGB Color Cube - Three-dimensional color space visualization
+72. Rolling Cylinder - Cylindrical object rotation animation
+73. Sand Drop - Granular material physics simulation
+74. Sine Wave Color Flow - Mathematical color wave propagation
+75. Snake - Classic growing-tail game simulation
+76. Solar System - Planetary orbital simulation
+77. Sort Visualizer - Algorithm comparison visualization
+78. Space Invaders - Classic arcade shooter game simulation
+79. Spiral2 - Enhanced spiral pattern generation
+80. Spirograph Pen - Single pen spirograph drawing simulation
+81. Spirograph Sequence - Multiple geometric drawing tool patterns
+82. Sprite With Grid - Character movement on coordinate system
+83. Squares2 - Advanced square pattern generation
+84. Starburst - Radial light explosion effect
+85. Starfield - Space star simulation with depth
+86. Swarm - Collective movement behavior simulation
+87. The Matrix - Digital reality simulation effect
+88. Voronoi Pattern - Cellular geometric pattern generation
+89. Vortex Spiral - Spinning funnel pattern animation
+90. Wave Grid - Undulating coordinate mesh animation
+91. Wormhole - Space-time tunnel visualization
