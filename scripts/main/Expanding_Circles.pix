@@ -1,0 +1,147 @@
+throttle(.4)
+# Spiral Expanding Circles with enhanced color cycling and rotating polygon shapes
+v_angle = 0
+v_max_circles = 20  # Keep original capacity
+create_array(v_radius, v_max_circles)  # Current radius of each circle (floating point)
+create_array(v_center_x, v_max_circles)  # X center position (floating point)
+create_array(v_center_y, v_max_circles)  # Y center position (floating point)
+create_array(v_color, v_max_circles)  # Color of each circle
+create_array(v_active, v_max_circles)  # Is circle active
+create_array(v_shape, v_max_circles)  # Shape type for each object
+
+# Color management variables
+v_color_start = 1  # Start color value
+v_color_increment = 3  # How much to increment color each time
+v_current_color = v_color_start
+
+# Shape management variables
+v_shape_cycle = 0  # Tracks which shape to use (0-3)
+v_shape_counter = 0  # Counts rotations before changing shape
+v_shapes_per_cycle = 4  # Number of full rotations before changing shape
+
+# Initialize all circles as inactive
+for v_i in (0, v_max_circles - 1, 1)
+    v_active[v_i] = 0
+endfor v_i
+
+# Circle creation variables
+v_spawn_timer = 0
+v_spawn_interval = 8  # Create new circle every X frames
+v_growth_speed = 0.5  # How fast circles expand (for consistent growth)
+v_cos_20 = 0.9397  # Precalculated cos(20°) - the common rotation amount
+v_sin_20 = 0.3420  # Precalculated sin(20°)
+v_current_cos = 1.0  # Start at angle 0
+v_current_sin = 0.0
+
+# Main animation loop
+while true then
+    begin_frame(false)
+    
+    # Draw and update all active circles
+    for v_i in (0, v_max_circles - 1, 1)
+        if v_active[v_i] == 1 then
+            # Draw this circle - convert floating point values to integers for drawing
+            v_draw_x = round(v_center_x[v_i])
+            v_draw_y = round(v_center_y[v_i])
+            v_draw_radius = round(v_radius[v_i])
+            
+            # Only draw if radius is at least 1
+            if v_draw_radius >= 1 then
+                if v_shape[v_i] == 0 then
+                    # 5-sided polygon
+                    draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 5, v_color[v_i], 80, 0, false)
+                elseif v_shape[v_i] == 1 then
+                    # 7-sided polygon
+                    draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 7, v_color[v_i], 80, 0, false)
+                elseif v_shape[v_i] == 2 then
+                    # 9-sided polygon
+                    draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 9, v_color[v_i], 80, 0, false)
+                else
+                    # Circle
+                    draw_circle(v_draw_x, v_draw_y, v_draw_radius, v_color[v_i], 80, false)
+                endif
+            endif
+            
+            # Grow the circle - use floating point values for consistent growth
+            v_radius[v_i] = v_radius[v_i] + v_growth_speed
+            
+            # Deactivate if off screen (simple radius check is sufficient)
+            if v_radius[v_i] > 45 then
+                v_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    
+    # Increment spawn timer and create new circle when ready
+    v_spawn_timer = v_spawn_timer + 1
+    if v_spawn_timer >= v_spawn_interval then
+        # Reset timer
+        v_spawn_timer = 0
+        
+        # Find inactive slot
+        v_new_index = -1
+        for v_i in (0, v_max_circles - 1, 1)
+            if v_active[v_i] == 0 then
+                v_new_index = v_i
+                break
+            endif
+        endfor v_i
+        
+        # If found slot, create new circle
+        if v_new_index >= 0 then
+            # Calculate position along spiral - use cached cos/sin values
+            v_offset_distance = 8  # Fixed distance from center
+            v_center_x[v_new_index] = 32 + v_current_cos * v_offset_distance
+            v_center_y[v_new_index] = 32 + v_current_sin * v_offset_distance
+            
+            # Initialize properties
+            v_radius[v_new_index] = 0.5  # Start smaller for smoother appearance
+            
+            # Assign current color and increment for next circle
+            v_color[v_new_index] = v_current_color
+            
+            # Assign current shape
+            v_shape[v_new_index] = v_shape_cycle
+            
+            # Increment color for next circle and wrap around if needed
+            v_current_color = v_current_color + v_color_increment
+            if v_current_color > 99 then
+                v_current_color = ((v_current_color - 1) % 99) + 1  # Wrap to range 1-99
+            endif
+            
+            v_active[v_new_index] = 1  # Activate
+            
+            # Update angle for next circle using efficient rotation
+            # Using rotation formula instead of recalculating trig functions:
+            # cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
+            # sin(a+b) = sin(a)cos(b) + cos(a)sin(b)
+            v_next_cos = v_current_cos * v_cos_20 - v_current_sin * v_sin_20
+            v_next_sin = v_current_sin * v_cos_20 + v_current_cos * v_sin_20
+            v_current_cos = v_next_cos
+            v_current_sin = v_next_sin
+            
+            # Recalibrate occasionally to prevent drift
+            if v_angle % 360 == 0 then
+                v_current_cos = 1.0
+                v_current_sin = 0.0
+                
+                # Count this as a complete rotation
+                v_shape_counter = v_shape_counter + 1
+                
+                # Change shape after specified number of rotations
+                if v_shape_counter >= v_shapes_per_cycle then
+                    v_shape_counter = 0
+                    v_shape_cycle = v_shape_cycle + 1
+                    if v_shape_cycle > 3 then
+                        v_shape_cycle = 0
+                    endif
+                endif
+            endif
+        endif
+        
+        # Update angle for tracking
+        v_angle = v_angle + 20
+    endif
+    
+    end_frame
+endwhile

@@ -1,4 +1,4 @@
-throttle(1)
+throttle(0)
 
 # Common variables
 v_start_x = 32

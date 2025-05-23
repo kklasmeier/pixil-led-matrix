@@ -1,0 +1,212 @@
+# Radar Sweep - Realistic radar display with sweep-detected objects
+# Objects only appear when the sweep line passes over them
+
+clear()
+
+# Radar center and parameters
+v_center_x = 32
+v_center_y = 32
+v_max_radius = 30
+
+# Sweep parameters
+v_sweep_angle = 0
+v_sweep_speed = 0.08
+v_sweep_width = 0.08  # Angular width of detection beam (narrower for precise timing)
+
+# Grid and display colors
+v_grid_color = "dark_gray"
+v_sweep_color = "lime"
+v_blip_color = "green"
+v_fade_color = "forest_green"
+
+# Arrays for fixed objects (targets that exist but are invisible until detected)
+create_array(v_target_x, 15)
+create_array(v_target_y, 15)
+create_array(v_target_active, 15)
+v_max_targets = 15
+
+# Arrays for visible blips (detected objects that fade over time)
+create_array(v_blip_x, 15)
+create_array(v_blip_y, 15)
+create_array(v_blip_intensity, 15)
+create_array(v_blip_active, 15)
+
+# Arrays for target movement vectors
+create_array(v_target_dx, 15)
+create_array(v_target_dy, 15)
+
+# Initialize target positions and movement vectors
+for v_i in (0, v_max_targets - 1, 1)
+    # Generate random target positions
+    v_target_distance = random(10, v_max_radius - 2, 0)
+    v_target_angle = random(0, 628, 0) / 100  # Random angle in radians
+    
+    v_target_x[v_i] = v_center_x + v_target_distance * cos(v_target_angle)
+    v_target_y[v_i] = v_center_y + v_target_distance * sin(v_target_angle)
+    v_target_active[v_i] = 1
+    
+    # Generate random movement vectors (slow movement)
+    v_target_dx[v_i] = random(-20, 20, 0) / 100  # Small movement per sweep
+    v_target_dy[v_i] = random(-20, 20, 0) / 100
+    
+    # Initialize corresponding blip as inactive
+    v_blip_active[v_i] = 0
+    v_blip_intensity[v_i] = 0
+endfor v_i
+
+# Draw static radar grid
+def draw_radar_grid {
+    # Draw range circles
+    for v_ring in (10, v_max_radius, 10)
+        draw_circle(v_center_x, v_center_y, v_ring, v_grid_color, 25, false)
+    endfor v_ring
+    
+    # Draw crosshairs
+    draw_line(v_center_x - v_max_radius, v_center_y, v_center_x + v_max_radius, v_center_y, v_grid_color, 25)
+    draw_line(v_center_x, v_center_y - v_max_radius, v_center_x, v_center_y + v_max_radius, v_grid_color, 25)
+    
+    # Draw diagonal reference lines
+    v_diag_offset = v_max_radius * 0.707  # sin(45°) = cos(45°) ≈ 0.707
+    draw_line(v_center_x - v_diag_offset, v_center_y - v_diag_offset, v_center_x + v_diag_offset, v_center_y + v_diag_offset, v_grid_color, 15)
+    draw_line(v_center_x - v_diag_offset, v_center_y + v_diag_offset, v_center_x + v_diag_offset, v_center_y - v_diag_offset, v_grid_color, 15)
+}
+
+# Main animation loop (runs forever)
+v_frame = 0
+while v_frame >= 0 then
+    begin_frame
+    
+    # Draw radar grid
+    call draw_radar_grid
+    
+    # Update sweep angle
+    v_sweep_angle = v_sweep_angle + v_sweep_speed
+    if v_sweep_angle > 6.28318530718 then  # 2*pi - complete rotation
+        v_sweep_angle = v_sweep_angle - 6.28318530718
+        
+        # Move all targets slightly each sweep (ships in motion)
+        for v_move_i in (0, v_max_targets - 1, 1)
+            if v_target_active[v_move_i] == 1 then
+                # Calculate new position
+                v_new_x = v_target_x[v_move_i] + v_target_dx[v_move_i]
+                v_new_y = v_target_y[v_move_i] + v_target_dy[v_move_i]
+                
+                # Check if new position would be within radar range
+                v_new_distance = sqrt((v_new_x - v_center_x) * (v_new_x - v_center_x) + (v_new_y - v_center_y) * (v_new_y - v_center_y))
+                
+                # Only move if it stays within bounds, otherwise bounce
+                if v_new_distance <= v_max_radius - 1 and v_new_distance >= 8 then
+                    # Safe to move
+                    v_target_x[v_move_i] = v_new_x
+                    v_target_y[v_move_i] = v_new_y
+                else
+                    # Bounce off boundary
+                    v_target_dx[v_move_i] = v_target_dx[v_move_i] * -1
+                    v_target_dy[v_move_i] = v_target_dy[v_move_i] * -1
+                endif
+                
+                # Occasionally change direction slightly (realistic ship movement)
+                v_course_change = random(0, 100, 0)
+                if v_course_change < 10 then
+                    v_new_dx = random(-20, 20, 0) / 100
+                    v_new_dy = random(-20, 20, 0) / 100
+                    v_target_dx[v_move_i] = v_new_dx
+                    v_target_dy[v_move_i] = v_new_dy
+                endif
+            endif
+        endfor v_move_i
+    endif
+    
+    # Calculate sweep line endpoints
+    v_sweep_end_x = v_center_x + v_max_radius * cos(v_sweep_angle)
+    v_sweep_end_y = v_center_y + v_max_radius * sin(v_sweep_angle)
+    
+    # Check each target to see if sweep is passing over it
+    for v_i in (0, v_max_targets - 1, 1)
+        if v_target_active[v_i] == 1 then
+            # Calculate angle from center to this target
+            v_target_angle = atan2(v_target_y[v_i] - v_center_y, v_target_x[v_i] - v_center_x)
+            if v_target_angle < 0 then
+                v_target_angle = v_target_angle + 6.28318530718
+            endif
+            
+            # Calculate angle difference between sweep and target
+            v_angle_diff = abs(v_sweep_angle - v_target_angle)
+            if v_angle_diff > 3.14159265359 then  # Handle wraparound
+                v_angle_diff = 6.28318530718 - v_angle_diff
+            endif
+            
+            # Check if target is within radar range
+            v_target_distance = sqrt((v_target_x[v_i] - v_center_x) * (v_target_x[v_i] - v_center_x) + (v_target_y[v_i] - v_center_y) * (v_target_y[v_i] - v_center_y))
+            
+            # If sweep is passing over target AND target is within range, create/refresh blip
+            if v_angle_diff <= v_sweep_width and v_target_distance <= v_max_radius then
+                v_blip_x[v_i] = v_target_x[v_i]
+                v_blip_y[v_i] = v_target_y[v_i]
+                v_blip_intensity[v_i] = 100  # Fresh detection
+                v_blip_active[v_i] = 1
+            endif
+        endif
+    endfor v_i
+    
+    # Update and draw all active blips (fade them over time)
+    for v_i in (0, v_max_targets - 1, 1)
+        if v_blip_active[v_i] == 1 then
+            # Fade the blip over time
+            v_blip_intensity[v_i] = v_blip_intensity[v_i] - 1
+            if v_blip_intensity[v_i] <= 0 then
+                v_blip_active[v_i] = 0
+            endif
+            
+            # Draw the blip based on its intensity
+            if v_blip_intensity[v_i] > 70 then
+                # Bright fresh detection
+                plot(v_blip_x[v_i], v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i])
+                # Add glow effect for bright blips
+                if v_blip_x[v_i] > 0 then
+                    plot(v_blip_x[v_i] - 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
+                endif
+                if v_blip_x[v_i] < 63 then
+                    plot(v_blip_x[v_i] + 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
+                endif
+                if v_blip_y[v_i] > 0 then
+                    plot(v_blip_x[v_i], v_blip_y[v_i] - 1, v_blip_color, v_blip_intensity[v_i] / 4)
+                endif
+                if v_blip_y[v_i] < 63 then
+                    plot(v_blip_x[v_i], v_blip_y[v_i] + 1, v_blip_color, v_blip_intensity[v_i] / 4)
+                endif
+            elseif v_blip_intensity[v_i] > 30 then
+                # Medium intensity
+                plot(v_blip_x[v_i], v_blip_y[v_i], v_fade_color, v_blip_intensity[v_i])
+            else
+                # Fading out
+                plot(v_blip_x[v_i], v_blip_y[v_i], v_grid_color, v_blip_intensity[v_i] + 20)
+            endif
+        endif
+    endfor v_i
+    
+    # Draw sweep trail (fading line behind the main sweep)
+    for v_trail in (1, 12, 1)
+        v_trail_angle = v_sweep_angle - v_trail * 0.015
+        if v_trail_angle < 0 then
+            v_trail_angle = v_trail_angle + 6.28318530718
+        endif
+        
+        v_trail_end_x = v_center_x + v_max_radius * cos(v_trail_angle)
+        v_trail_end_y = v_center_y + v_max_radius * sin(v_trail_angle)
+        v_trail_intensity = 100 - v_trail * 8
+        
+        if v_trail_intensity > 0 then
+            draw_line(v_center_x, v_center_y, v_trail_end_x, v_trail_end_y, v_sweep_color, v_trail_intensity)
+        endif
+    endfor v_trail
+    
+    # Draw the main rotating sweep line (brightest)
+    draw_line(v_center_x, v_center_y, v_sweep_end_x, v_sweep_end_y, v_sweep_color, 100)
+    
+    end_frame
+
+    
+    v_frame = v_frame + 1
+    
+endwhile

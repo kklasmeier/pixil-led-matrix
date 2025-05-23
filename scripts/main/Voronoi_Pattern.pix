@@ -1,0 +1,86 @@
+# Voronoi diagram animation
+v_num_points = 5
+create_array(v_px, v_num_points)
+create_array(v_py, v_num_points)
+create_array(v_vx, v_num_points)
+create_array(v_vy, v_num_points)
+create_array(v_colors, v_num_points)
+
+# Initialize points
+for v_i in (0, v_num_points - 1, 1)
+    v_px[v_i] = random(5, 59, 0)
+    v_py[v_i] = random(5, 59, 0)
+    v_vx[v_i] = random(-10, 10, 0) / 20
+    v_vy[v_i] = random(-10, 10, 0) / 20
+    v_colors[v_i] = random(0, 99, 0)
+endfor v_i
+
+# Main animation loop
+for v_frame in (0, 300, 1)
+    begin_frame(false)
+    
+    # For each pixel, find closest point
+    for v_y in (0, 63, 1)
+        for v_x in (0, 63, 1)
+            v_closest = 0
+            v_min_dist = 10000
+            
+            for v_i in (0, v_num_points - 1, 1)
+                v_dx = v_x - v_px[v_i]
+                v_dy = v_y - v_py[v_i]
+                v_dist = v_dx * v_dx + v_dy * v_dy
+                
+                if v_dist < v_min_dist then
+                    v_min_dist = v_dist
+                    v_closest = v_i
+                endif
+            endfor v_i
+            
+            # Color based on closest point
+            v_edge = 0
+            
+            # Check if this is an edge (second closest point is almost as close)
+            for v_i in (0, v_num_points - 1, 1)
+                if v_i != v_closest then
+                    v_dx = v_x - v_px[v_i]
+                    v_dy = v_y - v_py[v_i]
+                    v_dist = v_dx * v_dx + v_dy * v_dy
+                    
+                    if v_dist < v_min_dist * 1.05 then
+                        v_edge = 1
+                        break
+                    endif
+                endif
+            endfor v_i
+            
+            if v_edge == 1 then
+                plot(v_x, v_y, white, 90)
+            else
+                plot(v_x, v_y, v_colors[v_closest], 60)
+            endif
+        endfor v_x
+    endfor v_y
+    
+    # Draw the actual points
+    for v_i in (0, v_num_points - 1, 1)
+        draw_circle(v_px[v_i], v_py[v_i], 2, white, 100, true)
+    endfor v_i
+    
+    # Update point positions
+    for v_i in (0, v_num_points - 1, 1)
+        v_px[v_i] = v_px[v_i] + v_vx[v_i]
+        v_py[v_i] = v_py[v_i] + v_vy[v_i]
+        
+        # Bounce off edges
+        if v_px[v_i] < 2 or v_px[v_i] > 62 then
+            v_vx[v_i] = -v_vx[v_i]
+        endif
+        
+        if v_py[v_i] < 2 or v_py[v_i] > 62 then
+            v_vy[v_i] = -v_vy[v_i]
+        endif
+    endfor v_i
+    
+    end_frame
+    rest(0.05)
+endfor v_frame

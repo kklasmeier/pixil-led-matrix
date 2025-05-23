@@ -1,0 +1,196 @@
+# Tornado Formation - Optimized version with pre-calculated spiral paths
+# Fast performance with visual spiral effect
+
+clear()
+
+# Tornado center
+v_center_x = 32
+v_center_y = 32
+
+# Tornado strength
+v_tornado_strength = 0
+v_max_strength = 100
+v_growth_rate = 1
+
+# Simplified particle system - fewer particles, simpler math
+v_num_particles = 20
+create_array(v_particle_angle, 20)
+create_array(v_particle_radius, 20)
+create_array(v_particle_speed, 20)
+create_array(v_particle_life, 20)
+
+# Simple debris system
+v_num_debris = 8
+create_array(v_debris_x, 8)
+create_array(v_debris_y, 8)
+create_array(v_debris_angle, 8)
+create_array(v_debris_radius, 8)
+
+# Colors - realistic tornado/storm colors
+v_inner_color = "dark_gray"
+v_mid_color = "forest_green"
+v_outer_color = "dark_brown"
+v_debris_color = "brown"
+
+# Initialize particles on spiral paths
+for v_i in (0, v_num_particles - 1, 1)
+    v_particle_angle[v_i] = random(0, 628, 0) / 100
+    v_particle_radius[v_i] = random(30, 45, 0)
+    v_particle_speed[v_i] = random(8, 15, 0) / 100
+    v_particle_life[v_i] = random(100, 200, 0)
+endfor v_i
+
+# Initialize debris
+for v_i in (0, v_num_debris - 1, 1)
+    v_debris_x[v_i] = random(10, 54, 0)
+    v_debris_y[v_i] = random(45, 58, 0)
+    v_debris_angle[v_i] = 0
+    v_debris_radius[v_i] = 30
+endfor v_i
+
+# Tornado phase
+v_phase = 0
+v_phase_timer = 0
+
+# Pre-calculated spiral positions for performance
+create_array(v_spiral_x, 6)
+create_array(v_spiral_y, 6)
+create_array(v_spiral_r, 6)
+v_spiral_offset = 0
+
+# Main animation loop
+while true then
+    begin_frame
+    
+    # Update tornado strength
+    v_phase_timer = v_phase_timer + 1
+    
+    if v_phase == 0 then
+        # Growing
+        v_tornado_strength = v_tornado_strength + v_growth_rate
+        if v_tornado_strength >= v_max_strength then
+            v_phase = 1
+            v_phase_timer = 0
+        endif
+    elseif v_phase == 1 then
+        # Mature
+        if v_phase_timer > 200 then
+            v_phase = 2
+            v_phase_timer = 0
+        endif
+    else
+        # Dissipating
+        v_tornado_strength = v_tornado_strength - v_growth_rate
+        if v_tornado_strength <= 0 then
+            v_tornado_strength = 0
+            v_phase = 0
+            v_phase_timer = 0
+        endif
+    endif
+    
+    # Update spiral offset for rotation effect
+    v_spiral_offset = v_spiral_offset + 0.15
+    if v_spiral_offset > 6.28318530718 then
+        v_spiral_offset = v_spiral_offset - 6.28318530718
+    endif
+    
+    # Draw simple spiral arms (fast pre-calculated positions)
+    v_strength_factor = v_tornado_strength / 100
+    
+    for v_arm in (0, 2, 1)
+        v_arm_angle = v_spiral_offset + v_arm * 2.094  # 120 degrees apart
+        
+        # Draw spiral arm
+        for v_segment in (3, 25, 3)
+            v_seg_angle = v_arm_angle + v_segment * 0.2
+            v_seg_radius = v_segment * v_strength_factor
+            
+            v_x = v_center_x + v_seg_radius * cos(v_seg_angle)
+            v_y = v_center_y + v_seg_radius * sin(v_seg_angle)
+            
+            if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+                # Color based on distance from center
+                if v_seg_radius < 8 then
+                    plot(v_x, v_y, v_inner_color, 90 * v_strength_factor)
+                elseif v_seg_radius < 15 then
+                    plot(v_x, v_y, v_mid_color, 70 * v_strength_factor)
+                else
+                    plot(v_x, v_y, v_outer_color, 50 * v_strength_factor)
+                endif
+            endif
+        endfor v_segment
+    endfor v_arm
+    
+    # Simple particle animation
+    for v_i in (0, v_num_particles - 1, 1)
+        # Update particle position along spiral
+        v_particle_angle[v_i] = v_particle_angle[v_i] + v_particle_speed[v_i] * v_strength_factor
+        v_particle_radius[v_i] = v_particle_radius[v_i] - 0.3 * v_strength_factor
+        
+        # Calculate position
+        v_x = v_center_x + v_particle_radius[v_i] * cos(v_particle_angle[v_i])
+        v_y = v_center_y + v_particle_radius[v_i] * sin(v_particle_angle[v_i])
+        
+        # Reset particle if it reaches center or dies
+        v_particle_life[v_i] = v_particle_life[v_i] - 1
+        if v_particle_radius[v_i] < 3 or v_particle_life[v_i] <= 0 then
+            v_particle_angle[v_i] = random(0, 628, 0) / 100
+            v_particle_radius[v_i] = random(30, 45, 0)
+            v_particle_life[v_i] = random(100, 200, 0)
+        endif
+        
+        # Draw particle
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 and v_particle_radius[v_i] > 3 then
+            v_intensity = 60 + v_particle_radius[v_i]
+            if v_intensity > 100 then
+                v_intensity = 100
+            endif
+            plot(v_x, v_y, v_outer_color, v_intensity)
+        endif
+    endfor v_i
+    
+    # Simple debris animation - always move debris when tornado is active
+    if v_tornado_strength > 10 then
+        for v_i in (0, v_num_debris - 1, 1)
+            # Move debris toward tornado center with rotation
+            v_dx = v_debris_x[v_i] - v_center_x
+            v_dy = v_debris_y[v_i] - v_center_y
+            v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+            
+            # Scale movement by tornado strength and distance
+            v_pull_strength = v_tornado_strength * 0.002
+            
+            # Move toward center
+            v_debris_x[v_i] = v_debris_x[v_i] - v_dx * v_pull_strength
+            v_debris_y[v_i] = v_debris_y[v_i] - v_dy * v_pull_strength
+            
+            # Add rotational movement
+            v_debris_x[v_i] = v_debris_x[v_i] - v_dy * v_pull_strength * 3
+            v_debris_y[v_i] = v_debris_y[v_i] + v_dx * v_pull_strength * 3
+            
+            # Reset if debris gets too close to center or goes off screen
+            if v_distance < 4 or v_debris_x[v_i] < 0 or v_debris_x[v_i] > 63 or v_debris_y[v_i] < 0 or v_debris_y[v_i] > 63 then
+                v_debris_x[v_i] = random(10, 54, 0)
+                v_debris_y[v_i] = random(45, 58, 0)
+            endif
+            
+            # Draw debris
+            plot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 80)
+        endfor v_i
+    else
+        # When tornado is weak/dissipated, just draw stationary debris
+        for v_i in (0, v_num_debris - 1, 1)
+            plot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 60)
+        endfor v_i
+    endif
+    
+    # Draw tornado eye when mature
+    if v_tornado_strength > 50 then
+        v_eye_size = 2 + v_tornado_strength / 50
+        draw_circle(v_center_x, v_center_y, v_eye_size, "black", 80, true)
+        draw_circle(v_center_x, v_center_y, v_eye_size, "gray", 40, false)
+    endif
+    
+    end_frame
+
+endwhile
