@@ -154,8 +154,10 @@ def report_metrics(reason="complete"):
     else:
         print("Phase 1 Fast Path: No simple variable lookups detected")
     print("--")
-    from pixil_utils.math_functions import report_fast_math_stats
-    report_fast_math_stats()  
+    from pixil_utils.math_functions import report_fast_math_stats, report_expression_cache_stats
+    report_fast_math_stats()
+    print("--")
+    report_expression_cache_stats()
 
     print("--------------------------------------------")
 
@@ -195,8 +197,9 @@ def process_script(filename, execute_func=None):
     # Initialize metrics
     initialize_metrics()
     reset_fast_path_stats()
-    from pixil_utils.math_functions import reset_fast_math_stats
+    from pixil_utils.math_functions import reset_fast_math_stats, reset_expression_cache_stats
     reset_fast_math_stats()
+    reset_expression_cache_stats()  # Reset cache
 
     # Get queue instance
     queue = QueueManager.get_instance()
