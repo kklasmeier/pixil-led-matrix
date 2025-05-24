@@ -56,5 +56,5 @@ __all__ = [
     'initialize_terminal',
     'start_terminal', 
     'stop_terminal',
-    'check_spacebar',
+    'check_spacebar', 
 ]

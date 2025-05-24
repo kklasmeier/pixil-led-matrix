@@ -24151,3 +24151,89 @@ Active execution time: 361.120 seconds
 Performance: 282.32 commands/second
 Script processing: 10288.62 lines/second
 --------------------------------------------
+=== GitHub Interaction Script ===
+Current directory: /home/pi/Programming/piMatrix/Lightshow/git
+Repository: git@github.com:kklasmeier/pixil-led-matrix.git
+Current branch: master
+
+=== Checking Git Status ===
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   Pixil.py
+	modified:   docs/AI_Instructions.txt
+	modified:   nohup.out
+	modified:   pixil_utils/__init__.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	Tools/check_db.py
+	Tools/view_pixil_metrics.py
+	database/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+=== Staging Changes ===
+./gitsync.sh: line 20: read: read error: 0: Bad file descriptor
+Staging all changes...
+Changes staged:
+M  Pixil.py
+A  Tools/check_db.py
+A  Tools/view_pixil_metrics.py
+A  database/__init__.py
+A  database/base.py
+A  database/data/.gitkeep
+A  database/data/pixil_metrics.db
+A  database/migrations/.gitkeep
+A  database/migrations/001_pixil_initial.sql
+A  database/pixil_metrics.py
+A  database/queries/__init__.py
+A  database/queries/pixil_queries.py
+M  docs/AI_Instructions.txt
+MM nohup.out
+M  pixil_utils/__init__.py
+
+=== Committing Changes ===
+Current staged changes:
+Pixil.py
+Tools/check_db.py
+Tools/view_pixil_metrics.py
+database/__init__.py
+database/base.py
+database/data/.gitkeep
+database/data/pixil_metrics.db
+database/migrations/.gitkeep
+database/migrations/001_pixil_initial.sql
+database/pixil_metrics.py
+database/queries/__init__.py
+database/queries/pixil_queries.py
+docs/AI_Instructions.txt
+nohup.out
+pixil_utils/__init__.py
+
+./gitsync.sh: line 50: read: read error: 0: Bad file descriptor
+Commit message cannot be empty. Using default message.
+Committing with message: 'Update from interactive script'
+[master 65c01d4] Update from interactive script
+ 15 files changed, 1027 insertions(+), 7 deletions(-)
+ create mode 100644 Tools/check_db.py
+ create mode 100644 Tools/view_pixil_metrics.py
+ create mode 100644 database/__init__.py
+ create mode 100644 database/base.py
+ create mode 100644 database/data/.gitkeep
+ create mode 100644 database/data/pixil_metrics.db
+ create mode 100644 database/migrations/.gitkeep
+ create mode 100644 database/migrations/001_pixil_initial.sql
+ create mode 100644 database/pixil_metrics.py
+ create mode 100644 database/queries/__init__.py
+ create mode 100644 database/queries/pixil_queries.py
+Commit complete:
+65c01d4 Update from interactive script
+
+=== Pushing to GitHub ===
+./gitsync.sh: line 63: read: read error: 0: Bad file descriptor
+Pushing to 'origin/master'...
+send-pack: unexpected disconnect while reading sideband packet
