@@ -37,6 +37,7 @@ SIMPLE_DIV_PATTERN = re.compile(r'^(v_\w+)\s*/\s*(-?\d*\.?\d+)$')
 SIMPLE_MOD_PATTERN = re.compile(r'^(v_\w+)\s*%\s*(-?\d*\.?\d+)$')
 SIMPLE_ARRAY_ACCESS_PATTERN = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
 NUMBER_PATTERN = re.compile(r'^-?\d*\.?\d+$')
+RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
 
 # Two variable patterns
 VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
@@ -355,12 +356,17 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
             return fast_result
     # ===== END PHASE 2.5 OPTIMIZATION =====
 
+    # Parse variables early so we can check for random in both original and parsed expressions
+    parsed_expr = substitute_variables(expr, variables)
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"After substitution: {parsed_expr}", DEBUG_VERBOSE)
+
     # Cache key and tracking remain the same
     cache_key = None
     
     try:
         # Caching logic remains the same
-        if isinstance(expr, str) and "random" not in expr:
+        if isinstance(expr, str) and "random" not in expr and "random" not in parsed_expr:
             # Same caching logic as before...
             # (Code omitted for brevity)
             
@@ -430,41 +436,36 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         # Handle string literals
         if (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
             return expr.strip('"\'')
-            
-        # Parse remaining variables
-        parsed_expr = substitute_variables(expr, variables)
-        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-            debug_print(f"After substitution: {parsed_expr}", DEBUG_VERBOSE)
-        
-        # ===== EXPRESSION RESULT CACHING =====
-        # Try to get cached result first
-        cache_key = create_cache_key(expr, variables)
-        if cache_key is not None:
-            cached_result = get_cached_result(cache_key)
-            if cached_result is not None:
-                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Expression cache hit: {expr}", DEBUG_VERBOSE)
-                return cached_result
 
-        # Parse remaining variables (existing code)
-        parsed_expr = substitute_variables(expr, variables)
+        # ===== EXPRESSION RESULT CACHING =====
+        # Try to get cached result first (but not for random expressions)
+        if "random" not in expr and "random" not in parsed_expr:
+            cache_key = create_cache_key(expr, variables)
+            if cache_key is not None:
+                cached_result = get_cached_result(cache_key)
+                if cached_result is not None:
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Expression cache hit: {expr}", DEBUG_VERBOSE)
+                    return cached_result
 
         # Try evaluating as math expression (existing code)
         eval_env = {**MATH_FUNCTIONS, '__builtins__': None}
         result = eval(parsed_expr, {"__builtins__": None}, eval_env)
 
-        # Cache the result if we have a cache key
-        if cache_key is not None:
-            cache_result(cache_key, result)
-            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Expression cached: {expr} = {result}", DEBUG_VERBOSE)
+        # Cache the result if we have a cache key (but not for random expressions)
+        if "random" not in expr and "random" not in parsed_expr:
+            cache_key = create_cache_key(expr, variables)
+            if cache_key is not None:
+                cache_result(cache_key, result)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Expression cached: {expr} = {result}", DEBUG_VERBOSE)
         # ===== END EXPRESSION RESULT CACHING =====
 
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Evaluation result: {result}", DEBUG_VERBOSE)
         
-        # Cache the result if appropriate
-        if cache_key is not None:
+        # Cache the result if appropriate (but never cache random expressions)
+        if cache_key is not None and "random" not in expr and "random" not in parsed_expr:
             # Implement LRU eviction with OrderedDict
             if len(_EXPR_CACHE) >= _EXPR_CACHE_SIZE:
                 # Remove oldest item (first in the OrderedDict)
@@ -498,8 +499,10 @@ def random_float(min_val, max_val, precision):
     range_val = max_val - min_val
     random_val = random.random() * range_val + min_val
     if precision == 0:
-        return int(round(random_val))
-    return round(random_val, precision)
+        result = int(round(random_val))
+    else:
+        result = round(random_val, precision)
+    return result
 
 def has_math_expression(value: str) -> bool:
     """

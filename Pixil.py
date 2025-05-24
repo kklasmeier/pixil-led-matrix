@@ -382,6 +382,22 @@ def process_script(filename, execute_func=None):
                     _FAST_PATH_HITS += 1
                     var_value = variables[value]
                     
+                    # Special handling for font_name parameter in draw_text
+                    if command_name == 'draw_text' and param_position == 3:
+                        # If the variable contains a string value, treat it as a font name
+                        if isinstance(var_value, str):
+                            # If it's already quoted, return as-is
+                            if var_value.startswith('"') and var_value.endswith('"'):
+                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                    debug_print(f"Fast path font (pre-quoted): {value} -> {var_value}", DEBUG_VERBOSE)
+                                return var_value
+                            # Otherwise, quote it as a font name
+                            else:
+                                result = f'"{var_value}"'
+                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                    debug_print(f"Fast path font (quoted): {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
+                                return result
+                    
                     # Use format_parameter for proper type conversion and formatting
                     result = format_parameter(var_value, command_name, param_position, variables)
                     
@@ -396,7 +412,7 @@ def process_script(filename, execute_func=None):
         # ===== END PHASE 1 OPTIMIZATION =====    
 
         # Fast path for variable references (very common in scripts)
-        if value.startswith('v_') and not has_math_expression(value):
+        if value.startswith('v_') and not has_math_expression(value) and "random" not in value:
             # Create cache key: (variable_name, command, position)
             cache_key = (value, command_name, param_position)
             
@@ -415,13 +431,33 @@ def process_script(filename, execute_func=None):
             # Not in cache, look up and format
             if value in variables:
                 var_value = variables[value]
-                result = format_parameter(var_value, command_name, param_position, variables)
                 
-                # Cache the result with LRU eviction
-                if len(_VAR_FORMAT_CACHE) >= _VAR_CACHE_SIZE:
-                    # Remove oldest item (first in OrderedDict)
-                    _VAR_FORMAT_CACHE.popitem(last=False)
-                _VAR_FORMAT_CACHE[cache_key] = result
+                # Special handling for font_name parameter in draw_text
+                if command_name == 'draw_text' and param_position == 3:
+                    # If the variable contains a string value, treat it as a font name
+                    if isinstance(var_value, str):
+                        # If it's already quoted, return as-is
+                        if var_value.startswith('"') and var_value.endswith('"'):
+                            result = var_value
+                        # Otherwise, quote it as a font name
+                        else:
+                            result = f'"{var_value}"'
+                        
+                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                            debug_print(f"Variable cache font handling: {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
+                    else:
+                        # Non-string variable for font name - use normal formatting
+                        result = format_parameter(var_value, command_name, param_position, variables)
+                else:
+                    # Normal parameter formatting
+                    result = format_parameter(var_value, command_name, param_position, variables)
+                
+                # Cache the result with LRU eviction (but not random expressions)
+                if "random" not in value:
+                    if len(_VAR_FORMAT_CACHE) >= _VAR_CACHE_SIZE:
+                        # Remove oldest item (first in OrderedDict)
+                        _VAR_FORMAT_CACHE.popitem(last=False)
+                    _VAR_FORMAT_CACHE[cache_key] = result
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Variable cache miss: {value} -> {result}", DEBUG_VERBOSE)
                 return result
@@ -459,28 +495,6 @@ def process_script(filename, execute_func=None):
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Passing to format_parameter: {val}", DEBUG_VERBOSE)
         return format_parameter(val, command_name, param_position, variables)
-
-    def safe_eval(expr, vars):
-        try:
-            # Check for the random function pattern
-            random_match = RANDOM_PATTERN.match(expr)
-            if random_match:
-                min_val = float(random_match.group(1))
-                max_val = float(random_match.group(2))
-                precision = int(random_match.group(3))
-                return random_float(min_val, max_val, precision)
-            
-            # Add math functions to evaluation environment
-            eval_vars = vars.copy()
-            eval_vars.update(MATH_FUNCTIONS)
-            
-            return eval(expr, {"__builtins__": None}, eval_vars)
-        except NameError as e:
-            debug_print(f"Error: Undefined variable in expression '{expr}': {e}", DEBUG_SUMMARY)
-            return 0
-        except Exception as e:
-            debug_print(f"Error evaluating expression '{expr}': {e}", DEBUG_SUMMARY)
-            return 0
 
     # Add new array helper functions here
     def process_array_creation(line):
@@ -820,8 +834,8 @@ def process_script(filename, execute_func=None):
                     else:
                         if DEBUG_LEVEL >= DEBUG_VERBOSE:
                             debug_print(f"  Evaluating numeric expression: {expr}", DEBUG_VERBOSE)
-                        var_value = safe_eval(expr, variables)
-                        
+                        var_value = evaluate_math_expression(expr, variables)
+
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"  Evaluation result: {var_value}", DEBUG_VERBOSE)
                     variables[var_name] = var_value
