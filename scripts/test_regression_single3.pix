@@ -1,43 +1,29 @@
-# Moving Square - Horizontal Bounce
-# A 2x2 square moves back and forth across the screen at y=32
-# The script runs in an infinite loop
+# Random Number Test Script
+# Tests random number generation between 0 and 63, 100 times
+# Each call should produce a different result
 
-# Initialize position and movement variables
-v_x = 0                  # Starting x position at left edge
-v_y = 32                 # Fixed y position in middle of screen
-v_direction = 1          # Movement direction (1 = right, -1 = left)
-v_speed = 1              # Movement speed
-v_size = 2               # Square size
-v_max_x = 62             # Maximum x position (64 - square size)
-v_color = "red"          # Square color
-v_intensity = 100        # Color intensity
-v_delay = 0.01           # Animation delay in seconds
+# Set up variables
+v_min = 0
+v_max = 63
+v_precision = 0
+v_count = 100
 
-# Clear the display to start
-clear()
+print("Starting random number test...")
+print(f"Generating {v_count} random numbers between {v_min} and {v_max}")
 
-# Infinite loop for continuous movement
-while 1 == 1 then
-    # Clear previous position
-    # Draw the square at current position
-    draw_rectangle(v_x, v_y, v_size, v_size, v_color, v_intensity, true, 2000)
-    
-    # Update position
-    v_x = v_x + (v_speed * v_direction)
-    
-    # Check boundary conditions and reverse direction if needed
-    if v_x <= 0 then
-        v_x = 0
-        v_direction = 1          # Change direction to right
-        rest(3)
-    endif
-    
-    if v_x >= v_max_x then
-        v_x = v_max_x
-        v_direction = -1         # Change direction to left
-        rest(3)
-    endif
-    
-    # Pause briefly for animation timing
-    rest(v_delay)
-endwhile
+# Test loop
+for v_i in (1, v_count, 1) then
+    v_random_result = random(v_min, v_max, v_precision)
+    print(f"Test {v_i}: {v_random_result}")
+endfor v_i
+
+print("Random number test completed!")
+
+# Additional test with variable expressions
+print("Testing with variable expressions...")
+for v_i in (1, 10, 1) then
+    v_random_result = random(0, v_max - 1, 0)
+    print(f"Variable test {v_i}: {v_random_result}")
+endfor v_i
+
+print("All tests completed!")

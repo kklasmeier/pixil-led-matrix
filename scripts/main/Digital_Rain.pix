@@ -1,6 +1,6 @@
 # Digital Rain
-# Matrix-style falling characters
-throttle(0.2)
+# Matrix-style falling characters - Full 64x64 display
+throttle(0)
 # Parameters
 v_width = 64
 v_height = 64
@@ -20,6 +20,9 @@ v_rain_char = "1"
 v_font = "piboto-regular"
 v_font_size = 8
 
+# Text offset to start at top of screen (compensate for font baseline)
+v_text_offset = 3
+
 # Initialize drops
 for v_i in (0, v_num_drops - 1, 1) then
     v_drop_x[v_i] = random(0, v_width - 1, 0)
@@ -34,7 +37,7 @@ v_running = 1
 v_frame = 0
 
 while v_running == 1 then
-    begin_frame
+    begin_frame(true)
     
     # Fade previous frame for trail effect
     # draw_rectangle(0, 0, v_width, v_height, black, 25, true)
@@ -44,15 +47,16 @@ while v_running == 1 then
         if v_drop_active[v_i] == 1 then
             # Draw the drop
             for v_j in (0, v_drop_length[v_i] - 1, 1) then
-                if v_drop_y[v_i] - v_j >= 0 then
+                v_draw_y = v_drop_y[v_i] - v_j - v_text_offset
+                if v_draw_y >= -v_text_offset and v_draw_y <= v_height - v_text_offset then
                     v_modifier = random(-1, 1, 0)
                     if v_j == 0 then
                         # Head of the drop is bright
-                        draw_text(v_drop_x[v_i] + v_modifier, v_drop_y[v_i] - v_j, v_rain_char, v_font, v_font_size, green, 100)
+                        draw_text(v_drop_x[v_i] + v_modifier, v_draw_y, v_rain_char, v_font, v_font_size, green, 100)
                     else
                         # Tail fades out
                         v_intensity = 100 - (v_j * (70 / v_drop_length[v_i]))
-                        draw_text(v_drop_x[v_i] + v_modifier, v_drop_y[v_i] - v_j, v_rain_char, v_font, v_font_size, green, v_intensity)
+                        draw_text(v_drop_x[v_i] + v_modifier, v_draw_y, v_rain_char, v_font, v_font_size, green, v_intensity)
                     endif
                 endif
             endfor v_j
@@ -60,8 +64,8 @@ while v_running == 1 then
             # Update drop position
             v_drop_y[v_i] = v_drop_y[v_i] + v_drop_speed[v_i]
             
-            # Check if drop is off screen
-            if v_drop_y[v_i] - v_drop_length[v_i] > v_height then
+            # Check if drop is off screen (adjusted for new positioning)
+            if v_drop_y[v_i] - v_drop_length[v_i] > v_height + v_text_offset then
                 # Reset drop
                 v_drop_x[v_i] = random(0, v_width - 1, 0)
                 v_drop_y[v_i] = random(-15, -1, 0)
