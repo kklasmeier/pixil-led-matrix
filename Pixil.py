@@ -5,6 +5,9 @@ import signal  # At top with other imports
 import time
 from queue import Empty
 from shared import QueueManager
+import datetime
+from pathlib import Path
+from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
 from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition)
@@ -100,7 +103,7 @@ def initialize_metrics():
     _metrics['pause_start'] = None
     _metrics['total_pause_time'] = 0
 
-def report_metrics(reason="complete"):
+def report_metrics(reason="complete", script_name=None, start_time=None):
     """Calculate and display metrics."""
     if not _metrics['enabled']:
         return
@@ -161,7 +164,77 @@ def report_metrics(reason="complete"):
 
     print("--------------------------------------------")
 
+    # Save to database if we have script info
+    if script_name and start_time:
+        try:
+            save_performance_metrics(script_name, start_time, reason)
+        except Exception as e:
+            print(f"Warning: Could not save metrics to database: {e}")
+            # Continue without failing - database is optional
 
+def save_performance_metrics(script_name, start_time, reason):
+    """Save current performance metrics to database."""
+    end_time = datetime.datetime.now()
+    
+    # Import the cache variables from math_functions
+    from pixil_utils.math_functions import (_FAST_MATH_HITS, _FAST_MATH_TOTAL, 
+                                          _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES)
+    
+    # Calculate metrics
+    total_time = (end_time - start_time).total_seconds()
+    active_time = total_time - _metrics.get('total_pause_time', 0)
+    if active_time <= 0:
+        active_time = 0.001
+    
+    commands_per_second = _metrics['commands_processed'] / active_time
+    lines_per_second = _metrics['script_lines_processed'] / active_time
+    
+    # Fast path metrics
+    fast_path_hit_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL * 100) if _FAST_PATH_TOTAL > 0 else 0
+    fast_path_time_saved = (_FAST_PATH_HITS * 30) / 1000000
+    
+    # Fast math metrics
+    fast_math_hit_rate = (_FAST_MATH_HITS / _FAST_MATH_TOTAL * 100) if _FAST_MATH_TOTAL > 0 else 0
+    fast_math_time_saved = (_FAST_MATH_HITS * 35) / 1000000
+    
+    # Cache metrics
+    cache_attempts = _CACHE_HITS + _CACHE_MISSES
+    cache_hit_rate = (_CACHE_HITS / cache_attempts * 100) if cache_attempts > 0 else 0
+    cache_time_saved = (_CACHE_HITS * 30) / 1000000
+    cache_size = len(_EXPRESSION_RESULT_CACHE)
+    
+    # Prepare metrics data
+    metrics_data = {
+        'commands_executed': _metrics['commands_processed'],
+        'script_lines_processed': _metrics['script_lines_processed'],
+        'total_execution_time': total_time,
+        'active_execution_time': active_time,
+        'commands_per_second': commands_per_second,
+        'lines_per_second': lines_per_second,
+        'fast_path_attempts': _FAST_PATH_TOTAL,
+        'fast_path_hits': _FAST_PATH_HITS,
+        'fast_path_hit_rate': fast_path_hit_rate,
+        'fast_path_time_saved': fast_path_time_saved,
+        'fast_math_attempts': _FAST_MATH_TOTAL,
+        'fast_math_hits': _FAST_MATH_HITS,
+        'fast_math_hit_rate': fast_math_hit_rate,
+        'fast_math_time_saved': fast_math_time_saved,
+        'cache_attempts': cache_attempts,
+        'cache_hits': _CACHE_HITS,
+        'cache_hit_rate': cache_hit_rate,
+        'cache_size': cache_size,
+        'cache_time_saved': cache_time_saved
+    }
+    
+    # Save to database
+    try:
+        db = PixilMetricsDB()
+        db.save_metrics(script_name, start_time, end_time, metrics_data, reason)
+        print(f"✓ Performance metrics saved to database")
+    except Exception as e:
+        # Log but don't fail - database is optional
+        print(f"Database save failed: {e}")
+        raise  # Re-raise so the calling function can handle it
 
 def on_queue_pause():
     """Called when the command queue becomes full."""
@@ -188,6 +261,11 @@ def process_script(filename, execute_func=None):
     if execute_func is None:
         raise ValueError("execute_func must be provided")
     normal_exit = True
+
+    # Track script execution timing
+    global script_start_time, script_name
+    script_start_time = datetime.datetime.now()
+    script_name = Path(filename).name
 
     global current_command, variables, frame_commands, in_frame_mode
     current_command = None  # Reset at script start
@@ -1074,13 +1152,18 @@ def process_script(filename, execute_func=None):
         
     debug_print("Script processing completed", DEBUG_CONCISE)
 
-    report_metrics()
+    execution_reason = "complete" if normal_exit else "interrupted"
+    report_metrics(execution_reason, script_name, script_start_time)
     
 def signal_handler(signum, frame):
     """Handle interrupt signal with graceful display cleanup"""
     print("\nInitiating graceful shutdown sequence...")
     # Report metrics with "interrupted" reason
-    report_metrics("interrupted")
+    # NEW: Report metrics with script info if available
+    if 'script_start_time' in globals() and 'script_name' in globals():
+        report_metrics("interrupted", script_name, script_start_time)
+    else:
+        report_metrics("interrupted")
 
     # Check if in headless mode
     if is_headless():

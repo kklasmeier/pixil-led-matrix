@@ -773,10 +773,42 @@ Solution file map:
 │   ├── command_queue.py     # Producer/consumer queue for matrix commands
 │   └── queue_monitor.py     # Real-time monitoring of queue depth
 │
+├── database/                # Database package for performance metrics
+│   ├── __init__.py          # Database package exports
+│   ├── base.py              # Base database utilities and configuration
+│   ├── pixil_metrics.py     # Pixil performance metrics database
+│   ├── queries/             # Database query helpers
+│   │   ├── __init__.py      # Query package exports
+│   │   └── pixil_queries.py # Advanced Pixil performance queries
+│   ├── migrations/          # Database schema migrations
+│   │   ├── 001_pixil_initial.sql # Initial Pixil metrics schema
+│   │   └── .gitkeep         # Preserve directory in git
+│   └── data/                # Database files (created automatically)
+│       ├── pixil_metrics.db # Pixil performance database (auto-created)
+│       ├── backups/         # Database backups (auto-created)
+│       └── .gitkeep         # Preserve directory in git
+│
+├── tools/                   # Database utilities and analysis tools
+│   └── view_pixil_metrics.py # View and analyze Pixil performance data
+│
 └── scripts/                 # Contains Pixil script files
-    ├── examples/            # Example and demo scripts
-    ├── tests/               # Test and validation scripts
-    └── user/                # User-created scripts
+    ├── main/                # Main scripts
+    └── testing/             # Test scripts
+
+Key Components:
+- Pixil.py: Main script interpreter with integrated performance tracking
+- pixil_utils: Command parsing and processing utilities
+- rgb_matrix_lib: Hardware interface and LED matrix operations
+- database: Performance metrics storage and analysis
+- tools: Database viewing and analysis utilities
+- scripts: Pixil script storage and organization
+
+Database Features:
+- Automatic performance metrics collection during script execution
+- Historical performance tracking and trend analysis
+- Optimization effectiveness monitoring (fast path, fast math, cache hits)
+- Compact and verbose reporting formats
+- Script comparison and system-wide performance analysis
 
 Key Components:
 - Pixil.py: Main script interpreter
