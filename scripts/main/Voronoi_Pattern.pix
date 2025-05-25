@@ -6,6 +6,11 @@ create_array(v_vx, v_num_points)
 create_array(v_vy, v_num_points)
 create_array(v_colors, v_num_points)
 
+draw_text(0, 10, "Generating", piboto-regular, 12, 	dark_brown, 100, SCAN)  
+draw_text(0, 25, "Voronoi", piboto-regular, 12, dark_brown, 100, SCAN)  
+draw_text(0, 40, "Pattern", piboto-regular, 12, dark_brown, 100, SCAN) 
+rest(3)
+
 # Initialize points
 for v_i in (0, v_num_points - 1, 1)
     v_px[v_i] = random(5, 59, 0)

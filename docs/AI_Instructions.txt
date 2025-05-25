@@ -199,6 +199,12 @@ fmod(x,y) - Floating point modulo operation
 Random Number Generation:
 
 random(min_val, max_val, precision) - Generate random number between min and max with specified decimal precision
+The third parameter is precision = number of decimal places
+precision = 0 means integer (like 5)
+precision = 1 means 1 decimal place (like 5.3)
+precision = 2 means 2 decimal places (like 5.34)
+
+So random(-1, 1, 1) will give you random numbers between -1 and 1 with 1 decimal place, like: -0.3, 0.7, -0.9, 1.0, etc.
 
 
 

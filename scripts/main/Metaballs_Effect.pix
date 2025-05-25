@@ -28,7 +28,7 @@ for v_frame in (0, 300, 1)
                 v_dx = v_x - v_pos_x[v_i]
                 v_dy = v_y - v_pos_y[v_i]
                 #v_dist_sq = v_dx * v_dx + v_dy * v_dy
-                v_sum = v_sum + (v_radius[v_i] * v_radius[v_i]) / (v_dx * v_dx + v_dy * v_dy)
+                v_sum = v_sum + (v_radius[v_i] * v_radius[v_i]) / max((v_dx * v_dx + v_dy * v_dy), 1)
             endfor v_i
             
             # Determine color based on field strength

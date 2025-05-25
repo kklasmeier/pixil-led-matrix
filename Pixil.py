@@ -67,6 +67,17 @@ _VAR_CACHE_MISSES = 0
 _FAST_PATH_HITS = 0
 _FAST_PATH_TOTAL = 0
 _FAST_PATH_ENABLED = True 
+_PARSE_VALUE_ATTEMPTS = 0
+_PARSE_VALUE_ULTRA_FAST_HITS = 0  
+_PARSE_VALUE_FAST_HITS = 0
+
+# Detailed breakdown counters
+_DIRECT_INTEGER_HITS = 0
+_DIRECT_COLOR_HITS = 0
+_DIRECT_STRING_HITS = 0
+_SIMPLE_ARRAY_HITS = 0
+_SIMPLE_ARITHMETIC_HITS = 0
+
 
 set_debug_level(DEBUG_OFF)  # Default debug level
 
@@ -102,6 +113,41 @@ def initialize_metrics():
     _metrics['active_time'] = 0
     _metrics['pause_start'] = None
     _metrics['total_pause_time'] = 0
+
+def report_parse_value_stats():
+    """Report parse value optimization statistics."""
+    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
+    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
+    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+    
+    print("Parse Value Optimization Statistics:")
+    
+    if _PARSE_VALUE_ATTEMPTS > 0:
+        ultra_fast_rate = (_PARSE_VALUE_ULTRA_FAST_HITS / _PARSE_VALUE_ATTEMPTS) * 100
+        fast_rate = (_PARSE_VALUE_FAST_HITS / _PARSE_VALUE_ATTEMPTS) * 100
+        total_fast_hits = _PARSE_VALUE_ULTRA_FAST_HITS + _PARSE_VALUE_FAST_HITS
+        total_rate = (total_fast_hits / _PARSE_VALUE_ATTEMPTS) * 100
+        
+        print(f"  Total parameter parsing attempts: {_PARSE_VALUE_ATTEMPTS:,}")
+        print(f"  Ultra-fast path hits: {_PARSE_VALUE_ULTRA_FAST_HITS:,} ({ultra_fast_rate:.1f}%)")
+        print(f"  Fast path hits: {_PARSE_VALUE_FAST_HITS:,} ({fast_rate:.1f}%)")
+        print(f"  Total optimized: {total_fast_hits:,} ({total_rate:.1f}%)")
+        
+        if total_fast_hits > 0:
+            print(f"  Breakdown:")
+            print(f"    Direct integers: {_DIRECT_INTEGER_HITS:,}")
+            print(f"    Direct colors: {_DIRECT_COLOR_HITS:,}")
+            print(f"    Direct strings: {_DIRECT_STRING_HITS:,}")
+            print(f"    Simple arrays: {_SIMPLE_ARRAY_HITS:,}")
+            print(f"    Simple arithmetic: {_SIMPLE_ARITHMETIC_HITS:,}")
+            
+            # Estimate time savings
+            ultra_fast_savings = (_PARSE_VALUE_ULTRA_FAST_HITS * 25) / 1000000  # 25 microseconds per hit
+            fast_savings = (_PARSE_VALUE_FAST_HITS * 15) / 1000000  # 15 microseconds per hit
+            total_savings = ultra_fast_savings + fast_savings
+            print(f"  Estimated time saved: {total_savings:.3f} seconds")
+    else:
+        print("  No parameter parsing attempts detected")
 
 def report_metrics(reason="complete", script_name=None, start_time=None):
     """Calculate and display metrics."""
@@ -161,6 +207,8 @@ def report_metrics(reason="complete", script_name=None, start_time=None):
     report_fast_math_stats()
     print("--")
     report_expression_cache_stats()
+    print("--")
+    report_parse_value_stats()
 
     print("--------------------------------------------")
 
@@ -179,6 +227,11 @@ def save_performance_metrics(script_name, start_time, reason):
     # Import the cache variables from math_functions
     from pixil_utils.math_functions import (_FAST_MATH_HITS, _FAST_MATH_TOTAL, 
                                           _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES)
+    
+    # Import our new parse value stats
+    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
+    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
+    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
     
     # Calculate metrics
     total_time = (end_time - start_time).total_seconds()
@@ -203,6 +256,11 @@ def save_performance_metrics(script_name, start_time, reason):
     cache_time_saved = (_CACHE_HITS * 30) / 1000000
     cache_size = len(_EXPRESSION_RESULT_CACHE)
     
+    # NEW: Parse value metrics
+    parse_value_total_hits = _PARSE_VALUE_ULTRA_FAST_HITS + _PARSE_VALUE_FAST_HITS
+    parse_value_hit_rate = (parse_value_total_hits / _PARSE_VALUE_ATTEMPTS * 100) if _PARSE_VALUE_ATTEMPTS > 0 else 0
+    parse_value_time_saved = (_PARSE_VALUE_ULTRA_FAST_HITS * 25 + _PARSE_VALUE_FAST_HITS * 15) / 1000000
+    
     # Prepare metrics data
     metrics_data = {
         'commands_executed': _metrics['commands_processed'],
@@ -223,9 +281,24 @@ def save_performance_metrics(script_name, start_time, reason):
         'cache_hits': _CACHE_HITS,
         'cache_hit_rate': cache_hit_rate,
         'cache_size': cache_size,
-        'cache_time_saved': cache_time_saved
+        'cache_time_saved': cache_time_saved,
+        # NEW: Parse value metrics
+        'parse_value_attempts': _PARSE_VALUE_ATTEMPTS,
+        'parse_value_ultra_fast_hits': _PARSE_VALUE_ULTRA_FAST_HITS,
+        'parse_value_fast_hits': _PARSE_VALUE_FAST_HITS,
+        'parse_value_hit_rate': parse_value_hit_rate,
+        'parse_value_time_saved': parse_value_time_saved,
+        'direct_integer_hits': _DIRECT_INTEGER_HITS,
+        'direct_color_hits': _DIRECT_COLOR_HITS,
+        'direct_string_hits': _DIRECT_STRING_HITS,
+        'simple_array_hits': _SIMPLE_ARRAY_HITS,
+        'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS
     }
-    
+
+    print(f"DEBUG: About to save {len(metrics_data)} metrics items:")
+    for key, value in metrics_data.items():
+        print(f"  {key}: {value}")
+
     # Save to database
     try:
         db = PixilMetricsDB()
@@ -278,6 +351,7 @@ def process_script(filename, execute_func=None):
     from pixil_utils.math_functions import reset_fast_math_stats, reset_expression_cache_stats
     reset_fast_math_stats()
     reset_expression_cache_stats()  # Reset cache
+    reset_parse_value_stats()
 
     # Get queue instance
     queue = QueueManager.get_instance()
@@ -328,12 +402,222 @@ def process_script(filename, execute_func=None):
     def store_frame_command(cmd):
         """Store command if in frame mode, execute immediately if not"""
         global _metrics
-        _metrics['commands_processed'] += 1  # Add this line
+        _metrics['commands_processed'] += 1
+        
+        # TEMPORARY DEBUG - let's see what commands look like
+        #if 'plot' in cmd:
+        #    print(f"DEBUG COMMAND: {cmd}")
+        
         if in_frame_mode:
             frame_commands.append(cmd)
         else:
             execute_command(cmd)
 
+
+    def debug_missed_patterns(value, command_name, param_position):
+        """Temporary function to see what patterns we're not catching"""
+        if not isinstance(value, str):
+            return
+            
+        value_stripped = value.strip()
+        
+        # Skip the ones we already catch
+        if value_stripped.isdigit():
+            return
+            
+        KNOWN_COLORS = {'black', 'white', 'gray', 'red', 'blue', 'green', 'yellow', 'etc'}  # abbreviated
+        if value_stripped in KNOWN_COLORS:
+            return
+            
+        if ((value_stripped.startswith('"') and value_stripped.endswith('"')) or
+            (value_stripped.startswith("'") and value_stripped.endswith("'"))):
+            return
+        
+        # Log what we're missing
+        if len(value_stripped) < 50:  # Don't log super long expressions
+            print(f"MISSED PATTERN: '{value_stripped}' for {command_name} pos {param_position}")
+            
+
+    def try_ultra_fast_path(value, command_name, param_position):
+        """
+        Handle the simplest parameter cases with minimal overhead.
+        Returns formatted parameter string or None if not handled.
+        """
+        global _PARSE_VALUE_ULTRA_FAST_HITS, _DIRECT_INTEGER_HITS
+        global _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
+        
+        if not isinstance(value, str):
+            return None
+            
+        value_stripped = value.strip()
+        
+        # Ultra-Fast Path #1: Direct integers (e.g., "100", "32", "5")
+        if value_stripped.isdigit():
+            _PARSE_VALUE_ULTRA_FAST_HITS += 1
+            _DIRECT_INTEGER_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Ultra-fast integer: {value_stripped}", DEBUG_VERBOSE)
+            return value_stripped
+        
+        # Ultra-Fast Path #2: Direct color names (e.g., "red", "blue", "green")
+        # Create a set of known color names from your color list
+        KNOWN_COLORS = {
+            'black', 'white', 'gray', 'light_gray', 'dark_gray', 'silver',
+            'red', 'crimson', 'maroon', 'rose', 'pink', 'salmon', 'coral',
+            'brown', 'standard_brown', 'dark_brown', 'wood_brown', 'tan',
+            'orange', 'gold', 'peach', 'bronze', 'yellow', 'lime', 'green',
+            'olive', 'spring_green', 'forest_green', 'mint', 'teal', 'turquoise',
+            'cyan', 'sky_blue', 'azure', 'blue', 'navy', 'royal_blue', 'ocean_blue',
+            'indigo', 'purple', 'violet', 'magenta', 'lavender'
+        }
+        
+        if value_stripped in KNOWN_COLORS:
+            _PARSE_VALUE_ULTRA_FAST_HITS += 1
+            _DIRECT_COLOR_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Ultra-fast color: {value_stripped}", DEBUG_VERBOSE)
+            return value_stripped
+        
+        # Ultra-Fast Path #3: Direct quoted strings (e.g., "Hello", "piboto-regular")
+        if ((value_stripped.startswith('"') and value_stripped.endswith('"')) or
+            (value_stripped.startswith("'") and value_stripped.endswith("'"))):
+            _PARSE_VALUE_ULTRA_FAST_HITS += 1
+            _DIRECT_STRING_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Ultra-fast quoted string: {value_stripped}", DEBUG_VERBOSE)
+            return value_stripped
+        
+        # Not handled by ultra-fast path
+        return None
+
+    def try_fast_path(value, command_name, param_position):
+        """
+        Handle moderately complex parameter cases efficiently.
+        Returns formatted parameter string or None if not handled.
+        """
+        global _PARSE_VALUE_FAST_HITS, _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+        
+        if not isinstance(value, str):
+            return None
+            
+        value_stripped = value.strip()
+        
+        # Fast Path #1: Simple array access (e.g., "v_array[v_i]", "v_px[v_i]")
+        simple_array_pattern = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
+        array_match = simple_array_pattern.match(value_stripped)
+        if array_match:
+            array_name, index_var = array_match.groups()
+            
+            # Check if both variables exist
+            if array_name in variables and index_var in variables:
+                try:
+                    array = variables[array_name]
+                    index_value = variables[index_var]
+                    
+                    # Ensure index is numeric and in bounds
+                    if isinstance(index_value, (int, float)):
+                        index = int(index_value)
+                        
+                        # Check if it's a PixilArray or regular array
+                        if hasattr(array, '__getitem__') and hasattr(array, 'data'):
+                            # PixilArray - use bounds checking
+                            if 0 <= index < len(array.data):
+                                result = array[index]
+                                _PARSE_VALUE_FAST_HITS += 1
+                                _SIMPLE_ARRAY_HITS += 1
+                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                    debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
+                                return format_parameter(result, command_name, param_position, variables)
+                        elif isinstance(array, (list, tuple)) and 0 <= index < len(array):
+                            # Regular Python array
+                            result = array[index]
+                            _PARSE_VALUE_FAST_HITS += 1
+                            _SIMPLE_ARRAY_HITS += 1
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
+                            return format_parameter(result, command_name, param_position, variables)
+                            
+                except (ValueError, TypeError, IndexError, AttributeError):
+                    pass  # Fall back to normal processing
+        
+            # Fast Path #2: Simple arithmetic (v_variable + number, v_variable * number, etc.)
+            # Variable + number pattern
+            var_plus_num_pattern = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
+            plus_match = var_plus_num_pattern.match(value_stripped)
+            if plus_match:
+                var_name, number_str = plus_match.groups()
+                if var_name in variables:
+                    try:
+                        var_value = variables[var_name]
+                        
+                        # Determine if we should keep as integer or use float
+                        if '.' in number_str:
+                            # Number has decimal, use float arithmetic
+                            var_value = float(var_value)
+                            number_value = float(number_str)
+                            result = var_value + number_value
+                        else:
+                            # Both should be integers if possible
+                            if isinstance(var_value, (int, float)) and var_value == int(var_value):
+                                var_value = int(var_value)
+                                number_value = int(number_str)
+                                result = var_value + number_value  # Integer result
+                            else:
+                                var_value = float(var_value)
+                                number_value = float(number_str)
+                                result = var_value + number_value
+                                # Convert back to int if it's a whole number
+                                if result == int(result):
+                                    result = int(result)
+                        
+                        _PARSE_VALUE_FAST_HITS += 1
+                        _SIMPLE_ARITHMETIC_HITS += 1
+                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                            debug_print(f"Fast arithmetic: {var_name} + {number_str} = {result}", DEBUG_VERBOSE)
+                        return format_parameter(result, command_name, param_position, variables)
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Variable * number pattern  
+            var_mul_num_pattern = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
+            mul_match = var_mul_num_pattern.match(value_stripped)
+            if mul_match:
+                var_name, number_str = mul_match.groups()
+                if var_name in variables:
+                    try:
+                        var_value = variables[var_name]
+                        
+                        # Determine if we should keep as integer or use float
+                        if '.' in number_str:
+                            # Number has decimal, use float arithmetic
+                            var_value = float(var_value)
+                            number_value = float(number_str)
+                            result = var_value * number_value
+                        else:
+                            # Both should be integers if possible
+                            if isinstance(var_value, (int, float)) and var_value == int(var_value):
+                                var_value = int(var_value)
+                                number_value = int(number_str)
+                                result = var_value * number_value  # Integer result
+                            else:
+                                var_value = float(var_value)
+                                number_value = float(number_str)
+                                result = var_value * number_value
+                                # Convert back to int if it's a whole number
+                                if result == int(result):
+                                    result = int(result)
+                        
+                        _PARSE_VALUE_FAST_HITS += 1
+                        _SIMPLE_ARITHMETIC_HITS += 1
+                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                            debug_print(f"Fast arithmetic: {var_name} * {number_str} = {result}", DEBUG_VERBOSE)
+                        return format_parameter(result, command_name, param_position, variables)
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Not handled by fast path
+            return None
+        
     def parse_value(value, command_name, param_position):
         """
         Parse and format a parameter value, handling variables and math expressions.
@@ -347,16 +631,30 @@ def process_script(filename, execute_func=None):
         Returns:
             Formatted value ready for command string
         """
-        global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
-        
+        global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES, _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ATTEMPTS
+        _PARSE_VALUE_ATTEMPTS += 1
+
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Parsing value: {value} ({type(value)})", DEBUG_VERBOSE)
             debug_print(f"Command: {command_name}, Position: {param_position}", DEBUG_VERBOSE)
+
+        # NEW: Try ultra-fast path first
+        ultra_fast_result = try_ultra_fast_path(value, command_name, param_position)
+        if ultra_fast_result is not None:
+            return ultra_fast_result
+
+        # Try fast path next
         
+        fast_result = try_fast_path(value, command_name, param_position)
+        if fast_result is not None:
+            return fast_result
+    
         # Handle direct value types (non-strings)
         if not isinstance(value, str):
             return format_parameter(value, command_name, param_position, variables)
-            
+
+        #debug_missed_patterns(value, command_name, param_position)
+
         value = value.strip()
         
         # Handle quoted strings directly
@@ -1233,6 +1531,21 @@ def signal_handler(signum, frame):
     finally:
         print("Shutdown sequence complete.")
         sys.exit(0)
+
+def reset_parse_value_stats():
+    """Reset parse value optimization statistics for new script."""
+    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
+    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS 
+    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+    
+    _PARSE_VALUE_ATTEMPTS = 0
+    _PARSE_VALUE_ULTRA_FAST_HITS = 0
+    _PARSE_VALUE_FAST_HITS = 0
+    _DIRECT_INTEGER_HITS = 0
+    _DIRECT_COLOR_HITS = 0
+    _DIRECT_STRING_HITS = 0
+    _SIMPLE_ARRAY_HITS = 0
+    _SIMPLE_ARITHMETIC_HITS = 0
 
 # Main Execution
 if __name__ == '__main__':

@@ -67,8 +67,20 @@ def show_recent(limit):
         print(f"  Executed: {row['start_time']} ({row['execution_reason']})")
         print(f"  Duration: {duration:.3f}s")
         print(f"  Performance: {row['commands_per_second']:.1f} cmds/sec, {row['lines_per_second']:.1f} lines/sec")
-        print(f"  Optimizations: Fast Path {row['fast_path_hit_rate']:.1f}%, Fast Math {row['fast_math_hit_rate']:.1f}%, Cache {row['cache_hit_rate']:.1f}%")
-        total_saved = row['fast_path_time_saved'] + row['fast_math_time_saved'] + row['cache_time_saved']
+        
+        # Include parse value optimization in the optimization summary
+        try:
+            parse_val_rate = row['parse_value_hit_rate'] or 0
+            parse_val_time_saved = row['parse_value_time_saved'] or 0
+        except (KeyError, TypeError):
+            parse_val_rate = 0
+            parse_val_time_saved = 0
+
+        print(f"  Optimizations: Fast Path {row['fast_path_hit_rate']:.1f}%, Fast Math {row['fast_math_hit_rate']:.1f}%, Cache {row['cache_hit_rate']:.1f}%, Parse Value {parse_val_rate:.1f}%")
+
+        total_saved = (row['fast_path_time_saved'] + row['fast_math_time_saved'] + 
+                    row['cache_time_saved'] + parse_val_time_saved)
+
         print(f"  Time Saved: {total_saved:.3f}s")
         print()
 
@@ -174,8 +186,8 @@ def show_script_trends(script_name, count, verbose=False):
     print(f"\n=== Performance Trends: {script_name} (Last {len(recent_history)} executions) ===")
     
     if verbose:
-        print("Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP-Hits   FP-Tries  FP%     FM-Hits     FM-Tries   FM%   C-Hits   C-Tries  C%   C-Size")
-        print("-" * 165)
+        print("Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP-Hits   FP-Tries  FP%     FM-Hits     FM-Tries   FM%   C-Hits   C-Tries  C%   PV-Hits   PV-Tries  PV%   C-Size")
+        print("-" * 185)
         
         for row in reversed(history):
             date_str = row['start_time'][:16].replace('T', ' ')
@@ -199,12 +211,26 @@ def show_script_trends(script_name, count, verbose=False):
             cache_rate = f"{row['cache_hit_rate']:.0f}%"
             cache_size = f"{row['cache_size']}"
             
-            print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_hits:>10} {fp_tries:>10} {fp_rate:>7} {fm_hits:>11} {fm_tries:>10} {fm_rate:>5} {cache_hits:>8} {cache_tries:>9} {cache_rate:>4} {cache_size:>6}")
+            # Parse value metrics (with safe defaults for old records)
+            try:
+                pv_hits_val = (row['parse_value_ultra_fast_hits'] or 0) + (row['parse_value_fast_hits'] or 0)
+                pv_tries_val = row['parse_value_attempts'] or 0
+                pv_rate_val = row['parse_value_hit_rate'] or 0
+            except (KeyError, TypeError):
+                pv_hits_val = 0
+                pv_tries_val = 0
+                pv_rate_val = 0
+
+            pv_hits = f"{pv_hits_val:,}"
+            pv_tries = f"{pv_tries_val:,}"
+            pv_rate = f"{pv_rate_val:.0f}%"
+
+            print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_hits:>10} {fp_tries:>10} {fp_rate:>7} {fm_hits:>11} {fm_tries:>10} {fm_rate:>5} {cache_hits:>8} {cache_tries:>9} {cache_rate:>4} {pv_hits:>9} {pv_tries:>10} {pv_rate:>5} {cache_size:>6}")
 
     else:
-        # Compact format (existing)
-        print("Date/Time           ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%")
-        print("-" * 78)
+        # Compact format - add ParseVal% column
+        print("Date/Time           ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%")
+        print("-" * 88)
         
         for row in reversed(recent_history):
             date_str = row['start_time'][:16].replace('T', ' ')
@@ -214,12 +240,17 @@ def show_script_trends(script_name, count, verbose=False):
             fast_path = f"{row['fast_path_hit_rate']:.0f}%"
             fast_math = f"{row['fast_math_hit_rate']:.0f}%"
             cache = f"{row['cache_hit_rate']:.0f}%"
-            
-            print(f"{date_str:19} {exec_time:>8} {cmds_per_sec:>7} {lines_per_sec:>8} {fast_path:>9} {fast_math:>9} {cache:>6}")
+            # Parse value hit rate (with safe default for old records)
+            try:
+                parse_val = f"{row['parse_value_hit_rate']:.0f}%"
+            except (KeyError, TypeError):
+                parse_val = "0%"
+
+            print(f"{date_str:19} {exec_time:>8} {cmds_per_sec:>7} {lines_per_sec:>8} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9}")
     
     # Calculate trends
     if len(recent_history) >= 2:
-        print("\n" + "=" * (165 if verbose else 78))
+        print("\n" + "=" * (185 if verbose else 88))
         calculate_trends(recent_history, script_name)
 
 def show_system_trends(count, verbose=False):
@@ -233,7 +264,8 @@ def show_system_trends(count, verbose=False):
                        commands_executed, commands_per_second, script_lines_processed, lines_per_second,
                        fast_path_hits, fast_path_attempts, fast_path_hit_rate,
                        fast_math_hits, fast_math_attempts, fast_math_hit_rate,
-                       cache_hits, cache_attempts, cache_hit_rate, cache_size
+                       cache_hits, cache_attempts, cache_hit_rate, cache_size,
+                       parse_value_ultra_fast_hits, parse_value_fast_hits, parse_value_attempts, parse_value_hit_rate
                 FROM script_metrics 
                 WHERE execution_reason = 'complete'
                 ORDER BY start_time DESC
@@ -242,7 +274,8 @@ def show_system_trends(count, verbose=False):
         else:
             cursor = conn.execute('''
                 SELECT script_name, start_time, active_execution_time, commands_per_second, 
-                       lines_per_second, fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate
+                       lines_per_second, fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
+                       parse_value_hit_rate
                 FROM script_metrics 
                 WHERE execution_reason = 'complete'
                 ORDER BY start_time DESC
@@ -258,8 +291,8 @@ def show_system_trends(count, verbose=False):
     print(f"\n=== System-Wide Performance Trends (Last {len(history)} executions) ===")
     
     if verbose:
-        print("Date/Time           Script              TotalTime ActTime  Cmds     Lines    FP:Hits/Tries    FM:Hits/Tries    C:Hits/Tries/Size")
-        print("-" * 140)
+        print("Date/Time           Script              TotalTime ActTime  Cmds     Lines    FP:Hits/Tries    FM:Hits/Tries    C:Hits/Tries/Size    PV:Hits/Tries")
+        print("-" * 160)
         
         for row in reversed(history):
             date_str = row['start_time'][:16].replace('T', ' ')
@@ -273,11 +306,15 @@ def show_system_trends(count, verbose=False):
             fm_detail = f"{row['fast_math_hits']:,}/{row['fast_math_attempts']:,}"
             cache_detail = f"{row['cache_hits']:,}/{row['cache_attempts']:,}/{row['cache_size']}"
             
-            print(f"{date_str:19} {script:18} {total_time:>8} {active_time:>7} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_detail:>16} {fm_detail:>16} {cache_detail:>16}")
+            # NEW: Parse value details (with safe defaults)
+            pv_total_hits = (row.get('parse_value_ultra_fast_hits', 0) + row.get('parse_value_fast_hits', 0))
+            pv_detail = f"{pv_total_hits:,}/{row.get('parse_value_attempts', 0):,}"
+            
+            print(f"{date_str:19} {script:18} {total_time:>8} {active_time:>7} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_detail:>16} {fm_detail:>16} {cache_detail:>16} {pv_detail:>16}")
     
     else:
-        print("Date/Time           Script              ExecTime  Cmds/s  FastPath%  FastMath%  Cache%")
-        print("-" * 88)
+        print("Date/Time           Script              ExecTime  Cmds/s  FastPath%  FastMath%  Cache%  ParseVal%")
+        print("-" * 98)
         
         for row in reversed(history):
             date_str = row['start_time'][:16].replace('T', ' ')
@@ -287,8 +324,15 @@ def show_system_trends(count, verbose=False):
             fast_path = f"{row['fast_path_hit_rate']:.0f}%"
             fast_math = f"{row['fast_math_hit_rate']:.0f}%"
             cache = f"{row['cache_hit_rate']:.0f}%"
+
+            # Parse value hit rate
+            try:
+                parse_val = f"{row['parse_value_hit_rate']:.0f}%"
+            except (KeyError, TypeError):
+                parse_val = "0%"  # Default for old records without this column
+
             
-            print(f"{date_str:19} {script:18} {exec_time:>8} {cmds_per_sec:>7} {fast_path:>9} {fast_math:>9} {cache:>6}")
+            print(f"{date_str:19} {script:18} {exec_time:>8} {cmds_per_sec:>7} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9}")
 
 def list_scripts():
     """List all scripts in database."""
