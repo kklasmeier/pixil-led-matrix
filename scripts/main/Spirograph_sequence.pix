@@ -14,16 +14,16 @@ for v_pattern in (1, 10000, 1)  # Do 20 different patterns
     v_color_pick = random(1, 4, 0)
     
     if v_color_pick == 1 then
-        v_color = cyan
+        v_color = "cyan"
     endif
     if v_color_pick == 2 then
-        v_color = magenta
+        v_color = "magenta"
     endif
     if v_color_pick == 3 then
-        v_color = yellow
+        v_color = "yellow"
     endif
     if v_color_pick == 4 then
-        v_color = white
+        v_color = "white"
     endif
     
     # Draw one complete pattern

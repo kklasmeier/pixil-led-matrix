@@ -76,15 +76,15 @@ for v_frame in (0, 300, 1)
                     v_intensity = v_heat_val * 3
                 elseif v_heat_val < 40 then
                     # Dark red
-                    v_color = red
+                    v_color = "red"
                     v_intensity = (v_heat_val - 20) * 3 + 20
                 elseif v_heat_val < 70 then
                     # Orange/yellow
-                    v_color = orange
+                    v_color = "orange"
                     v_intensity = (v_heat_val - 40) * 2 + 40
                 else
                     # White/yellow
-                    v_color = yellow
+                    v_color = "yellow"
                     v_intensity = min(v_heat_val, 100)
                 endif
                 

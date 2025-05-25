@@ -112,12 +112,12 @@ while true then
 endwhile
 
 # Variables for light colors array
-v_color1 = red
-v_color2 = gold
-v_color3 = blue
-v_color4 = yellow
-v_color5 = purple
-v_color6 = cyan
+v_color1 = "red"
+v_color2 = "gold"
+v_color3 = "blue"
+v_color4 = "yellow"
+v_color5 = "purple"
+v_color6 = "cyan"
 
 # Create a procedure for the tree
 def draw_tree {

@@ -1,6 +1,7 @@
 -- Initial schema for Pixil performance metrics database
 -- Migration: 001_pixil_initial
 -- Created: 2025-01-XX
+-- Updated: 2025-05-25 - Added parse value optimization metrics
 
 -- Main table for storing Pixil script execution metrics
 CREATE TABLE IF NOT EXISTS script_metrics (
@@ -39,6 +40,20 @@ CREATE TABLE IF NOT EXISTS script_metrics (
     cache_size INTEGER DEFAULT 0,
     cache_time_saved REAL DEFAULT 0.0,
     
+    -- Parse value optimization metrics (Phase 3)
+    parse_value_attempts INTEGER DEFAULT 0,
+    parse_value_ultra_fast_hits INTEGER DEFAULT 0,
+    parse_value_fast_hits INTEGER DEFAULT 0,
+    parse_value_hit_rate REAL DEFAULT 0.0,
+    parse_value_time_saved REAL DEFAULT 0.0,
+    
+    -- Parse value detailed breakdown
+    direct_integer_hits INTEGER DEFAULT 0,
+    direct_color_hits INTEGER DEFAULT 0,
+    direct_string_hits INTEGER DEFAULT 0,
+    simple_array_hits INTEGER DEFAULT 0,
+    simple_arithmetic_hits INTEGER DEFAULT 0,
+    
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -62,5 +77,13 @@ CREATE INDEX IF NOT EXISTS idx_optimization_rates ON script_metrics(
     fast_path_hit_rate,
     fast_math_hit_rate,
     cache_hit_rate,
+    parse_value_hit_rate,
+    execution_reason
+);
+
+-- Index for parse value optimization analysis
+CREATE INDEX IF NOT EXISTS idx_parse_value_metrics ON script_metrics(
+    parse_value_hit_rate,
+    parse_value_time_saved,
     execution_reason
 );

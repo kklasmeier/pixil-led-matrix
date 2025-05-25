@@ -75,7 +75,7 @@ while 1 then
         
         v_particle_x = v_x + 1
         v_particle_y = 3
-        v_velocity_y = random(-1, 1, 0.1)
+        v_velocity_y = random(-1, 1, 1)
         v_time = 0
     endif
     

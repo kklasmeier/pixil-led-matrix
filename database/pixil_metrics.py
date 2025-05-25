@@ -76,16 +76,7 @@ class PixilMetricsDB(BaseDatabase):
     def save_metrics(self, script_name: str, start_time: datetime.datetime, 
                     end_time: datetime.datetime, metrics_data: Dict[str, Any], 
                     reason: str = "complete"):
-        """
-        Save performance metrics to database.
-        
-        Args:
-            script_name: Name of the executed script
-            start_time: When script execution started
-            end_time: When script execution ended
-            metrics_data: Dictionary containing all performance metrics
-            reason: Execution completion reason ('complete', 'interrupted', 'error')
-        """
+        """Save performance metrics to database."""
         with self.get_connection() as conn:
             conn.execute('''
                 INSERT INTO script_metrics (
@@ -95,8 +86,12 @@ class PixilMetricsDB(BaseDatabase):
                     commands_per_second, lines_per_second,
                     fast_path_attempts, fast_path_hits, fast_path_hit_rate, fast_path_time_saved,
                     fast_math_attempts, fast_math_hits, fast_math_hit_rate, fast_math_time_saved,
-                    cache_attempts, cache_hits, cache_hit_rate, cache_size, cache_time_saved
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    cache_attempts, cache_hits, cache_hit_rate, cache_size, cache_time_saved,
+                    parse_value_attempts, parse_value_ultra_fast_hits, parse_value_fast_hits, 
+                    parse_value_hit_rate, parse_value_time_saved,
+                    direct_integer_hits, direct_color_hits, direct_string_hits,
+                    simple_array_hits, simple_arithmetic_hits
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 script_name, start_time, end_time, reason,
                 metrics_data.get('commands_executed', 0),
@@ -117,10 +112,20 @@ class PixilMetricsDB(BaseDatabase):
                 metrics_data.get('cache_hits', 0),
                 metrics_data.get('cache_hit_rate', 0.0),
                 metrics_data.get('cache_size', 0),
-                metrics_data.get('cache_time_saved', 0.0)
+                metrics_data.get('cache_time_saved', 0.0),
+                metrics_data.get('parse_value_attempts', 0),
+                metrics_data.get('parse_value_ultra_fast_hits', 0),
+                metrics_data.get('parse_value_fast_hits', 0),
+                metrics_data.get('parse_value_hit_rate', 0.0),
+                metrics_data.get('parse_value_time_saved', 0.0),
+                metrics_data.get('direct_integer_hits', 0),
+                metrics_data.get('direct_color_hits', 0),
+                metrics_data.get('direct_string_hits', 0),
+                metrics_data.get('simple_array_hits', 0),
+                metrics_data.get('simple_arithmetic_hits', 0)
             ))
             conn.commit()
-    
+
     def get_recent_metrics(self, limit: int = 10) -> List[sqlite3.Row]:
         """
         Get the most recent metrics records.

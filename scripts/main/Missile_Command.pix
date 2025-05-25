@@ -11,7 +11,7 @@ v_city_spacing = (v_screen_width - (v_city_count * v_city_width)) / (v_city_coun
 
 # hit rate of missiles
 v_destroy_rate = 80 # 95% of the time, the missle will be intercepted
-v_defance_active_rate = 80  # 98% of the time, the missile defence will detect the missile.
+v_defence_active_rate = 80  # 98% of the time, the missile defence will detect the missile.
 
 # Game state tracking
 v_game_over = 0           # Flag to indicate game is ending

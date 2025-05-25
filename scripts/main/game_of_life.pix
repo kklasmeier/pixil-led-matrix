@@ -41,7 +41,7 @@ while true then
         endfor v_x
     endfor v_y
     draw_rectangle(0, 0, 10, 7, black, 100, true)
-    draw_text(1, 1, v_generation, tiny64_font, 5, white, 100)
+    draw_text(1, 1, int(v_generation), tiny64_font, 5, white, 100)
     end_frame
 
 
