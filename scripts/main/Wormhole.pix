@@ -75,10 +75,9 @@ while v_running == 1 then
     # Update time variables
     v_time = v_time + 1
     v_pulse_time = v_pulse_time + 0.1
-    v_pulse_index = int(v_pulse_time * 10)
-    if v_pulse_index >= 360 then
-        v_pulse_index = v_pulse_index - 360
-    endif
+    
+    # FIX: Use modulo to keep pulse_index within bounds
+    v_pulse_index = int(v_pulse_time * 10) % 360
     
     # Draw outer ring that pulses
     # Use (sin + 1) / 2 to get values from 0 to 1, then scale to desired range

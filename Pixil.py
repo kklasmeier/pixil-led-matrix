@@ -10,7 +10,7 @@ from pathlib import Path
 from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
-from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition)
+from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats)
 from pixil_utils.file_manager import PixilFileManager
 from pixil_utils.parameter_types import (PARAMETER_TYPES, validate_command_params)
 from pixil_utils.expression_parser import format_parameter
@@ -56,8 +56,6 @@ _metrics = {
     'total_pause_time': 0,        # Total time spent waiting on full queue
     'enabled': True               # Toggle for enabling/disabling metrics
 }
-
-
 
 #Variable cache
 _VAR_FORMAT_CACHE = OrderedDict()
@@ -209,7 +207,8 @@ def report_metrics(reason="complete", script_name=None, start_time=None):
     report_expression_cache_stats()
     print("--")
     report_parse_value_stats()
-
+    print("--")
+    report_jit_stats()
     print("--------------------------------------------")
 
     # Save to database if we have script info
@@ -295,9 +294,9 @@ def save_performance_metrics(script_name, start_time, reason):
         'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS
     }
 
-    print(f"DEBUG: About to save {len(metrics_data)} metrics items:")
-    for key, value in metrics_data.items():
-        print(f"  {key}: {value}")
+    #print(f"DEBUG: About to save {len(metrics_data)} metrics items:")
+    #for key, value in metrics_data.items():
+    #    print(f"  {key}: {value}")
 
     # Save to database
     try:
@@ -352,6 +351,7 @@ def process_script(filename, execute_func=None):
     reset_fast_math_stats()
     reset_expression_cache_stats()  # Reset cache
     reset_parse_value_stats()
+    reset_jit_stats()
 
     # Get queue instance
     queue = QueueManager.get_instance()
