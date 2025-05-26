@@ -10,6 +10,7 @@ from typing import Dict, Any, Union, Optional, Tuple
 from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print)
 from .array_manager import validate_array_access
 from collections import OrderedDict
+from .jit_compiler import JITExpressionCache
 
 # Regex pattern for identifying math expressions
 MATH_EXPR_PATTERN = re.compile(r'[\+\-\*/\(\)]|v_\w+|\d+\.?\d*')
@@ -28,6 +29,10 @@ _EXPRESSION_RESULT_CACHE = {}
 _CACHE_HITS = 0
 _CACHE_MISSES = 0
 _CACHE_MAX_SIZE = 500 
+_JIT_CACHE = JITExpressionCache(max_size=1000)
+_JIT_ATTEMPTS = 0
+_JIT_HITS = 0
+_JIT_COMPILATION_FAILURES = 0
 
 # Phase 2: Pre-compiled regex patterns for fast math expressions
 SIMPLE_ADD_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
@@ -43,6 +48,44 @@ RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*
 VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
 VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
 
+def try_jit_compilation(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float, str]]:
+    """
+    Phase 3: JIT compilation fast path for complex expressions.
+    
+    Args:
+        expr: Expression string to compile and evaluate
+        variables: Current variable values
+        
+    Returns:
+        Result of expression evaluation, or None if JIT compilation failed
+    """
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
+    
+    _JIT_ATTEMPTS += 1
+    
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Trying JIT compilation for: {expr}", DEBUG_VERBOSE)
+    
+    try:
+        result = _JIT_CACHE.evaluate(expr, variables)
+        
+        if result is not None:
+            _JIT_HITS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"JIT compilation successful: {expr} = {result}", DEBUG_VERBOSE)
+            return result
+        else:
+            _JIT_COMPILATION_FAILURES += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"JIT compilation failed for: {expr}", DEBUG_VERBOSE)
+            return None
+            
+    except Exception as e:
+        _JIT_COMPILATION_FAILURES += 1
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"JIT compilation error for '{expr}': {str(e)}", DEBUG_VERBOSE)
+        return None
+    
 def create_cache_key(expr: str, variables: Dict[str, Any]) -> Optional[tuple]:
     """
     Create a cache key for expression + relevant variable values.
@@ -114,6 +157,37 @@ def report_fast_math_stats():
             print(f"  Estimated time saved: {estimated_savings:.3f} seconds")
     else:
         print("Phase 2 Fast Math: No math expressions detected")
+
+def report_jit_stats():
+    """Report JIT compilation statistics."""
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
+    
+    print("JIT Compilation Statistics:")
+    
+    if _JIT_ATTEMPTS > 0:
+        hit_rate = (_JIT_HITS / _JIT_ATTEMPTS) * 100
+        failure_rate = (_JIT_COMPILATION_FAILURES / _JIT_ATTEMPTS) * 100
+        
+        print(f"  JIT attempts: {_JIT_ATTEMPTS:,}")
+        print(f"  JIT hits: {_JIT_HITS:,} ({hit_rate:.1f}%)")
+        print(f"  JIT failures: {_JIT_COMPILATION_FAILURES:,} ({failure_rate:.1f}%)")
+        
+        # Get cache statistics
+        cache_stats = _JIT_CACHE.get_stats()
+        print(f"  Cache hit rate: {cache_stats.hit_rate:.1f}%")
+        print(f"  Cache size: {_JIT_CACHE.cache_size} expressions")
+        print(f"  Compilation time: {cache_stats.compilation_time:.4f}s")
+        print(f"  Estimated time saved: {cache_stats.total_time_saved:.4f}s")
+    else:
+        print("  No JIT compilation attempts")
+
+def reset_jit_stats():
+    """Reset JIT compilation statistics for new script."""
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
+    _JIT_ATTEMPTS = 0
+    _JIT_HITS = 0
+    _JIT_COMPILATION_FAILURES = 0
+    _JIT_CACHE.stats.reset()
 
 def reset_fast_math_stats():
     """Reset fast math statistics for new script."""
@@ -354,8 +428,14 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Fast arithmetic hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
-    # ===== END PHASE 2.5 OPTIMIZATION =====
+    # ===== END PHASE 2 + 2.5 OPTIMIZATION =====
 
+    # ===== PHASE 3: JIT COMPILATION =====
+    jit_result = try_jit_compilation(expr, variables)
+    if jit_result is not None:
+        return jit_result
+    # ===== END PHASE 3 =====
+    
     # Parse variables early so we can check for random in both original and parsed expressions
     parsed_expr = substitute_variables(expr, variables)
     if DEBUG_LEVEL >= DEBUG_VERBOSE:
