@@ -73,6 +73,8 @@ class PixilMetricsDB(BaseDatabase):
         """
         self.execute_migration(schema_sql)
     
+    # Update the save_metrics method in database/pixil_metrics.py
+
     def save_metrics(self, script_name: str, start_time: datetime.datetime, 
                     end_time: datetime.datetime, metrics_data: Dict[str, Any], 
                     reason: str = "complete"):
@@ -90,42 +92,57 @@ class PixilMetricsDB(BaseDatabase):
                     parse_value_attempts, parse_value_ultra_fast_hits, parse_value_fast_hits, 
                     parse_value_hit_rate, parse_value_time_saved,
                     direct_integer_hits, direct_color_hits, direct_string_hits,
-                    simple_array_hits, simple_arithmetic_hits
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    simple_array_hits, simple_arithmetic_hits,
+                    jit_attempts, jit_hits, jit_failures, jit_hit_rate, jit_time_saved,
+                    jit_line_cache_skips, failed_lines_cached, jit_skip_efficiency, jit_skip_time_saved,
+                    jit_cache_size, jit_cache_utilization, jit_compilation_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                script_name, start_time, end_time, reason,
-                metrics_data.get('commands_executed', 0),
-                metrics_data.get('script_lines_processed', 0),
-                metrics_data.get('total_execution_time', 0.0),
-                metrics_data.get('active_execution_time', 0.0),
-                metrics_data.get('commands_per_second', 0.0),
-                metrics_data.get('lines_per_second', 0.0),
-                metrics_data.get('fast_path_attempts', 0),
-                metrics_data.get('fast_path_hits', 0),
-                metrics_data.get('fast_path_hit_rate', 0.0),
-                metrics_data.get('fast_path_time_saved', 0.0),
-                metrics_data.get('fast_math_attempts', 0),
-                metrics_data.get('fast_math_hits', 0),
-                metrics_data.get('fast_math_hit_rate', 0.0),
-                metrics_data.get('fast_math_time_saved', 0.0),
-                metrics_data.get('cache_attempts', 0),
-                metrics_data.get('cache_hits', 0),
-                metrics_data.get('cache_hit_rate', 0.0),
-                metrics_data.get('cache_size', 0),
-                metrics_data.get('cache_time_saved', 0.0),
-                metrics_data.get('parse_value_attempts', 0),
-                metrics_data.get('parse_value_ultra_fast_hits', 0),
-                metrics_data.get('parse_value_fast_hits', 0),
-                metrics_data.get('parse_value_hit_rate', 0.0),
-                metrics_data.get('parse_value_time_saved', 0.0),
-                metrics_data.get('direct_integer_hits', 0),
-                metrics_data.get('direct_color_hits', 0),
-                metrics_data.get('direct_string_hits', 0),
-                metrics_data.get('simple_array_hits', 0),
-                metrics_data.get('simple_arithmetic_hits', 0)
+                script_name, start_time, end_time, reason,                                    # 4 values
+                metrics_data.get('commands_executed', 0),                                      # 1
+                metrics_data.get('script_lines_processed', 0),                               # 1  
+                metrics_data.get('total_execution_time', 0.0),                               # 1
+                metrics_data.get('active_execution_time', 0.0),                              # 1
+                metrics_data.get('commands_per_second', 0.0),                                # 1
+                metrics_data.get('lines_per_second', 0.0),                                   # 1 = 10 total
+                metrics_data.get('fast_path_attempts', 0),                                    # 1
+                metrics_data.get('fast_path_hits', 0),                                       # 1
+                metrics_data.get('fast_path_hit_rate', 0.0),                                 # 1
+                metrics_data.get('fast_path_time_saved', 0.0),                               # 1
+                metrics_data.get('fast_math_attempts', 0),                                    # 1
+                metrics_data.get('fast_math_hits', 0),                                       # 1
+                metrics_data.get('fast_math_hit_rate', 0.0),                                 # 1
+                metrics_data.get('fast_math_time_saved', 0.0),                               # 1
+                metrics_data.get('cache_attempts', 0),                                       # 1
+                metrics_data.get('cache_hits', 0),                                           # 1
+                metrics_data.get('cache_hit_rate', 0.0),                                     # 1
+                metrics_data.get('cache_size', 0),                                           # 1
+                metrics_data.get('cache_time_saved', 0.0),                                   # 1 = 23 total
+                metrics_data.get('parse_value_attempts', 0),                                 # 1
+                metrics_data.get('parse_value_ultra_fast_hits', 0),                          # 1
+                metrics_data.get('parse_value_fast_hits', 0),                                # 1
+                metrics_data.get('parse_value_hit_rate', 0.0),                               # 1
+                metrics_data.get('parse_value_time_saved', 0.0),                             # 1
+                metrics_data.get('direct_integer_hits', 0),                                  # 1
+                metrics_data.get('direct_color_hits', 0),                                    # 1
+                metrics_data.get('direct_string_hits', 0),                                   # 1
+                metrics_data.get('simple_array_hits', 0),                                    # 1
+                metrics_data.get('simple_arithmetic_hits', 0),                               # 1 = 33 total
+                metrics_data.get('jit_attempts', 0),                                         # 1
+                metrics_data.get('jit_hits', 0),                                             # 1
+                metrics_data.get('jit_failures', 0),                                         # 1
+                metrics_data.get('jit_hit_rate', 0.0),                                       # 1
+                metrics_data.get('jit_time_saved', 0.0),                                     # 1
+                metrics_data.get('jit_line_cache_skips', 0),                                 # 1
+                metrics_data.get('failed_lines_cached', 0),                                  # 1
+                metrics_data.get('jit_skip_efficiency', 0.0),                                # 1
+                metrics_data.get('jit_skip_time_saved', 0.0),                                # 1
+                metrics_data.get('jit_cache_size', 0),                                       # 1
+                metrics_data.get('jit_cache_utilization', 0.0),                              # 1
+                metrics_data.get('jit_compilation_time', 0.0)                                # 1 = 45 total
             ))
             conn.commit()
-
+        
     def get_recent_metrics(self, limit: int = 10) -> List[sqlite3.Row]:
         """
         Get the most recent metrics records.

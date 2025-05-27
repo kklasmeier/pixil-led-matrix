@@ -29,10 +29,13 @@ _EXPRESSION_RESULT_CACHE = {}
 _CACHE_HITS = 0
 _CACHE_MISSES = 0
 _CACHE_MAX_SIZE = 500 
-_JIT_CACHE = JITExpressionCache(max_size=1000)
+_JIT_CACHE = JITExpressionCache(max_size=500)
 _JIT_ATTEMPTS = 0
 _JIT_HITS = 0
 _JIT_COMPILATION_FAILURES = 0
+_FAILED_SCRIPT_LINES = set()  # Use set for faster lookups
+_JIT_LINE_CACHE_SKIPS = 0
+_current_script_line = None  # Store current script line locally
 
 # Phase 2: Pre-compiled regex patterns for fast math expressions
 SIMPLE_ADD_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
@@ -48,23 +51,30 @@ RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*
 VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
 VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
 
+def set_current_script_line(line):
+    """Set the current script line for JIT failure caching."""
+    global _current_script_line
+    _current_script_line = line
+
 def try_jit_compilation(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float, str]]:
     """
-    Phase 3: JIT compilation fast path for complex expressions.
-    
-    Args:
-        expr: Expression string to compile and evaluate
-        variables: Current variable values
-        
-    Returns:
-        Result of expression evaluation, or None if JIT compilation failed
+    Phase 3: JIT compilation with line-based failure caching.
     """
-    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
-    
-    _JIT_ATTEMPTS += 1
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES, _JIT_LINE_CACHE_SKIPS, _current_script_line
     
     if DEBUG_LEVEL >= DEBUG_VERBOSE:
-        debug_print(f"Trying JIT compilation for: {expr}", DEBUG_VERBOSE)
+        debug_print(f"JIT attempt for: {expr}", DEBUG_VERBOSE)
+    
+    # NEW: Check line-based failure cache first
+    if _current_script_line:
+        cache_key = hash(_current_script_line)
+        if cache_key in _FAILED_SCRIPT_LINES:
+            _JIT_LINE_CACHE_SKIPS += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"JIT skipped (known failure): {expr}", DEBUG_VERBOSE)
+            return None
+    
+    _JIT_ATTEMPTS += 1
     
     try:
         result = _JIT_CACHE.evaluate(expr, variables)
@@ -75,12 +85,33 @@ def try_jit_compilation(expr: str, variables: Dict[str, Any]) -> Optional[Union[
                 debug_print(f"JIT compilation successful: {expr} = {result}", DEBUG_VERBOSE)
             return result
         else:
+            # Mark this script line as always failing
+            if _current_script_line:
+                cache_key = hash(_current_script_line)
+                _FAILED_SCRIPT_LINES.add(cache_key)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"JIT failed, caching line: {_current_script_line[:50]}...", DEBUG_VERBOSE)
+            
             _JIT_COMPILATION_FAILURES += 1
-            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"JIT compilation failed for: {expr}", DEBUG_VERBOSE)
             return None
             
     except Exception as e:
+        # Mark this script line as always failing
+        if _current_script_line:
+            cache_key = hash(_current_script_line)
+            _FAILED_SCRIPT_LINES.add(cache_key)
+        
+        _JIT_COMPILATION_FAILURES += 1
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"JIT compilation error for '{expr}': {str(e)}", DEBUG_VERBOSE)
+        return None
+            
+    except Exception as e:
+        # Mark this script line as always failing
+        if current_command:
+            cache_key = hash(current_command)
+            _FAILED_SCRIPT_LINES.add(cache_key)
+        
         _JIT_COMPILATION_FAILURES += 1
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"JIT compilation error for '{expr}': {str(e)}", DEBUG_VERBOSE)
@@ -159,35 +190,53 @@ def report_fast_math_stats():
         print("Phase 2 Fast Math: No math expressions detected")
 
 def report_jit_stats():
-    """Report JIT compilation statistics."""
-    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
+    """Report JIT compilation statistics with line cache efficiency."""
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES, _JIT_LINE_CACHE_SKIPS
     
     print("JIT Compilation Statistics:")
     
-    if _JIT_ATTEMPTS > 0:
-        hit_rate = (_JIT_HITS / _JIT_ATTEMPTS) * 100
-        failure_rate = (_JIT_COMPILATION_FAILURES / _JIT_ATTEMPTS) * 100
+    if _JIT_ATTEMPTS > 0 or _JIT_LINE_CACHE_SKIPS > 0:
+        # Basic stats
+        hit_rate = (_JIT_HITS / _JIT_ATTEMPTS * 100) if _JIT_ATTEMPTS > 0 else 0
+        failure_rate = (_JIT_COMPILATION_FAILURES / _JIT_ATTEMPTS * 100) if _JIT_ATTEMPTS > 0 else 0
         
         print(f"  JIT attempts: {_JIT_ATTEMPTS:,}")
         print(f"  JIT hits: {_JIT_HITS:,} ({hit_rate:.1f}%)")
         print(f"  JIT failures: {_JIT_COMPILATION_FAILURES:,} ({failure_rate:.1f}%)")
+        
+        # NEW: Line cache efficiency
+        print(f"  Line cache skips: {_JIT_LINE_CACHE_SKIPS:,}")
+        
+        total_expressions = _JIT_ATTEMPTS + _JIT_LINE_CACHE_SKIPS
+        if total_expressions > 0:
+            skip_rate = (_JIT_LINE_CACHE_SKIPS / total_expressions) * 100
+            print(f"  Skip efficiency: {skip_rate:.1f}% of expressions avoided")
+            
+            # Time savings estimation
+            skip_time_saved = (_JIT_LINE_CACHE_SKIPS * 250) / 1000000  # 250 μs per avoided attempt
+            print(f"  Time saved by skipping: {skip_time_saved:.3f} seconds")
         
         # Get cache statistics
         cache_stats = _JIT_CACHE.get_stats()
         print(f"  Cache hit rate: {cache_stats.hit_rate:.1f}%")
         print(f"  Cache size: {_JIT_CACHE.cache_size} expressions")
         print(f"  Compilation time: {cache_stats.compilation_time:.4f}s")
-        print(f"  Estimated time saved: {cache_stats.total_time_saved:.4f}s")
+        print(f"  Total time saved: {cache_stats.total_time_saved:.4f}s")
+        
+        # Line cache stats
+        print(f"  Failed lines cached: {len(_FAILED_SCRIPT_LINES)} unique lines")
+        
     else:
         print("  No JIT compilation attempts")
 
 def reset_jit_stats():
     """Reset JIT compilation statistics for new script."""
-    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES
+    global _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES, _JIT_LINE_CACHE_SKIPS
     _JIT_ATTEMPTS = 0
     _JIT_HITS = 0
     _JIT_COMPILATION_FAILURES = 0
-    _JIT_CACHE.stats.reset()
+    _JIT_LINE_CACHE_SKIPS = 0
+    # Note: Don't reset _FAILED_SCRIPT_LINES - keep learning across scripts
 
 def reset_fast_math_stats():
     """Reset fast math statistics for new script."""

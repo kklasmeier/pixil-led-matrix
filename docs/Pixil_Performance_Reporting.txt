@@ -1,0 +1,191 @@
+# Pixil Performance Metrics Viewer
+
+**Location**: `tools/view_pixil_metrics.py`
+
+A comprehensive tool for analyzing Pixil script performance data from the database. Provides insights into script execution times, optimization effectiveness, and JIT compilation performance.
+
+## Basic Usage
+
+```bash
+python tools/view_pixil_metrics.py [options]
+```
+
+## Command Options
+
+### Recent Executions (Default)
+```bash
+# Show 10 most recent script runs (default)
+python tools/view_pixil_metrics.py
+
+# Show specific number of recent runs
+python tools/view_pixil_metrics.py --recent 20
+```
+
+**Output includes**:
+- Script name and execution time
+- Performance metrics (commands/sec, lines/sec)
+- Optimization hit rates (Fast Path, Fast Math, Cache, Parse Value)
+- JIT performance (Hit Rate, Skip Efficiency)
+- Total time saved by optimizations
+
+### Script-Specific Analysis
+```bash
+# Show performance history for a specific script
+python tools/view_pixil_metrics.py --script "bouncing_ball.pix"
+
+# Show performance trends for a script (last 20 executions)
+python tools/view_pixil_metrics.py --trends "starfield.pix"
+
+# Show more executions in trends
+python tools/view_pixil_metrics.py --trends "fractal_trees.pix" --count 50
+```
+
+### System-Wide Analysis
+```bash
+# Show overall performance summary (last 7 days)
+python tools/view_pixil_metrics.py --summary
+
+# Show system-wide performance trends
+python tools/view_pixil_metrics.py --trends-all
+
+# Show more detailed trends with verbose output
+python tools/view_pixil_metrics.py --trends-all --count 30 --verbose
+```
+
+### JIT Compilation Analysis
+```bash
+# Show JIT line caching performance summary
+python tools/view_pixil_metrics.py --jit-summary
+```
+
+### Database Management
+```bash
+# List all scripts in database
+python tools/view_pixil_metrics.py --list
+```
+
+## Understanding the Output
+
+### Performance Metrics
+
+**Basic Performance**:
+- **Commands/sec**: Rate of command processing
+- **Lines/sec**: Rate of script line processing
+- **Execution Time**: Total time including setup/teardown vs Active time (pure execution)
+
+**Optimization Hit Rates**:
+- **Fast Path**: Percentage of commands using optimized execution paths
+- **Fast Math**: Percentage of math operations using fast evaluation
+- **Cache**: Expression cache hit rate
+- **Parse Value**: Parse value cache hit rate for repeated evaluations
+
+**JIT Compilation Metrics**:
+- **JIT Hit Rate**: Percentage of expressions served from JIT bytecode cache
+- **Skip Efficiency**: Percentage of expression lines that could be skipped entirely
+- **JIT Time Saved**: Time saved through JIT compilation
+- **Skip Time Saved**: Time saved by skipping redundant evaluations
+
+### Trend Indicators
+
+When viewing trends, arrows indicate performance direction:
+- **↗**: Improving (faster execution, higher optimization rates)
+- **↘**: Declining (slower execution, lower optimization rates)  
+- **→**: Stable (no significant change)
+
+### Output Formats
+
+**Compact Format** (default for trends):
+```
+Date/Time           ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%
+2025-05-26 14:30    2.1s      1250    890      85%        72%        64%     58%        42%   28%
+```
+
+**Verbose Format** (with `--verbose`):
+```
+Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Time JIT-Skip Failed
+2025-05-26 14:30    bouncing_ball.pix   2.3s      2.1s     1250     890        85%     72%   64%  58%   42%   28%    0.12s    0.08s    3
+```
+
+## Common Use Cases
+
+### 1. Performance Monitoring
+```bash
+# Quick check of recent performance
+python tools/view_pixil_metrics.py --recent 5
+
+# Weekly performance summary
+python tools/view_pixil_metrics.py --summary
+```
+
+### 2. Script Optimization
+```bash
+# Analyze specific script performance
+python tools/view_pixil_metrics.py --script "bouncing_ball.pix"
+
+# Track optimization improvements over time
+python tools/view_pixil_metrics.py --trends "bouncing_ball.pix" --verbose
+```
+
+### 3. JIT Compilation Analysis
+```bash
+# Check JIT effectiveness
+python tools/view_pixil_metrics.py --jit-summary
+
+# Detailed JIT performance in trends
+python tools/view_pixil_metrics.py --trends-all --verbose
+```
+
+### 4. System Performance Trends
+```bash
+# Overall system performance
+python tools/view_pixil_metrics.py --trends-all --count 100
+
+# Find performance regressions
+python tools/view_pixil_metrics.py --trends-all --verbose
+```
+
+## Interpreting Results
+
+### Good Performance Indicators
+- **High hit rates**: Fast Path >80%, Cache >60%, JIT >40%
+- **Consistent performance**: Stable commands/sec across executions
+- **Time savings**: Significant optimization time savings
+- **Low failed lines**: Minimal JIT compilation failures
+
+### Performance Issues to Investigate
+- **Declining trends**: ↘ arrows in performance metrics
+- **Low hit rates**: <50% on optimization features
+- **High failed lines**: Many JIT compilation failures
+- **Inconsistent performance**: Large variations in execution time
+
+### JIT Cache Efficiency
+- **Hit Rate >40%**: Good JIT utilization
+- **Skip Efficiency >20%**: Effective redundant computation elimination  
+- **Low Failed Lines**: <10 per script indicates good expression compatibility
+
+## Tips for Analysis
+
+1. **Compare Similar Scripts**: Use trends to compare performance across similar animations
+2. **Track Optimization Changes**: Monitor hit rates before/after code optimizations
+3. **Identify Bottlenecks**: Low hit rates indicate areas for optimization
+4. **Cache Effectiveness**: JIT summary shows if cache size is appropriate
+5. **Performance Regression**: System trends help identify when performance declined
+
+## Example Workflow
+
+```bash
+# 1. Check overall system health
+python tools/view_pixil_metrics.py --summary
+
+# 2. Identify problematic scripts
+python tools/view_pixil_metrics.py --list
+python tools/view_pixil_metrics.py --trends "slow_script.pix"
+
+# 3. Analyze JIT performance
+python tools/view_pixil_metrics.py --jit-summary
+
+# 4. Monitor recent changes
+python tools/view_pixil_metrics.py --recent 10 --verbose
+```
+
+This tool provides comprehensive insights into Pixil's performance characteristics and helps optimize both individual scripts and the overall system.

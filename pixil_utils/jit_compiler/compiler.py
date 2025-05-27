@@ -1,6 +1,6 @@
 """
 Expression compiler for Pixil JIT system.
-Converts string expressions to bytecode.
+Enhanced with array access and advanced math functions.
 """
 import re
 import math
@@ -20,12 +20,12 @@ class Token:
 class ExpressionTokenizer:
     """Tokenizes Pixil expressions into parseable tokens."""
     
-    # Token patterns (order matters!)
+    # Enhanced token patterns (order matters!)
     TOKEN_PATTERNS = [
         (r'\s+', 'WHITESPACE'),           # Whitespace (skip)
         (r'\d+\.?\d*', 'NUMBER'),         # Numbers: 123, 12.34
         (r'v_\w+', 'VARIABLE'),           # Variables: v_x, v_radius
-        (r'[a-zA-Z_]\w*', 'FUNCTION'),    # Functions: cos, sin, sqrt
+        (r'[a-zA-Z_]\w*', 'FUNCTION'),    # Functions: cos, sin, sqrt, random
         (r'\+', 'PLUS'),                  # +
         (r'-', 'MINUS'),                  # -
         (r'\*', 'MULTIPLY'),              # *
@@ -35,6 +35,7 @@ class ExpressionTokenizer:
         (r'\)', 'RPAREN'),                # )
         (r'\[', 'LBRACKET'),              # [
         (r'\]', 'RBRACKET'),              # ]
+        (r',', 'COMMA'),                  # , (for function arguments)
     ]
     
     def __init__(self):
@@ -68,7 +69,7 @@ class ExpressionTokenizer:
         return tokens
 
 class ExpressionCompiler:
-    """Compiles tokenized expressions to bytecode using Shunting Yard algorithm."""
+    """Compiles tokenized expressions to bytecode using enhanced Shunting Yard algorithm."""
     
     def __init__(self):
         self.tokenizer = ExpressionTokenizer()
@@ -82,12 +83,31 @@ class ExpressionCompiler:
             'MODULO': (2, 'LEFT'),
         }
         
-        # Function names to opcodes
-        self.functions = {
+        # Pure mathematical functions (deterministic - can be cached)
+        self.pure_functions = {
             'cos': OpCode.CALL_COS,
             'sin': OpCode.CALL_SIN,
+            'tan': OpCode.CALL_TAN,
+            'acos': OpCode.CALL_ACOS,
+            'asin': OpCode.CALL_ASIN,
+            'atan': OpCode.CALL_ATAN,
+            'atan2': OpCode.CALL_ATAN2,
             'sqrt': OpCode.CALL_SQRT,
             'abs': OpCode.CALL_ABS,
+            'round': OpCode.CALL_ROUND,
+            'floor': OpCode.CALL_FLOOR,
+            'ceil': OpCode.CALL_CEIL,
+            'log': OpCode.CALL_LOG,
+            'log10': OpCode.CALL_LOG10,
+            'exp': OpCode.CALL_EXP,
+            'min': OpCode.CALL_MIN,
+            'max': OpCode.CALL_MAX,
+        }
+        
+        # Runtime functions (non-deterministic - execute fresh each time)
+        self.runtime_functions = {
+            'random': OpCode.CALL_RUNTIME,
+            # Future runtime functions can be added here
         }
     
     def compile(self, expression: str) -> CompiledExpression:
@@ -104,6 +124,10 @@ class ExpressionCompiler:
             ValueError: If expression cannot be compiled
         """
         try:
+            # Handle array access patterns first
+            if self._is_simple_array_access(expression):
+                return self._compile_array_access(expression)
+            
             tokens = self.tokenizer.tokenize(expression)
             postfix_tokens = self._infix_to_postfix(tokens)
             bytecode = self._postfix_to_bytecode(postfix_tokens)
@@ -111,6 +135,25 @@ class ExpressionCompiler:
             
         except Exception as e:
             raise ValueError(f"Cannot compile expression '{expression}': {str(e)}")
+    
+    def _is_simple_array_access(self, expression: str) -> bool:
+        """Check if expression is a simple array access like v_array[v_index]."""
+        pattern = re.compile(r'^v_\w+\[v_\w+\]$')
+        return bool(pattern.match(expression.strip()))
+    
+    def _compile_array_access(self, expression: str) -> CompiledExpression:
+        """Compile simple array access to bytecode."""
+        # Parse v_array[v_index] pattern
+        match = re.match(r'^(v_\w+)\[(v_\w+)\]$', expression.strip())
+        if not match:
+            raise ValueError(f"Invalid array access pattern: {expression}")
+        
+        array_name = match.group(1)
+        index_var = match.group(2)
+        
+        # Create bytecode for array access
+        bytecode = [Instruction(OpCode.LOAD_ARRAY, (array_name, index_var))]
+        return CompiledExpression(bytecode, expression)
     
     def _infix_to_postfix(self, tokens: List[Token]) -> List[Token]:
         """Convert infix tokens to postfix using Shunting Yard algorithm."""
@@ -153,6 +196,11 @@ class ExpressionCompiler:
                 # If there's a function on top of stack, pop it
                 if operator_stack and operator_stack[-1].type == 'FUNCTION':
                     output.append(operator_stack.pop())
+            
+            elif token.type == 'COMMA':
+                # Handle function argument separator
+                while operator_stack and operator_stack[-1].type != 'LPAREN':
+                    output.append(operator_stack.pop())
         
         # Pop remaining operators
         while operator_stack:
@@ -189,8 +237,10 @@ class ExpressionCompiler:
                 bytecode.append(Instruction(OpCode.MOD))
                 
             elif token.type == 'FUNCTION':
-                if token.value in self.functions:
-                    bytecode.append(Instruction(self.functions[token.value]))
+                if token.value in self.pure_functions:
+                    bytecode.append(Instruction(self.pure_functions[token.value]))
+                elif token.value in self.runtime_functions:
+                    bytecode.append(Instruction(OpCode.CALL_RUNTIME, token.value))
                 else:
                     raise ValueError(f"Unknown function: {token.value}")
                     

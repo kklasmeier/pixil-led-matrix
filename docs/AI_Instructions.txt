@@ -746,6 +746,7 @@ Example:
 Solution file map:
 ------------------
 
+```
 /
 ├── Pixil.py                 # Main script interpreter - Parses and executes Pixil script commands
 │
@@ -760,7 +761,13 @@ Solution file map:
 │   ├── cli.py               # Command line argument parsing and validation
 │   ├── script_manager.py    # Manages script loading and execution queuing
 │   ├── terminal_handler.py  # Raw terminal input handling for keyboard control
-│   └── timer_manager.py     # Script duration tracking and timing control
+│   ├── timer_manager.py     # Script duration tracking and timing control
+│   └── jit_compiler/        # JIT compilation system for mathematical expressions
+│       ├── __init__.py      # JIT compiler package exports
+│       ├── bytecode.py      # Bytecode instruction definitions and data structures
+│       ├── compiler.py      # Expression tokenizer and bytecode compiler
+│       ├── vm.py            # Stack-based virtual machine for bytecode execution
+│       └── cache.py         # LRU cache with performance tracking and statistics
 │
 ├── rgb_matrix_lib/       
 │   ├── __init__.py          # Package exports for RGB matrix library
@@ -783,6 +790,7 @@ Solution file map:
 │   ├── __init__.py          # Database package exports
 │   ├── base.py              # Base database utilities and configuration
 │   ├── pixil_metrics.py     # Pixil performance metrics database
+│   ├── migrate.py           # Database migration tool for version upgrades
 │   ├── queries/             # Database query helpers
 │   │   ├── __init__.py      # Query package exports
 │   │   └── pixil_queries.py # Advanced Pixil performance queries
@@ -800,27 +808,41 @@ Solution file map:
 └── scripts/                 # Contains Pixil script files
     ├── main/                # Main scripts
     └── testing/             # Test scripts
+```
 
-Key Components:
-- Pixil.py: Main script interpreter with integrated performance tracking
-- pixil_utils: Command parsing and processing utilities
-- rgb_matrix_lib: Hardware interface and LED matrix operations
-- database: Performance metrics storage and analysis
-- tools: Database viewing and analysis utilities
-- scripts: Pixil script storage and organization
+## Key Components:
 
-Database Features:
+**JIT Compiler System** (`pixil_utils/jit_compiler/`):
+- **bytecode.py**: Defines instruction opcodes and data structures for compiled expressions
+- **compiler.py**: Tokenizes and compiles mathematical expressions to bytecode using enhanced Shunting Yard algorithm
+- **vm.py**: Stack-based virtual machine that executes compiled bytecode with array access and advanced math functions
+- **cache.py**: LRU cache with performance tracking, eviction statistics, and efficiency monitoring
+
+**Core Architecture**:
+- **Pixil.py**: Main script interpreter with integrated performance tracking and JIT compilation
+- **pixil_utils**: Command parsing, processing, and optimization utilities
+- **rgb_matrix_lib**: Hardware interface and LED matrix operations
+- **database**: Performance metrics storage, migration system, and analysis
+- **tools**: Database viewing and analysis utilities
+- **scripts**: Pixil script storage and organization
+
+**Database Features**:
+- **migrate.py**: Handles database schema upgrades based on migration files
 - Automatic performance metrics collection during script execution
 - Historical performance tracking and trend analysis
-- Optimization effectiveness monitoring (fast path, fast math, cache hits)
+- JIT compilation optimization tracking (cache hits, compilation time, execution time)
 - Compact and verbose reporting formats
 - Script comparison and system-wide performance analysis
 
-Key Components:
-- Pixil.py: Main script interpreter
-- pixil_utils: Command parsing and processing
-- rgb_matrix_api: Hardware interface and operations
-- scripts: Script storage and organization
+**JIT Compilation Features**:
+- Compiles mathematical expressions to bytecode for faster execution
+- LRU cache with configurable size and eviction tracking
+- Support for variables, arrays, and advanced math functions
+- Performance statistics including hit rates, compilation time, and time saved
+- Automatic fallback to standard evaluation if compilation fails
+- Cache efficiency monitoring and thrashing detection
+
+The Pixil system uses a producer/consumer architecture with a command queue to manage LED matrix operations, enhanced with JIT compilation for mathematical expressions to improve performance in computation-heavy scripts.
 
 
 The Pixil system uses a producer/consumer architecture with a command queue to manage LED matrix operations:
