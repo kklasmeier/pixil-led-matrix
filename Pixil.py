@@ -57,6 +57,8 @@ _metrics = {
     'enabled': True               # Toggle for enabling/disabling metrics
 }
 
+current_command = None
+
 #Variable cache
 _VAR_FORMAT_CACHE = OrderedDict()
 _VAR_CACHE_SIZE = 1024
@@ -75,7 +77,6 @@ _DIRECT_COLOR_HITS = 0
 _DIRECT_STRING_HITS = 0
 _SIMPLE_ARRAY_HITS = 0
 _SIMPLE_ARITHMETIC_HITS = 0
-
 
 set_debug_level(DEBUG_OFF)  # Default debug level
 
@@ -219,15 +220,19 @@ def report_metrics(reason="complete", script_name=None, start_time=None):
             print(f"Warning: Could not save metrics to database: {e}")
             # Continue without failing - database is optional
 
+# Update the save_performance_metrics function in Pixil.py
+
 def save_performance_metrics(script_name, start_time, reason):
     """Save current performance metrics to database."""
     end_time = datetime.datetime.now()
     
     # Import the cache variables from math_functions
     from pixil_utils.math_functions import (_FAST_MATH_HITS, _FAST_MATH_TOTAL, 
-                                          _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES)
+                                          _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES,
+                                          _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES,
+                                          _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE)
     
-    # Import our new parse value stats
+    # Import our parse value stats
     global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
     global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
     global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
@@ -255,10 +260,23 @@ def save_performance_metrics(script_name, start_time, reason):
     cache_time_saved = (_CACHE_HITS * 30) / 1000000
     cache_size = len(_EXPRESSION_RESULT_CACHE)
     
-    # NEW: Parse value metrics
+    # Parse value metrics
     parse_value_total_hits = _PARSE_VALUE_ULTRA_FAST_HITS + _PARSE_VALUE_FAST_HITS
     parse_value_hit_rate = (parse_value_total_hits / _PARSE_VALUE_ATTEMPTS * 100) if _PARSE_VALUE_ATTEMPTS > 0 else 0
     parse_value_time_saved = (_PARSE_VALUE_ULTRA_FAST_HITS * 25 + _PARSE_VALUE_FAST_HITS * 15) / 1000000
+    
+    # NEW: JIT line caching metrics
+    jit_hit_rate = (_JIT_HITS / _JIT_ATTEMPTS * 100) if _JIT_ATTEMPTS > 0 else 0
+    jit_cache_stats = _JIT_CACHE.get_stats()
+    jit_time_saved = jit_cache_stats.total_time_saved
+    
+    # JIT line cache efficiency
+    total_jit_expressions = _JIT_ATTEMPTS + _JIT_LINE_CACHE_SKIPS
+    jit_skip_efficiency = (_JIT_LINE_CACHE_SKIPS / total_jit_expressions * 100) if total_jit_expressions > 0 else 0
+    jit_skip_time_saved = (_JIT_LINE_CACHE_SKIPS * 250) / 1000000  # 250 μs per skip
+    
+    # JIT cache utilization
+    jit_cache_utilization = (_JIT_CACHE.cache_size / _JIT_CACHE.max_size * 100) if _JIT_CACHE.max_size > 0 else 0
     
     # Prepare metrics data
     metrics_data = {
@@ -281,7 +299,6 @@ def save_performance_metrics(script_name, start_time, reason):
         'cache_hit_rate': cache_hit_rate,
         'cache_size': cache_size,
         'cache_time_saved': cache_time_saved,
-        # NEW: Parse value metrics
         'parse_value_attempts': _PARSE_VALUE_ATTEMPTS,
         'parse_value_ultra_fast_hits': _PARSE_VALUE_ULTRA_FAST_HITS,
         'parse_value_fast_hits': _PARSE_VALUE_FAST_HITS,
@@ -291,12 +308,21 @@ def save_performance_metrics(script_name, start_time, reason):
         'direct_color_hits': _DIRECT_COLOR_HITS,
         'direct_string_hits': _DIRECT_STRING_HITS,
         'simple_array_hits': _SIMPLE_ARRAY_HITS,
-        'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS
+        'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS,
+        # NEW: JIT line caching metrics
+        'jit_attempts': _JIT_ATTEMPTS,
+        'jit_hits': _JIT_HITS,
+        'jit_failures': _JIT_COMPILATION_FAILURES,
+        'jit_hit_rate': jit_hit_rate,
+        'jit_time_saved': jit_time_saved,
+        'jit_line_cache_skips': _JIT_LINE_CACHE_SKIPS,
+        'failed_lines_cached': len(_FAILED_SCRIPT_LINES),
+        'jit_skip_efficiency': jit_skip_efficiency,
+        'jit_skip_time_saved': jit_skip_time_saved,
+        'jit_cache_size': _JIT_CACHE.cache_size,
+        'jit_cache_utilization': jit_cache_utilization,
+        'jit_compilation_time': jit_cache_stats.compilation_time
     }
-
-    #print(f"DEBUG: About to save {len(metrics_data)} metrics items:")
-    #for key, value in metrics_data.items():
-    #    print(f"  {key}: {value}")
 
     # Save to database
     try:
@@ -304,9 +330,8 @@ def save_performance_metrics(script_name, start_time, reason):
         db.save_metrics(script_name, start_time, end_time, metrics_data, reason)
         print(f"✓ Performance metrics saved to database")
     except Exception as e:
-        # Log but don't fail - database is optional
         print(f"Database save failed: {e}")
-        raise  # Re-raise so the calling function can handle it
+        raise
 
 def on_queue_pause():
     """Called when the command queue becomes full."""
@@ -1055,6 +1080,8 @@ def process_script(filename, execute_func=None):
             
             _metrics['script_lines_processed'] += 1
             current_command = line
+            from pixil_utils.math_functions import set_current_script_line
+            set_current_script_line(current_command)
 
             #print("Looping...")
             if check_spacebar():

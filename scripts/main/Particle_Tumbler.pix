@@ -62,13 +62,12 @@ def count_falling {
             v_falling_count = v_falling_count + 1
         endif
     endfor v_i
-    return v_falling_count
 }
 
 # Update rock positions
 def update_rocks {
     # Count falling rocks
-    v_falling_count = count_falling()
+    call count_falling 
     
     for v_i in (0, v_num_rocks, 1) then
         # Store previous position for tracing

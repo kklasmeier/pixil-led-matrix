@@ -23,6 +23,12 @@ class JITCacheStats:
         self.execution_time = 0.0
         self.total_time_saved = 0.0
         
+        # Cache management statistics
+        self.evictions = 0              # How many expressions were evicted
+        self.recompilations = 0         # How many expressions were recompiled after eviction
+        self.max_cache_size_reached = 0 # How many times we hit max cache size
+
+        
     @property
     def hit_rate(self) -> float:
         """Cache hit rate percentage."""
@@ -34,6 +40,14 @@ class JITCacheStats:
     def miss_rate(self) -> float:
         """Cache miss rate percentage."""
         return 100.0 - self.hit_rate
+
+    # Cache utilization properties
+    @property
+    def eviction_rate(self) -> float:
+        """Percentage of compilations that caused evictions."""
+        if self.cache_misses == 0:
+            return 0.0
+        return (self.evictions / self.cache_misses) * 100
 
 class JITExpressionCache:
     """
@@ -50,7 +64,8 @@ class JITExpressionCache:
         self.vm = PixilVM()
         self.stats = JITCacheStats()
         
-        # Performance tracking
+        # NEW: Track expression usage for eviction analysis
+        self._expression_recompile_tracker = set()  # Track recompiled expressions
         self._enabled = True
         
     def evaluate(self, expression: str, variables: Dict[str, Any]) -> Optional[float]:
@@ -104,8 +119,13 @@ class JITExpressionCache:
             return None
     
     def _compile_and_cache(self, expression: str) -> CompiledExpression:
-        """Compile expression and add to cache with LRU eviction."""
+        """Compile expression and add to cache with enhanced LRU eviction tracking."""
         start_time = time.time()
+        
+        # Check if this expression was previously evicted and is being recompiled
+        if expression in self._expression_recompile_tracker:
+            self.stats.recompilations += 1
+            self._expression_recompile_tracker.discard(expression)  # Remove from tracker
         
         # Compile expression
         compiled_expr = self.compiler.compile(expression)
@@ -113,15 +133,74 @@ class JITExpressionCache:
         compilation_time = time.time() - start_time
         self.stats.compilation_time += compilation_time
         
-        # Add to cache with LRU eviction
+        # Add to cache with enhanced LRU eviction tracking
         if len(self.cache) >= self.max_size:
-            # Remove least recently used expression
-            self.cache.popitem(last=False)
+            # Track eviction statistics
+            self.stats.evictions += 1
+            self.stats.max_cache_size_reached += 1
+            
+            # Track the evicted expression for potential recompilation detection
+            evicted_expr, _ = self.cache.popitem(last=False)
+            self._expression_recompile_tracker.add(evicted_expr)
             
         self.cache[expression] = compiled_expr
-        
         return compiled_expr
-    
+
+    def get_cache_utilization(self) -> dict:
+        """Get detailed cache utilization information."""
+        return {
+            'current_size': len(self.cache),
+            'max_size': self.max_size,
+            'utilization_percent': (len(self.cache) / self.max_size) * 100,
+            'available_slots': self.max_size - len(self.cache),
+            'is_full': len(self.cache) >= self.max_size,
+            'evictions': self.stats.evictions,
+            'recompilations': self.stats.recompilations,
+            'eviction_rate': self.stats.eviction_rate,
+        }
+
+    def get_top_expressions(self, count: int = 10) -> list:
+        """Get the most recently used expressions (top of cache)."""
+        if count > len(self.cache):
+            count = len(self.cache)
+        
+        # Get last N items from OrderedDict (most recently used)
+        recent_expressions = list(self.cache.keys())[-count:]
+        return recent_expressions
+
+    def get_cache_efficiency_report(self) -> str:
+        """Generate a detailed cache efficiency report."""
+        util = self.get_cache_utilization()
+        
+        report = [
+            "=== JIT Cache Efficiency Report ===",
+            f"Cache Size: {util['current_size']}/{util['max_size']} ({util['utilization_percent']:.1f}% full)",
+            f"Available Slots: {util['available_slots']}",
+            f"Cache Status: {'FULL' if util['is_full'] else 'Available'}",
+            "",
+            f"Eviction Statistics:",
+            f"  Total Evictions: {util['evictions']:,}",
+            f"  Recompilations: {util['recompilations']:,}",
+            f"  Eviction Rate: {util['eviction_rate']:.1f}% of cache misses",
+            "",
+            f"Performance Impact:",
+            f"  Hit Rate: {self.stats.hit_rate:.1f}%",
+            f"  Total Time Saved: {self.stats.total_time_saved:.4f}s",
+            f"  Compilation Time: {self.stats.compilation_time:.4f}s",
+        ]
+        
+        if util['recompilations'] > 0:
+            efficiency_loss = (util['recompilations'] / self.stats.cache_misses) * 100
+            report.extend([
+                "",
+                f"⚠️  Cache Thrashing Detection:",
+                f"  {util['recompilations']:,} expressions recompiled after eviction",
+                f"  {efficiency_loss:.1f}% efficiency loss due to cache pressure",
+                f"  Consider increasing cache size if this is > 5%"
+            ])
+        
+        return "\n".join(report)
+
     def get_stats(self) -> JITCacheStats:
         """Get current performance statistics."""
         return self.stats
