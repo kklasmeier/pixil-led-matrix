@@ -189,14 +189,16 @@ def show_script_trends(script_name, count, verbose=False):
     print(f"\n=== Performance Trends: {script_name} (Last {len(recent_history)} executions) ===")
     
     if verbose:
-        print("Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Size JIT-Hit JIT-Comp Failed")
-        print("-" * 135)
+        # Updated header to include Commands
+        print("Date/Time           Script              TotalTime ActTime  Commands Cmds/s   Lines/s     FP%     FM%   C%   PV%  JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed")
+        print("-" * 160)  # Adjusted length for new column
         
         for row in reversed(recent_history):
             date_str = row['start_time'][:16].replace('T', ' ')
             script = row['script_name'][:18]
             total_time = f"{row['total_execution_time']:.1f}s"
             active_time = f"{row['active_execution_time']:.1f}s"
+            commands = f"{row['commands_executed']}"  # New column
             cmds_per_sec = f"{row['commands_per_second']:.0f}"
             lines_per_sec = f"{row['lines_per_second']:.0f}"
             
@@ -214,10 +216,10 @@ def show_script_trends(script_name, count, verbose=False):
             jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
             failed_lines = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
 
-            print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>7} {fm_rate:>7} {cache_rate:>4} {pv_rate:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
+            print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {commands:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>7} {fm_rate:>7} {cache_rate:>4} {pv_rate:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
 
     else:
-        # Compact format
+        # Compact format (unchanged)
         print("Date/Time           ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%")
         print("-" * 103)
         
@@ -237,10 +239,94 @@ def show_script_trends(script_name, count, verbose=False):
     
     # Calculate trends if we have enough data
     if len(recent_history) >= 2:
-        print("\n" + "=" * (135 if verbose else 103))
+        print("\n" + "=" * (160 if verbose else 103))  # Adjusted length for verbose
         calculate_trends(recent_history, script_name)
 
 def show_system_trends(count, verbose=False):
+    """Show system-wide performance trends."""
+    db = PixilMetricsDB()
+    
+    with db.get_connection() as conn:
+        if verbose:
+            cursor = conn.execute('''
+                SELECT script_name, start_time, total_execution_time, active_execution_time, 
+                       commands_executed, commands_per_second, lines_per_second,
+                       fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
+                       parse_value_hit_rate, jit_hit_rate, jit_skip_efficiency,
+                       jit_cache_size, jit_cache_utilization, jit_compilation_time, failed_lines_cached
+                FROM script_metrics 
+                WHERE execution_reason IN ('complete', 'interrupted')
+                ORDER BY start_time DESC
+                LIMIT ?
+            ''', (count,))
+        else:
+            cursor = conn.execute('''
+                SELECT script_name, start_time, active_execution_time, commands_per_second, 
+                       lines_per_second, fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
+                       parse_value_hit_rate, jit_hit_rate, jit_skip_efficiency
+                FROM script_metrics 
+                WHERE execution_reason IN ('complete', 'interrupted')
+                ORDER BY start_time DESC
+                LIMIT ?
+            ''', (count,))
+        
+        history = cursor.fetchall()
+    
+    if not history:
+        print("No executions found.")
+        return
+    
+    print(f"\n=== System-Wide Performance Trends (Last {len(history)} executions) ===")
+    
+    if verbose:
+        # Updated header to include Commands
+        print("Date/Time           Script              TotalTime ActTime  Commands Cmds/s   Lines/s  FP%     FM%   C%   PV% JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed")
+        print("-" * 160)  # Adjusted length for new column
+        
+        for row in reversed(history):
+            date_str = row['start_time'][:16].replace('T', ' ')
+            script = row['script_name'][:18]
+            total_time = f"{row['total_execution_time']:.1f}s"
+            active_time = f"{row['active_execution_time']:.1f}s"
+            commands = f"{row['commands_executed']}"  # New column
+            cmds_per_sec = f"{row['commands_per_second']:.0f}"
+            lines_per_sec = f"{row['lines_per_second']:.0f}"
+            
+            fp_rate = f"{row['fast_path_hit_rate']:.0f}%"
+            fm_rate = f"{row['fast_math_hit_rate']:.0f}%"
+            cache_rate = f"{row['cache_hit_rate']:.0f}%"
+            parse_val = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
+            jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
+            skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
+            jit_size = f"{safe_get_column(row, 'jit_cache_size', 0)}"
+            jit_hit_rate = f"{safe_get_column(row, 'jit_cache_utilization', 0):.0f}%"
+            jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
+            failed = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
+            
+            print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {commands:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>5} {fm_rate:>5} {cache_rate:>4} {parse_val:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed:>6}")
+    
+    else:
+        # Compact format (unchanged)
+        print("Date/Time           Script              ExecTime  Cmds/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%")
+        print("-" * 108)
+        
+        for row in reversed(history):
+            date_str = row['start_time'][:16].replace('T', ' ')
+            script = row['script_name'][:18]
+            exec_time = f"{row['active_execution_time']:.1f}s"
+            cmds_per_sec = f"{row['commands_per_second']:.0f}"
+            fast_path = f"{row['fast_path_hit_rate']:.0f}%"
+            fast_math = f"{row['fast_math_hit_rate']:.0f}%"
+            cache = f"{row['cache_hit_rate']:.0f}%"
+            parse_val = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
+            jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
+            skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
+            
+            print(f"{date_str:19} {script:18} {exec_time:>8} {cmds_per_sec:>7} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9} {jit_rate:>5} {skip_rate:>6}")
+
+
+
+
     """Show system-wide performance trends."""
     db = PixilMetricsDB()
     
@@ -277,8 +363,8 @@ def show_system_trends(count, verbose=False):
     print(f"\n=== System-Wide Performance Trends (Last {len(history)} executions) ===")
     
     if verbose:
-        print("Date/Time           Script              ExecTime  Cmds/s  Lines/s  FP%   FM%   C%   PV%   JIT%  Skip%  JIT-Size JIT-Hit JIT-Comp Failed")
-        print("-" * 135)
+        print("Date/Time           Script              ExecTime  Cmds/s  Lines/s  FP%     FM%   C%   PV% JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed")
+        print("-" * 150)
         
         for row in reversed(history):
             date_str = row['start_time'][:16].replace('T', ' ')
@@ -421,7 +507,7 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
     with db.get_connection() as conn:
         base_query = '''
             SELECT script_name, start_time, total_execution_time, active_execution_time, 
-                   commands_per_second, lines_per_second,
+                   commands_executed, commands_per_second, lines_per_second,
                    fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
                    parse_value_hit_rate, jit_hit_rate, jit_skip_efficiency'''
         
@@ -449,11 +535,9 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
         return
     
     if script_filter:
-        # Single script - just limit by count
         runs_data = {script_filter: all_runs[:count]}
         title = f"Resource-Constrained Analysis for {script_filter}"
     else:
-        # Multiple scripts - group and limit per script
         scripts_data = {}
         for row in all_runs:
             script_name = row['script_name']
@@ -464,7 +548,6 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
         runs_data = scripts_data
         title = "Resource-Constrained Analysis (Active Time ≥ 99% of Total Time)"
     
-    # Calculate totals
     total_scripts = len(runs_data)
     total_runs = sum(len(runs) for runs in runs_data.values())
     
@@ -475,27 +558,35 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
     print()
     
     if verbose:
-        print("Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Size JIT-Hit JIT-Comp Failed")
-        print("-" * 135)
+        # Define the header once
+        header_line = "Date/Time           Script              TotalTime ActTime  Commands Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed"
+        separator_line = "-" * 160
         
-        for script_name in sorted(runs_data.keys()):
+        for script_index, script_name in enumerate(sorted(runs_data.keys())):
             runs = runs_data[script_name]
+            
+            # Print script header
+            if script_index > 0:
+                print()  # Add space between scripts
+            
+            print(f"=== {script_name} ({len(runs)} runs) ===")
+            print(header_line)
+            print(separator_line)
             
             for row in runs:
                 date_str = row['start_time'][:16].replace('T', ' ')
                 script = script_name[:18]
                 total_time = f"{row['total_execution_time']:.1f}s"
                 active_time = f"{row['active_execution_time']:.1f}s"
+                commands = f"{row['commands_executed']}"
                 cmds_per_sec = f"{row['commands_per_second']:.0f}"
                 lines_per_sec = f"{row['lines_per_second']:.0f}"
                 
-                # Optimization rates
                 fp_rate = f"{row['fast_path_hit_rate']:.0f}%"
                 fm_rate = f"{row['fast_math_hit_rate']:.0f}%"
                 cache_rate = f"{row['cache_hit_rate']:.0f}%"
                 pv_rate = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
                 
-                # JIT metrics with updated columns
                 jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
                 skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
                 jit_size = f"{safe_get_column(row, 'jit_cache_size', 0)}"
@@ -503,19 +594,23 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
                 jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
                 failed_lines = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
 
-                print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>7} {fm_rate:>7} {cache_rate:>4} {pv_rate:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
-            
-            # Add blank line between scripts for readability (except last)
-            if not script_filter and script_name != sorted(runs_data.keys())[-1]:
-                print()
+                print(f"{date_str:19} {script:18} {total_time:>9} {active_time:>8} {commands:>8} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>7} {fm_rate:>7} {cache_rate:>4} {pv_rate:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
     
     else:
-        # Compact format
-        print("Date/Time           Script              ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%")
-        print("-" * 103)
+        # Define the header once for compact format
+        header_line = "Date/Time           Script              ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%"
+        separator_line = "-" * 103
         
-        for script_name in sorted(runs_data.keys()):
+        for script_index, script_name in enumerate(sorted(runs_data.keys())):
             runs = runs_data[script_name]
+            
+            # Print script header
+            if script_index > 0:
+                print()  # Add space between scripts
+            
+            print(f"=== {script_name} ({len(runs)} runs) ===")
+            print(header_line)
+            print(separator_line)
             
             for row in runs:
                 date_str = row['start_time'][:16].replace('T', ' ')
@@ -531,12 +626,8 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
                 skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
 
                 print(f"{date_str:19} {script:18} {exec_time:>8} {cmds_per_sec:>7} {lines_per_sec:>8} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9} {jit_rate:>5} {skip_rate:>6}")
-            
-            # Add blank line between scripts for readability (except last)
-            if not script_filter and script_name != sorted(runs_data.keys())[-1]:
-                print()
-    
-    # Summary statistics
+
+    # Summary statistics (unchanged)
     if total_runs > 0:
         print(f"\n=== Summary ===")
         print(f"Total scripts with resource-unconstrained runs: {total_scripts}")
@@ -544,7 +635,6 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
         if not script_filter:
             print(f"Average runs per script: {total_runs/total_scripts:.1f}")
         
-        # Calculate efficiency percentage
         with db.get_connection() as conn:
             cursor = conn.execute('''
                 SELECT COUNT(*) as total_executions
@@ -556,7 +646,7 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
             if total_executions > 0:
                 efficiency_rate = (total_runs / total_executions) * 100
                 print(f"Resource efficiency: {efficiency_rate:.1f}% of all executions run without constraints")
-
+                
 def show_jit_summary():
     """Show JIT line caching performance summary."""
     db = PixilMetricsDB()

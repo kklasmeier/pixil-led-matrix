@@ -11,6 +11,7 @@ from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBU
 from .array_manager import validate_array_access
 from collections import OrderedDict
 from .jit_compiler import JITExpressionCache
+from .optimization_flags import ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT
 
 # Regex pattern for identifying math expressions
 MATH_EXPR_PATTERN = re.compile(r'[\+\-\*/\(\)]|v_\w+|\d+\.?\d*')
@@ -434,7 +435,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
 def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int, float, str]:
     """
     Evaluate a mathematical or string expression with variable substitution.
-    Uses optimized LRU caching for performance.
+    Uses configurable optimization flags to control caching behavior.
     """
     global _EXPR_CACHE, _EXPR_CACHE_HITS, _EXPR_CACHE_MISSES
     
@@ -442,18 +443,18 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         debug_print(f"Evaluating expression: {expr}", DEBUG_VERBOSE)
         debug_print(f"Variables state: {variables}", DEBUG_VERBOSE)
     
-    # Fast paths for common cases
+    # Fast paths for common cases (always enabled - these are basic optimizations)
     if not isinstance(expr, str):
         return expr
     if expr.startswith('v_') and expr in variables:
         return variables[expr]
 
-    # ===== PHASE 2 + 2.5 OPTIMIZATION: EXPANDED FAST PATHS =====
-    if isinstance(expr, str) and not ('&' in expr or '"' in expr or "'" in expr):
+    # ===== PHASE 2 OPTIMIZATION: FAST MATH PATHS (Controlled by flag) =====
+    if ENABLE_FAST_MATH and isinstance(expr, str) and not ('&' in expr or '"' in expr or "'" in expr):
         global _FAST_MATH_HITS, _FAST_MATH_TOTAL
         _FAST_MATH_TOTAL += 1
         
-        # NEW: Try simple numbers first (HUGE opportunity)
+        # Try simple numbers first (HUGE opportunity)
         fast_result = try_fast_number(expr)
         if fast_result is not None:
             _FAST_MATH_HITS += 1
@@ -461,7 +462,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
                 debug_print(f"Fast number hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
         
-        # NEW: Try simple array access (v_array[v_index])
+        # Try simple array access (v_array[v_index])
         if '[' in expr and ']' in expr and expr.count('[') == 1:
             fast_result = try_fast_array_access(expr, variables)
             if fast_result is not None:
@@ -470,138 +471,114 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
                     debug_print(f"Fast array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
                 return fast_result
         
-        # EXISTING: Try simple arithmetic
+        # Try simple arithmetic
         fast_result = try_fast_arithmetic(expr, variables)
         if fast_result is not None:
             _FAST_MATH_HITS += 1
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Fast arithmetic hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
-    # ===== END PHASE 2 + 2.5 OPTIMIZATION =====
+    # ===== END PHASE 2 OPTIMIZATION =====
 
-    # ===== PHASE 3: JIT COMPILATION =====
-    jit_result = try_jit_compilation(expr, variables)
-    if jit_result is not None:
-        return jit_result
-    # ===== END PHASE 3 =====
-    
     # Parse variables early so we can check for random in both original and parsed expressions
     parsed_expr = substitute_variables(expr, variables)
     if DEBUG_LEVEL >= DEBUG_VERBOSE:
         debug_print(f"After substitution: {parsed_expr}", DEBUG_VERBOSE)
 
-    # Cache key and tracking remain the same
+    # ===== EXPRESSION RESULT CACHING (Controlled by flag) =====
     cache_key = None
-    
-    try:
-        # Caching logic remains the same
-        if isinstance(expr, str) and "random" not in expr and "random" not in parsed_expr:
-            # Same caching logic as before...
-            # (Code omitted for brevity)
-            
-            # Try to use cache if we have a valid key
-            if cache_key is not None and cache_key in _EXPR_CACHE:
-                # Same cache hit logic as before...
-                return result
-            
-            # Cache miss logic remains the same
-            if cache_key is not None:
-                _EXPR_CACHE_MISSES += 1
-        
-        # Handle string concatenation
-        if '&' in expr:
-            result = evaluate_string_concatenation(expr, variables)
-            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Concatenation result: {result}", DEBUG_VERBOSE)
-            return result
-
-        # Process array accesses - THIS IS THE MODIFIED SECTION
-        if '[' in expr and ']' in expr:
-            # Find the innermost array access
-            array_match = ARRAY_INDEX_PATTERN.search(expr)
-            if array_match:
-                array_name = array_match.group(1)
-                index_expr = array_match.group(2)
-                full_match = array_match.group(0)
-                
-                # Get array
-                if array_name not in variables:
-                    raise ValueError(f"Array '{array_name}' not found")
-                array = variables[array_name]
-                
-                # Evaluate index expression
-                index = evaluate_math_expression(index_expr, variables)
-                
-                # Ensure index is an integer
-                if isinstance(index, float):
-                    index = int(index)
-                elif not isinstance(index, int):
-                    raise ValueError(f"Array index must be a number, got {type(index)}")
-                    
-                # Get array value
-                value = array[index]
+    if ENABLE_EXPRESSION_CACHE and "random" not in expr and "random" not in parsed_expr:
+        cache_key = create_cache_key(expr, variables)
+        if cache_key is not None:
+            cached_result = get_cached_result(cache_key)
+            if cached_result is not None:
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Array access {array_name}[{index}] = {value}", DEBUG_VERBOSE)
-                
-                # Replace array access with its value
-                expr_modified = expr.replace(full_match, str(value))
-                
-                # Check if there are still array accesses to process
-                if '[' in expr_modified and ']' in expr_modified:
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Processing nested array access: {expr_modified}", DEBUG_VERBOSE)
-                    # Process the modified expression with the inner array access resolved
-                    return evaluate_math_expression(expr_modified, variables)
-                else:
-                    # No more array accesses, treat as normal expression
-                    expr = expr_modified
-                    
-                    # If the result is a direct string (from string array), return it
-                    if isinstance(value, str) and expr == str(value):
-                        return value
+                    debug_print(f"Expression cache hit: {expr} = {cached_result}", DEBUG_VERBOSE)
+                return cached_result
+    # ===== END EXPRESSION RESULT CACHING =====
+
+    # ===== PHASE 3: JIT COMPILATION (Controlled by flag) =====
+    if ENABLE_JIT:
+        jit_result = try_jit_compilation(expr, variables)
+        if jit_result is not None:
+            # Cache the JIT result for future instant retrieval (if caching is enabled)
+            if ENABLE_EXPRESSION_CACHE and cache_key is not None:
+                cache_result(cache_key, jit_result)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"JIT result cached: {expr} = {jit_result}", DEBUG_VERBOSE)
+            return jit_result
+    # ===== END PHASE 3 =====
+    
+    # Handle string concatenation (always enabled - basic functionality)
+    if '&' in expr:
+        result = evaluate_string_concatenation(expr, variables)
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Concatenation result: {result}", DEBUG_VERBOSE)
+        return result
+
+    # Process array accesses (always enabled - basic functionality)
+    if '[' in expr and ']' in expr:
+        # Find the innermost array access
+        array_match = ARRAY_INDEX_PATTERN.search(expr)
+        if array_match:
+            array_name = array_match.group(1)
+            index_expr = array_match.group(2)
+            full_match = array_match.group(0)
             
-        # The rest of the function remains the same
+            # Get array
+            if array_name not in variables:
+                raise ValueError(f"Array '{array_name}' not found")
+            array = variables[array_name]
+            
+            # Evaluate index expression (recursive call will use flags)
+            index = evaluate_math_expression(index_expr, variables)
+            
+            # Ensure index is an integer
+            if isinstance(index, float):
+                index = int(index)
+            elif not isinstance(index, int):
+                raise ValueError(f"Array index must be a number, got {type(index)}")
+                
+            # Get array value
+            value = array[index]
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Array access {array_name}[{index}] = {value}", DEBUG_VERBOSE)
+            
+            # Replace array access with its value
+            expr_modified = expr.replace(full_match, str(value))
+            
+            # Check if there are still array accesses to process
+            if '[' in expr_modified and ']' in expr_modified:
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Processing nested array access: {expr_modified}", DEBUG_VERBOSE)
+                # Process the modified expression with the inner array access resolved
+                return evaluate_math_expression(expr_modified, variables)
+            else:
+                # No more array accesses, treat as normal expression
+                expr = expr_modified
+                
+                # If the result is a direct string (from string array), return it
+                if isinstance(value, str) and expr == str(value):
+                    return value
         
-        # Handle string literals
-        if (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
-            return expr.strip('"\'')
+    # Handle string literals (always enabled - basic functionality)
+    if (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+        return expr.strip('"\'')
 
-        # ===== EXPRESSION RESULT CACHING =====
-        # Try to get cached result first (but not for random expressions)
-        if "random" not in expr and "random" not in parsed_expr:
-            cache_key = create_cache_key(expr, variables)
-            if cache_key is not None:
-                cached_result = get_cached_result(cache_key)
-                if cached_result is not None:
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Expression cache hit: {expr}", DEBUG_VERBOSE)
-                    return cached_result
-
-        # Try evaluating as math expression (existing code)
+    # ===== FINAL FALLBACK: EVAL() (Always enabled - core functionality) =====
+    try:
+        # Try evaluating as math expression
         eval_env = {**MATH_FUNCTIONS, '__builtins__': None}
         result = eval(parsed_expr, {"__builtins__": None}, eval_env)
 
-        # Cache the result if we have a cache key (but not for random expressions)
-        if "random" not in expr and "random" not in parsed_expr:
-            cache_key = create_cache_key(expr, variables)
-            if cache_key is not None:
-                cache_result(cache_key, result)
-                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Expression cached: {expr} = {result}", DEBUG_VERBOSE)
-        # ===== END EXPRESSION RESULT CACHING =====
+        # Cache the eval() result for future instant retrieval (if caching is enabled)
+        if ENABLE_EXPRESSION_CACHE and cache_key is not None:
+            cache_result(cache_key, result)
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Eval result cached: {expr} = {result}", DEBUG_VERBOSE)
 
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Evaluation result: {result}", DEBUG_VERBOSE)
-        
-        # Cache the result if appropriate (but never cache random expressions)
-        if cache_key is not None and "random" not in expr and "random" not in parsed_expr:
-            # Implement LRU eviction with OrderedDict
-            if len(_EXPR_CACHE) >= _EXPR_CACHE_SIZE:
-                # Remove oldest item (first in the OrderedDict)
-                _EXPR_CACHE.popitem(last=False)
-            
-            # Add new item to end (most recently used)
-            _EXPR_CACHE[cache_key] = result
         
         return result
         
@@ -611,8 +588,8 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         if expr.startswith('v_') and expr in variables:
             return variables[expr]
         raise ValueError(f"Error evaluating expression '{expr}': {str(e)}")
-
-
+    # ===== END EVAL() FALLBACK =====
+    
 def random_float(min_val, max_val, precision):
     """
     Generate a random float between min_val and max_val with specified precision.
@@ -1094,3 +1071,128 @@ __all__ = [
     'evaluate_math_expression',
     'evaluate_condition'
 ]
+
+"""
+def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int, float, str]:
+    
+    #Evaluate a mathematical or string expression with variable substitution.
+    #Uses optimized LRU caching for performance.
+
+    global _EXPR_CACHE, _EXPR_CACHE_HITS, _EXPR_CACHE_MISSES
+    
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Evaluating expression: {expr}", DEBUG_VERBOSE)
+        debug_print(f"Variables state: {variables}", DEBUG_VERBOSE)
+    
+    # Fast paths for common cases
+    if not isinstance(expr, str):
+        return expr
+    if expr.startswith('v_') and expr in variables:
+        return variables[expr]
+    
+    # Cache key and tracking remain the same
+    cache_key = None
+    
+    try:
+        # Caching logic remains the same
+        if isinstance(expr, str) and "random" not in expr:
+            # Same caching logic as before...
+            # (Code omitted for brevity)
+            
+            # Try to use cache if we have a valid key
+            if cache_key is not None and cache_key in _EXPR_CACHE:
+                # Same cache hit logic as before...
+                return result
+            
+            # Cache miss logic remains the same
+            if cache_key is not None:
+                _EXPR_CACHE_MISSES += 1
+        
+        # Handle string concatenation
+        if '&' in expr:
+            result = evaluate_string_concatenation(expr, variables)
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Concatenation result: {result}", DEBUG_VERBOSE)
+            return result
+
+        # Process array accesses - THIS IS THE MODIFIED SECTION
+        if '[' in expr and ']' in expr:
+            # Find the innermost array access
+            array_match = ARRAY_INDEX_PATTERN.search(expr)
+            if array_match:
+                array_name = array_match.group(1)
+                index_expr = array_match.group(2)
+                full_match = array_match.group(0)
+                
+                # Get array
+                if array_name not in variables:
+                    raise ValueError(f"Array '{array_name}' not found")
+                array = variables[array_name]
+                
+                # Evaluate index expression
+                index = evaluate_math_expression(index_expr, variables)
+                
+                # Ensure index is an integer
+                if isinstance(index, float):
+                    index = int(index)
+                elif not isinstance(index, int):
+                    raise ValueError(f"Array index must be a number, got {type(index)}")
+                    
+                # Get array value
+                value = array[index]
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Array access {array_name}[{index}] = {value}", DEBUG_VERBOSE)
+                
+                # Replace array access with its value
+                expr_modified = expr.replace(full_match, str(value))
+                
+                # Check if there are still array accesses to process
+                if '[' in expr_modified and ']' in expr_modified:
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Processing nested array access: {expr_modified}", DEBUG_VERBOSE)
+                    # Process the modified expression with the inner array access resolved
+                    return evaluate_math_expression(expr_modified, variables)
+                else:
+                    # No more array accesses, treat as normal expression
+                    expr = expr_modified
+                    
+                    # If the result is a direct string (from string array), return it
+                    if isinstance(value, str) and expr == str(value):
+                        return value
+            
+        # The rest of the function remains the same
+        
+        # Handle string literals
+        if (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+            return expr.strip('"\'')
+            
+        # Parse remaining variables
+        parsed_expr = substitute_variables(expr, variables)
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"After substitution: {parsed_expr}", DEBUG_VERBOSE)
+        
+        # Try evaluating as math expression
+        eval_env = {**MATH_FUNCTIONS, '__builtins__': None}
+        result = eval(parsed_expr, {"__builtins__": None}, eval_env)
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Evaluation result: {result}", DEBUG_VERBOSE)
+        
+        # Cache the result if appropriate
+        if cache_key is not None:
+            # Implement LRU eviction with OrderedDict
+            if len(_EXPR_CACHE) >= _EXPR_CACHE_SIZE:
+                # Remove oldest item (first in the OrderedDict)
+                _EXPR_CACHE.popitem(last=False)
+            
+            # Add new item to end (most recently used)
+            _EXPR_CACHE[cache_key] = result
+        
+        return result
+        
+    except Exception as e:
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Error evaluating expression: {str(e)}", DEBUG_VERBOSE)
+        if expr.startswith('v_') and expr in variables:
+            return variables[expr]
+        raise ValueError(f"Error evaluating expression '{expr}': {str(e)}")
+"""

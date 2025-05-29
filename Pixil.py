@@ -24,6 +24,10 @@ from pixil_utils import (ScriptManager, parse_args,
                         stop_terminal, check_spacebar)
 from pixil_utils.array_manager import PixilArray
 from collections import OrderedDict  # Make sure this is imported
+from pixil_utils.optimization_flags import (
+    ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE,
+    ENABLE_PHASE1_FAST_PATH, show_status, set_profile
+)
 
 def is_headless():
     """Detect if running in a headless/non-interactive environment"""
@@ -66,17 +70,7 @@ _VAR_CACHE_HITS = 0
 _VAR_CACHE_MISSES = 0
 _FAST_PATH_HITS = 0
 _FAST_PATH_TOTAL = 0
-_FAST_PATH_ENABLED = True 
 _PARSE_VALUE_ATTEMPTS = 0
-_PARSE_VALUE_ULTRA_FAST_HITS = 0  
-_PARSE_VALUE_FAST_HITS = 0
-
-# Detailed breakdown counters
-_DIRECT_INTEGER_HITS = 0
-_DIRECT_COLOR_HITS = 0
-_DIRECT_STRING_HITS = 0
-_SIMPLE_ARRAY_HITS = 0
-_SIMPLE_ARITHMETIC_HITS = 0
 
 set_debug_level(DEBUG_OFF)  # Default debug level
 
@@ -115,36 +109,40 @@ def initialize_metrics():
 
 def report_parse_value_stats():
     """Report parse value optimization statistics."""
-    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
-    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
-    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+    global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
+    global _FAST_PATH_HITS, _FAST_PATH_TOTAL
     
     print("Parse Value Optimization Statistics:")
     
     if _PARSE_VALUE_ATTEMPTS > 0:
-        ultra_fast_rate = (_PARSE_VALUE_ULTRA_FAST_HITS / _PARSE_VALUE_ATTEMPTS) * 100
-        fast_rate = (_PARSE_VALUE_FAST_HITS / _PARSE_VALUE_ATTEMPTS) * 100
-        total_fast_hits = _PARSE_VALUE_ULTRA_FAST_HITS + _PARSE_VALUE_FAST_HITS
-        total_rate = (total_fast_hits / _PARSE_VALUE_ATTEMPTS) * 100
-        
         print(f"  Total parameter parsing attempts: {_PARSE_VALUE_ATTEMPTS:,}")
-        print(f"  Ultra-fast path hits: {_PARSE_VALUE_ULTRA_FAST_HITS:,} ({ultra_fast_rate:.1f}%)")
-        print(f"  Fast path hits: {_PARSE_VALUE_FAST_HITS:,} ({fast_rate:.1f}%)")
-        print(f"  Total optimized: {total_fast_hits:,} ({total_rate:.1f}%)")
         
-        if total_fast_hits > 0:
-            print(f"  Breakdown:")
-            print(f"    Direct integers: {_DIRECT_INTEGER_HITS:,}")
-            print(f"    Direct colors: {_DIRECT_COLOR_HITS:,}")
-            print(f"    Direct strings: {_DIRECT_STRING_HITS:,}")
-            print(f"    Simple arrays: {_SIMPLE_ARRAY_HITS:,}")
-            print(f"    Simple arithmetic: {_SIMPLE_ARITHMETIC_HITS:,}")
+        # Phase 1 Fast Path stats
+        if _FAST_PATH_TOTAL > 0:
+            phase1_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL) * 100
+            print(f"  Phase 1 Fast Path attempts: {_FAST_PATH_TOTAL:,}")
+            print(f"  Phase 1 Fast Path hits: {_FAST_PATH_HITS:,} ({phase1_rate:.1f}%)")
             
             # Estimate time savings
-            ultra_fast_savings = (_PARSE_VALUE_ULTRA_FAST_HITS * 25) / 1000000  # 25 microseconds per hit
-            fast_savings = (_PARSE_VALUE_FAST_HITS * 15) / 1000000  # 15 microseconds per hit
-            total_savings = ultra_fast_savings + fast_savings
-            print(f"  Estimated time saved: {total_savings:.3f} seconds")
+            phase1_savings = (_FAST_PATH_HITS * 30) / 1000000  # 30 microseconds per hit
+            print(f"  Phase 1 estimated time saved: {phase1_savings:.3f} seconds")
+        
+        # Variable cache stats
+        cache_attempts = _VAR_CACHE_HITS + _VAR_CACHE_MISSES
+        if cache_attempts > 0:
+            cache_rate = (_VAR_CACHE_HITS / cache_attempts) * 100
+            print(f"  Variable cache attempts: {cache_attempts:,}")
+            print(f"  Variable cache hits: {_VAR_CACHE_HITS:,} ({cache_rate:.1f}%)")
+            
+            # Estimate time savings
+            cache_savings = (_VAR_CACHE_HITS * 20) / 1000000  # 20 microseconds per hit
+            print(f"  Variable cache estimated time saved: {cache_savings:.3f} seconds")
+            
+        # Total optimized percentage
+        optimized_count = _FAST_PATH_HITS + _VAR_CACHE_HITS
+        if optimized_count > 0:
+            total_rate = (optimized_count / _PARSE_VALUE_ATTEMPTS) * 100
+            print(f"  Total optimized parameters: {optimized_count:,} ({total_rate:.1f}%)")
     else:
         print("  No parameter parsing attempts detected")
 
@@ -232,10 +230,8 @@ def save_performance_metrics(script_name, start_time, reason):
                                           _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES,
                                           _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE)
     
-    # Import our parse value stats
-    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
-    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
-    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+    # UPDATED: Import our simplified parse value stats (removed the detailed breakdown variables)
+    global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     
     # Calculate metrics
     total_time = (end_time - start_time).total_seconds()
@@ -246,7 +242,7 @@ def save_performance_metrics(script_name, start_time, reason):
     commands_per_second = _metrics['commands_processed'] / active_time
     lines_per_second = _metrics['script_lines_processed'] / active_time
     
-    # Fast path metrics
+    # Fast path metrics (Phase 1 - this is working well)
     fast_path_hit_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL * 100) if _FAST_PATH_TOTAL > 0 else 0
     fast_path_time_saved = (_FAST_PATH_HITS * 30) / 1000000
     
@@ -254,18 +250,22 @@ def save_performance_metrics(script_name, start_time, reason):
     fast_math_hit_rate = (_FAST_MATH_HITS / _FAST_MATH_TOTAL * 100) if _FAST_MATH_TOTAL > 0 else 0
     fast_math_time_saved = (_FAST_MATH_HITS * 35) / 1000000
     
-    # Cache metrics
+    # Cache metrics (expression cache)
     cache_attempts = _CACHE_HITS + _CACHE_MISSES
     cache_hit_rate = (_CACHE_HITS / cache_attempts * 100) if cache_attempts > 0 else 0
     cache_time_saved = (_CACHE_HITS * 30) / 1000000
     cache_size = len(_EXPRESSION_RESULT_CACHE)
     
-    # Parse value metrics
-    parse_value_total_hits = _PARSE_VALUE_ULTRA_FAST_HITS + _PARSE_VALUE_FAST_HITS
-    parse_value_hit_rate = (parse_value_total_hits / _PARSE_VALUE_ATTEMPTS * 100) if _PARSE_VALUE_ATTEMPTS > 0 else 0
-    parse_value_time_saved = (_PARSE_VALUE_ULTRA_FAST_HITS * 25 + _PARSE_VALUE_FAST_HITS * 15) / 1000000
+    # UPDATED: Parse value metrics (simplified - now tracks variable cache instead of ultra-fast/fast paths)
+    var_cache_attempts = _VAR_CACHE_HITS + _VAR_CACHE_MISSES
+    var_cache_hit_rate = (_VAR_CACHE_HITS / var_cache_attempts * 100) if var_cache_attempts > 0 else 0
+    var_cache_time_saved = (_VAR_CACHE_HITS * 20) / 1000000
     
-    # NEW: JIT line caching metrics
+    # Overall parse value optimization rate
+    total_parse_optimized = _FAST_PATH_HITS + _VAR_CACHE_HITS  # Phase1 + Variable cache
+    parse_value_hit_rate = (total_parse_optimized / _PARSE_VALUE_ATTEMPTS * 100) if _PARSE_VALUE_ATTEMPTS > 0 else 0
+    
+    # JIT line caching metrics
     jit_hit_rate = (_JIT_HITS / _JIT_ATTEMPTS * 100) if _JIT_ATTEMPTS > 0 else 0
     jit_cache_stats = _JIT_CACHE.get_stats()
     jit_time_saved = jit_cache_stats.total_time_saved
@@ -278,7 +278,7 @@ def save_performance_metrics(script_name, start_time, reason):
     # JIT cache utilization
     jit_cache_utilization = (_JIT_CACHE.cache_size / _JIT_CACHE.max_size * 100) if _JIT_CACHE.max_size > 0 else 0
     
-    # Prepare metrics data
+    # UPDATED: Prepare metrics data (replaced detailed breakdown with simplified tracking)
     metrics_data = {
         'commands_executed': _metrics['commands_processed'],
         'script_lines_processed': _metrics['script_lines_processed'],
@@ -286,30 +286,48 @@ def save_performance_metrics(script_name, start_time, reason):
         'active_execution_time': active_time,
         'commands_per_second': commands_per_second,
         'lines_per_second': lines_per_second,
+        
+        # Phase 1 Fast Path (kept - this works well)
         'fast_path_attempts': _FAST_PATH_TOTAL,
         'fast_path_hits': _FAST_PATH_HITS,
         'fast_path_hit_rate': fast_path_hit_rate,
         'fast_path_time_saved': fast_path_time_saved,
+        
+        # Fast math metrics (kept)
         'fast_math_attempts': _FAST_MATH_TOTAL,
         'fast_math_hits': _FAST_MATH_HITS,
         'fast_math_hit_rate': fast_math_hit_rate,
         'fast_math_time_saved': fast_math_time_saved,
+        
+        # Expression cache metrics (kept)
         'cache_attempts': cache_attempts,
         'cache_hits': _CACHE_HITS,
         'cache_hit_rate': cache_hit_rate,
         'cache_size': cache_size,
         'cache_time_saved': cache_time_saved,
+        
+        # UPDATED: Simplified parse value metrics
         'parse_value_attempts': _PARSE_VALUE_ATTEMPTS,
-        'parse_value_ultra_fast_hits': _PARSE_VALUE_ULTRA_FAST_HITS,
-        'parse_value_fast_hits': _PARSE_VALUE_FAST_HITS,
+        'parse_value_optimized_total': total_parse_optimized,
         'parse_value_hit_rate': parse_value_hit_rate,
-        'parse_value_time_saved': parse_value_time_saved,
-        'direct_integer_hits': _DIRECT_INTEGER_HITS,
-        'direct_color_hits': _DIRECT_COLOR_HITS,
-        'direct_string_hits': _DIRECT_STRING_HITS,
-        'simple_array_hits': _SIMPLE_ARRAY_HITS,
-        'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS,
-        # NEW: JIT line caching metrics
+        
+        # Variable cache specific metrics (new)
+        'var_cache_attempts': var_cache_attempts,
+        'var_cache_hits': _VAR_CACHE_HITS,
+        'var_cache_hit_rate': var_cache_hit_rate,
+        'var_cache_time_saved': var_cache_time_saved,
+        
+        # REMOVED: These detailed breakdown metrics (were adding overhead with low benefit)
+        # 'parse_value_ultra_fast_hits': _PARSE_VALUE_ULTRA_FAST_HITS,
+        # 'parse_value_fast_hits': _PARSE_VALUE_FAST_HITS,
+        # 'parse_value_time_saved': parse_value_time_saved,
+        # 'direct_integer_hits': _DIRECT_INTEGER_HITS,
+        # 'direct_color_hits': _DIRECT_COLOR_HITS,
+        # 'direct_string_hits': _DIRECT_STRING_HITS,
+        # 'simple_array_hits': _SIMPLE_ARRAY_HITS,
+        # 'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS,
+        
+        # JIT line caching metrics (kept)
         'jit_attempts': _JIT_ATTEMPTS,
         'jit_hits': _JIT_HITS,
         'jit_failures': _JIT_COMPILATION_FAILURES,
@@ -332,7 +350,6 @@ def save_performance_metrics(script_name, start_time, reason):
     except Exception as e:
         print(f"Database save failed: {e}")
         raise
-
 def on_queue_pause():
     """Called when the command queue becomes full."""
     global _metrics
@@ -377,7 +394,7 @@ def process_script(filename, execute_func=None):
     reset_expression_cache_stats()  # Reset cache
     reset_parse_value_stats()
     reset_jit_stats()
-
+    show_status()
     # Get queue instance
     queue = QueueManager.get_instance()
 
@@ -462,14 +479,12 @@ def process_script(filename, execute_func=None):
         if len(value_stripped) < 50:  # Don't log super long expressions
             print(f"MISSED PATTERN: '{value_stripped}' for {command_name} pos {param_position}")
             
-
     def try_ultra_fast_path(value, command_name, param_position):
         """
         Handle the simplest parameter cases with minimal overhead.
         Returns formatted parameter string or None if not handled.
         """
-        global _PARSE_VALUE_ULTRA_FAST_HITS, _DIRECT_INTEGER_HITS
-        global _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS
+        # REMOVED: Detailed counter tracking for better performance
         
         if not isinstance(value, str):
             return None
@@ -478,8 +493,6 @@ def process_script(filename, execute_func=None):
         
         # Ultra-Fast Path #1: Direct integers (e.g., "100", "32", "5")
         if value_stripped.isdigit():
-            _PARSE_VALUE_ULTRA_FAST_HITS += 1
-            _DIRECT_INTEGER_HITS += 1
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Ultra-fast integer: {value_stripped}", DEBUG_VERBOSE)
             return value_stripped
@@ -497,8 +510,6 @@ def process_script(filename, execute_func=None):
         }
         
         if value_stripped in KNOWN_COLORS:
-            _PARSE_VALUE_ULTRA_FAST_HITS += 1
-            _DIRECT_COLOR_HITS += 1
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Ultra-fast color: {value_stripped}", DEBUG_VERBOSE)
             return value_stripped
@@ -506,8 +517,6 @@ def process_script(filename, execute_func=None):
         # Ultra-Fast Path #3: Direct quoted strings (e.g., "Hello", "piboto-regular")
         if ((value_stripped.startswith('"') and value_stripped.endswith('"')) or
             (value_stripped.startswith("'") and value_stripped.endswith("'"))):
-            _PARSE_VALUE_ULTRA_FAST_HITS += 1
-            _DIRECT_STRING_HITS += 1
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Ultra-fast quoted string: {value_stripped}", DEBUG_VERBOSE)
             return value_stripped
@@ -520,7 +529,7 @@ def process_script(filename, execute_func=None):
         Handle moderately complex parameter cases efficiently.
         Returns formatted parameter string or None if not handled.
         """
-        global _PARSE_VALUE_FAST_HITS, _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+        # REMOVED: Detailed counter tracking for better performance
         
         if not isinstance(value, str):
             return None
@@ -548,16 +557,12 @@ def process_script(filename, execute_func=None):
                             # PixilArray - use bounds checking
                             if 0 <= index < len(array.data):
                                 result = array[index]
-                                _PARSE_VALUE_FAST_HITS += 1
-                                _SIMPLE_ARRAY_HITS += 1
                                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                                     debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
                                 return format_parameter(result, command_name, param_position, variables)
                         elif isinstance(array, (list, tuple)) and 0 <= index < len(array):
                             # Regular Python array
                             result = array[index]
-                            _PARSE_VALUE_FAST_HITS += 1
-                            _SIMPLE_ARRAY_HITS += 1
                             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                                 debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
                             return format_parameter(result, command_name, param_position, variables)
@@ -565,120 +570,97 @@ def process_script(filename, execute_func=None):
                 except (ValueError, TypeError, IndexError, AttributeError):
                     pass  # Fall back to normal processing
         
-            # Fast Path #2: Simple arithmetic (v_variable + number, v_variable * number, etc.)
-            # Variable + number pattern
-            var_plus_num_pattern = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
-            plus_match = var_plus_num_pattern.match(value_stripped)
-            if plus_match:
-                var_name, number_str = plus_match.groups()
-                if var_name in variables:
-                    try:
-                        var_value = variables[var_name]
-                        
-                        # Determine if we should keep as integer or use float
-                        if '.' in number_str:
-                            # Number has decimal, use float arithmetic
+        # Fast Path #2: Simple arithmetic (v_variable + number, v_variable * number, etc.)
+        # Variable + number pattern
+        var_plus_num_pattern = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
+        plus_match = var_plus_num_pattern.match(value_stripped)
+        if plus_match:
+            var_name, number_str = plus_match.groups()
+            if var_name in variables:
+                try:
+                    var_value = variables[var_name]
+                    
+                    # Determine if we should keep as integer or use float
+                    if '.' in number_str:
+                        # Number has decimal, use float arithmetic
+                        var_value = float(var_value)
+                        number_value = float(number_str)
+                        result = var_value + number_value
+                    else:
+                        # Both should be integers if possible
+                        if isinstance(var_value, (int, float)) and var_value == int(var_value):
+                            var_value = int(var_value)
+                            number_value = int(number_str)
+                            result = var_value + number_value  # Integer result
+                        else:
                             var_value = float(var_value)
                             number_value = float(number_str)
                             result = var_value + number_value
+                            # Convert back to int if it's a whole number
+                            if result == int(result):
+                                result = int(result)
+                    
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast arithmetic: {var_name} + {number_str} = {result}", DEBUG_VERBOSE)
+                    return format_parameter(result, command_name, param_position, variables)
+                except (ValueError, TypeError):
+                    pass
+        
+        # Variable * number pattern  
+        var_mul_num_pattern = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
+        mul_match = var_mul_num_pattern.match(value_stripped)
+        if mul_match:
+            var_name, number_str = mul_match.groups()
+            if var_name in variables:
+                try:
+                    var_value = variables[var_name]
+                    
+                    # Determine if we should keep as integer or use float
+                    if '.' in number_str:
+                        # Number has decimal, use float arithmetic
+                        var_value = float(var_value)
+                        number_value = float(number_str)
+                        result = var_value * number_value
+                    else:
+                        # Both should be integers if possible
+                        if isinstance(var_value, (int, float)) and var_value == int(var_value):
+                            var_value = int(var_value)
+                            number_value = int(number_str)
+                            result = var_value * number_value  # Integer result
                         else:
-                            # Both should be integers if possible
-                            if isinstance(var_value, (int, float)) and var_value == int(var_value):
-                                var_value = int(var_value)
-                                number_value = int(number_str)
-                                result = var_value + number_value  # Integer result
-                            else:
-                                var_value = float(var_value)
-                                number_value = float(number_str)
-                                result = var_value + number_value
-                                # Convert back to int if it's a whole number
-                                if result == int(result):
-                                    result = int(result)
-                        
-                        _PARSE_VALUE_FAST_HITS += 1
-                        _SIMPLE_ARITHMETIC_HITS += 1
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"Fast arithmetic: {var_name} + {number_str} = {result}", DEBUG_VERBOSE)
-                        return format_parameter(result, command_name, param_position, variables)
-                    except (ValueError, TypeError):
-                        pass
-            
-            # Variable * number pattern  
-            var_mul_num_pattern = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
-            mul_match = var_mul_num_pattern.match(value_stripped)
-            if mul_match:
-                var_name, number_str = mul_match.groups()
-                if var_name in variables:
-                    try:
-                        var_value = variables[var_name]
-                        
-                        # Determine if we should keep as integer or use float
-                        if '.' in number_str:
-                            # Number has decimal, use float arithmetic
                             var_value = float(var_value)
                             number_value = float(number_str)
                             result = var_value * number_value
-                        else:
-                            # Both should be integers if possible
-                            if isinstance(var_value, (int, float)) and var_value == int(var_value):
-                                var_value = int(var_value)
-                                number_value = int(number_str)
-                                result = var_value * number_value  # Integer result
-                            else:
-                                var_value = float(var_value)
-                                number_value = float(number_str)
-                                result = var_value * number_value
-                                # Convert back to int if it's a whole number
-                                if result == int(result):
-                                    result = int(result)
-                        
-                        _PARSE_VALUE_FAST_HITS += 1
-                        _SIMPLE_ARITHMETIC_HITS += 1
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"Fast arithmetic: {var_name} * {number_str} = {result}", DEBUG_VERBOSE)
-                        return format_parameter(result, command_name, param_position, variables)
-                    except (ValueError, TypeError):
-                        pass
-            
-            # Not handled by fast path
-            return None
+                            # Convert back to int if it's a whole number
+                            if result == int(result):
+                                result = int(result)
+                    
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast arithmetic: {var_name} * {number_str} = {result}", DEBUG_VERBOSE)
+                    return format_parameter(result, command_name, param_position, variables)
+                except (ValueError, TypeError):
+                    pass
         
+        # Not handled by fast path
+        return None
+
+
+
     def parse_value(value, command_name, param_position):
         """
         Parse and format a parameter value, handling variables and math expressions.
-        Uses optimized LRU caching for variable lookups.
-        
-        Args:
-            value: The parameter value to parse
-            command_name: Name of the command being processed
-            param_position: Position of parameter in command
-            
-        Returns:
-            Formatted value ready for command string
+        Uses configurable optimization flags to control caching behavior.
         """
-        global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES, _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ATTEMPTS
+        global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES, _PARSE_VALUE_ATTEMPTS
         _PARSE_VALUE_ATTEMPTS += 1
 
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Parsing value: {value} ({type(value)})", DEBUG_VERBOSE)
             debug_print(f"Command: {command_name}, Position: {param_position}", DEBUG_VERBOSE)
 
-        # NEW: Try ultra-fast path first
-        ultra_fast_result = try_ultra_fast_path(value, command_name, param_position)
-        if ultra_fast_result is not None:
-            return ultra_fast_result
-
-        # Try fast path next
-        
-        fast_result = try_fast_path(value, command_name, param_position)
-        if fast_result is not None:
-            return fast_result
-    
         # Handle direct value types (non-strings)
         if not isinstance(value, str):
             return format_parameter(value, command_name, param_position, variables)
-
-        #debug_missed_patterns(value, command_name, param_position)
 
         value = value.strip()
         
@@ -688,55 +670,56 @@ def process_script(filename, execute_func=None):
                 debug_print(f"Quoted string detected: {value}", DEBUG_VERBOSE)
             return format_parameter(value, command_name, param_position, variables)
 
-        # ===== PHASE 1 OPTIMIZATION: FAST PATH FOR SIMPLE VARIABLES =====
-        if (isinstance(value, str) and 
-            value.startswith('v_') and 
-            len(value) > 2 and
+        # OPTIMIZATION 1: Ultra-fast path (controlled by flag)
+        if ENABLE_ULTRA_FAST_PATH:
+            ultra_fast_result = try_ultra_fast_path(value, command_name, param_position)
+            if ultra_fast_result is not None:
+                return ultra_fast_result
+
+        # OPTIMIZATION 2: Fast path for arrays and arithmetic (controlled by flag)
+        if ENABLE_FAST_PATH:
+            fast_result = try_fast_path(value, command_name, param_position)
+            if fast_result is not None:
+                return fast_result
+
+        # OPTIMIZATION 3: Phase 1 Fast Path for simple variables (controlled by flag)
+        if (ENABLE_PHASE1_FAST_PATH and isinstance(value, str) and 
+            value.startswith('v_') and len(value) > 2 and
             not any(c in value for c in '+-*/()[]&')):
             
-            # Track that we attempted the fast path
-            global _FAST_PATH_HITS, _FAST_PATH_TOTAL, _FAST_PATH_ENABLED
+            global _FAST_PATH_HITS, _FAST_PATH_TOTAL
+            _FAST_PATH_TOTAL += 1
             
-            if _FAST_PATH_ENABLED:
-                _FAST_PATH_TOTAL += 1
+            if value in variables:
+                _FAST_PATH_HITS += 1
+                var_value = variables[value]
                 
-                # This is a simple variable reference like "v_x" or "v_color"
-                if value in variables:
-                    _FAST_PATH_HITS += 1
-                    var_value = variables[value]
-                    
-                    # Special handling for font_name parameter in draw_text
-                    if command_name == 'draw_text' and param_position == 3:
-                        # If the variable contains a string value, treat it as a font name
-                        if isinstance(var_value, str):
-                            # If it's already quoted, return as-is
-                            if var_value.startswith('"') and var_value.endswith('"'):
-                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                                    debug_print(f"Fast path font (pre-quoted): {value} -> {var_value}", DEBUG_VERBOSE)
-                                return var_value
-                            # Otherwise, quote it as a font name
-                            else:
-                                result = f'"{var_value}"'
-                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                                    debug_print(f"Fast path font (quoted): {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
-                                return result
-                    
-                    # Use format_parameter for proper type conversion and formatting
-                    result = format_parameter(var_value, command_name, param_position, variables)
-                    
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Fast path variable lookup: {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
-                    
-                    return result
-                else:
-                    # Variable not found - let the normal path handle the error
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Variable {value} not found, falling back to normal path", DEBUG_VERBOSE)
-        # ===== END PHASE 1 OPTIMIZATION =====    
+                # Special handling for font_name parameter
+                if command_name == 'draw_text' and param_position == 3:
+                    if isinstance(var_value, str):
+                        if var_value.startswith('"') and var_value.endswith('"'):
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                debug_print(f"Phase1 fast path font (pre-quoted): {value} -> {var_value}", DEBUG_VERBOSE)
+                            return var_value
+                        else:
+                            result = f'"{var_value}"'
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                debug_print(f"Phase1 fast path font (quoted): {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
+                            return result
+                
+                result = format_parameter(var_value, command_name, param_position, variables)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Phase1 fast path variable lookup: {value} -> {var_value} -> {result}", DEBUG_VERBOSE)
+                return result
+            else:
+                # Variable not found - continue to normal path for error handling
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Phase1: Variable {value} not found, falling back to normal path", DEBUG_VERBOSE)
 
-        # Fast path for variable references (very common in scripts)
-        if value.startswith('v_') and not has_math_expression(value) and "random" not in value:
-            # Create cache key: (variable_name, command, position)
+        # OPTIMIZATION 4: Variable format cache (controlled by flag)
+        if (ENABLE_PARSE_VALUE_CACHE and value.startswith('v_') and 
+            not has_math_expression(value) and "random" not in value):
+            
             cache_key = (value, command_name, param_position)
             
             # Check cache first
@@ -755,9 +738,8 @@ def process_script(filename, execute_func=None):
             if value in variables:
                 var_value = variables[value]
                 
-                # Special handling for font_name parameter in draw_text
+                # Special handling for font_name parameter
                 if command_name == 'draw_text' and param_position == 3:
-                    # If the variable contains a string value, treat it as a font name
                     if isinstance(var_value, str):
                         # If it's already quoted, return as-is
                         if var_value.startswith('"') and var_value.endswith('"'):
@@ -775,34 +757,41 @@ def process_script(filename, execute_func=None):
                     # Normal parameter formatting
                     result = format_parameter(var_value, command_name, param_position, variables)
                 
-                # Cache the result with LRU eviction (but not random expressions)
-                if "random" not in value:
-                    if len(_VAR_FORMAT_CACHE) >= _VAR_CACHE_SIZE:
-                        # Remove oldest item (first in OrderedDict)
-                        _VAR_FORMAT_CACHE.popitem(last=False)
-                    _VAR_FORMAT_CACHE[cache_key] = result
+                # Cache the result with LRU eviction
+                if len(_VAR_FORMAT_CACHE) >= _VAR_CACHE_SIZE:
+                    # Remove oldest item (first in OrderedDict)
+                    _VAR_FORMAT_CACHE.popitem(last=False)
+                _VAR_FORMAT_CACHE[cache_key] = result
+                
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Variable cache miss: {value} -> {result}", DEBUG_VERBOSE)
                 return result
+            else:
+                # Variable not found - continue to normal path for error handling
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Cache: Variable {value} not found, falling back to normal path", DEBUG_VERBOSE)
+
+        # NORMAL PATH: Handle remaining cases without optimizations
         
         # Special case for draw_text's font_name (position 3)
-        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-            debug_print(f"Checking font_name condition: command_name={command_name}, position={param_position}", DEBUG_VERBOSE)
         if command_name == 'draw_text' and param_position == 3:
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Inside font_name block for: {value}", DEBUG_VERBOSE)
+                debug_print(f"Normal path font_name handling for: {value}", DEBUG_VERBOSE)
+                
             starts_with_v = value.startswith('v_')
-            has_math_chars = any(c in value for c in '+-*/()')  # Direct check for debugging
+            has_math_chars = any(c in value for c in '+-*/()')
+            
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Raw has_math_chars: {has_math_chars}", DEBUG_VERBOSE)
+                debug_print(f"Font analysis: starts_with_v={starts_with_v}, has_math_chars={has_math_chars}", DEBUG_VERBOSE)
+                
             # Only treat as expression if it's a variable or has clear math context
             if starts_with_v or (has_math_chars and any(c.isdigit() or c in 'v_' for c in value)):
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Font_name is variable or expression: {value}", DEBUG_VERBOSE)
+                    debug_print(f"Font_name is variable/expression: {value}", DEBUG_VERBOSE)
                 return format_parameter(value, command_name, param_position, variables)
             else:
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Treating as font name literal: {value}", DEBUG_VERBOSE)
+                    debug_print(f"Font_name is literal, quoting: {value}", DEBUG_VERBOSE)
                 return f'"{value}"'
         
         # Handle simple variable reference or math expression
@@ -816,7 +805,8 @@ def process_script(filename, execute_func=None):
             val = value
             
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
-            debug_print(f"Passing to format_parameter: {val}", DEBUG_VERBOSE)
+            debug_print(f"Normal path: passing to format_parameter: {val}", DEBUG_VERBOSE)
+            
         return format_parameter(val, command_name, param_position, variables)
 
     # Add new array helper functions here
@@ -1561,18 +1551,14 @@ def signal_handler(signum, frame):
 
 def reset_parse_value_stats():
     """Reset parse value optimization statistics for new script."""
-    global _PARSE_VALUE_ATTEMPTS, _PARSE_VALUE_ULTRA_FAST_HITS, _PARSE_VALUE_FAST_HITS
-    global _DIRECT_INTEGER_HITS, _DIRECT_COLOR_HITS, _DIRECT_STRING_HITS 
-    global _SIMPLE_ARRAY_HITS, _SIMPLE_ARITHMETIC_HITS
+    global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
+    global _FAST_PATH_HITS, _FAST_PATH_TOTAL
     
     _PARSE_VALUE_ATTEMPTS = 0
-    _PARSE_VALUE_ULTRA_FAST_HITS = 0
-    _PARSE_VALUE_FAST_HITS = 0
-    _DIRECT_INTEGER_HITS = 0
-    _DIRECT_COLOR_HITS = 0
-    _DIRECT_STRING_HITS = 0
-    _SIMPLE_ARRAY_HITS = 0
-    _SIMPLE_ARITHMETIC_HITS = 0
+    _VAR_CACHE_HITS = 0
+    _VAR_CACHE_MISSES = 0
+    _FAST_PATH_HITS = 0
+    _FAST_PATH_TOTAL = 0
 
 # Main Execution
 if __name__ == '__main__':
