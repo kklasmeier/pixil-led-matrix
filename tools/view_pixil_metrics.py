@@ -31,15 +31,17 @@ Examples:
   %(prog)s recent --count 20
   %(prog)s trends --script "Blob.pix" --verbose
   %(prog)s summary
-  %(prog)s resource-constrained --count 5 --verbose
+  %(prog)s runs --count 40 --verbose
+  %(prog)s runs --script "Boids_Flocking_Simulation.pix" --days 7 --verbose
 
 Column Definitions:
   Performance Metrics:
+    Commands     - Total commands executed in the script run
+    TotalTime    - Total execution time (including queue waits)
+    ActTime      - Active execution time (excluding queue waits)
+    QWaitTime    - Queue wait time (TotalTime - ActTime)
     Cmds/s       - Commands processed per second (based on active time)
     Lines/s      - Script lines processed per second
-    ExecTime     - Active execution time (excluding queue waits)
-    TotalTime    - Total execution time (including queue waits)
-    ActTime      - Same as ExecTime (active execution time)
   
   Optimization Hit Rates:
     FP%%          - Fast Path hit rate (simple variable lookups)
@@ -80,15 +82,18 @@ Column Definitions:
     summary_parser.add_argument('--script', type=str,
                                 help='Show summary for specific script (default: system-wide)')
     
-    # Resource-constrained command
-    resource_parser = subparsers.add_parser('resource-constrained', 
-                                           help='Show efficient runs (active time ≥ 99%% of total time)')
-    resource_parser.add_argument('--count', type=int, default=20,
-                                help='Number of runs per script (default: 20)')
-    resource_parser.add_argument('--script', type=str,
-                                help='Show resource-constrained runs for specific script only')
-    resource_parser.add_argument('--verbose', '-v', action='store_true',
-                                help='Show detailed metrics')
+    # New runs command (replaces resource-constrained)
+    runs_parser = subparsers.add_parser('runs', help='Show script execution runs with optional filters')
+    runs_parser.add_argument('--count', type=int, default=20,
+                            help='Number of runs per script (default: 20)')
+    runs_parser.add_argument('--script', type=str,
+                            help='Show runs for specific script only')
+    runs_parser.add_argument('--verbose', '-v', action='store_true',
+                            help='Show detailed metrics')
+    runs_parser.add_argument('--resource-constrained', action='store_true',
+                            help='Show only resource-efficient runs (active time ≥ 99%% of total time)')
+    runs_parser.add_argument('--days', type=int, default=5,
+                            help='Number of days to look back (default: 5)')
     
     # JIT summary command
     jit_parser = subparsers.add_parser('jit-summary', help='Show JIT compilation performance')
@@ -97,6 +102,194 @@ Column Definitions:
     list_parser = subparsers.add_parser('list', help='List all scripts in database')
     
     return parser
+
+def show_script_runs(count, script_filter=None, verbose=False, resource_constrained=False, days=5):
+    """Show script execution runs with optional filters."""
+    db = PixilMetricsDB()
+    
+    with db.get_connection() as conn:
+        base_query = '''
+            SELECT script_name, start_time, total_execution_time, active_execution_time, 
+                   commands_executed, commands_per_second, lines_per_second,
+                   fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
+                   parse_value_hit_rate, jit_hit_rate, jit_skip_efficiency'''
+        
+        if verbose:
+            base_query += ''', jit_cache_size, jit_cache_utilization, jit_compilation_time, failed_lines_cached'''
+        
+        where_conditions = [
+            "execution_reason IN ('complete', 'interrupted')",
+            f"start_time >= datetime('now', '-{days} days')"
+        ]
+        
+        if resource_constrained:
+            where_conditions.append("active_execution_time >= (total_execution_time * 0.99)")
+        
+        if script_filter:
+            where_conditions.append(f"script_name = '{script_filter}'")
+        
+        where_clause = " FROM script_metrics WHERE " + " AND ".join(where_conditions)
+        order_clause = " ORDER BY script_name ASC, start_time DESC"  # DESC to get most recent first
+        
+        cursor = conn.execute(base_query + where_clause + order_clause)
+        all_runs = cursor.fetchall()
+    
+    if not all_runs:
+        filter_desc = []
+        if script_filter:
+            filter_desc.append(f"script '{script_filter}'")
+        if resource_constrained:
+            filter_desc.append("resource-constrained")
+        filter_desc.append(f"last {days} days")
+        
+        filter_text = " and ".join(filter_desc)
+        print(f"No script runs found for {filter_text}.")
+        return
+    
+    # Group runs by script
+    if script_filter:
+        runs_data = {script_filter: all_runs[:count]}
+        title_parts = [f"Script Runs for {script_filter}"]
+    else:
+        scripts_data = {}
+        for row in all_runs:
+            script_name = row['script_name']
+            if script_name not in scripts_data:
+                scripts_data[script_name] = []
+            if len(scripts_data[script_name]) < count:
+                scripts_data[script_name].append(row)
+        runs_data = scripts_data
+        title_parts = ["Script Execution Runs"]
+    
+    # Build title with filters
+    if resource_constrained:
+        title_parts.append("(Resource-Constrained)")
+    if days != 5:  # Only show if not default
+        title_parts.append(f"(Last {days} days)")
+    else:
+        title_parts.append("(Last 5 days)")
+    
+    title = " ".join(title_parts)
+    
+    total_scripts = len(runs_data)
+    total_runs = sum(len(runs) for runs in runs_data.values())
+    
+    print(f"\n=== {title} ===")
+    print(f"Found {total_runs} runs across {total_scripts} scripts")
+    if not script_filter:
+        print(f"Showing up to {count} most recent runs per script")
+    print()
+    
+    if verbose:
+        # Define the header once
+        header_line = "Date/Time           Script              Commands  TotalTime ActTime  QWaitTime Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed"
+        separator_line = "-" * 170
+        
+        for script_index, script_name in enumerate(sorted(runs_data.keys())):
+            runs = runs_data[script_name]
+            
+            # Print script header
+            if script_index > 0:
+                print()  # Add space between scripts
+            
+            print(f"=== {script_name} ({len(runs)} runs) ===")
+            print(header_line)
+            print(separator_line)
+            
+            for row in runs:
+                date_str = row['start_time'][:16].replace('T', ' ')
+                script = script_name[:18]
+                commands = f"{row['commands_executed']}"
+                total_time = f"{row['total_execution_time']:.1f}s"
+                active_time = f"{row['active_execution_time']:.1f}s"
+                queue_wait_time = f"{row['total_execution_time'] - row['active_execution_time']:.1f}s"
+                cmds_per_sec = f"{row['commands_per_second']:.0f}"
+                lines_per_sec = f"{row['lines_per_second']:.0f}"
+                
+                fp_rate = f"{row['fast_path_hit_rate']:.0f}%"
+                fm_rate = f"{row['fast_math_hit_rate']:.0f}%"
+                cache_rate = f"{row['cache_hit_rate']:.0f}%"
+                pv_rate = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
+                
+                jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
+                skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
+                jit_size = f"{safe_get_column(row, 'jit_cache_size', 0)}"
+                jit_hit_rate = f"{safe_get_column(row, 'jit_cache_utilization', 0):.0f}%"
+                jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
+                failed_lines = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
+
+                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>7} {fm_rate:>7} {cache_rate:>4} {pv_rate:>5} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
+    
+    else:
+        # Define the header once for compact format
+        header_line = "Date/Time           Script              Commands  TotalTime ActTime  QWaitTime Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%"
+        separator_line = "-" * 123
+        
+        for script_index, script_name in enumerate(sorted(runs_data.keys())):
+            runs = runs_data[script_name]
+            
+            # Print script header
+            if script_index > 0:
+                print()  # Add space between scripts
+            
+            print(f"=== {script_name} ({len(runs)} runs) ===")
+            print(header_line)
+            print(separator_line)
+            
+            for row in runs:
+                date_str = row['start_time'][:16].replace('T', ' ')
+                script = script_name[:18]
+                commands = f"{row['commands_executed']}"
+                total_time = f"{row['total_execution_time']:.1f}s"
+                active_time = f"{row['active_execution_time']:.1f}s"
+                queue_wait_time = f"{row['total_execution_time'] - row['active_execution_time']:.1f}s"
+                cmds_per_sec = f"{row['commands_per_second']:.0f}"
+                lines_per_sec = f"{row['lines_per_second']:.0f}"
+                fast_path = f"{row['fast_path_hit_rate']:.0f}%"
+                fast_math = f"{row['fast_math_hit_rate']:.0f}%"
+                cache = f"{row['cache_hit_rate']:.0f}%"
+                parse_val = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
+                jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
+                skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
+
+                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {cmds_per_sec:>7} {lines_per_sec:>8} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9} {jit_rate:>5} {skip_rate:>6}")
+
+    # Summary statistics
+    if total_runs > 0:
+        print(f"\n=== Summary ===")
+        print(f"Total scripts with runs: {total_scripts}")
+        print(f"Total executions: {total_runs}")
+        if not script_filter:
+            print(f"Average runs per script: {total_runs/total_scripts:.1f}")
+        
+        # Show resource efficiency if not already filtered
+        if not resource_constrained:
+            with db.get_connection() as conn:
+                # Get total runs in the time window (not filtered by count limit)
+                cursor = conn.execute(f'''
+                    SELECT COUNT(*) as total_runs_in_window
+                    FROM script_metrics 
+                    WHERE execution_reason IN ('complete', 'interrupted')
+                    AND start_time >= datetime('now', '-{days} days')
+                    {f"AND script_name = '{script_filter}'" if script_filter else ""}
+                ''')
+                total_runs_in_window = cursor.fetchone()['total_runs_in_window']
+                
+                # Get resource-constrained runs in the same time window
+                cursor = conn.execute(f'''
+                    SELECT COUNT(*) as resource_constrained_runs
+                    FROM script_metrics 
+                    WHERE execution_reason IN ('complete', 'interrupted')
+                    AND start_time >= datetime('now', '-{days} days')
+                    AND active_execution_time >= (total_execution_time * 0.99)
+                    {f"AND script_name = '{script_filter}'" if script_filter else ""}
+                ''')
+                resource_runs = cursor.fetchone()['resource_constrained_runs']
+                
+                if total_runs_in_window > 0:
+                    efficiency_rate = (resource_runs / total_runs_in_window) * 100
+                    print(f"Resource-constrained runs: {resource_runs} of {total_runs_in_window} total ({efficiency_rate:.1f}%)")
+
 
 def main():
     parser = create_parser()
@@ -120,8 +313,8 @@ def main():
                 show_script_summary(args.script)
             else:
                 show_system_summary()
-        elif args.command == 'resource-constrained':
-            show_resource_constrained_runs(args.count, args.script, args.verbose)
+        elif args.command == 'runs':
+            show_script_runs(args.count, args.script, args.verbose, args.resource_constrained, args.days)
         elif args.command == 'jit-summary':
             show_jit_summary()
         elif args.command == 'list':
@@ -646,7 +839,7 @@ def show_resource_constrained_runs(count, script_filter=None, verbose=False):
             if total_executions > 0:
                 efficiency_rate = (total_runs / total_executions) * 100
                 print(f"Resource efficiency: {efficiency_rate:.1f}% of all executions run without constraints")
-                
+
 def show_jit_summary():
     """Show JIT line caching performance summary."""
     db = PixilMetricsDB()
