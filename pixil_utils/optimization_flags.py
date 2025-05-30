@@ -133,12 +133,17 @@ ENABLE_JIT = False
 # 2. Enable ENABLE_FAST_MATH → See FM% change to ~59%
 # 3. Enable ENABLE_EXPRESSION_CACHE → See C% change to ~27%
 # etc.
+
+FP% = ENABLE_PHASE1_FAST_PATH (simple v_variable lookups)
+Fast% = ENABLE_FAST_PATH (complex regex patterns)
+UF% = ENABLE_ULTRA_FAST_PATH (direct integers/colors/strings)
+
 """
 
 
 # ===== PARSE VALUE OPTIMIZATIONS =====
 ENABLE_ULTRA_FAST_PATH = True        # True - Direct integer/color/string detection
-ENABLE_FAST_PATH = True              # True - Simple array access and arithmetic  
+ENABLE_FAST_PATH = True              # True - regex Simple array access and arithmetic  
 ENABLE_PARSE_VALUE_CACHE = True      # True - LRU cache for parse_value results
 ENABLE_PHASE1_FAST_PATH = True       # True - Simple variable lookups (v_variable only)
 
