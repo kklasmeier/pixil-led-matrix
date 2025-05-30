@@ -71,6 +71,10 @@ _VAR_CACHE_MISSES = 0
 _FAST_PATH_HITS = 0
 _FAST_PATH_TOTAL = 0
 _PARSE_VALUE_ATTEMPTS = 0
+_ULTRA_FAST_HITS = 0
+_ULTRA_FAST_TOTAL = 0
+_FAST_PATH_PARSE_HITS = 0
+_FAST_PATH_PARSE_TOTAL = 0
 
 set_debug_level(DEBUG_OFF)  # Default debug level
 
@@ -108,43 +112,99 @@ def initialize_metrics():
     _metrics['total_pause_time'] = 0
 
 def report_parse_value_stats():
-    """Report parse value optimization statistics."""
+    """Report detailed parse value optimization statistics."""
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     global _FAST_PATH_HITS, _FAST_PATH_TOTAL
+    global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
     
     print("Parse Value Optimization Statistics:")
     
     if _PARSE_VALUE_ATTEMPTS > 0:
         print(f"  Total parameter parsing attempts: {_PARSE_VALUE_ATTEMPTS:,}")
+        print()
         
-        # Phase 1 Fast Path stats
+        # Ultra Fast Path stats (Optimization 1)
+        if _ULTRA_FAST_TOTAL > 0:
+            ultra_fast_rate = (_ULTRA_FAST_HITS / _ULTRA_FAST_TOTAL) * 100
+            ultra_fast_savings = (_ULTRA_FAST_HITS * 15) / 1000000  # 15 microseconds per hit
+            print(f"  Ultra Fast Path (PV-UF%):")
+            print(f"    Attempts: {_ULTRA_FAST_TOTAL:,}")
+            print(f"    Hits: {_ULTRA_FAST_HITS:,} ({ultra_fast_rate:.1f}%)")
+            print(f"    Time saved: {ultra_fast_savings:.3f} seconds")
+        else:
+            print(f"  Ultra Fast Path (PV-UF%): No attempts")
+        
+        # Fast Path Parse stats (Optimization 2) 
+        if _FAST_PATH_PARSE_TOTAL > 0:
+            fast_parse_rate = (_FAST_PATH_PARSE_HITS / _FAST_PATH_PARSE_TOTAL) * 100
+            fast_parse_savings = (_FAST_PATH_PARSE_HITS * 25) / 1000000  # 25 microseconds per hit
+            print(f"  Fast Path Parse (PV-F%):")
+            print(f"    Attempts: {_FAST_PATH_PARSE_TOTAL:,}")
+            print(f"    Hits: {_FAST_PATH_PARSE_HITS:,} ({fast_parse_rate:.1f}%)")
+            print(f"    Time saved: {fast_parse_savings:.3f} seconds")
+        else:
+            print(f"  Fast Path Parse (PV-F%): No attempts")
+        
+        # Phase 1 Fast Path stats (Optimization 3) - Keep existing
         if _FAST_PATH_TOTAL > 0:
             phase1_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL) * 100
-            print(f"  Phase 1 Fast Path attempts: {_FAST_PATH_TOTAL:,}")
-            print(f"  Phase 1 Fast Path hits: {_FAST_PATH_HITS:,} ({phase1_rate:.1f}%)")
-            
-            # Estimate time savings
             phase1_savings = (_FAST_PATH_HITS * 30) / 1000000  # 30 microseconds per hit
-            print(f"  Phase 1 estimated time saved: {phase1_savings:.3f} seconds")
+            print(f"  Phase 1 Fast Path (FP%):")
+            print(f"    Attempts: {_FAST_PATH_TOTAL:,}")
+            print(f"    Hits: {_FAST_PATH_HITS:,} ({phase1_rate:.1f}%)")
+            print(f"    Time saved: {phase1_savings:.3f} seconds")
+        else:
+            print(f"  Phase 1 Fast Path (FP%): No attempts")
         
-        # Variable cache stats
+        # Variable cache stats (Optimization 4)
         cache_attempts = _VAR_CACHE_HITS + _VAR_CACHE_MISSES
         if cache_attempts > 0:
             cache_rate = (_VAR_CACHE_HITS / cache_attempts) * 100
-            print(f"  Variable cache attempts: {cache_attempts:,}")
-            print(f"  Variable cache hits: {_VAR_CACHE_HITS:,} ({cache_rate:.1f}%)")
-            
-            # Estimate time savings
             cache_savings = (_VAR_CACHE_HITS * 20) / 1000000  # 20 microseconds per hit
-            print(f"  Variable cache estimated time saved: {cache_savings:.3f} seconds")
+            print(f"  Variable Cache (PV-Cache%):")
+            print(f"    Attempts: {cache_attempts:,}")
+            print(f"    Hits: {_VAR_CACHE_HITS:,} ({cache_rate:.1f}%)")
+            print(f"    Time saved: {cache_savings:.3f} seconds")
+        else:
+            print(f"  Variable Cache (PV-Cache%): No attempts")
+        
+        print()
+        
+        # Summary statistics
+        total_optimization_hits = _ULTRA_FAST_HITS + _FAST_PATH_PARSE_HITS + _FAST_PATH_HITS + _VAR_CACHE_HITS
+        if total_optimization_hits > 0:
+            total_rate = (total_optimization_hits / _PARSE_VALUE_ATTEMPTS) * 100
+            print(f"  Total Optimized Parameters: {total_optimization_hits:,} of {_PARSE_VALUE_ATTEMPTS:,} ({total_rate:.1f}%)")
             
-        # Total optimized percentage
-        optimized_count = _FAST_PATH_HITS + _VAR_CACHE_HITS
-        if optimized_count > 0:
-            total_rate = (optimized_count / _PARSE_VALUE_ATTEMPTS) * 100
-            print(f"  Total optimized parameters: {optimized_count:,} ({total_rate:.1f}%)")
+            # Individual contribution breakdown
+            uf_contribution = (_ULTRA_FAST_HITS / total_optimization_hits) * 100 if total_optimization_hits > 0 else 0
+            fp_contribution = (_FAST_PATH_PARSE_HITS / total_optimization_hits) * 100 if total_optimization_hits > 0 else 0
+            p1_contribution = (_FAST_PATH_HITS / total_optimization_hits) * 100 if total_optimization_hits > 0 else 0
+            cache_contribution = (_VAR_CACHE_HITS / total_optimization_hits) * 100 if total_optimization_hits > 0 else 0
+            
+            print(f"  Optimization Breakdown:")
+            print(f"    Ultra Fast: {uf_contribution:.1f}% | Fast Path: {fp_contribution:.1f}% | Phase 1: {p1_contribution:.1f}% | Cache: {cache_contribution:.1f}%")
     else:
         print("  No parameter parsing attempts detected")
+
+def report_detailed_summary():
+    """Print a one-line summary with the new detailed format."""
+    global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
+    global _FAST_PATH_HITS, _FAST_PATH_TOTAL, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
+    
+    # Calculate individual rates
+    uf_rate = (_ULTRA_FAST_HITS / _ULTRA_FAST_TOTAL * 100) if _ULTRA_FAST_TOTAL > 0 else 0
+    fp_rate = (_FAST_PATH_PARSE_HITS / _FAST_PATH_PARSE_TOTAL * 100) if _FAST_PATH_PARSE_TOTAL > 0 else 0
+    p1_rate = (_FAST_PATH_HITS / _FAST_PATH_TOTAL * 100) if _FAST_PATH_TOTAL > 0 else 0
+    
+    cache_attempts = _VAR_CACHE_HITS + _VAR_CACHE_MISSES
+    cache_rate = (_VAR_CACHE_HITS / cache_attempts * 100) if cache_attempts > 0 else 0
+    
+    print()
+    print("=== DETAILED OPTIMIZATION SUMMARY ===")
+    print(f"PV-UF%: {uf_rate:.0f}% | PV-F%: {fp_rate:.0f}% | FP%: {p1_rate:.0f}% | PV-Cache%: {cache_rate:.0f}%")
+    print("=====================================")
+
 
 def report_metrics(reason="complete", script_name=None, start_time=None):
     """Calculate and display metrics."""
@@ -206,6 +266,7 @@ def report_metrics(reason="complete", script_name=None, start_time=None):
     report_expression_cache_stats()
     print("--")
     report_parse_value_stats()
+    report_detailed_summary()
     print("--")
     report_jit_stats()
     print("--------------------------------------------")
@@ -230,8 +291,9 @@ def save_performance_metrics(script_name, start_time, reason):
                                           _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES,
                                           _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE)
     
-    # UPDATED: Import our simplified parse value stats (removed the detailed breakdown variables)
+    # Import our detailed parse value stats - ADD NEW IMPORTS
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
+    global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
     
     # Calculate metrics
     total_time = (end_time - start_time).total_seconds()
@@ -256,12 +318,21 @@ def save_performance_metrics(script_name, start_time, reason):
     cache_time_saved = (_CACHE_HITS * 30) / 1000000
     cache_size = len(_EXPRESSION_RESULT_CACHE)
     
-    # UPDATED: Parse value metrics (simplified - now tracks variable cache instead of ultra-fast/fast paths)
+    # NEW: Detailed parse value metrics
+    # Ultra Fast Path metrics
+    ultra_fast_hit_rate = (_ULTRA_FAST_HITS / _ULTRA_FAST_TOTAL * 100) if _ULTRA_FAST_TOTAL > 0 else 0
+    ultra_fast_time_saved = (_ULTRA_FAST_HITS * 15) / 1000000
+    
+    # Fast Path Parse metrics  
+    fast_path_parse_hit_rate = (_FAST_PATH_PARSE_HITS / _FAST_PATH_PARSE_TOTAL * 100) if _FAST_PATH_PARSE_TOTAL > 0 else 0
+    fast_path_parse_time_saved = (_FAST_PATH_PARSE_HITS * 25) / 1000000
+    
+    # Variable cache metrics
     var_cache_attempts = _VAR_CACHE_HITS + _VAR_CACHE_MISSES
     var_cache_hit_rate = (_VAR_CACHE_HITS / var_cache_attempts * 100) if var_cache_attempts > 0 else 0
     var_cache_time_saved = (_VAR_CACHE_HITS * 20) / 1000000
     
-    # Overall parse value optimization rate
+    # Overall parse value optimization rate (keep existing calculation for backward compatibility)
     total_parse_optimized = _FAST_PATH_HITS + _VAR_CACHE_HITS  # Phase1 + Variable cache
     parse_value_hit_rate = (total_parse_optimized / _PARSE_VALUE_ATTEMPTS * 100) if _PARSE_VALUE_ATTEMPTS > 0 else 0
     
@@ -278,7 +349,7 @@ def save_performance_metrics(script_name, start_time, reason):
     # JIT cache utilization
     jit_cache_utilization = (_JIT_CACHE.cache_size / _JIT_CACHE.max_size * 100) if _JIT_CACHE.max_size > 0 else 0
     
-    # UPDATED: Prepare metrics data (replaced detailed breakdown with simplified tracking)
+    # Prepare metrics data - ADD NEW FIELDS
     metrics_data = {
         'commands_executed': _metrics['commands_processed'],
         'script_lines_processed': _metrics['script_lines_processed'],
@@ -306,26 +377,27 @@ def save_performance_metrics(script_name, start_time, reason):
         'cache_size': cache_size,
         'cache_time_saved': cache_time_saved,
         
-        # UPDATED: Simplified parse value metrics
+        # Original parse value metrics (kept for backward compatibility)
         'parse_value_attempts': _PARSE_VALUE_ATTEMPTS,
         'parse_value_optimized_total': total_parse_optimized,
         'parse_value_hit_rate': parse_value_hit_rate,
         
-        # Variable cache specific metrics (new)
+        # Variable cache specific metrics (kept)
         'var_cache_attempts': var_cache_attempts,
         'var_cache_hits': _VAR_CACHE_HITS,
         'var_cache_hit_rate': var_cache_hit_rate,
         'var_cache_time_saved': var_cache_time_saved,
         
-        # REMOVED: These detailed breakdown metrics (were adding overhead with low benefit)
-        # 'parse_value_ultra_fast_hits': _PARSE_VALUE_ULTRA_FAST_HITS,
-        # 'parse_value_fast_hits': _PARSE_VALUE_FAST_HITS,
-        # 'parse_value_time_saved': parse_value_time_saved,
-        # 'direct_integer_hits': _DIRECT_INTEGER_HITS,
-        # 'direct_color_hits': _DIRECT_COLOR_HITS,
-        # 'direct_string_hits': _DIRECT_STRING_HITS,
-        # 'simple_array_hits': _SIMPLE_ARRAY_HITS,
-        # 'simple_arithmetic_hits': _SIMPLE_ARITHMETIC_HITS,
+        # NEW: Detailed optimization metrics
+        'ultra_fast_attempts': _ULTRA_FAST_TOTAL,
+        'ultra_fast_hits': _ULTRA_FAST_HITS,
+        'ultra_fast_hit_rate': ultra_fast_hit_rate,
+        'ultra_fast_time_saved': ultra_fast_time_saved,
+        
+        'fast_path_parse_attempts': _FAST_PATH_PARSE_TOTAL,
+        'fast_path_parse_hits': _FAST_PATH_PARSE_HITS,
+        'fast_path_parse_hit_rate': fast_path_parse_hit_rate,
+        'fast_path_parse_time_saved': fast_path_parse_time_saved,
         
         # JIT line caching metrics (kept)
         'jit_attempts': _JIT_ATTEMPTS,
@@ -350,6 +422,7 @@ def save_performance_metrics(script_name, start_time, reason):
     except Exception as e:
         print(f"Database save failed: {e}")
         raise
+    
 def on_queue_pause():
     """Called when the command queue becomes full."""
     global _metrics
@@ -652,6 +725,7 @@ def process_script(filename, execute_func=None):
         Uses configurable optimization flags to control caching behavior.
         """
         global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES, _PARSE_VALUE_ATTEMPTS
+        global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
         _PARSE_VALUE_ATTEMPTS += 1
 
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -672,14 +746,18 @@ def process_script(filename, execute_func=None):
 
         # OPTIMIZATION 1: Ultra-fast path (controlled by flag)
         if ENABLE_ULTRA_FAST_PATH:
+            _ULTRA_FAST_TOTAL += 1
             ultra_fast_result = try_ultra_fast_path(value, command_name, param_position)
             if ultra_fast_result is not None:
+                _ULTRA_FAST_HITS += 1
                 return ultra_fast_result
 
         # OPTIMIZATION 2: Fast path for arrays and arithmetic (controlled by flag)
         if ENABLE_FAST_PATH:
+            _FAST_PATH_PARSE_TOTAL += 1
             fast_result = try_fast_path(value, command_name, param_position)
             if fast_result is not None:
+                _FAST_PATH_PARSE_HITS += 1
                 return fast_result
 
         # OPTIMIZATION 3: Phase 1 Fast Path for simple variables (controlled by flag)
@@ -1553,12 +1631,18 @@ def reset_parse_value_stats():
     """Reset parse value optimization statistics for new script."""
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     global _FAST_PATH_HITS, _FAST_PATH_TOTAL
+    global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL
+    global _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
     
     _PARSE_VALUE_ATTEMPTS = 0
     _VAR_CACHE_HITS = 0
     _VAR_CACHE_MISSES = 0
     _FAST_PATH_HITS = 0
     _FAST_PATH_TOTAL = 0
+    _ULTRA_FAST_HITS = 0
+    _ULTRA_FAST_TOTAL = 0
+    _FAST_PATH_PARSE_HITS = 0
+    _FAST_PATH_PARSE_TOTAL = 0
 
 # Main Execution
 if __name__ == '__main__':

@@ -93,10 +93,13 @@ class PixilMetricsDB(BaseDatabase):
                     parse_value_hit_rate, parse_value_time_saved,
                     direct_integer_hits, direct_color_hits, direct_string_hits,
                     simple_array_hits, simple_arithmetic_hits,
+                    var_cache_attempts, var_cache_hits, var_cache_hit_rate, var_cache_time_saved,
+                    ultra_fast_attempts, ultra_fast_hits, ultra_fast_hit_rate, ultra_fast_time_saved,
+                    fast_path_parse_attempts, fast_path_parse_hits, fast_path_parse_hit_rate, fast_path_parse_time_saved,
                     jit_attempts, jit_hits, jit_failures, jit_hit_rate, jit_time_saved,
                     jit_line_cache_skips, failed_lines_cached, jit_skip_efficiency, jit_skip_time_saved,
                     jit_cache_size, jit_cache_utilization, jit_compilation_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 script_name, start_time, end_time, reason,                                    # 4 values
                 metrics_data.get('commands_executed', 0),                                      # 1
@@ -128,6 +131,22 @@ class PixilMetricsDB(BaseDatabase):
                 metrics_data.get('direct_string_hits', 0),                                   # 1
                 metrics_data.get('simple_array_hits', 0),                                    # 1
                 metrics_data.get('simple_arithmetic_hits', 0),                               # 1 = 33 total
+                # NEW: Variable cache metrics
+                metrics_data.get('var_cache_attempts', 0),                                   # 1
+                metrics_data.get('var_cache_hits', 0),                                       # 1
+                metrics_data.get('var_cache_hit_rate', 0.0),                                 # 1
+                metrics_data.get('var_cache_time_saved', 0.0),                               # 1
+                # NEW: Ultra Fast Path metrics
+                metrics_data.get('ultra_fast_attempts', 0),                                  # 1
+                metrics_data.get('ultra_fast_hits', 0),                                      # 1
+                metrics_data.get('ultra_fast_hit_rate', 0.0),                                # 1
+                metrics_data.get('ultra_fast_time_saved', 0.0),                              # 1
+                # NEW: Fast Path Parse metrics
+                metrics_data.get('fast_path_parse_attempts', 0),                             # 1
+                metrics_data.get('fast_path_parse_hits', 0),                                 # 1
+                metrics_data.get('fast_path_parse_hit_rate', 0.0),                           # 1
+                metrics_data.get('fast_path_parse_time_saved', 0.0),                         # 1 = 45 total
+                # JIT metrics (existing)
                 metrics_data.get('jit_attempts', 0),                                         # 1
                 metrics_data.get('jit_hits', 0),                                             # 1
                 metrics_data.get('jit_failures', 0),                                         # 1
@@ -139,7 +158,7 @@ class PixilMetricsDB(BaseDatabase):
                 metrics_data.get('jit_skip_time_saved', 0.0),                                # 1
                 metrics_data.get('jit_cache_size', 0),                                       # 1
                 metrics_data.get('jit_cache_utilization', 0.0),                              # 1
-                metrics_data.get('jit_compilation_time', 0.0)                                # 1 = 45 total
+                metrics_data.get('jit_compilation_time', 0.0)                                # 1 = 57 total
             ))
             conn.commit()
         
