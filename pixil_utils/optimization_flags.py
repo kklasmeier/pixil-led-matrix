@@ -139,7 +139,7 @@ ENABLE_JIT = False
 # ===== PARSE VALUE OPTIMIZATIONS =====
 ENABLE_ULTRA_FAST_PATH = True        # True - Direct integer/color/string detection
 ENABLE_FAST_PATH = True              # True - Simple array access and arithmetic  
-ENABLE_PARSE_VALUE_CACHE = True      # * - LRU cache for parse_value results
+ENABLE_PARSE_VALUE_CACHE = True      # True - LRU cache for parse_value results
 ENABLE_PHASE1_FAST_PATH = True       # True - Simple variable lookups (v_variable only)
 
 # ===== MATH OPTIMIZATIONS =====
