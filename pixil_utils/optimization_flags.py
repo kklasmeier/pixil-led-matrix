@@ -142,15 +142,15 @@ UF% = ENABLE_ULTRA_FAST_PATH (direct integers/colors/strings)
 
 
 # ===== PARSE VALUE OPTIMIZATIONS =====
-ENABLE_ULTRA_FAST_PATH = True        # True - Direct integer/color/string detection
-ENABLE_FAST_PATH = True              # True - regex Simple array access and arithmetic  
-ENABLE_PARSE_VALUE_CACHE = True      # True - LRU cache for parse_value results
-ENABLE_PHASE1_FAST_PATH = True       # True - Simple variable lookups (v_variable only)
+ENABLE_ULTRA_FAST_PATH = True        # FP% - Direct integer/color/string detection
+ENABLE_FAST_PATH = True              # UF% - regex Simple array access and arithmetic  
+ENABLE_PARSE_VALUE_CACHE = True      # Fast% - LRU cache for parse_value results
+ENABLE_PHASE1_FAST_PATH = True       # Cache% - Simple variable lookups (v_variable only)
 
 # ===== MATH OPTIMIZATIONS =====
-ENABLE_FAST_MATH = True              # True - Optimized math expression evaluation
-ENABLE_EXPRESSION_CACHE = False       # Cache results of math expressions
-ENABLE_JIT = False                    # JIT compilation of expressions
+ENABLE_FAST_MATH = True              # FM% - Optimized math expression evaluation
+ENABLE_EXPRESSION_CACHE = False      # C% - Cache results of math expressions
+ENABLE_JIT = False                   # JIT%, Skip%, JIT-Size, JIT-Hit, JIT-Comp, Failed - JIT compilation of expressions
 
 # ===== DEBUGGING AND MONITORING =====
 SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup

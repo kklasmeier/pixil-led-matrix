@@ -12,13 +12,14 @@ from .array_manager import validate_array_access
 from collections import OrderedDict
 from .jit_compiler import JITExpressionCache
 from .optimization_flags import ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT
-
-# Regex pattern for identifying math expressions
-MATH_EXPR_PATTERN = re.compile(r'[\+\-\*/\(\)]|v_\w+|\d+\.?\d*')
-ARRAY_ACCESS_PATTERN = re.compile(r'(v_\w+)\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]')
-VARIABLE_PATTERN = re.compile(r'v_\w+')
-ARRAY_INDEX_PATTERN = re.compile(r'(v_\w+)\[([^\[\]]+)\]')
-CONCAT_ARRAY_PATTERN = re.compile(r'(v_\w+)\[(.+?)\]')
+# Import pre-compiled regex patterns instead of recompiling
+from .regex_patterns import (
+    SIMPLE_ADD_PATTERN, SIMPLE_SUB_PATTERN, SIMPLE_MUL_PATTERN,
+    SIMPLE_DIV_PATTERN, SIMPLE_MOD_PATTERN, SIMPLE_ARRAY_ACCESS_PATTERN,
+    NUMBER_PATTERN, VAR_ADD_VAR_PATTERN, VAR_MUL_VAR_PATTERN,
+    MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
+    ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN
+)
 
 _EXPR_CACHE = OrderedDict()
 _EXPR_CACHE_SIZE = 128 # Adjust based on typical script complexity
@@ -37,20 +38,6 @@ _JIT_COMPILATION_FAILURES = 0
 _FAILED_SCRIPT_LINES = set()  # Use set for faster lookups
 _JIT_LINE_CACHE_SKIPS = 0
 _current_script_line = None  # Store current script line locally
-
-# Phase 2: Pre-compiled regex patterns for fast math expressions
-SIMPLE_ADD_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
-SIMPLE_SUB_PATTERN = re.compile(r'^(v_\w+)\s*-\s*(-?\d*\.?\d+)$')  
-SIMPLE_MUL_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
-SIMPLE_DIV_PATTERN = re.compile(r'^(v_\w+)\s*/\s*(-?\d*\.?\d+)$')
-SIMPLE_MOD_PATTERN = re.compile(r'^(v_\w+)\s*%\s*(-?\d*\.?\d+)$')
-SIMPLE_ARRAY_ACCESS_PATTERN = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
-NUMBER_PATTERN = re.compile(r'^-?\d*\.?\d+$')
-RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
-
-# Two variable patterns
-VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
-VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
 
 def set_current_script_line(line):
     """Set the current script line for JIT failure caching."""
@@ -239,7 +226,7 @@ def reset_jit_stats():
     _JIT_HITS = 0
     _JIT_COMPILATION_FAILURES = 0
     _JIT_LINE_CACHE_SKIPS = 0
-    # Note: Don't reset _FAILED_SCRIPT_LINES - keep learning across scripts
+    _FAILED_SCRIPT_LINES.clear() 
 
 def reset_fast_math_stats():
     """Reset fast math statistics for new script."""

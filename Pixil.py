@@ -26,7 +26,17 @@ from pixil_utils.array_manager import PixilArray
 from collections import OrderedDict  # Make sure this is imported
 from pixil_utils.optimization_flags import (
     ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE,
-    ENABLE_PHASE1_FAST_PATH, show_status, set_profile
+    ENABLE_PHASE1_FAST_PATH, show_status, set_profile)
+# Import pre-compiled regex patterns
+from pixil_utils.regex_patterns import (
+    # Fast Path patterns
+    FAST_SIMPLE_ARRAY_PATTERN, FAST_VAR_PLUS_NUM_PATTERN, FAST_VAR_MUL_NUM_PATTERN,
+    FAST_VAR_SUB_NUM_PATTERN, FAST_VAR_DIV_NUM_PATTERN, FAST_VAR_MOD_NUM_PATTERN,
+    FAST_VAR_ADD_VAR_PATTERN, FAST_VAR_MUL_VAR_PATTERN,
+    # Legacy patterns  
+    ARRAY_CREATE_PATTERN, ARRAY_ASSIGN_PATTERN, SPRITE_DEF_PATTERN, COMMAND_PATTERN,
+    SPRITE_OP_PATTERN, PROCEDURE_DEF_PATTERN, PROCEDURE_CALL_PATTERN, FRAME_PARAM_PATTERN,
+    FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN
 )
 
 def is_headless():
@@ -75,22 +85,9 @@ _ULTRA_FAST_HITS = 0
 _ULTRA_FAST_TOTAL = 0
 _FAST_PATH_PARSE_HITS = 0
 _FAST_PATH_PARSE_TOTAL = 0
+_PARSE_VALUE_TOTAL_TIME = 0.0  # Total time spent in parse_value() in seconds
 
 set_debug_level(DEBUG_OFF)  # Default debug level
-
-# Pre-compiled regex patterns for improved performance
-ARRAY_CREATE_PATTERN = re.compile(r'create_array\((\w+),\s*(.+?)(?:\s*,\s*(\w+))?\)')
-ARRAY_ASSIGN_PATTERN = re.compile(r'(v_\w+)\[(.+?)\]\s*=\s*([^#]+)')
-SPRITE_DEF_PATTERN = re.compile(r'define_sprite\((\w+),\s*(.+?),\s*(.+?)\)')
-COMMAND_PATTERN = re.compile(r'(\w+)\((.*)\)')
-SPRITE_OP_PATTERN = re.compile(r'(show|hide|move|dispose)_sprite\((\w+)(?:,\s*(.+?)(?:,\s*(.+?))?(?:,\s*(.+?))?)?\)')
-PROCEDURE_DEF_PATTERN = re.compile(r'def (\w+) {')
-PROCEDURE_CALL_PATTERN = re.compile(r'call (\w+)')
-FRAME_PARAM_PATTERN = re.compile(r'begin_frame\((.*)\)')
-FOR_LOOP_PATTERN = re.compile(r'for (v_\w+) in \((.+?), (.+?), (.+?)\)')
-WHILE_LOOP_PATTERN = re.compile(r'while (.+?) then')
-IF_PATTERN = re.compile(r'if (.+?) then')
-RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
 
 # Initialize file manager
 file_manager = PixilFileManager()
@@ -116,13 +113,17 @@ def report_parse_value_stats():
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     global _FAST_PATH_HITS, _FAST_PATH_TOTAL
     global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
-    
+    global _PARSE_VALUE_TOTAL_TIME 
+
     print("Parse Value Optimization Statistics:")
     
     if _PARSE_VALUE_ATTEMPTS > 0:
         print(f"  Total parameter parsing attempts: {_PARSE_VALUE_ATTEMPTS:,}")
+        print(f"  Total time in parse_value: {_PARSE_VALUE_TOTAL_TIME:.6f} seconds")  # Add this line
+        avg_time_per_call = _PARSE_VALUE_TOTAL_TIME / _PARSE_VALUE_ATTEMPTS
+        print(f"  Average time per parse_value call: {avg_time_per_call:.6f} seconds")  # Add this line
         print()
-        
+
         # Ultra Fast Path stats (Optimization 1)
         if _ULTRA_FAST_TOTAL > 0:
             ultra_fast_rate = (_ULTRA_FAST_HITS / _ULTRA_FAST_TOTAL) * 100
@@ -191,7 +192,8 @@ def report_detailed_summary():
     """Print a one-line summary with the new detailed format."""
     global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
     global _FAST_PATH_HITS, _FAST_PATH_TOTAL, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
-    
+    global _PARSE_VALUE_TOTAL_TIME
+
     # Calculate individual rates
     uf_rate = (_ULTRA_FAST_HITS / _ULTRA_FAST_TOTAL * 100) if _ULTRA_FAST_TOTAL > 0 else 0
     fp_rate = (_FAST_PATH_PARSE_HITS / _FAST_PATH_PARSE_TOTAL * 100) if _FAST_PATH_PARSE_TOTAL > 0 else 0
@@ -203,6 +205,7 @@ def report_detailed_summary():
     print()
     print("=== DETAILED OPTIMIZATION SUMMARY ===")
     print(f"PV-UF%: {uf_rate:.0f}% | PV-F%: {fp_rate:.0f}% | FP%: {p1_rate:.0f}% | PV-Cache%: {cache_rate:.0f}%")
+    print(f"Parse Value Total Time: {_PARSE_VALUE_TOTAL_TIME:.6f}s")  # Add this line
     print("=====================================")
 
 
@@ -294,7 +297,8 @@ def save_performance_metrics(script_name, start_time, reason):
     # Import our detailed parse value stats - ADD NEW IMPORTS
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
-    
+    global _PARSE_VALUE_TOTAL_TIME 
+
     # Calculate metrics
     total_time = (end_time - start_time).total_seconds()
     active_time = total_time - _metrics.get('total_pause_time', 0)
@@ -411,7 +415,12 @@ def save_performance_metrics(script_name, start_time, reason):
         'jit_skip_time_saved': jit_skip_time_saved,
         'jit_cache_size': _JIT_CACHE.cache_size,
         'jit_cache_utilization': jit_cache_utilization,
-        'jit_compilation_time': jit_cache_stats.compilation_time
+        'jit_compilation_time': jit_cache_stats.compilation_time,
+
+        # Parse value timing metrics
+        'parse_value_total_time': _PARSE_VALUE_TOTAL_TIME,
+        'parse_value_avg_time_per_call': (_PARSE_VALUE_TOTAL_TIME / _PARSE_VALUE_ATTEMPTS) if _PARSE_VALUE_ATTEMPTS > 0 else 0.0,
+
     }
 
     # Save to database
@@ -610,122 +619,165 @@ def process_script(filename, execute_func=None):
         value_stripped = value.strip()
         
         # Fast Path #1: Simple array access (e.g., "v_array[v_i]", "v_px[v_i]")
-        simple_array_pattern = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
-        array_match = simple_array_pattern.match(value_stripped)
+        array_match = FAST_SIMPLE_ARRAY_PATTERN.match(value_stripped)
         if array_match:
             array_name, index_var = array_match.groups()
             
-            # Check if both variables exist
+            # Minimal validation then let Python handle the rest
             if array_name in variables and index_var in variables:
                 try:
                     array = variables[array_name]
-                    index_value = variables[index_var]
+                    index = int(variables[index_var])
+                    result = array[index]  # Let Python handle bounds checking and array type
                     
-                    # Ensure index is numeric and in bounds
-                    if isinstance(index_value, (int, float)):
-                        index = int(index_value)
-                        
-                        # Check if it's a PixilArray or regular array
-                        if hasattr(array, '__getitem__') and hasattr(array, 'data'):
-                            # PixilArray - use bounds checking
-                            if 0 <= index < len(array.data):
-                                result = array[index]
-                                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                                    debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
-                                return format_parameter(result, command_name, param_position, variables)
-                        elif isinstance(array, (list, tuple)) and 0 <= index < len(array):
-                            # Regular Python array
-                            result = array[index]
-                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                                debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
-                            return format_parameter(result, command_name, param_position, variables)
-                            
-                except (ValueError, TypeError, IndexError, AttributeError):
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast array access: {array_name}[{index_var}] = {array_name}[{index}] = {result}", DEBUG_VERBOSE)
+                    return format_parameter(result, command_name, param_position, variables)
+                    
+                except (KeyError, IndexError, TypeError, ValueError):
                     pass  # Fall back to normal processing
         
         # Fast Path #2: Simple arithmetic (v_variable + number, v_variable * number, etc.)
         # Variable + number pattern
-        var_plus_num_pattern = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
-        plus_match = var_plus_num_pattern.match(value_stripped)
+        plus_match = FAST_VAR_PLUS_NUM_PATTERN.match(value_stripped)
         if plus_match:
             var_name, number_str = plus_match.groups()
-            if var_name in variables:
-                try:
-                    var_value = variables[var_name]
-                    
-                    # Determine if we should keep as integer or use float
-                    if '.' in number_str:
-                        # Number has decimal, use float arithmetic
-                        var_value = float(var_value)
-                        number_value = float(number_str)
-                        result = var_value + number_value
-                    else:
-                        # Both should be integers if possible
-                        if isinstance(var_value, (int, float)) and var_value == int(var_value):
-                            var_value = int(var_value)
-                            number_value = int(number_str)
-                            result = var_value + number_value  # Integer result
-                        else:
-                            var_value = float(var_value)
-                            number_value = float(number_str)
-                            result = var_value + number_value
-                            # Convert back to int if it's a whole number
-                            if result == int(result):
-                                result = int(result)
-                    
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Fast arithmetic: {var_name} + {number_str} = {result}", DEBUG_VERBOSE)
-                    return format_parameter(result, command_name, param_position, variables)
-                except (ValueError, TypeError):
-                    pass
+            if is_valid_numeric_operation(var_name, number_str, variables):
+                var_value = variables[var_name]
+                
+                # Simplified arithmetic - let Python handle int/float automatically
+                if '.' in number_str:
+                    result = float(var_value) + float(number_str)
+                else:
+                    result = var_value + int(number_str)
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast add: {var_name} + {number_str} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
         
-        # Variable * number pattern  
-        var_mul_num_pattern = re.compile(r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)$')
-        mul_match = var_mul_num_pattern.match(value_stripped)
-        if mul_match:
-            var_name, number_str = mul_match.groups()
-            if var_name in variables:
-                try:
-                    var_value = variables[var_name]
-                    
-                    # Determine if we should keep as integer or use float
-                    if '.' in number_str:
-                        # Number has decimal, use float arithmetic
-                        var_value = float(var_value)
-                        number_value = float(number_str)
-                        result = var_value * number_value
-                    else:
-                        # Both should be integers if possible
-                        if isinstance(var_value, (int, float)) and var_value == int(var_value):
-                            var_value = int(var_value)
-                            number_value = int(number_str)
-                            result = var_value * number_value  # Integer result
-                        else:
-                            var_value = float(var_value)
-                            number_value = float(number_str)
-                            result = var_value * number_value
-                            # Convert back to int if it's a whole number
-                            if result == int(result):
-                                result = int(result)
-                    
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Fast arithmetic: {var_name} * {number_str} = {result}", DEBUG_VERBOSE)
-                    return format_parameter(result, command_name, param_position, variables)
-                except (ValueError, TypeError):
-                    pass
-        
+        # Variable * number pattern 
+        sub_match = FAST_VAR_SUB_NUM_PATTERN.match(value_stripped)
+        if sub_match:
+            var_name, number_str = sub_match.groups()
+            if is_valid_numeric_operation(var_name, number_str, variables):
+                var_value = variables[var_name]
+                
+                # Simplified arithmetic - let Python handle int/float automatically
+                if '.' in number_str:
+                    result = float(var_value) - float(number_str)
+                else:
+                    result = var_value - int(number_str)
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast sub: {var_name} - {number_str} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+                
+        # Variable - number pattern
+        sub_match = FAST_VAR_SUB_NUM_PATTERN.match(value_stripped)
+        if sub_match:
+            var_name, number_str = sub_match.groups()
+            if is_valid_numeric_operation(var_name, number_str, variables):
+                var_value = variables[var_name]
+                
+                # Simplified arithmetic - let Python handle int/float automatically
+                if '.' in number_str:
+                    result = float(var_value) - float(number_str)
+                else:
+                    result = var_value - int(number_str)
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast sub: {var_name} - {number_str} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+
+        # Variable / number pattern
+        div_match = FAST_VAR_DIV_NUM_PATTERN.match(value_stripped)
+        if div_match:
+            var_name, number_str = div_match.groups()
+            if is_valid_numeric_operation(var_name, number_str, variables) and float(number_str) != 0:
+                var_value = variables[var_name]
+                
+                # Division always results in float to avoid integer division issues
+                result = float(var_value) / float(number_str)
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast div: {var_name} / {number_str} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+
+        # Variable % number pattern
+        mod_match = FAST_VAR_MOD_NUM_PATTERN.match(value_stripped)
+        if mod_match:
+            var_name, number_str = mod_match.groups()
+            if is_valid_numeric_operation(var_name, number_str, variables) and float(number_str) != 0:
+                var_value = variables[var_name]
+                
+                # Modulo operation
+                if '.' in number_str:
+                    result = float(var_value) % float(number_str)
+                else:
+                    result = var_value % int(number_str)
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast mod: {var_name} % {number_str} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+
+        # Variable + variable pattern
+        var_add_match = FAST_VAR_ADD_VAR_PATTERN.match(value_stripped)
+        if var_add_match:
+            var1, var2 = var_add_match.groups()
+            if (var1 in variables and var2 in variables and
+                isinstance(variables[var1], (int, float)) and
+                isinstance(variables[var2], (int, float))):
+                
+                result = variables[var1] + variables[var2]
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast var add: {var1} + {var2} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+
+        # Variable * variable pattern
+        var_mul_match = FAST_VAR_MUL_VAR_PATTERN.match(value_stripped)
+        if var_mul_match:
+            var1, var2 = var_mul_match.groups()
+            if (var1 in variables and var2 in variables and
+                isinstance(variables[var1], (int, float)) and
+                isinstance(variables[var2], (int, float))):
+                
+                result = variables[var1] * variables[var2]
+                
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast var mul: {var1} * {var2} = {result}", DEBUG_VERBOSE)
+                return format_parameter(result, command_name, param_position, variables)
+
         # Not handled by fast path
         return None
 
-
+    def is_valid_numeric_operation(var_name, number_str, variables):
+        """Pre-validate that we can do numeric arithmetic without exceptions."""
+        if var_name not in variables:
+            return False
+        
+        var_value = variables[var_name]
+        if not isinstance(var_value, (int, float)):
+            return False
+        
+        # Quick check if number_str is valid
+        try:
+            float(number_str)
+            return True
+        except ValueError:
+            return False
 
     def parse_value(value, command_name, param_position):
         """
         Parse and format a parameter value, handling variables and math expressions.
         Uses configurable optimization flags to control caching behavior.
         """
+        # Start timing
+        start_time = time.perf_counter()
+
         global _VAR_FORMAT_CACHE, _VAR_CACHE_HITS, _VAR_CACHE_MISSES, _PARSE_VALUE_ATTEMPTS
         global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
+        global _PARSE_VALUE_TOTAL_TIME 
         _PARSE_VALUE_ATTEMPTS += 1
 
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -798,7 +850,7 @@ def process_script(filename, execute_func=None):
         if (ENABLE_PARSE_VALUE_CACHE and value.startswith('v_') and 
             not has_math_expression(value) and "random" not in value):
             
-            cache_key = (value, command_name, param_position)
+            cache_key = f"{value}|{command_name}|{param_position}"
             
             # Check cache first
             if cache_key in _VAR_FORMAT_CACHE:
@@ -884,7 +936,10 @@ def process_script(filename, execute_func=None):
             
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Normal path: passing to format_parameter: {val}", DEBUG_VERBOSE)
-            
+
+        end_time = time.perf_counter()
+        _PARSE_VALUE_TOTAL_TIME += (end_time - start_time)
+
         return format_parameter(val, command_name, param_position, variables)
 
     # Add new array helper functions here
@@ -1142,7 +1197,7 @@ def process_script(filename, execute_func=None):
     # Generator-based line processing logic
     def process_lines(line_generator):
         nonlocal normal_exit  # Track script exit status
-        global current_command, _metrics
+        global current_command, _metrics, _VAR_FORMAT_CACHE
         for line_number, line in enumerate(line_generator, 1):
             # Increment line counter
             
@@ -1236,13 +1291,15 @@ def process_script(filename, execute_func=None):
                         debug_print(f"  Variable assignment: {var_name} = {var_value}", DEBUG_VERBOSE)
                     
                     # Add cache invalidation for the variable lookup cache
-                    keys_to_remove = []
-                    for key in list(_VAR_FORMAT_CACHE.keys()):
-                        if key[0] == var_name:
-                            keys_to_remove.append(key)
-                    
-                    for key in keys_to_remove:
-                        _VAR_FORMAT_CACHE.pop(key)
+                    if var_name.startswith('v_'):  # Only process actual variables
+                        # Create new cache excluding entries for the changed variable
+                        new_cache = OrderedDict()
+                        for cache_key, cached_value in _VAR_FORMAT_CACHE.items():
+                            # Using your new string key format: "value|command_name|param_position"
+                            cached_var_name = cache_key.split('|')[0]
+                            if cached_var_name != var_name:
+                                new_cache[cache_key] = cached_value
+                        _VAR_FORMAT_CACHE = new_cache
                         
                 except ValueError as e:
                     if DEBUG_LEVEL >= DEBUG_SUMMARY:
@@ -1633,7 +1690,8 @@ def reset_parse_value_stats():
     global _FAST_PATH_HITS, _FAST_PATH_TOTAL
     global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL
     global _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
-    
+    global _PARSE_VALUE_TOTAL_TIME 
+
     _PARSE_VALUE_ATTEMPTS = 0
     _VAR_CACHE_HITS = 0
     _VAR_CACHE_MISSES = 0
@@ -1643,6 +1701,7 @@ def reset_parse_value_stats():
     _ULTRA_FAST_TOTAL = 0
     _FAST_PATH_PARSE_HITS = 0
     _FAST_PATH_PARSE_TOTAL = 0
+    _PARSE_VALUE_TOTAL_TIME = 0.0
 
 # Main Execution
 if __name__ == '__main__':
