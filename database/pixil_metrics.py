@@ -91,6 +91,7 @@ class PixilMetricsDB(BaseDatabase):
                     cache_attempts, cache_hits, cache_hit_rate, cache_size, cache_time_saved,
                     parse_value_attempts, parse_value_ultra_fast_hits, parse_value_fast_hits, 
                     parse_value_hit_rate, parse_value_time_saved,
+                    parse_value_total_time, parse_value_avg_time_per_call, 
                     direct_integer_hits, direct_color_hits, direct_string_hits,
                     simple_array_hits, simple_arithmetic_hits,
                     var_cache_attempts, var_cache_hits, var_cache_hit_rate, var_cache_time_saved,
@@ -99,7 +100,7 @@ class PixilMetricsDB(BaseDatabase):
                     jit_attempts, jit_hits, jit_failures, jit_hit_rate, jit_time_saved,
                     jit_line_cache_skips, failed_lines_cached, jit_skip_efficiency, jit_skip_time_saved,
                     jit_cache_size, jit_cache_utilization, jit_compilation_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 script_name, start_time, end_time, reason,                                    # 4 values
                 metrics_data.get('commands_executed', 0),                                      # 1
@@ -121,12 +122,16 @@ class PixilMetricsDB(BaseDatabase):
                 metrics_data.get('cache_hit_rate', 0.0),                                     # 1
                 metrics_data.get('cache_size', 0),                                           # 1
                 metrics_data.get('cache_time_saved', 0.0),                                   # 1 = 23 total
+
                 metrics_data.get('parse_value_attempts', 0),                                 # 1
                 metrics_data.get('parse_value_ultra_fast_hits', 0),                          # 1
                 metrics_data.get('parse_value_fast_hits', 0),                                # 1
                 metrics_data.get('parse_value_hit_rate', 0.0),                               # 1
                 metrics_data.get('parse_value_time_saved', 0.0),                             # 1
+                metrics_data.get('parse_value_total_time', 0.0),                             # 1 - NEW
+                metrics_data.get('parse_value_avg_time_per_call', 0.0),                      # 1 - NEW
                 metrics_data.get('direct_integer_hits', 0),                                  # 1
+
                 metrics_data.get('direct_color_hits', 0),                                    # 1
                 metrics_data.get('direct_string_hits', 0),                                   # 1
                 metrics_data.get('simple_array_hits', 0),                                    # 1
