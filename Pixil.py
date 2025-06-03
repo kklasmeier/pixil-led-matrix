@@ -9,6 +9,7 @@ import datetime
 from pathlib import Path
 from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
+from pixil_utils.variable_registry import VariableRegistry
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
 from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats)
 from pixil_utils.file_manager import PixilFileManager
@@ -454,6 +455,9 @@ class SpriteContext:
         self.sprite_commands = []
 
 def process_script(filename, execute_func=None):
+    """
+    UPDATED: Main script processing with VariableRegistry optimization.
+    """
     if execute_func is None:
         raise ValueError("execute_func must be provided")
     normal_exit = True
@@ -463,7 +467,7 @@ def process_script(filename, execute_func=None):
     script_start_time = datetime.datetime.now()
     script_name = Path(filename).name
 
-    global current_command, variables, frame_commands, in_frame_mode
+    global current_command
     current_command = None  # Reset at script start
 
     debug_print(f"Opening script file: {filename}", DEBUG_CONCISE)
@@ -473,35 +477,35 @@ def process_script(filename, execute_func=None):
     reset_fast_path_stats()
     from pixil_utils.math_functions import reset_fast_math_stats, reset_expression_cache_stats
     reset_fast_math_stats()
-    reset_expression_cache_stats()  # Reset cache
+    reset_expression_cache_stats()
     reset_parse_value_stats()
     reset_jit_stats()
     show_status()
+    
     # Get queue instance
     queue = QueueManager.get_instance()
-
-    # Set up queue callbacks
-    queue.set_pause_callbacks(
-        on_pause=on_queue_pause,
-        on_resume=on_queue_resume
-    )
-
-    # Reset throttle factor at start of script
+    queue.set_pause_callbacks(on_pause=on_queue_pause, on_resume=on_queue_resume)
     queue.reset_throttle()
-    
+
     # Initialize script environment
     global variables, frame_commands, in_frame_mode
-    variables = {}
-    procedures = {}
-    sprite_context = SpriteContext()  # Add sprite context
-    frame_commands = []  # Add frame command buffer
-    in_frame_mode = False  # Add frame mode tracking
 
     # Preprocess lines to remove comments
     def preprocess_lines(filename):
         with open(filename, 'r') as f:
             return [line.split('#', 1)[0].strip() for line in f if line.split('#', 1)[0].strip()]
-        
+
+    # Load and scan script for variable optimization
+    print("Initializing optimized variable system...")
+    script_lines = preprocess_lines(filename)  # Use existing preprocessing
+    variables = VariableRegistry()
+    variables.scan_and_register(script_lines)
+
+    procedures = {}
+    sprite_context = SpriteContext()  # Add sprite context
+    frame_commands = []  # Add frame command buffer
+    in_frame_mode = False  # Add frame mode tracking
+
     # Define helper functions after variables are initialized
     def execute_command(cmd):
         """Queue command with appropriate timing"""
@@ -537,30 +541,6 @@ def process_script(filename, execute_func=None):
         else:
             execute_command(cmd)
 
-
-    def debug_missed_patterns(value, command_name, param_position):
-        """Temporary function to see what patterns we're not catching"""
-        if not isinstance(value, str):
-            return
-            
-        value_stripped = value.strip()
-        
-        # Skip the ones we already catch
-        if value_stripped.isdigit():
-            return
-            
-        KNOWN_COLORS = {'black', 'white', 'gray', 'red', 'blue', 'green', 'yellow', 'etc'}  # abbreviated
-        if value_stripped in KNOWN_COLORS:
-            return
-            
-        if ((value_stripped.startswith('"') and value_stripped.endswith('"')) or
-            (value_stripped.startswith("'") and value_stripped.endswith("'"))):
-            return
-        
-        # Log what we're missing
-        if len(value_stripped) < 50:  # Don't log super long expressions
-            print(f"MISSED PATTERN: '{value_stripped}' for {command_name} pos {param_position}")
-            
     def try_ultra_fast_path(value, command_name, param_position):
         """
         Handle the simplest parameter cases with minimal overhead.
@@ -986,27 +966,25 @@ def process_script(filename, execute_func=None):
         return False
 
     def process_array_assignment(line):
-        """Process array assignment like v_array[index] = value."""
-        # Old pattern: r'(v_\w+)\[(.+?)\]\s*=\s*(.+)'
-        # New pattern that handles comments
+        """OPTIMIZED: Process array assignment with VariableRegistry."""
         match = ARRAY_ASSIGN_PATTERN.match(line)
         if match:
             array_name = match.group(1)
             index_expr = match.group(2)
-            value_expr = match.group(3).strip()  # Strip to remove trailing spaces
+            value_expr = match.group(3).strip()
             
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Processing array assignment: {array_name}[{index_expr}] = {value_expr}", DEBUG_VERBOSE)
             
             try:
-                # Get array
+                # OPTIMIZED: Check if array exists using VariableRegistry
                 if array_name not in variables:
                     raise ValueError(f"Array '{array_name}' not found")
-                array = variables[array_name]
+                array = variables.get(array_name)
                 if not isinstance(array, PixilArray):
                     raise ValueError(f"Variable '{array_name}' is not an array")
                 
-                # Evaluate index
+                # OPTIMIZED: Evaluate index using VariableRegistry
                 index = evaluate_math_expression(index_expr, variables)
                 if not isinstance(index, (int, float)):
                     raise ValueError(f"Array index must be a number, got {type(index)}")
@@ -1015,20 +993,20 @@ def process_script(filename, execute_func=None):
                 if array.get_type() == 'string':
                     # Handle string value
                     if value_expr.startswith('"') and value_expr.endswith('"'):
-                        value = value_expr  # Keep quotes for string array assignment
+                        value = value_expr
                     elif value_expr.startswith("'") and value_expr.endswith("'"):
-                        value = value_expr  # Keep quotes for string array assignment
+                        value = value_expr
                     elif value_expr.startswith('v_'):
-                        # Handle variable value
+                        # OPTIMIZED: Use VariableRegistry for variable lookup
                         if value_expr not in variables:
                             raise ValueError(f"Variable '{value_expr}' not found")
-                        value = variables[value_expr]
+                        value = variables.get(value_expr)
                         if not isinstance(value, str):
                             raise ValueError(f"Cannot assign non-string value to string array")
                     else:
                         raise ValueError(f"String array values must be quoted or reference string variables")
                 else:
-                    # Handle numeric value
+                    # OPTIMIZED: Handle numeric value using VariableRegistry
                     value = evaluate_math_expression(value_expr, variables)
                     if not isinstance(value, (int, float)):
                         raise ValueError(f"Numeric array values must be numbers")
@@ -1257,50 +1235,28 @@ def process_script(filename, execute_func=None):
                 parts = line.split('=')
                 var_name = parts[0].strip()
                 expr = parts[1].strip()
+                
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"  Processing expression: {expr}", DEBUG_VERBOSE)
                 
                 try:
                     if expr.startswith('"') and expr.endswith('"'):
                         var_value = expr[1:-1]  # Remove quotes
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  String value detected: {var_value}", DEBUG_VERBOSE)
                     elif expr.lower() == 'true':
                         var_value = True
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  Boolean value detected: {var_value}", DEBUG_VERBOSE)
                     elif expr.lower() == 'false':
                         var_value = False
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  Boolean value detected: {var_value}", DEBUG_VERBOSE)
                     elif '&' in expr:
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  Concatenation expression detected: {expr}", DEBUG_VERBOSE)
                         var_value = evaluate_math_expression(expr, variables)
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  Concatenation result: {var_value}", DEBUG_VERBOSE)
                     else:
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"  Evaluating numeric expression: {expr}", DEBUG_VERBOSE)
                         var_value = evaluate_math_expression(expr, variables)
 
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"  Evaluation result: {var_value}", DEBUG_VERBOSE)
-                    variables[var_name] = var_value
+                    # OPTIMIZED: Use VariableRegistry.set() instead of dict assignment
+                    variables.set(var_name, var_value)
+                    
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"  Variable assignment: {var_name} = {var_value}", DEBUG_VERBOSE)
                     
-                    # Add cache invalidation for the variable lookup cache
-                    if var_name.startswith('v_'):  # Only process actual variables
-                        # Create new cache excluding entries for the changed variable
-                        new_cache = OrderedDict()
-                        for cache_key, cached_value in _VAR_FORMAT_CACHE.items():
-                            # Using your new string key format: "value|command_name|param_position"
-                            cached_var_name = cache_key.split('|')[0]
-                            if cached_var_name != var_name:
-                                new_cache[cache_key] = cached_value
-                        _VAR_FORMAT_CACHE = new_cache
-                        
                 except ValueError as e:
                     if DEBUG_LEVEL >= DEBUG_SUMMARY:
                         debug_print(f"  Error in variable assignment: {str(e)}", DEBUG_SUMMARY)
@@ -1558,15 +1514,22 @@ def process_script(filename, execute_func=None):
                     
     # Call the generator for file reading
     try:
-        processed_lines = preprocess_lines(filename)
-        process_lines(iter(processed_lines))
+        process_lines(iter(script_lines))
         if normal_exit:
             print("Script completed normally - sync queue run")
             debug_print("Script completed normally, adding sync_queue", DEBUG_SUMMARY)
             execute_command('sync_queue')
-            queue.wait_until_empty()       # Wait for queue to empty
-            queue.last_command_time = time.time() * 1000  # Reset timing after sync
+            queue.wait_until_empty()
+            queue.last_command_time = time.time() * 1000
     finally:
+        stats = variables.get_performance_stats()
+        print(f"\n=== Variable Performance Stats ===")
+        print(f"Variables registered: {stats['total_variables']}")
+        print(f"Variable accesses: {stats['total_accesses']:,}")
+        print(f"Average access time: {stats['avg_access_time_us']:.2f} μs")
+        print(f"Total variable access time: {stats['total_access_time']:.4f}s")
+        print(f"Estimated time saved vs dict: {stats['estimated_time_saved']:.4f}s")
+        print("=================================")
         debug_print("\n1. Starting cleanup sequence...", DEBUG_CONCISE)
         
         # Get initial queue size

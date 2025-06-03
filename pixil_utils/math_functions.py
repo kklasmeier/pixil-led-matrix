@@ -126,7 +126,7 @@ def create_cache_key(expr: str, variables: Dict[str, Any]) -> Optional[tuple]:
     relevant_vars = []
     for var in var_matches:
         if var in variables:
-            value = variables[var]
+            value = variables.get(var)
             # Only cache if value is simple (number or short string)
             if isinstance(value, (int, float, str)) and (not isinstance(value, str) or len(str(value)) < 20):
                 relevant_vars.append((var, value))
@@ -282,38 +282,21 @@ def try_fast_number(expr: str) -> Optional[Union[int, float]]:
             pass
     return None
 
-def try_fast_array_access(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float, str]]:
+def try_fast_array_access(expr: str, variables) -> Optional[Union[int, float, str]]:
     """
-    Handle simple array access like v_array[v_index] without complex parsing.
+    Handle simple array access with VariableRegistry optimization.
     """
     match = SIMPLE_ARRAY_ACCESS_PATTERN.match(expr)
     if match:
         array_name, index_var = match.groups()
         
+        # OPTIMIZED: Use fast_array_access method
         if array_name in variables and index_var in variables:
             try:
-                array = variables[array_name]
-                index_value = variables[index_var]
-                
-                # Ensure index is numeric
-                if isinstance(index_value, (int, float)):
-                    index = int(index_value)
-                    
-                    # Check if it's a PixilArray or regular array
-                    if hasattr(array, '__getitem__'):
-                        # For PixilArray, use the optimized access
-                        if hasattr(array, 'data') and 0 <= index < len(array.data):
-                            result = array[index]
-                        # For regular Python arrays/lists
-                        elif isinstance(array, (list, tuple)) and 0 <= index < len(array):
-                            result = array[index]
-                        else:
-                            return None  # Out of bounds or invalid
-                            
-                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print(f"Fast array access: {array_name}[{index_var}] = {array_name}[{index}] = {result}", DEBUG_VERBOSE)
-                        return result
-                        
+                result = variables.fast_array_access(array_name, index_var)
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast array access: {array_name}[{index_var}] = {result}", DEBUG_VERBOSE)
+                return result
             except (ValueError, TypeError, IndexError, AttributeError):
                 pass
     return None
@@ -332,7 +315,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables[var_name]) + float(number)
+                result = float(variables.get(var_name)) + float(number)
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast add: {var_name} + {number} = {result}", DEBUG_VERBOSE)
                 return result
@@ -345,7 +328,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables[var_name]) - float(number)
+                result = float(variables.get(var_name)) - float(number)
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast sub: {var_name} - {number} = {result}", DEBUG_VERBOSE)
                 return result
@@ -358,7 +341,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables[var_name]) * float(number)
+                result = float(variables.get(var_name)) * float(number)
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast mul: {var_name} * {number} = {result}", DEBUG_VERBOSE)
                 return result
@@ -373,7 +356,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
             try:
                 divisor = float(number)
                 if divisor != 0:
-                    result = float(variables[var_name]) / divisor
+                    result = float(variables.get(var_name)) / divisor
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Fast div: {var_name} / {number} = {result}", DEBUG_VERBOSE)
                     return result
@@ -388,7 +371,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
             try:
                 modulus = float(number)
                 if modulus != 0:
-                    result = float(variables[var_name]) % modulus
+                    result = float(variables.get(var_name)) % modulus
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Fast mod: {var_name} % {number} = {result}", DEBUG_VERBOSE)
                     return result
@@ -401,7 +384,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var1, var2 = match.groups()
         if var1 in variables and var2 in variables:
             try:
-                result = float(variables[var1]) + float(variables[var2])
+                result = float(variables.get(var1)) + float(variables.get(var2))
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast var add: {var1} + {var2} = {result}", DEBUG_VERBOSE)
                 return result
@@ -414,7 +397,7 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var1, var2 = match.groups()
         if var1 in variables and var2 in variables:
             try:
-                result = float(variables[var1]) * float(variables[var2])
+                result = float(variables.get(var1)) * float(variables.get(var2))
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast var mul: {var1} * {var2} = {result}", DEBUG_VERBOSE)
                 return result
@@ -436,7 +419,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
     if not isinstance(expr, str):
         return expr
     if expr.startswith('v_') and expr in variables:
-        return variables[expr]
+        return variables.get(expr)
 
     # ===== PHASE 2 OPTIMIZATION: FAST MATH PATHS (Controlled by flag) =====
     if ENABLE_FAST_MATH and isinstance(expr, str) and not ('&' in expr or '"' in expr or "'" in expr):
@@ -517,7 +500,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
             # Get array
             if array_name not in variables:
                 raise ValueError(f"Array '{array_name}' not found")
-            array = variables[array_name]
+            array = variables.get(array_name)
             
             # Evaluate index expression (recursive call will use flags)
             index = evaluate_math_expression(index_expr, variables)
@@ -575,7 +558,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Error evaluating expression: {str(e)}", DEBUG_VERBOSE)
         if expr.startswith('v_') and expr in variables:
-            return variables[expr]
+            return variables.get(expr)
         raise ValueError(f"Error evaluating expression '{expr}': {str(e)}")
     # ===== END EVAL() FALLBACK =====
 
@@ -614,31 +597,21 @@ def has_math_expression(value: str) -> bool:
         
     return any(c in value for c in '+-*/()') or 'v_' in value
 
-def substitute_variables(expr: str, variables: Dict[str, Any]) -> str:
+def substitute_variables(expr: str, variables) -> str:
     """
-    Replace variable references with their values in an expression. Handles array access expressions.
+    UPDATED: Replace variable references with their values in an expression.
+    Now uses VariableRegistry.get() instead of dictionary access.
     
     Args:
         expr: Expression containing variable references
-        variables: Dictionary of current variable values
+        variables: VariableRegistry instance (not dict)
         
     Returns:
         Expression with variables replaced by their values
-        
-    Raises:
-        ValueError: If variable not found
     """
-
-    """Replace variable references with their values in an expression."""
-
-    debug_print(f"Substituting in expression: {expr}", DEBUG_VERBOSE)
-
-    # Process all array accesses first
+    
     def process_array_accesses(expr: str) -> str:
         """Find and process each array access, replacing with its value"""
-        
-        # Match array access pattern: v_name[...] allowing nested brackets
-        # array_pattern = re.compile(r'(v_\w+)\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]')
         
         while True:
             match = ARRAY_ACCESS_PATTERN.search(expr)
@@ -649,23 +622,22 @@ def substitute_variables(expr: str, variables: Dict[str, Any]) -> str:
             index_expr = match.group(2)
             full_match = match.group(0)
             
-            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Found array access: {array_name}[{index_expr}]", DEBUG_VERBOSE)
-            
             try:
-                # First recursively process any array accesses in the index expression
-                processed_index = process_array_accesses(index_expr)
-                
-                # Then evaluate the processed index expression
-                index_value = evaluate_math_expression(processed_index, variables)
-                
-                # Get array value using the computed index
-                array_value = validate_array_access(array_name, index_value, variables)
+                # OPTIMIZED: Use fast_array_access if simple index
+                if index_expr.startswith('v_') and index_expr in variables:
+                    # Simple case: v_array[v_index]
+                    array_value = variables.fast_array_access(array_name, index_expr)
+                else:
+                    # Complex case: v_array[v_i + 1] - evaluate index expression
+                    processed_index = process_array_accesses(index_expr)
+                    index_value = evaluate_math_expression(processed_index, variables)
+                    
+                    # OPTIMIZED: Direct array access
+                    array_obj = variables.get(array_name)
+                    array_value = array_obj[int(index_value)]
                 
                 # Replace this array access with its value
                 expr = expr[:match.start()] + str(array_value) + expr[match.end():]
-                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Expression after substitution: {expr}", DEBUG_VERBOSE)
                 
             except Exception as e:
                 raise ValueError(f"Error processing array access '{full_match}': {str(e)}")
@@ -679,15 +651,13 @@ def substitute_variables(expr: str, variables: Dict[str, Any]) -> str:
     def replace_var(match):
         var_name = match.group(0)
         if var_name.startswith('v_'):
+            # OPTIMIZED: Use VariableRegistry.get() instead of dict access
             if var_name not in variables:
                 raise ValueError(f"Variable '{var_name}' not found")
-            return str(variables[var_name])
+            return str(variables.get(var_name))
         return var_name
 
     expr = VARIABLE_PATTERN.sub(replace_var, expr)
-    
-    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-        debug_print(f"Final expression after all substitutions: {expr}", DEBUG_VERBOSE)
     return expr
 
 def split_outside_quotes(text, delimiter):
@@ -768,7 +738,7 @@ def evaluate_simple_condition(condition, variables):
     
     # Handle single variable
     if condition.startswith('v_') and condition in variables:
-        result = bool(variables[condition])
+        result = bool(variables.get(condition))
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Simple condition is variable '{condition}' = {result}", DEBUG_VERBOSE)
         return result
@@ -866,7 +836,7 @@ def evaluate_condition(condition, variables):
     if condition_lower == 'false':
         return False
     if condition.startswith('v_') and condition in variables:
-        return bool(variables[condition])
+        return bool(variables.get(condition))
     
     # Check if this is a compound condition
     has_and = " and " in condition
@@ -962,7 +932,7 @@ def evaluate_string_concatenation(expr: str, variables: Dict[str, Any]) -> str:
             try:
                 if array_name not in variables:
                     raise ValueError(f"Array '{array_name}' not found")
-                array = variables[array_name]
+                array = variables.get(array_name)
                 
                 # Evaluate index
                 index = evaluate_math_expression(index_expr, variables)
@@ -987,7 +957,7 @@ def evaluate_string_concatenation(expr: str, variables: Dict[str, Any]) -> str:
         if part.startswith('v_'):
             if part not in variables:
                 raise ValueError(f"Variable '{part}' not found")
-            value = variables[part]
+            value = variables.get(part)
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Variable value: {value}", DEBUG_VERBOSE)
             results.append(str(value))

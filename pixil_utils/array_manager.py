@@ -142,16 +142,15 @@ class PixilArray:
         """Get array type."""
         return self.array_type
 
-def validate_array_access(array_name: str, index: Any, variables: Dict[str, Any]) -> Union[float, str]:
+def validate_array_access(array_name: str, index: Any, variables) -> Union[float, str]:
     """
-    Validate array access and return value.
-    This encapsulates all array validation logic.
+    UPDATED: Validate array access and return value using VariableRegistry.
     """
-    # Check array exists
+    # OPTIMIZED: Use VariableRegistry.get() instead of dict access
     if array_name not in variables:
         raise ValueError(f"Array '{array_name}' not found")
         
-    array = variables[array_name]
+    array = variables.get(array_name)
     if not isinstance(array, PixilArray):
         raise ValueError(f"'{array_name}' is not an array")
         
