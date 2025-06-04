@@ -5,6 +5,8 @@ Provides debug, math functionality, and file management while maintaining Pixil'
 
 from .debug import DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, debug_print, set_debug_level
 from .math_functions import MATH_FUNCTIONS, random_float, has_math_expression, substitute_variables, evaluate_math_expression
+from .math_functions import MATH_FUNCTIONS, random_float, has_math_expression, substitute_variables, evaluate_math_expression
+from .condition_templates import evaluate_condition_fast, get_condition_template_stats, reset_condition_template_stats
 from .file_manager import PixilFileManager
 from .parameter_types import PARAMETER_TYPES, get_parameter_type, convert_to_type, validate_command_params
 from .expression_parser import format_parameter
@@ -33,6 +35,9 @@ __all__ = [
     'has_math_expression',
     'substitute_variables',
     'evaluate_math_expression',
+    'evaluate_condition_fast',
+    'get_condition_template_stats', 
+    'reset_condition_template_stats',
     'PixilFileManager',
     'ScriptManager',
     # Parameter type handling

@@ -99,8 +99,10 @@ class PixilMetricsDB(BaseDatabase):
                     fast_path_parse_attempts, fast_path_parse_hits, fast_path_parse_hit_rate, fast_path_parse_time_saved,
                     jit_attempts, jit_hits, jit_failures, jit_hit_rate, jit_time_saved,
                     jit_line_cache_skips, failed_lines_cached, jit_skip_efficiency, jit_skip_time_saved,
-                    jit_cache_size, jit_cache_utilization, jit_compilation_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    jit_cache_size, jit_cache_utilization, jit_compilation_time,
+                    condition_template_attempts, condition_template_hits, condition_template_hit_rate,
+                    condition_template_time_saved, condition_template_cache_size
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 script_name, start_time, end_time, reason,                                    # 4 values
                 metrics_data.get('commands_executed', 0),                                      # 1
@@ -163,7 +165,13 @@ class PixilMetricsDB(BaseDatabase):
                 metrics_data.get('jit_skip_time_saved', 0.0),                                # 1
                 metrics_data.get('jit_cache_size', 0),                                       # 1
                 metrics_data.get('jit_cache_utilization', 0.0),                              # 1
-                metrics_data.get('jit_compilation_time', 0.0)                                # 1 = 57 total
+                metrics_data.get('jit_compilation_time', 0.0), 
+                # Conditional Templates
+                metrics_data.get('condition_template_attempts', 0),                          # 1
+                metrics_data.get('condition_template_hits', 0),                              # 1
+                metrics_data.get('condition_template_hit_rate', 0.0),                        # 1
+                metrics_data.get('condition_template_time_saved', 0.0),                      # 1
+                metrics_data.get('condition_template_cache_size', 0)                         # 1 = 62 total
             ))
             conn.commit()
         

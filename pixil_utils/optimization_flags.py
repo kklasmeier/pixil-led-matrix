@@ -151,6 +151,7 @@ ENABLE_PHASE1_FAST_PATH = True       # Cache% - Simple variable lookups (v_varia
 ENABLE_FAST_MATH = True              # FM% - Optimized math expression evaluation
 ENABLE_EXPRESSION_CACHE = False      # C% - Cache results of math expressions
 ENABLE_JIT = False                   # JIT%, Skip%, JIT-Size, JIT-Hit, JIT-Comp, Failed - JIT compilation of expressions
+ENABLE_CONDITION_TEMPLATES = True    # Condition Templates - Pre-parsed condition templates for fast boolean evaluation
 
 # ===== DEBUGGING AND MONITORING =====
 SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup
@@ -158,8 +159,8 @@ SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup
 # ===== PREDEFINED PROFILES =====
 def set_profile_all_off():
     """Disable all optimizations for baseline testing."""
-    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT
-    
+    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
+
     ENABLE_ULTRA_FAST_PATH = False
     ENABLE_FAST_PATH = False
     ENABLE_PARSE_VALUE_CACHE = False
@@ -167,11 +168,12 @@ def set_profile_all_off():
     ENABLE_FAST_MATH = False
     ENABLE_EXPRESSION_CACHE = False
     ENABLE_JIT = False
+    ENABLE_CONDITION_TEMPLATES = False
     print("✓ All optimizations disabled (baseline mode)")
 
 def set_profile_all_on():
     """Enable all optimizations."""
-    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT
+    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
     
     ENABLE_ULTRA_FAST_PATH = True
     ENABLE_FAST_PATH = True
@@ -180,6 +182,7 @@ def set_profile_all_on():
     ENABLE_FAST_MATH = True
     ENABLE_EXPRESSION_CACHE = True
     ENABLE_JIT = True
+    ENABLE_CONDITION_TEMPLATES = True
     print("✓ All optimizations enabled")
 
 def set_profile_math_heavy():

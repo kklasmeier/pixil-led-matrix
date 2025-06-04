@@ -5,13 +5,15 @@ Provides safe math operations without variable state dependencies.
 
 import math
 import random
+import time
 import re
 from typing import Dict, Any, Union, Optional, Tuple
 from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print)
 from .array_manager import validate_array_access
 from collections import OrderedDict
 from .jit_compiler import JITExpressionCache
-from .optimization_flags import ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT
+from .condition_templates import evaluate_condition_fast
+from .optimization_flags import ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
 # Import pre-compiled regex patterns instead of recompiling
 from .regex_patterns import (
     SIMPLE_ADD_PATTERN, SIMPLE_SUB_PATTERN, SIMPLE_MUL_PATTERN,
@@ -38,6 +40,9 @@ _JIT_COMPILATION_FAILURES = 0
 _FAILED_SCRIPT_LINES = set()  # Use set for faster lookups
 _JIT_LINE_CACHE_SKIPS = 0
 _current_script_line = None  # Store current script line locally
+_CONDITION_TEMPLATE_HITS = 0
+_CONDITION_TEMPLATE_MISSES = 0
+_CONDITION_TEMPLATE_TIME_SAVED = 0.0
 
 def set_current_script_line(line):
     """Set the current script line for JIT failure caching."""
@@ -262,6 +267,33 @@ def reset_expression_cache_stats():
     _CACHE_HITS = 0
     _CACHE_MISSES = 0
     _EXPRESSION_RESULT_CACHE.clear()
+
+def reset_condition_template_stats():
+    """Reset condition template statistics for new script."""
+    global _CONDITION_TEMPLATE_HITS, _CONDITION_TEMPLATE_MISSES, _CONDITION_TEMPLATE_TIME_SAVED
+    _CONDITION_TEMPLATE_HITS = 0
+    _CONDITION_TEMPLATE_MISSES = 0
+    _CONDITION_TEMPLATE_TIME_SAVED = 0.0
+
+def report_condition_template_stats():
+    """Report condition template statistics."""
+    global _CONDITION_TEMPLATE_HITS, _CONDITION_TEMPLATE_MISSES, _CONDITION_TEMPLATE_TIME_SAVED
+    
+    total_attempts = _CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES
+    if total_attempts > 0:
+        hit_rate = (_CONDITION_TEMPLATE_HITS / total_attempts) * 100
+        
+        print(f"Condition Template Statistics:")
+        print(f"  Template attempts: {total_attempts:,}")
+        print(f"  Template hits: {_CONDITION_TEMPLATE_HITS:,} ({hit_rate:.1f}%)")
+        print(f"  Template misses: {_CONDITION_TEMPLATE_MISSES:,}")
+        print(f"  Time saved: {_CONDITION_TEMPLATE_TIME_SAVED:.3f} seconds")
+        
+        if _CONDITION_TEMPLATE_HITS > 0:
+            avg_time_saved = (_CONDITION_TEMPLATE_TIME_SAVED / _CONDITION_TEMPLATE_HITS) * 1000000  # microseconds
+            print(f"  Avg time saved per hit: {avg_time_saved:.1f} μs")
+    else:
+        print("Condition Templates: No template attempts")
 
 def try_fast_number(expr: str) -> Optional[Union[int, float]]:
     """
@@ -819,7 +851,26 @@ def evaluate_condition(condition, variables):
     """
     if DEBUG_LEVEL >= DEBUG_VERBOSE:
         debug_print(f"Evaluating condition: '{condition}'", DEBUG_VERBOSE)
-    
+
+    # ===== CONDITION TEMPLATES OPTIMIZATION =====
+    if ENABLE_CONDITION_TEMPLATES:
+        global _CONDITION_TEMPLATE_HITS, _CONDITION_TEMPLATE_MISSES, _CONDITION_TEMPLATE_TIME_SAVED
+        
+        template_start = time.perf_counter()
+        fast_result = evaluate_condition_fast(condition, variables)
+        
+        if fast_result is not None:
+            _CONDITION_TEMPLATE_HITS += 1
+            _CONDITION_TEMPLATE_TIME_SAVED += time.perf_counter() - template_start
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Condition template hit: {condition} = {fast_result}", DEBUG_VERBOSE)
+            return fast_result
+        else:
+            _CONDITION_TEMPLATE_MISSES += 1
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Condition template miss, using fallback: {condition}", DEBUG_VERBOSE)
+    # ===== END CONDITION TEMPLATES =====
+
     # Validate condition format
     condition = condition.strip()
     if not condition:

@@ -11,7 +11,7 @@ from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
 from pixil_utils.variable_registry import VariableRegistry
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
-from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats)
+from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats, report_condition_template_stats, reset_condition_template_stats)
 from pixil_utils.file_manager import PixilFileManager
 from pixil_utils.parameter_types import (PARAMETER_TYPES, validate_command_params)
 from pixil_utils.expression_parser import format_parameter
@@ -269,6 +269,8 @@ def report_metrics(reason="complete", script_name=None, start_time=None):
     print("--")
     report_expression_cache_stats()
     print("--")
+    report_condition_template_stats()    
+    print("--")
     report_parse_value_stats()
     report_detailed_summary()
     print("--")
@@ -291,9 +293,10 @@ def save_performance_metrics(script_name, start_time, reason):
     
     # Import the cache variables from math_functions
     from pixil_utils.math_functions import (_FAST_MATH_HITS, _FAST_MATH_TOTAL, 
-                                          _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES,
-                                          _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES,
-                                          _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE)
+                                        _EXPRESSION_RESULT_CACHE, _CACHE_HITS, _CACHE_MISSES,
+                                        _JIT_ATTEMPTS, _JIT_HITS, _JIT_COMPILATION_FAILURES,
+                                        _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE,
+                                        _CONDITION_TEMPLATE_HITS, _CONDITION_TEMPLATE_MISSES, _CONDITION_TEMPLATE_TIME_SAVED)
     
     # Import our detailed parse value stats - ADD NEW IMPORTS
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
@@ -422,6 +425,12 @@ def save_performance_metrics(script_name, start_time, reason):
         'parse_value_total_time': _PARSE_VALUE_TOTAL_TIME,
         'parse_value_avg_time_per_call': (_PARSE_VALUE_TOTAL_TIME / _PARSE_VALUE_ATTEMPTS) if _PARSE_VALUE_ATTEMPTS > 0 else 0.0,
 
+        # Condition template metrics
+        'condition_template_attempts': _CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES,
+        'condition_template_hits': _CONDITION_TEMPLATE_HITS,
+        'condition_template_hit_rate': (_CONDITION_TEMPLATE_HITS / (_CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES) * 100) if (_CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES) > 0 else 0.0,
+        'condition_template_time_saved': _CONDITION_TEMPLATE_TIME_SAVED,
+        'condition_template_cache_size': 0,  # Will be updated when we add proper cache size tracking
     }
 
     # Save to database
@@ -480,6 +489,7 @@ def process_script(filename, execute_func=None):
     reset_expression_cache_stats()
     reset_parse_value_stats()
     reset_jit_stats()
+    reset_condition_template_stats()
     show_status()
     
     # Get queue instance
