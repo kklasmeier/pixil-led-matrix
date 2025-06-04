@@ -298,6 +298,9 @@ def save_performance_metrics(script_name, start_time, reason):
                                         _JIT_LINE_CACHE_SKIPS, _FAILED_SCRIPT_LINES, _JIT_CACHE,
                                         _CONDITION_TEMPLATE_HITS, _CONDITION_TEMPLATE_MISSES, _CONDITION_TEMPLATE_TIME_SAVED)
     
+    # ADD THIS NEW IMPORT for condition template cache size:
+    from pixil_utils.condition_templates import get_condition_template_stats
+    
     # Import our detailed parse value stats - ADD NEW IMPORTS
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
     global _ULTRA_FAST_HITS, _ULTRA_FAST_TOTAL, _FAST_PATH_PARSE_HITS, _FAST_PATH_PARSE_TOTAL
@@ -356,6 +359,9 @@ def save_performance_metrics(script_name, start_time, reason):
     
     # JIT cache utilization
     jit_cache_utilization = (_JIT_CACHE.cache_size / _JIT_CACHE.max_size * 100) if _JIT_CACHE.max_size > 0 else 0
+    
+    # FIXED: Get condition template stats including cache size
+    ct_stats = get_condition_template_stats()
     
     # Prepare metrics data - ADD NEW FIELDS
     metrics_data = {
@@ -425,12 +431,12 @@ def save_performance_metrics(script_name, start_time, reason):
         'parse_value_total_time': _PARSE_VALUE_TOTAL_TIME,
         'parse_value_avg_time_per_call': (_PARSE_VALUE_TOTAL_TIME / _PARSE_VALUE_ATTEMPTS) if _PARSE_VALUE_ATTEMPTS > 0 else 0.0,
 
-        # Condition template metrics
+        # FIXED: Condition template metrics with proper cache size
         'condition_template_attempts': _CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES,
         'condition_template_hits': _CONDITION_TEMPLATE_HITS,
         'condition_template_hit_rate': (_CONDITION_TEMPLATE_HITS / (_CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES) * 100) if (_CONDITION_TEMPLATE_HITS + _CONDITION_TEMPLATE_MISSES) > 0 else 0.0,
         'condition_template_time_saved': _CONDITION_TEMPLATE_TIME_SAVED,
-        'condition_template_cache_size': 0,  # Will be updated when we add proper cache size tracking
+        'condition_template_cache_size': ct_stats['condition_cache_size'],  # FIXED: Use actual cache size
     }
 
     # Save to database
@@ -441,7 +447,7 @@ def save_performance_metrics(script_name, start_time, reason):
     except Exception as e:
         print(f"Database save failed: {e}")
         raise
-    
+
 def on_queue_pause():
     """Called when the command queue becomes full."""
     global _metrics
