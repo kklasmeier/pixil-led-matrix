@@ -116,10 +116,11 @@ def show_script_runs(count, script_filter=None, verbose=False, resource_constrai
                    parse_value_attempts, parse_value_total_time,  -- ADD THESE LINES
                    fast_path_hit_rate, fast_math_hit_rate, cache_hit_rate,
                    parse_value_hit_rate, jit_hit_rate, jit_skip_efficiency'''
-                
+
         if verbose:
-            base_query += ''', jit_cache_size, jit_cache_utilization, jit_compilation_time, failed_lines_cached,
-                             ultra_fast_hit_rate, fast_path_parse_hit_rate, var_cache_hit_rate'''
+                    base_query += ''', jit_cache_size, jit_cache_utilization, jit_compilation_time, failed_lines_cached,
+                                    ultra_fast_hit_rate, fast_path_parse_hit_rate, var_cache_hit_rate,
+                                    condition_template_hit_rate, condition_template_cache_size'''
         
         where_conditions = [
             "execution_reason IN ('complete', 'interrupted')",
@@ -186,9 +187,9 @@ def show_script_runs(count, script_filter=None, verbose=False, resource_constrai
     
     if verbose:
         # UPDATED HEADER with new detailed columns
-        header_line = "Date/Time           Script              Commands  TotalTime ActTime  QWaitTime TotalParses TotalParseTime Cmds/s   Lines/s  FP%   FM%   C%  UF%  Fast% Cache% JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed"
-        separator_line = "-" * 200  # Increase length for new columns
-        
+        header_line = "Date/Time           Script              Commands  TotalTime ActTime  QWaitTime TotalParses TotalParseTime Cmds/s   Lines/s  FP%   FM%   C%  UF%  Fast% Cache% CT-Hit% CT-CacheSize JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed"
+        separator_line = "-" * 220  # Increase length for new columns
+
         for script_index, script_name in enumerate(sorted(runs_data.keys())):
             runs = runs_data[script_name]
             
@@ -230,7 +231,11 @@ def show_script_runs(count, script_filter=None, verbose=False, resource_constrai
                 jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
                 failed_lines = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
 
-                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {total_parses:>11} {total_parse_time:>14} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>5} {fm_rate:>5} {cache_rate:>4} {uf_rate:>4} {fast_parse_rate:>5} {var_cache_rate:>6} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")    
+                # Condition template rates  
+                ct_hit_rate = f"{safe_get_column(row, 'condition_template_hit_rate', 0):.0f}%"
+                ct_cache_size = f"{safe_get_column(row, 'condition_template_cache_size', 0)}"
+
+                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {total_parses:>11} {total_parse_time:>14} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>5} {fm_rate:>5} {cache_rate:>4} {uf_rate:>4} {fast_parse_rate:>5} {var_cache_rate:>6} {ct_hit_rate:>7} {ct_cache_size:>12} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
     else:
         # Define the header once for compact format
         header_line = "Date/Time           Script              Commands  TotalTime ActTime  QWaitTime TotalParses TotalParseTime Cmds/s   Lines/s  FP%   FM%   C%  UF%  Fast% Cache% JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed"
