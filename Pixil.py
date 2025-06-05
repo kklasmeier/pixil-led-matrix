@@ -3,9 +3,10 @@ import sys
 import gc
 import signal  # At top with other imports
 import time
+import datetime
 from queue import Empty
 from shared import QueueManager
-import datetime
+from shared.mplot_protocol import pack_mplot, encode_buffer
 from pathlib import Path
 from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
@@ -39,6 +40,11 @@ from pixil_utils.regex_patterns import (
     SPRITE_OP_PATTERN, PROCEDURE_DEF_PATTERN, PROCEDURE_CALL_PATTERN, FRAME_PARAM_PATTERN,
     FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN
 )
+
+# Multi-plot buffer management
+mplot_buffer = bytearray()
+mplot_count = 0
+
 
 def is_headless():
     """Detect if running in a headless/non-interactive environment"""
@@ -101,13 +107,17 @@ def reset_fast_path_stats():
 
 def initialize_metrics():
     """Reset metrics at start of script."""
-    global _metrics
+    global _metrics, mplot_buffer, mplot_count
     _metrics['commands_processed'] = 0
     _metrics['script_lines_processed'] = 0
     _metrics['start_time'] = time.time()
     _metrics['active_time'] = 0
     _metrics['pause_start'] = None
     _metrics['total_pause_time'] = 0
+
+    # Reset mplot buffer
+    mplot_buffer.clear()
+    mplot_count = 0
 
 def report_parse_value_stats():
     """Report detailed parse value optimization statistics."""
@@ -479,6 +489,7 @@ def process_script(filename, execute_func=None):
 
     # Track script execution timing
     global script_start_time, script_name
+    global mplot_buffer, mplot_count  # Add this line
     script_start_time = datetime.datetime.now()
     script_name = Path(filename).name
 
@@ -1471,6 +1482,7 @@ def process_script(filename, execute_func=None):
                 handle_print_statement(line, variables)
                 continue  # Skip the rest of the loop for print statements
 
+
             # Command parsing
             else:
                 if line == 'clear' or line == 'clear()':
@@ -1499,6 +1511,62 @@ def process_script(filename, execute_func=None):
                     except (ValueError, KeyError) as e:
                         debug_print(f"Error processing throttle command: {str(e)}", DEBUG_SUMMARY)
                         raise
+                # Handle mplot command
+                elif line.startswith('mplot('):
+                    global mplot_buffer, mplot_count 
+                    command_match = COMMAND_PATTERN.match(line)
+                    if command_match:
+                        try:
+                            args = validate_command_params('mplot', command_match.group(2))
+                            # Parse parameters and convert to proper types
+                            x = int(float(parse_value(args[0], 'mplot', 0)))
+                            y = int(float(parse_value(args[1], 'mplot', 1)))
+                            raw_color = parse_value(args[2], 'mplot', 2)
+                            # Convert color properly
+                            if isinstance(raw_color, str) and raw_color.isdigit():
+                                final_color = int(raw_color)
+                            else:
+                                final_color = raw_color  # Keep as string for named colors
+                            
+                            # Convert optional parameters
+                            intensity = None
+                            if len(args) > 3 and args[3]:
+                                intensity = int(float(parse_value(args[3], 'mplot', 3)))
+                            burnout = None
+                            if len(args) > 4 and args[4]:
+                                burnout = int(float(parse_value(args[4], 'mplot', 4)))
+                           
+                            # Pack into buffer
+                            record = pack_mplot(x, y, final_color, intensity, burnout)
+                            mplot_buffer.extend(record)
+                            mplot_count += 1
+
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                debug_print(f"Packed mplot: buffer size={len(mplot_buffer)}, count={mplot_count}", DEBUG_VERBOSE)
+                                
+                        except (ValueError, KeyError) as e:
+                            debug_print(f"Error processing mplot command: {str(e)}", DEBUG_SUMMARY)
+                            raise
+
+                # Handle mflush command  
+                elif line == 'mflush' or line == 'mflush()':
+                    if len(mplot_buffer) > 0:
+                        # Encode buffer and send as single command
+                        encoded_data = encode_buffer(mplot_buffer)
+                        command = f"plot_batch(\"{encoded_data}\")"
+                        
+                        if DEBUG_LEVEL >= DEBUG_SUMMARY:
+                            debug_print(f"Flushing {mplot_count} mplot commands as plot_batch", DEBUG_SUMMARY)
+                        
+                        store_frame_command(command)
+                        
+                        # Clear buffer
+                        mplot_buffer.clear()
+                        mplot_count = 0
+                    else:
+                        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                            debug_print("mflush called with empty buffer", DEBUG_VERBOSE)
+
                 else:   
                     command_match = COMMAND_PATTERN.match(line)
                     if command_match:

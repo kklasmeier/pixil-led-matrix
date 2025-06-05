@@ -77,6 +77,10 @@ WHILE_LOOP_PATTERN = re.compile(r'while (.+?) then')
 IF_PATTERN = re.compile(r'if (.+?) then')
 RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
 
+# =============================================================================
+# Other
+# =============================================================================
+
 # Math expression detection patterns
 MATH_EXPR_PATTERN = re.compile(r'[\+\-\*/\(\)]|v_\w+|\d+\.?\d*')
 ARRAY_ACCESS_PATTERN = re.compile(r'(v_\w+)\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]')
@@ -84,9 +88,14 @@ VARIABLE_PATTERN = re.compile(r'v_\w+')
 ARRAY_INDEX_PATTERN = re.compile(r'(v_\w+)\[([^\[\]]+)\]')
 CONCAT_ARRAY_PATTERN = re.compile(r'(v_\w+)\[(.+?)\]')
 
+# Multi-plot patterns
+MPLOT_PATTERN = re.compile(r'mplot\((.*)\)')
+MFLUSH_PATTERN = re.compile(r'mflush\(\s*\)')
+
 # =============================================================================
 # PATTERN USAGE SUMMARY
 # =============================================================================
+
 """
 Fast Path Patterns (parse_value):
 - FAST_SIMPLE_ARRAY_PATTERN

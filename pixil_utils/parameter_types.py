@@ -14,6 +14,14 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},  # Added
         {'name': 'duration', 'type': 'float', 'position': 4, 'optional': True}
     ],
+    'mplot': [
+        {'name': 'x', 'type': 'int', 'position': 0},
+        {'name': 'y', 'type': 'int', 'position': 1},
+        {'name': 'color', 'type': 'color', 'position': 2},
+        {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},
+        {'name': 'burnout', 'type': 'float', 'position': 4, 'optional': True}
+    ],
+    'mflush': [],
     'draw_line': [
         {'name': 'x1', 'type': 'int', 'position': 0},
         {'name': 'y1', 'type': 'int', 'position': 1},
