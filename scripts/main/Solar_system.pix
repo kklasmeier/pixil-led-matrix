@@ -1,14 +1,15 @@
 # Solar System Animation with Multiple Views
-# Uses Mercury's revolutions to time state changes
+# Uses frame counting to time state changes (keeping realistic planet speeds)
 
-# Revolution settings for each state
-v_revolutions_state0 = 2000  # How many Mercury orbits for top view
-v_revolutions_state1 = 1200  # How many for perspective with rings
-v_revolutions_state2 = 3500  # How many for perspective without rings
+# Scene duration settings (in frames) - about 12 seconds each at 0.01s per frame
+v_frames_state0 = 1200   # Top view duration (~12 seconds)
+v_frames_state1 = 1200   # Perspective with rings duration (~12 seconds)  
+v_frames_state2 = 1200   # Perspective without rings duration (~12 seconds)
 
-# Revolution tracking
+# Frame counting for scene timing
+v_frame_counter = 0
 v_mercury_revolutions = 0
-v_last_angle = 0
+v_total_revolutions = 0
 
 # Initialize variables for sun
 v_sun_x = 32
@@ -34,7 +35,7 @@ create_array(v_size, 4)
 create_array(v_colors, 4, string)
 create_array(v_brightness, 4)
 
-# Set up planet properties
+# Set up planet properties (RESTORED: Original realistic speeds)
 # Mercury
 v_orbit_radius[0] = 10
 v_speed[0] = 0.105
@@ -86,22 +87,29 @@ def draw_perspective_orbits_with_plots {
 # Define procedure for drawing planets
 def draw_planets {
     for v_i in (0, 3, 1) then
-        # Store previous angle for Mercury
+        # Store previous angle for Mercury BEFORE updating
         if v_i == 0 then
             v_prev_angle = v_angle[0]
         endif
         
-        # Update orbital position
-        v_angle[v_i] = v_angle[v_i] + v_speed[v_i]
+        # Update orbital position (double speed in state 1 - perspective with rings)
+        if v_current_state == 1 then
+            v_angle[v_i] = v_angle[v_i] + (v_speed[v_i] * 2)
+        else
+            v_angle[v_i] = v_angle[v_i] + v_speed[v_i]
+        endif
         if v_angle[v_i] >= 360 then
             v_angle[v_i] = v_angle[v_i] - 360
         endif
         
-        # Check for Mercury crossing 0 degrees (completing a revolution)
-        # OPTIMIZED: Using compound condition instead of nested if
-        if v_i == 0 and v_prev_angle > 270 and v_angle[0] < 90 then
-            v_mercury_revolutions = v_mercury_revolutions + 1
-            #print(f"Mercury completed revolution {v_mercury_revolutions}")
+        # IMPROVED: Revolution detection for Mercury
+        if v_i == 0 then
+            # Check if Mercury wrapped around from high angle to low angle
+            if v_prev_angle > 300 and v_angle[0] < 60 then
+                v_mercury_revolutions = v_mercury_revolutions + 1
+                v_total_revolutions = v_total_revolutions + 1
+                print(f"Mercury revolution {v_mercury_revolutions} (total: {v_total_revolutions}) - State: {v_current_state}")
+            endif
         endif
         
         if v_current_state == 0 then
@@ -128,27 +136,28 @@ def draw_planets {
 def draw_system {
     begin_frame
     
-    # Check for state changes based on Mercury revolutions
-    # OPTIMIZED: Using compound conditions for state changes
-    if v_current_state == 0 and v_mercury_revolutions >= v_revolutions_state0 then
+    # Increment frame counter
+    v_frame_counter = v_frame_counter + 1
+    
+    # Check for state changes based on frame count (time-based instead of revolution-based)
+    if v_current_state == 0 and v_frame_counter >= v_frames_state0 then
         v_current_state = 1
-        v_mercury_revolutions = 0
-        print("Switching to perspective with rings")
-    elseif v_current_state == 1 and v_mercury_revolutions >= v_revolutions_state1 then
+        v_frame_counter = 0
+        print("*** SWITCHING to perspective with rings ***")
+    elseif v_current_state == 1 and v_frame_counter >= v_frames_state1 then
         v_current_state = 2
-        v_mercury_revolutions = 0
-        print("Switching to perspective without rings")
-    elseif v_current_state == 2 and v_mercury_revolutions >= v_revolutions_state2 then
+        v_frame_counter = 0
+        print("*** SWITCHING to perspective without rings ***")
+    elseif v_current_state == 2 and v_frame_counter >= v_frames_state2 then
         v_current_state = 0
-        v_mercury_revolutions = 0
-        print("Switching to top view")
+        v_frame_counter = 0
+        print("*** SWITCHING to top view ***")
     endif
     
     # Update perspective for states 1 and 2
     if v_current_state > 0 then
         v_view_angle = v_view_angle + (v_angle_direction * v_angle_speed)
         
-        # OPTIMIZED: Using compound conditions for angle control
         if v_view_angle > 80 and v_angle_direction == 1 then
             v_view_angle = 80
             v_angle_direction = -1
@@ -165,7 +174,6 @@ def draw_system {
     # Draw sun with pulsing effect
     v_sun_pulse = v_sun_pulse + (v_sun_pulse_dir * 0.14)
     
-    # OPTIMIZED: Using compound conditions for pulse control
     if v_sun_pulse > 95 and v_sun_pulse_dir == 1 then
         v_sun_pulse = 95
         v_sun_pulse_dir = -1
@@ -193,6 +201,13 @@ def draw_system {
 
 # Set animation speed
 throttle(1.0)
+
+print("Starting Solar System Animation")
+print("Each state lasts ~12 seconds (1200 frames)")
+print("Planets move at realistic orbital speeds")
+print("State 0: Top view")
+print("State 1: Perspective with rings")  
+print("State 2: Perspective without rings")
 
 # Main animation loop
 while 1 then

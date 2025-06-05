@@ -16,7 +16,7 @@ create_array(v_delay, v_num_drones)
 create_array(v_steps, v_num_drones)
 create_array(v_path_x, v_path_size)
 create_array(v_path_y, v_path_size)
-
+v_rest = 0.05
 # Initial color (white)
 v_color = 99
 
@@ -119,7 +119,7 @@ def animate_drones {
             endif
         endfor v_d
         end_frame
-        rest(0.01)
+        rest(v_rest)
     endfor v_s
     
     # Hold final frame to ensure all drones are visible

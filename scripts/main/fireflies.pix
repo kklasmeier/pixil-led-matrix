@@ -1,4 +1,4 @@
-throttle(.1)
+throttle(0)
 # Define a slight trail for the movement effect
 define_sprite(trail, 2, 2)
     plot(1, 1, yellow, 20)
