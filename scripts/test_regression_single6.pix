@@ -1,283 +1,35 @@
-# Oscilloscope Display - Optimized with pre-calculated waveforms
-# Fast performance using lookup tables
+# Multi-plot Performance Test
+# Plots every pixel on the 64x64 matrix using batched mplot commands
+# Tests all spectral colors 1-99 in sequence
 
+print("Starting mplot performance test...")
+print("This will plot 4096 pixels per color (64x64 matrix)")
+print("Testing spectral colors 1-99 with batched mplot commands")
+
+v_start_time = 0  # Will be set when timing starts
+
+# Clear display first
 clear()
 
-# Pre-calculated waveform lookup tables (much faster than real-time math)
-v_table_size = 128
-create_array(v_sine_table, 128)
-create_array(v_square_table, 128)
-create_array(v_sawtooth_table, 128)
-create_array(v_triangle_table, 128)
-
-# Channel parameters
-v_num_channels = 3
-create_array(v_channel_freq_mult, 3)
-create_array(v_channel_amp, 3)
-create_array(v_channel_phase_offset, 3)
-create_array(v_channel_type, 3)
-create_array(v_channel_y_offset, 3)
-
-# Channel colors
-create_array(v_channel_colors, 3, string)
-v_channel_colors[0] = "lime"
-v_channel_colors[1] = "cyan"  
-v_channel_colors[2] = "yellow"
-
-# Grid color
-v_grid_color = "dark_gray"
-
-# Time variables
-v_time_index = 0
-
-# Pre-calculate all waveform lookup tables
-print("Pre-calculating waveform tables...")
-
-for v_i in (0, v_table_size - 1, 1)
-    v_angle = v_i * 6.28318530718 / v_table_size
-    
-    # Sine wave
-    v_sine_table[v_i] = sin(v_angle) * 100  # Scale to avoid decimals
-    
-    # Square wave
-    if v_sine_table[v_i] > 0 then
-        v_square_table[v_i] = 100
-    else
-        v_square_table[v_i] = -100
-    endif
-    
-    # Sawtooth wave
-    v_sawtooth_table[v_i] = (v_i * 200 / v_table_size) - 100
-    
-    # Triangle wave
-    if v_i < v_table_size / 2 then
-        v_triangle_table[v_i] = (v_i * 200 / v_table_size) - 100
-    else
-        v_triangle_table[v_i] = 300 - (v_i * 200 / v_table_size)
-    endif
-endfor v_i
-
-print("Waveform tables ready!")
-
-# Initialize channels
-v_channel_freq_mult[0] = 2    # Channel 1 frequency multiplier
-v_channel_freq_mult[1] = 3    # Channel 2 frequency multiplier  
-v_channel_freq_mult[2] = 1    # Channel 3 frequency multiplier
-
-v_channel_amp[0] = 12         # Channel 1 amplitude
-v_channel_amp[1] = 8          # Channel 2 amplitude
-v_channel_amp[2] = 15         # Channel 3 amplitude
-
-v_channel_phase_offset[0] = 0          # Channel 1 phase
-v_channel_phase_offset[1] = 32         # Channel 2 phase offset
-v_channel_phase_offset[2] = 64         # Channel 3 phase offset
-
-v_channel_type[0] = 0         # Sine wave
-v_channel_type[1] = 1         # Square wave
-v_channel_type[2] = 2         # Sawtooth wave
-
-v_channel_y_offset[0] = 16    # Y offset for channel 1
-v_channel_y_offset[1] = 32    # Y offset for channel 2
-v_channel_y_offset[2] = 48    # Y offset for channel 3
-
-# Draw optimized grid (faster version)
-def draw_fast_grid {
-    # Just the essential grid lines for performance
-    # Horizontal lines
-    for v_x in (0, 63, 8)
-        plot(v_x, 16, v_grid_color, 25)
-        plot(v_x, 32, v_grid_color, 40)  # Center line brighter
-        plot(v_x, 48, v_grid_color, 25)
-    endfor v_x
-    
-    # Vertical lines
-    for v_y in (0, 63, 8)
-        plot(16, v_y, v_grid_color, 25)
-        plot(32, v_y, v_grid_color, 40)  # Center line brighter
-        plot(48, v_y, v_grid_color, 25)
+# Test each spectral color from 1 to 99
+for v_color in (1, 99, 1)
+    print(f"Testing color {v_color}...")
+    begin_frame(false)
+    # Plot every pixel on the 64x64 matrix for this color
+    for v_y in (0, 63, 1)
+        for v_x in (0, 63, 1)
+            plot(v_x, v_y, v_color)
+        endfor v_x
     endfor v_y
-}
-
-# Modulation for visual variety
-v_mod_timer = 0
-v_cycle_timer = 0
-v_current_mode = 0
-
-# Main animation loop - optimized for speed
-v_frame = 0
-while v_frame >= 0 then
-    begin_frame  # Normal frame clearing
     
-    # Draw minimal grid first
-    call draw_fast_grid
-    
-    # Update time and modulation
-    v_time_index = v_time_index + 1
-    v_mod_timer = v_mod_timer + 1
-    v_cycle_timer = v_cycle_timer + 1
-    
-    # Change modes every 4 seconds
-    if v_cycle_timer > 240 then    
-    # Mode indicator
-    if v_current_mode == 0 then
-        plot(60, 2, "white", 100)
-    elseif v_current_mode == 1 then
-        plot(60, 2, "red", 100)
-        plot(61, 2, "red", 100)
-    else
-        plot(60, 2, "blue", 100)
-        plot(61, 2, "blue", 100)
-    endif
-        v_cycle_timer = 0
-        v_current_mode = v_current_mode + 1
-        if v_current_mode > 2 then
-            v_current_mode = 0
-        endif
-    endif
-    
-    # Apply modulation based on mode
-    if v_current_mode == 1 then
-        # Frequency modulation
-        v_freq_mod = 50 + 30 * sin(v_mod_timer * 0.02)
-        v_channel_freq_mult[0] = 2 + v_freq_mod / 50
-        v_channel_freq_mult[1] = 3 + v_freq_mod / 40
-    elseif v_current_mode == 2 then
-        # Amplitude modulation
-        v_amp_mod = 50 + 40 * sin(v_mod_timer * 0.015)
-        v_channel_amp[0] = 12 * v_amp_mod / 50
-        v_channel_amp[1] = 8 * v_amp_mod / 50
-        v_channel_amp[2] = 15 * v_amp_mod / 50
-    else
-        # Reset to normal
-        v_channel_freq_mult[0] = 2
-        v_channel_freq_mult[1] = 3
-        v_channel_freq_mult[2] = 1
-        v_channel_amp[0] = 12
-        v_channel_amp[1] = 8
-        v_channel_amp[2] = 15
-    endif
-    
-    # Draw waveforms - optimized approach per waveform type
-    for v_ch in (0, v_num_channels - 1, 1)
-        
-        if v_channel_type[v_ch] == 0 then
-            # Sine wave - needs plot points for smooth curves
-            for v_x in (0, 63, 1)
-                v_table_index = (v_time_index * v_channel_freq_mult[v_ch] + v_x * 2 + v_channel_phase_offset[v_ch]) % v_table_size
-                v_wave_value = v_sine_table[v_table_index]
-                v_y = v_channel_y_offset[v_ch] + (v_wave_value * v_channel_amp[v_ch] / 100)
-                
-                if v_y < 1 then
-                    v_y = 1
-                endif
-                if v_y > 62 then
-                    v_y = 62
-                endif
-                
-                plot(v_x, v_y, v_channel_colors[v_ch], 90)
-            endfor v_x
-            
-        elseif v_channel_type[v_ch] == 1 then
-            # Square wave - draw horizontal and vertical line segments
-            v_last_y = 0
-            v_current_state = 0
-            v_segment_start = 0
-            
-            for v_x in (0, 63, 1)
-                v_table_index = (v_time_index * v_channel_freq_mult[v_ch] + v_x * 2 + v_channel_phase_offset[v_ch]) % v_table_size
-                v_wave_value = v_square_table[v_table_index]
-                v_y = v_channel_y_offset[v_ch] + (v_wave_value * v_channel_amp[v_ch] / 100)
-                
-                if v_y < 1 then
-                    v_y = 1
-                endif
-                if v_y > 62 then
-                    v_y = 62
-                endif
-                
-                # Check for state transition
-                if v_x == 0 then
-                    v_last_y = v_y
-                    v_segment_start = 0
-                elseif v_y != v_last_y then
-                    # Draw horizontal segment
-                    draw_line(v_segment_start, v_last_y, v_x - 1, v_last_y, v_channel_colors[v_ch], 90)
-                    # Draw vertical transition
-                    draw_line(v_x - 1, v_last_y, v_x, v_y, v_channel_colors[v_ch], 90)
-                    v_last_y = v_y
-                    v_segment_start = v_x
-                endif
-                
-                # Draw final segment
-                if v_x == 63 then
-                    draw_line(v_segment_start, v_last_y, 63, v_last_y, v_channel_colors[v_ch], 90)
-                endif
-            endfor v_x
-            
-        elseif v_channel_type[v_ch] == 2 then
-            # Sawtooth wave - simple and clean
-            v_last_x = 0
-            v_last_y = 0
-            
-            for v_x in (0, 63, 1)
-                # Simple sawtooth: rises linearly across screen, then resets
-                v_wave_pos = (v_x + v_time_index * v_channel_freq_mult[v_ch]) % 32
-                v_normalized = (v_wave_pos / 16) - 1  # -1 to +1 over 32 pixels
-                
-                v_y = v_channel_y_offset[v_ch] + v_normalized * v_channel_amp[v_ch]
-                
-                if v_y < 1 then
-                    v_y = 1
-                endif
-                if v_y > 62 then
-                    v_y = 62
-                endif
-                
-                # Draw line from last point to current point
-                if v_x > 0 then
-                    draw_line(v_last_x, v_last_y, v_x, v_y, v_channel_colors[v_ch], 90)
-                endif
-                
-                v_last_x = v_x
-                v_last_y = v_y
-            endfor v_x
-            
-        else
-            # Triangle wave - draw line segments between peaks
-            v_last_x = 0
-            v_last_y = 0
-            
-            for v_x in (0, 63, 2)  # Sample every 2 pixels for performance
-                v_table_index = (v_time_index * v_channel_freq_mult[v_ch] + v_x * 2 + v_channel_phase_offset[v_ch]) % v_table_size
-                v_wave_value = v_triangle_table[v_table_index]
-                v_y = v_channel_y_offset[v_ch] + (v_wave_value * v_channel_amp[v_ch] / 100)
-                
-                if v_y < 1 then
-                    v_y = 1
-                endif
-                if v_y > 62 then
-                    v_y = 62
-                endif
-                
-                # Draw line from last point to current point
-                if v_x > 0 then
-                    draw_line(v_last_x, v_last_y, v_x, v_y, v_channel_colors[v_ch], 90)
-                endif
-                
-                v_last_x = v_x
-                v_last_y = v_y
-            endfor v_x
-        endif
-    endfor v_ch
-    
-    # Draw channel indicators
-    for v_ch in (0, v_num_channels - 1, 1)
-        plot(0, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
-        plot(63, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
-    endfor v_ch
-
-    
+    # Flush all 4096 plots as a single batch
     end_frame
     
-    v_frame = v_frame + 1
-endwhile
+endfor v_color
+
+print("Performance test completed!")
+print("Total pixels plotted: 4096 pixels × 99 colors = 405,504 pixels")
+print("All pixels were batched and sent as single plot_batch commands")
+sync_queue
+# Final clear
+clear()

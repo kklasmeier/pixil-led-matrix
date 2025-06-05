@@ -72,7 +72,6 @@ class ConditionTemplate:
     
     def _parse_compound_condition(self) -> bool:
         """Parse compound conditions with 'and'/'or'."""
-        # DEBUG: Track compound parsing attempts
         # Split by 'and' and 'or' while preserving the operators
         parts = COMPOUND_CONDITION_PATTERN.split(self.original)
         
@@ -320,13 +319,10 @@ def get_or_create_condition_template(condition: str) -> ConditionTemplate:
 
 def evaluate_condition_fast(condition: str, variables) -> Optional[bool]:
     """Fast condition evaluation entry point."""
-    # DEBUG: Track rain-related conditions
-    
     try:
         template = get_or_create_condition_template(condition)
         if template.can_fast_evaluate():
             result = template.evaluate_fast(variables)
-            # DEBUG: Show rain condition results
             return result
         else:
             return None  # Fall back to slow path

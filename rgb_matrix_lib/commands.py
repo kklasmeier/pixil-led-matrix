@@ -5,7 +5,7 @@ from typing import List, Any, Optional, Union
 from .debug import debug, Level, Component
 from .utils import NAMED_COLORS, get_color_rgb  # Removed parse_color_spec
 from .text_effects import TextEffect, EffectModifier
-
+from shared.mplot_protocol import decode_buffer, unpack_mplot_batch
 class CommandExecutor:
     """Handles parsing and execution of drawing commands."""
     
@@ -34,6 +34,7 @@ class CommandExecutor:
             'clear_text': self._handle_clear_text,
             'dispose_all_sprites': self._handle_dispose_all_sprites,
             'sync_queue': self._handle_sync_queue,
+            'plot_batch': self._handle_plot_batch,
         }
         self.current_command = None
         self.current_sprite_command = None
@@ -373,3 +374,23 @@ class CommandExecutor:
         """Handle sync_queue command - exists purely for synchronization."""
         debug("Processing sync_queue", Level.DEBUG, Component.COMMAND)
         pass
+
+    def _handle_plot_batch(self, encoded_data: str):
+        """Handle plot_batch command with multiple packed plots."""
+        debug(f"Handling plot_batch command with encoded data length: {len(encoded_data)}", 
+            Level.DEBUG, Component.COMMAND)
+        
+        try:
+            # Decode binary data
+            binary_data = decode_buffer(encoded_data)
+            plots = list(unpack_mplot_batch(binary_data))
+            
+            # Single atomic operation
+            self.api.plot_batch(plots)
+            
+            debug(f"Successfully executed batch of {len(plots)} plots atomically", 
+                Level.DEBUG, Component.COMMAND)
+                
+        except Exception as e:
+            debug(f"Error processing plot_batch: {str(e)}", Level.ERROR, Component.COMMAND)
+            raise ValueError(f"plot_batch execution failed: {str(e)}")

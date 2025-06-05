@@ -1,148 +1,99 @@
-# Enhanced Geometric Pulse - shapes grow from center and cycle through patterns
-v_angle = 0
-v_min_radius = 1
-v_max_radius = 30
-v_current_radius = v_min_radius
-v_growing = 1
-v_cycle = 0
-v_pattern_duration = 50
-v_animation_speed = 0.8
+# Multi-plot Burnout Test Script
+# Tests burnout functionality with mplot commands
 
-# Main animation loop
-while true then
-    begin_frame(false)
-    
-    # Determine pattern based on cycle
-    v_pattern = v_cycle % 5
-    
-    # Different patterns use different shapes, colors, and arrangements
-    if v_pattern == 0 then
-        # Pattern 1: Concentric regular polygons with increasing sides
-        for v_level in (0, 4, 1)
-            v_level_radius = v_current_radius - (v_level * 5)
-            
-            # Skip negative radius shapes
-            if v_level_radius < 1 then
-                continue
-            endif
-            
-            # Number of sides increases with level
-            v_sides = v_level + 3  # 3, 4, 5, 6 sides
-            v_color = (v_level * 15 + v_cycle * 5) % 100
-            v_rotation = v_angle + (v_level * 15)
-            
-            draw_polygon(32, 32, v_level_radius, v_sides, v_color, 90, v_rotation, false)
-        endfor v_level
+print("Starting mplot burnout test...")
+clear()
+print("1")
+# Test 1: Simple burnout test
+print("Test 1: Simple burnouts (1-3 seconds)")
+mplot(10, 10, red, 100, 1000)    # Burns out after 1 second
+mplot(20, 10, blue, 100, 2000)   # Burns out after 2 seconds  
+mplot(30, 10, green, 100, 3000)  # Burns out after 3 seconds
+mflush()
+print("1")
+
+print("Watch pixels disappear: red(1s), blue(2s), green(3s)")
+rest(4)  # Wait to see all burnouts complete
+
+# Test 2: Mixed burnouts and permanent pixels
+print("Test 2: Mixed burnouts and permanent")
+mplot(10, 20, yellow, 100, 1500)  # Burns out after 1.5 seconds
+mplot(20, 20, orange, 100)        # Permanent (no burnout)
+mplot(30, 20, purple, 100, 2500)  # Burns out after 2.5 seconds
+mflush()
+print("1")
+
+print("Yellow disappears at 1.5s, orange stays, purple disappears at 2.5s")
+rest(3)
+print("1")
+
+# Test 3: Staggered burnout times
+print("Test 3: Staggered burnouts (0.5s intervals)")
+v_base_x = 10
+v_base_y = 30
+for v_i in (0, 9, 1)
+    v_burnout_time = (v_i + 1) * 500  # 500ms, 1000ms, 1500ms, etc.
+    mplot(v_base_x + v_i * 5, v_base_y, v_i * 10, 100, v_burnout_time)
+endfor v_i
+mflush()
+print("1")
+
+print("Watch pixels disappear in sequence every 0.5 seconds")
+rest(6)  # Wait for all to burn out
+print("1")
+
+# Test 4: Large batch with burnouts
+print("Test 4: Large batch with mixed burnouts")
+v_start_x = 5
+v_start_y = 40
+for v_row in (0, 7, 1)
+    for v_col in (0, 7, 1)
+        v_plot_x = v_start_x + v_col * 7
+        v_plot_y = v_start_y + v_row * 2
+        v_color_id = (v_row + v_col) % 100  # Simple color variation
         
-    elseif v_pattern == 1 then
-        # Pattern 2: Alternating circles and squares
-        for v_level in (0, 5, 1)
-            v_level_radius = v_current_radius - (v_level * 4)
-            
-            # Skip negative radius shapes
-            if v_level_radius < 1 then
-                continue
-            endif
-            
-            v_color = (v_level * 20 + v_cycle * 7) % 100
-            
-            if v_level % 2 == 0 then
-                # Circles
-                draw_circle(32, 32, v_level_radius, v_color, 80, false)
-            else
-                # Squares (as 4-sided polygons)
-                v_rotation = v_angle + (v_level * 10)
-                draw_polygon(32, 32, v_level_radius, 4, v_color, 80, v_rotation, false)
-            endif
-        endfor v_level
-        
-    elseif v_pattern == 2 then
-        # Pattern 3: Offset circles creating a spiral effect
-        for v_level in (0, 7, 1)
-            v_level_radius = v_current_radius - (v_level * 3)
-            
-            # Skip negative radius shapes
-            if v_level_radius < 1 then
-                continue
-            endif
-            
-            # Calculate offset position based on angle
-            v_offset_angle = v_angle + (v_level * 30)
-            v_offset_distance = v_level * 2.5
-            v_center_x = 32 + cos(v_offset_angle * 0.017) * v_offset_distance
-            v_center_y = 32 + sin(v_offset_angle * 0.017) * v_offset_distance
-            
-            v_color = (v_level * 10 + v_cycle * 3) % 100
-            draw_circle(v_center_x, v_center_y, v_level_radius, v_color, 80, false)
-        endfor v_level
-        
-    elseif v_pattern == 3 then
-        # Pattern 4: Star shapes (using polygons with offset radius)
-        for v_level in (0, 3, 1)
-            v_level_radius = v_current_radius - (v_level * 6)
-            
-            # Skip negative radius shapes
-            if v_level_radius < 1 then
-                continue
-            endif
-            
-            v_color = (v_level * 25 + v_cycle * 10) % 100
-            v_sides = 5 + v_level  # 5, 6, 7, 8 sides
-            v_rotation = v_angle - (v_level * 5)
-            
-            # Draw star-like shapes (two offset polygons)
-            draw_polygon(32, 32, v_level_radius, v_sides, v_color, 80, v_rotation, false)
-            draw_polygon(32, 32, v_level_radius * 0.6, v_sides, v_color, 60, v_rotation + 180/v_sides, false)
-        endfor v_level
-        
-    else
-        # Pattern 5: Ellipse pattern
-        for v_level in (0, 4, 1)
-            v_level_radius = v_current_radius - (v_level * 5)
-            
-            # Skip negative radius shapes
-            if v_level_radius < 1 then
-                continue
-            endif
-            
-            v_color = (v_level * 18 + v_angle) % 100
-            v_rotation = v_angle * 2 + (v_level * 15)
-            
-            # Calculate ellipse radii - alternating wide and tall
-            if v_level % 2 == 0 then
-                v_x_radius = v_level_radius
-                v_y_radius = v_level_radius * 0.6
-            else
-                v_x_radius = v_level_radius * 0.6
-                v_y_radius = v_level_radius
-            endif
-            
-            draw_ellipse(32, 32, v_x_radius, v_y_radius, v_color, 90, false, v_rotation)
-        endfor v_level
-    endif
-    
-    # Add common elements across all patterns
-    # Central point
-    plot(32, 32, white, 100)
-    
-    # Update animation parameters
-    v_angle = v_angle + 1
-    
-    # Update size - growing and shrinking
-    if v_growing == 1 then
-        v_current_radius = v_current_radius + v_animation_speed
-        if v_current_radius >= v_max_radius then
-            v_growing = 0
+        # Every other pixel gets a burnout
+        if (v_row + v_col) % 2 == 0
+            v_burnout = (v_row + v_col + 1) * 400  # Variable burnout times
+            print(f"v_burnout {v_burnout}")
+            sync_queue
+            mplot(v_plot_x, v_plot_y, v_color_id, 100, v_burnout)
+        else
+            mplot(v_plot_x, v_plot_y, v_color_id, 100)  # Permanent
         endif
-    else
-        v_current_radius = v_current_radius - v_animation_speed
-        if v_current_radius <= v_min_radius then
-            v_growing = 1
-            # Change to next pattern when we complete a cycle
-            v_cycle = v_cycle + 1
-        endif
-    endif
-    
-    end_frame
-    rest(0.04)
-endwhile
+    endfor v_col
+endfor v_row
+mflush()
+
+print("1")
+print("8x8 grid: half permanent, half with variable burnouts")
+rest(5)
+
+# Test 5: Rapid burnouts
+print("Test 5: Rapid burnouts (100-1000ms)")
+v_x = 15
+for v_i in (0, 9, 1)
+    v_quick_burnout = (v_i + 1) * 100  # 100ms to 1000ms
+    mplot(v_x + v_i * 4, 55, red, 100, v_quick_burnout)
+endfor v_i
+mflush()
+print("1")
+
+print("Quick sequence burnouts")
+rest(2)
+
+# Test 6: No burnouts batch (performance comparison)
+print("Test 6: No burnouts (should be faster)")
+for v_y in (58, 62, 1)
+    for v_x in (10, 50, 1)
+        mplot(v_x, v_y, blue, 100)  # No burnout parameter
+    endfor v_x
+endfor v_y
+mflush()
+
+print("Blue line should stay permanent")
+rest(2)
+
+print("Burnout test completed!")
+sync_queue
+clear()

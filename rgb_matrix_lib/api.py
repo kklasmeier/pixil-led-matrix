@@ -170,6 +170,50 @@ class RGB_Api:
         else:
             debug(f"Plot point ({x}, {y}) outside matrix bounds", Level.TRACE, Component.DRAWING)
 
+    def plot_batch(self, plots):
+        """Execute multiple plots atomically with single buffer swap."""
+        pixels_plotted = 0
+        burnout_objects = []  # Only used if we find burnouts
+        has_burnouts = False
+        
+        for x, y, color, intensity, burnout in plots:
+            # Skip invalid coordinates immediately
+            if not (0 <= x < self.matrix.width and 0 <= y < self.matrix.height):
+                continue
+                
+            # Get RGB color
+            rgb_color = self._get_color(color, intensity if intensity is not None else 100)
+            
+            # Write directly to buffers (bypass bounds check since we already validated)
+            self.drawing_buffer[y, x] = [rgb_color[0], rgb_color[1], rgb_color[2]]
+            self.canvas.SetPixel(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
+            if not self.frame_mode or self.preserve_frame_changes:
+                self.current_command_pixels.append((x, y, rgb_color[0], rgb_color[1], rgb_color[2]))
+            
+            # Only collect burnout data if burnout is specified
+            if burnout is not None:
+                if not has_burnouts:
+                    has_burnouts = True
+                    # Initialize burnout collection on first burnout found
+                burnout_objects.append(((x, y), burnout))
+            
+            pixels_plotted += 1
+        
+        # Single buffer swap for all pixels
+        self._maybe_swap_buffer()
+        
+        # Only process burnouts if any were found
+        if has_burnouts:
+            for (x, y), burnout_time in burnout_objects:
+                self.burnout_manager.add_object(
+                    ShapeType.POINT, (x, y), [(x, y)], burnout_time
+                )
+            debug(f"Batch plotted {pixels_plotted} pixels ({len(burnout_objects)} with burnouts) atomically", 
+                Level.DEBUG, Component.COMMAND)
+        else:
+            debug(f"Batch plotted {pixels_plotted} pixels atomically (no burnouts)", 
+                Level.DEBUG, Component.COMMAND)
+        
     def draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int], 
                   intensity: int = 100, burnout: Optional[int] = None):
         """Draw a line between two points."""
