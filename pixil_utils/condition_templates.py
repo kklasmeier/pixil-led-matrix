@@ -40,25 +40,23 @@ class ConditionTemplate:
         self.index_var = None            # For array access
 
     def parse(self):
-            """Parse condition into template format."""
-            if self.is_parsed:
-                return
-                
-            # Check if it's a simple condition first
-            if self._parse_simple_condition():
-                self.template_type = 'simple'
-                # NEW: Pre-parse operands for optimization
-                self._preparse_operands()
-            elif self._parse_compound_condition():
-                self.template_type = 'compound'
-            else:
-                self.template_type = 'unsupported'
-                
-            self.is_parsed = True
+        """Parse condition into template format."""
+        if self.is_parsed:
+            return
             
-            if debug_print and DEBUG_VERBOSE:
-                debug_print(f"Parsed condition: {self.original} → type: {self.template_type}", DEBUG_VERBOSE)
-
+        # NEW: Try compound condition parsing FIRST
+        if self._parse_compound_condition():
+            self.template_type = 'compound'
+        # THEN try simple condition parsing
+        elif self._parse_simple_condition():
+            self.template_type = 'simple'
+            # Pre-parse operands for optimization
+            self._preparse_operands()
+        else:
+            self.template_type = 'unsupported'
+            
+        self.is_parsed = True
+        
     def _parse_simple_condition(self) -> bool:
         """Parse simple conditions like 'v_x > 5' or 'v_array[v_i] == 0'."""
         match = SIMPLE_CONDITION_PATTERN.match(self.original)
@@ -74,6 +72,12 @@ class ConditionTemplate:
     
     def _parse_compound_condition(self) -> bool:
         """Parse compound conditions with 'and'/'or'."""
+        # DEBUG: Track compound parsing attempts
+        # Split by 'and' and 'or' while preserving the operators
+        parts = COMPOUND_CONDITION_PATTERN.split(self.original)
+        
+        if len(parts) < 3:
+            return False  # Not a compound condition
         # Split by 'and' and 'or' while preserving the operators
         parts = COMPOUND_CONDITION_PATTERN.split(self.original)
         
@@ -154,6 +158,12 @@ class ConditionTemplate:
 
     def can_fast_evaluate(self) -> bool:
         """Check if this condition can be evaluated using fast path."""
+        # Add checks for problematic patterns
+        if 'random(' in self.original:
+            return False  # Cannot handle function calls
+        if self.original.count(' and ') >= 2:
+            return False  # Cannot handle triple+ compound conditions reliably
+        
         return self.template_type in ['simple', 'compound']
     
     def evaluate_fast(self, variables) -> bool:
@@ -198,24 +208,35 @@ class ConditionTemplate:
         # Fast comparison using lookup table
         return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
     
-    def _evaluate_compound(self, variables) -> bool:
-        """Evaluate compound condition with and/or operators."""
-        if not self.compound_parts:
-            return False
-            
-        # Evaluate first condition
-        result = self.compound_parts[0].evaluate_fast(variables)
+    def _evaluate_simple(self, variables) -> bool:
+        """Optimized simple evaluation with pre-parsed data."""
         
-        # Apply operators left to right (no precedence handling for now)
-        for i, operator in enumerate(self.compound_operators):
-            next_result = self.compound_parts[i + 1].evaluate_fast(variables)
-            
-            if operator == 'and':
-                result = result and next_result
-            elif operator == 'or':
-                result = result or next_result
-                
-        return result
+        # Fast array access path using pre-parsed data
+        if self.is_array_access:
+            array_obj = variables.get(self.array_name)
+            index_val = variables.get(self.index_var)
+            left_value = array_obj[int(index_val)]
+        else:
+            # Simple variable access
+            left_value = variables.get(self.left_var)
+            if left_value is None:
+                raise ValueError(f"Variable '{self.left_var}' not found")
+        
+        # Fast right side evaluation using pre-parsed data
+        value_type, value_data = self.right_value_parsed
+        if value_type == 'number':
+            right_value = value_data
+        elif value_type == 'variable':
+            right_value = variables.get(value_data)
+            if right_value is None:
+                raise ValueError(f"Variable '{value_data}' not found")
+        elif value_type == 'string':
+            right_value = value_data
+        else:
+            right_value = value_data
+        
+        # Fast comparison using lookup table
+        return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
     
     def _evaluate_array_access(self, array_expr: str, variables) -> Any:
         """Evaluate array access like v_array[v_i]."""
@@ -299,14 +320,17 @@ def get_or_create_condition_template(condition: str) -> ConditionTemplate:
 
 def evaluate_condition_fast(condition: str, variables) -> Optional[bool]:
     """Fast condition evaluation entry point."""
+    # DEBUG: Track rain-related conditions
+    
     try:
         template = get_or_create_condition_template(condition)
         if template.can_fast_evaluate():
-            return template.evaluate_fast(variables)
-        return None  # Fall back to slow path
+            result = template.evaluate_fast(variables)
+            # DEBUG: Show rain condition results
+            return result
+        else:
+            return None  # Fall back to slow path
     except Exception as e:
-        if debug_print and DEBUG_VERBOSE:
-            debug_print(f"Fast condition evaluation failed: {condition} - {str(e)}", DEBUG_VERBOSE)
         return None  # Fall back to slow path
 
 def get_condition_template_stats() -> Dict[str, Any]:
