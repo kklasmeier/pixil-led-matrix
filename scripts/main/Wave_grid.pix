@@ -79,12 +79,14 @@ while 1 then
             
             # Plot point with optional burnout
             if v_burnout_enabled == 1 then
-                plot(v_x, v_y, v_color_base, v_intensity, random(v_burnout_min, v_burnout_max, 0))
+                mplot(v_x, v_y, v_color_base, v_intensity, random(v_burnout_min, v_burnout_max, 0))
             else
-                plot(v_x, v_y, v_color_base, v_intensity, 5000)
+                mplot(v_x, v_y, v_color_base, v_intensity, 5000)
                 v_rest_time = 3.5
             endif
         endfor v_y
+        mflush
+        rest(0.05)
     endfor v_x
 
     if v_frame_mode == 1 then

@@ -79,9 +79,10 @@ def draw_perspective_orbits_with_plots {
         for v_orbit_angle in (0, 359, 10) then
             v_orbit_x = v_sun_x + (cos(v_orbit_angle) * v_orbit_radius[v_i])
             v_orbit_y = v_sun_y + (sin(v_orbit_angle) * v_orbit_y_radius)
-            plot(v_orbit_x, v_orbit_y, white, 8)
+            mplot(v_orbit_x, v_orbit_y, white, 8)
         endfor v_orbit_angle
     endfor v_i
+    mflush
 }
 
 # Define procedure for drawing planets

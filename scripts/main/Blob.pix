@@ -101,7 +101,7 @@ while 1 == 1 then
         # Quadrant Mirror Pattern
         v_quad_size = 32
         for v_y in (0, v_quad_size - 1, 1) then
-            begin_frame(true)
+            #begin_frame(true)
             for v_x in (0, v_quad_size - 1, 1) then
                 v_height = 0
                 for v_src in (0, v_source_count - 1, 1) then
@@ -124,19 +124,20 @@ while 1 == 1 then
                     v_color = v_trough_color
                 endif
                 
-                plot(v_x, v_y, v_color, v_capped_intensity)
-                plot(63 - v_x, v_y, v_color, v_capped_intensity)
-                plot(v_x, 63 - v_y, v_color, v_capped_intensity)
-                plot(63 - v_x, 63 - v_y, v_color, v_capped_intensity)
+                mplot(v_x, v_y, v_color, v_capped_intensity)
+                mplot(63 - v_x, v_y, v_color, v_capped_intensity)
+                mplot(v_x, 63 - v_y, v_color, v_capped_intensity)
+                mplot(63 - v_x, 63 - v_y, v_color, v_capped_intensity)
             endfor v_x
-            end_frame
+            mflush
+            #end_frame
         endfor v_y
         
     elseif v_pattern == 2 then
         # Spiral Wave Pattern
         v_angle = v_angle + 0.1
         for v_r in (0, 31, 1) then
-            begin_frame(true)
+            #begin_frame(true)
             for v_t in (0, 360, 6) then
                 v_rad = radians(v_t + v_angle)
                 v_x = 32 + v_r * cos(v_rad)
@@ -163,15 +164,16 @@ while 1 == 1 then
                     v_color = v_trough_color
                 endif
                 
-                plot(v_x, v_y, v_color, v_capped_intensity)
+                mplot(v_x, v_y, v_color, v_capped_intensity)
             endfor v_t
-            end_frame
+            mflush
+            #end_frame
         endfor v_r
         
     elseif v_pattern == 3 then
         # Linear Sweep Pattern
         for v_y in (0, 63, 1) then
-            begin_frame(true)
+            #begin_frame(true)
             for v_x in (0, 63, 1) then
                 v_height = 0
                 for v_src in (0, v_source_count - 1, 1) then
@@ -195,15 +197,16 @@ while 1 == 1 then
                     v_color = v_trough_color
                 endif
                 
-                plot(v_x, v_y, v_color, v_capped_intensity)
+                mplot(v_x, v_y, v_color, v_capped_intensity)
             endfor v_x
-            end_frame
+            mflush
+            #end_frame
         endfor v_y
         
     else
         # Radial Pulse Pattern
         for v_y in (0, 63, 1) then 
-            begin_frame(true)
+            #begin_frame(true)
             for v_x in (0, 63, 1) then
                 v_dx = v_x - 32
                 v_dy = v_y - 32
@@ -231,8 +234,9 @@ while 1 == 1 then
                     v_color = v_trough_color
                 endif
                 
-                plot(v_x, v_y, v_color, v_capped_intensity)
+                mplot(v_x, v_y, v_color, v_capped_intensity)
             endfor v_x
+            mflush
             end_frame
         endfor v_y
     endif
