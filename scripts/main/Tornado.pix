@@ -111,11 +111,11 @@ while true then
             if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
                 # Color based on distance from center
                 if v_seg_radius < 8 then
-                    plot(v_x, v_y, v_inner_color, 90 * v_strength_factor)
+                    mplot(v_x, v_y, v_inner_color, 90 * v_strength_factor)
                 elseif v_seg_radius < 15 then
-                    plot(v_x, v_y, v_mid_color, 70 * v_strength_factor)
+                    mplot(v_x, v_y, v_mid_color, 70 * v_strength_factor)
                 else
-                    plot(v_x, v_y, v_outer_color, 50 * v_strength_factor)
+                    mplot(v_x, v_y, v_outer_color, 50 * v_strength_factor)
                 endif
             endif
         endfor v_segment
@@ -145,7 +145,7 @@ while true then
             if v_intensity > 100 then
                 v_intensity = 100
             endif
-            plot(v_x, v_y, v_outer_color, v_intensity)
+            mplot(v_x, v_y, v_outer_color, v_intensity)
         endif
     endfor v_i
     
@@ -175,15 +175,15 @@ while true then
             endif
             
             # Draw debris
-            plot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 80)
+            mplot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 80)
         endfor v_i
     else
         # When tornado is weak/dissipated, just draw stationary debris
         for v_i in (0, v_num_debris - 1, 1)
-            plot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 60)
+            mplot(v_debris_x[v_i], v_debris_y[v_i], v_debris_color, 60)
         endfor v_i
     endif
-    
+    mflush
     # Draw tornado eye when mature
     if v_tornado_strength > 50 then
         v_eye_size = 2 + v_tornado_strength / 50

@@ -1518,25 +1518,34 @@ def process_script(filename, execute_func=None):
                     if command_match:
                         try:
                             args = validate_command_params('mplot', command_match.group(2))
+                            
                             # Parse parameters and convert to proper types
                             x = int(float(parse_value(args[0], 'mplot', 0)))
                             y = int(float(parse_value(args[1], 'mplot', 1)))
+                            
+                            # Skip invalid coordinates silently (like plot() does)
+                            if not (0 <= x <= 63 and 0 <= y <= 63):
+                                # Just skip this mplot - don't add to buffer
+                                continue
+                            
                             raw_color = parse_value(args[2], 'mplot', 2)
+                            
                             # Convert color properly
                             if isinstance(raw_color, str) and raw_color.isdigit():
                                 final_color = int(raw_color)
                             else:
-                                final_color = raw_color  # Keep as string for named colors
+                                final_color = raw_color
                             
                             # Convert optional parameters
                             intensity = None
                             if len(args) > 3 and args[3]:
                                 intensity = int(float(parse_value(args[3], 'mplot', 3)))
+                            
                             burnout = None
                             if len(args) > 4 and args[4]:
                                 burnout = int(float(parse_value(args[4], 'mplot', 4)))
-                           
-                            # Pack into buffer
+                            
+                            # Pack into buffer (coordinates are already validated)
                             record = pack_mplot(x, y, final_color, intensity, burnout)
                             mplot_buffer.extend(record)
                             mplot_count += 1

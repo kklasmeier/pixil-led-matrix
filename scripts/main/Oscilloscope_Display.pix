@@ -93,22 +93,23 @@ def draw_fast_grid {
     # Just the essential grid lines for performance
     # Horizontal lines
     for v_x in (0, 63, 8)
-        plot(v_x, 16, v_grid_color, 25)
-        plot(v_x, 32, v_grid_color, 40)  # Center line brighter
-        plot(v_x, 48, v_grid_color, 25)
+        mplot(v_x, 16, v_grid_color, 25)
+        mplot(v_x, 32, v_grid_color, 40)  # Center line brighter
+        mplot(v_x, 48, v_grid_color, 25)
     endfor v_x
     
     # Vertical lines - ensure we get the full range
     for v_y in (0, 56, 8)  # Go to 56 instead of 63
-        plot(16, v_y, v_grid_color, 25)
-        plot(32, v_y, v_grid_color, 40)  # Center line brighter
-        plot(48, v_y, v_grid_color, 25)
+        mplot(16, v_y, v_grid_color, 25)
+        mplot(32, v_y, v_grid_color, 40)  # Center line brighter
+        mplot(48, v_y, v_grid_color, 25)
     endfor v_y
     
     # Explicitly add bottom row dots
-    plot(16, 63, v_grid_color, 25)
-    plot(32, 63, v_grid_color, 40)
-    plot(48, 63, v_grid_color, 25)
+    mplot(16, 63, v_grid_color, 25)
+    mplot(32, 63, v_grid_color, 40)
+    mplot(48, 63, v_grid_color, 25)
+    mflush
 }
 
 # Modulation for visual variety
@@ -292,8 +293,8 @@ while v_frame >= 0 then
     
     # Draw channel indicators
     #for v_ch in (0, v_num_channels - 1, 1)
-    #    plot(0, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
-    #    plot(63, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
+    #    mplot(0, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
+    #    mplot(63, v_channel_y_offset[v_ch], v_channel_colors[v_ch], 100)
     #endfor v_ch
     
     end_frame

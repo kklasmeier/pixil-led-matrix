@@ -127,8 +127,9 @@ def update_swarm {
         v_vx[v_i] = min(2, max(-2, v_vx[v_i]))
         v_vy[v_i] = min(2, max(-2, v_vy[v_i]))
         
-        plot(v_x[v_i], v_y[v_i], white, v_bright)
+        mplot(v_x[v_i], v_y[v_i], white, v_bright)
     endfor v_i
+    mflush
 }
 
 # Set throttle

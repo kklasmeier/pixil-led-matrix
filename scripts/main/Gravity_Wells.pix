@@ -37,7 +37,6 @@ v_change_interval = 1.5  # Seconds between major changes
 
 # Animation loop
 while true then
-    begin_frame
     
     # Update well positions and forces periodically
     v_change_timer = v_change_timer + 0.025
@@ -69,11 +68,13 @@ while true then
     v_wells_x[2] = v_wells_x[2] + sin(v_time + 1.5) * 2
     v_wells_y[2] = v_wells_y[2] + cos(v_time + 1.5) * 2
     
+    begin_frame
+
     # Draw particles
     for v_i in (0, 14, 1) then  # Changed from (0, 15, 1) to (0, 14, 1)
         v_x = v_particles_x[v_i]
         v_y = v_particles_y[v_i]
-        plot(v_x, v_y, v_colors[v_i % 3], 75, 250)
+        mplot(v_x, v_y, v_colors[v_i % 3], 75)
         
         # Calculate gravitational pull from each well
         v_ax = 0
@@ -114,9 +115,9 @@ while true then
     
     # Draw wells faintly
     for v_j in (0, 2, 1) then  # Changed from (0, 3, 1) to (0, 2, 1)
-        plot(v_wells_x[v_j], v_wells_y[v_j], white, 30, 250)
+        mplot(v_wells_x[v_j], v_wells_y[v_j], white, 30)
     endfor v_j
-    
+    mflush()
     end_frame
     v_time = v_time + 0.1
     rest(0.025)  # ~40 FPS

@@ -61,14 +61,7 @@ while v_running == 1 then
         # Update wave phase
         v_wave_phase[v_wave] = v_wave_phase[v_wave] + v_wave_speed[v_wave]
     endfor v_wave
-    
-    # Draw a few stars in background
-    if v_frame % 10 == 0 then
-        v_star_x = random(0, v_width - 1, 0)
-        v_star_y = random(0, v_height / 2 - 1, 0)
-        plot(v_star_x, v_star_y, white, random(50, 100, 0), random(30, 100, 0))
-    endif
-    
+       
     end_frame
     
     # Animation control

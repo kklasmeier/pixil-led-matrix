@@ -1,5 +1,5 @@
 # Number of particles
-throttle(1.3)
+throttle(.5)
 v_num_particles = 25    
 
 # Create arrays for particle properties
@@ -43,7 +43,7 @@ while true then
         if v_life[v_i] > 0 then
             # Only draw if within screen bounds using compound condition
             if v_x[v_i] >= 0 and v_x[v_i] < 64 and v_y[v_i] >= 0 and v_y[v_i] < 64 then
-                plot(v_x[v_i], v_y[v_i], orange, v_bright)  # Updated: separate color and intensity
+                mplot(v_x[v_i], v_y[v_i], orange, v_bright)  # Updated: separate color and intensity
             endif
         else
             # Reset dead particle
@@ -56,7 +56,7 @@ while true then
         
         v_i = v_i + 1
     endwhile
-    
+    mflush
     end_frame
 
 endwhile

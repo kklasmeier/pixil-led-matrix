@@ -218,8 +218,9 @@ def draw_scene {
         
         # Draw rocks
         for v_i in (0, v_num_rocks, 1) then
-            plot(v_rock_x[v_i], v_rock_y[v_i], v_rock_color[v_i], 100)
+            mplot(v_rock_x[v_i], v_rock_y[v_i], v_rock_color[v_i], 100)
         endfor v_i
+        mflush
     end_frame
 }
 
