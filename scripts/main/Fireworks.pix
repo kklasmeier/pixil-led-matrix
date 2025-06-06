@@ -127,16 +127,16 @@ while true then
                 
                 # Draw different colored sparks with random duration
                 if v_i % 3 == 0 then
-                    plot(v_x[v_i], v_y[v_i], red, v_r, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], red, v_r, random(300, 1300, 0))  # Updated: separated color and intensity
                 elseif v_i % 3 == 1 then
-                    plot(v_x[v_i], v_y[v_i], violet, v_g, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], violet, v_g, random(300, 1300, 0))  # Updated: separated color and intensity
                 else
-                    plot(v_x[v_i], v_y[v_i], blue, v_b, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], blue, v_b, random(300, 1300, 0))  # Updated: separated color and intensity
                 endif
             endif
         endif
         v_i = v_i + 1
     endwhile
-  
-    rest(0.01)
+    mflush()
+    rest(0.02)
 endwhile

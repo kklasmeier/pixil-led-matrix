@@ -77,7 +77,7 @@ while 1 == 1 then
         # Calculate final brightness
         v_intensity = v_star_brightness[v_i] * v_twinkle / 100
         v_capped_intensity = min(v_intensity, 99)
-        plot(v_star_x[v_i], v_star_y[v_i], white, v_capped_intensity)
+        mplot(v_star_x[v_i], v_star_y[v_i], white, v_capped_intensity)
     endfor v_i
     
     # Draw central dust cloud
@@ -85,7 +85,7 @@ while 1 == 1 then
     
     # Draw swirling dust
     for v_r in (0, v_dust_size[0], 1) then
-        begin_frame(true)
+        #begin_frame(true)
         for v_t in (0, 360, 6) then
             # Calculate spiral position
             v_rad = radians(v_t + v_dust_phase[0])
@@ -102,13 +102,14 @@ while 1 == 1 then
                 v_capped_intensity = min(v_intensity, 99)
                 
                 if v_wave > 0 then
-                    plot(v_x, v_y, v_dust_color1, v_capped_intensity)
+                    mplot(v_x, v_y, v_dust_color1, v_capped_intensity)
                 else
-                    plot(v_x, v_y, v_dust_color2, v_capped_intensity)
+                    mplot(v_x, v_y, v_dust_color2, v_capped_intensity)
                 endif
             endif
         endfor v_t
-        end_frame
+        mflush()
+        #end_frame
     endfor v_r
       
     # Star brightness changes - now affects a cluster

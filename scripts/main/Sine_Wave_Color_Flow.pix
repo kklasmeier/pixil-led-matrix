@@ -82,82 +82,82 @@ while true then
             if v_color_cycle == 0 then
                 # Cyan and Magenta
                 if v_i == 0 then
-                    plot(v_x, v_y, cyan, v_bright, v_burnout)
+                    mplot(v_x, v_y, cyan, v_bright, v_burnout)
                     if v_y > 0 then
                         if v_y < 63 then
-                            plot(v_x, v_y - 1, cyan, v_trail_bright, v_burnout)
-                            plot(v_x, v_y + 1, cyan, v_trail_bright, v_burnout)
+                            mplot(v_x, v_y - 1, cyan, v_trail_bright, v_burnout)
+                            mplot(v_x, v_y + 1, cyan, v_trail_bright, v_burnout)
                         endif
                     endif
                 else
-                    plot(v_x, v_y, magenta, v_bright, v_burnout)
+                    mplot(v_x, v_y, magenta, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, magenta, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, magenta, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, magenta, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, magenta, v_trail_bright, v_burnout)
                     endif
                 endif
             elseif v_color_cycle == 1 then
                 # Yellow and Blue
                 if v_i == 0 then
-                    plot(v_x, v_y, yellow, v_bright, v_burnout)
+                    mplot(v_x, v_y, yellow, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, yellow, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, yellow, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, yellow, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, yellow, v_trail_bright, v_burnout)
                     endif
                 else
-                    plot(v_x, v_y, blue, v_bright, v_burnout)
+                    mplot(v_x, v_y, blue, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, blue, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, blue, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, blue, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, blue, v_trail_bright, v_burnout)
                     endif
                 endif
             elseif v_color_cycle == 2 then
                 # Green and Red
                 if v_i == 0 then
-                    plot(v_x, v_y, green, v_bright, v_burnout)
+                    mplot(v_x, v_y, green, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, green, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, green, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, green, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, green, v_trail_bright, v_burnout)
                     endif
                 else
-                    plot(v_x, v_y, red, v_bright, v_burnout)
+                    mplot(v_x, v_y, red, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, red, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, red, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, red, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, red, v_trail_bright, v_burnout)
                     endif
                 endif
             elseif v_color_cycle == 3 then
                 # Purple and Orange
                 if v_i == 0 then
-                    plot(v_x, v_y, violet, v_bright, v_burnout)
+                    mplot(v_x, v_y, violet, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, violet, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, violet, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, violet, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, violet, v_trail_bright, v_burnout)
                     endif
                 else
-                    plot(v_x, v_y, orange, v_bright, v_burnout)
+                    mplot(v_x, v_y, orange, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, orange, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, orange, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, orange, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, orange, v_trail_bright, v_burnout)
                     endif
                 endif
             else
                 # Blue and Yellow
                 if v_i == 0 then
-                    plot(v_x, v_y, blue, v_bright, v_burnout)
+                    mplot(v_x, v_y, blue, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, blue, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, blue, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, blue, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, blue, v_trail_bright, v_burnout)
                     endif
                 else
-                    plot(v_x, v_y, yellow, v_bright, v_burnout)
+                    mplot(v_x, v_y, yellow, v_bright, v_burnout)
                     if v_y > 0 and v_y < 63 then
-                        plot(v_x, v_y - 1, yellow, v_trail_bright, v_burnout)
-                        plot(v_x, v_y + 1, yellow, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y - 1, yellow, v_trail_bright, v_burnout)
+                        mplot(v_x, v_y + 1, yellow, v_trail_bright, v_burnout)
                     endif
                 endif
             endif
-            
+            mflush()
             v_i = v_i + 1
         endwhile
         v_x = v_x + 1

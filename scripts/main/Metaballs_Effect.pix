@@ -19,7 +19,7 @@ endfor v_i
 for v_frame in (0, 300, 1)
     # For every pixel on the display
     for v_y in (0, 63, 1)
-        begin_frame(true)
+        #begin_frame(true)
         for v_x in (0, 63, 1)
             v_sum = 0
             
@@ -34,10 +34,11 @@ for v_frame in (0, 300, 1)
             # Determine color based on field strength
             if v_sum > 1 then
                 v_color = min(v_sum * 15, 95)
-                plot(v_x, v_y, v_color, 75)
+                mplot(v_x, v_y, v_color, 75)
             endif
         endfor v_x
-        end_frame
+        mflush()
+        #end_frame
     endfor v_y
     
     # Update metaball positions

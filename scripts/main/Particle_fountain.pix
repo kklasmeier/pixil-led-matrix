@@ -47,7 +47,7 @@ while v_running == 1 then
         if v_age[v_i] < v_max_age then
             # Draw particle
             v_intensity = 100 - (v_age[v_i] / v_max_age * 80)
-            plot(v_x[v_i], v_y[v_i], v_colors[v_color_index[v_i]], v_intensity)
+            mplot(v_x[v_i], v_y[v_i], v_colors[v_color_index[v_i]], v_intensity)
             
             # Update physics
             v_vel_y[v_i] = v_vel_y[v_i] + v_gravity
@@ -75,7 +75,7 @@ while v_running == 1 then
             v_color_index[v_i] = random(0, 5, 0)
         endif
     endfor v_i
-    
+    mflush()
     end_frame
        
     # Speed control

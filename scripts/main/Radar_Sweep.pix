@@ -161,30 +161,30 @@ while v_frame >= 0 then
             # Draw the blip based on its intensity
             if v_blip_intensity[v_i] > 70 then
                 # Bright fresh detection
-                plot(v_blip_x[v_i], v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i])
+                mplot(v_blip_x[v_i], v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i])
                 # Add glow effect for bright blips
                 if v_blip_x[v_i] > 0 then
-                    plot(v_blip_x[v_i] - 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
+                    mplot(v_blip_x[v_i] - 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
                 endif
                 if v_blip_x[v_i] < 63 then
-                    plot(v_blip_x[v_i] + 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
+                    mplot(v_blip_x[v_i] + 1, v_blip_y[v_i], v_blip_color, v_blip_intensity[v_i] / 4)
                 endif
                 if v_blip_y[v_i] > 0 then
-                    plot(v_blip_x[v_i], v_blip_y[v_i] - 1, v_blip_color, v_blip_intensity[v_i] / 4)
+                    mplot(v_blip_x[v_i], v_blip_y[v_i] - 1, v_blip_color, v_blip_intensity[v_i] / 4)
                 endif
                 if v_blip_y[v_i] < 63 then
-                    plot(v_blip_x[v_i], v_blip_y[v_i] + 1, v_blip_color, v_blip_intensity[v_i] / 4)
+                    mplot(v_blip_x[v_i], v_blip_y[v_i] + 1, v_blip_color, v_blip_intensity[v_i] / 4)
                 endif
             elseif v_blip_intensity[v_i] > 30 then
                 # Medium intensity
-                plot(v_blip_x[v_i], v_blip_y[v_i], v_fade_color, v_blip_intensity[v_i])
+                mplot(v_blip_x[v_i], v_blip_y[v_i], v_fade_color, v_blip_intensity[v_i])
             else
                 # Fading out
-                plot(v_blip_x[v_i], v_blip_y[v_i], v_grid_color, v_blip_intensity[v_i] + 20)
+                mplot(v_blip_x[v_i], v_blip_y[v_i], v_grid_color, v_blip_intensity[v_i] + 20)
             endif
         endif
     endfor v_i
-    
+    mflush()
     # Draw sweep trail (fading line behind the main sweep)
     for v_trail in (1, 12, 1)
         v_trail_angle = v_sweep_angle - v_trail * 0.015

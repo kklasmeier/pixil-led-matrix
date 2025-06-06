@@ -2,7 +2,7 @@
 # Optimized for Raspberry Pi 4 performance using flattened arrays
 
 # Set aggressive throttle to improve performance
-throttle(0.8)
+throttle(0.5)
 
 # Define constants
 v_center_x = 32
@@ -262,10 +262,11 @@ while v_frame < v_total_frames then
         v_i = 0
         while v_i < v_dot_size then
             if random(1, 3, 0) % 3 == 0 then
-                plot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 80)
+                mplot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 80)
                 v_i = v_i + 1
             endif
-        endwhile 
+        endwhile
+        mflush() 
         end_frame
     endif
     
@@ -285,10 +286,10 @@ while 1 == 1 then
     # Draw background dots
     v_i = 0
     while v_i < v_dot_size then
-        plot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 30)
+        mplot(v_dot_x[v_i], v_dot_y[v_i], v_dot_color[v_i], 30)
         v_i = v_i + 1
     endwhile
-    
+    mflush()
     # Draw back edges
     v_i = 0
     while v_i < 12 then  

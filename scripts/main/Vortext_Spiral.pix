@@ -37,9 +37,9 @@ while true then
     for v_i in (0, 20, 1) then
         v_x = 32 + cos(v_angle + v_i * 0.3) * v_i * 2
         v_y = 32 + sin(v_angle + v_i * 0.3) * v_i * 2
-        plot(v_x, v_y, v_color, 100, v_burnout)
+        mplot(v_x, v_y, v_color, 100, v_burnout)
     endfor v_i
-
+    mflush()
     # Close frame if needed
     if v_variation < 2 then
         end_frame
