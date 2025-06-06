@@ -52,18 +52,18 @@ while 1 > 0 then
         v_px = v_center_x + (v_x1 - v_center_x) * v_t
         v_py = v_center_y + (v_y1 - v_center_y) * v_t
         v_intensity = v_beam_intensity * (1 - v_t * 0.6)
-        plot(v_px, v_py, v_colors[v_color1], v_intensity)
+        mplot(v_px, v_py, v_colors[v_color1], v_intensity)
     endfor v_i
-
+    mflush()
     # Draw second beam with gradient
     for v_i in (0, v_steps, 1) then
         v_t = v_i / v_steps
         v_px = v_center_x + (v_x2 - v_center_x) * v_t
         v_py = v_center_y + (v_y2 - v_center_y) * v_t
         v_intensity = v_beam_intensity * (1 - v_t * 0.6)
-        plot(v_px, v_py, v_colors[v_color2], v_intensity)
+        mplot(v_px, v_py, v_colors[v_color2], v_intensity)
     endfor v_i
-
+    mflush()
     # Change colors every 40 frames
     if v_frame_count % 40 == 0 then
         v_color1 = v_color1 + 1

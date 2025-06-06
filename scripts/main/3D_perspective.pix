@@ -58,38 +58,38 @@ for v_frame in (0, v_frames, 1)
     # Layer 5 - Furthest dots
     for v_y in (v_l5_y1, v_l5_y3, 5)
         for v_x in (v_l5_x1, v_l5_x3, 5)
-            plot(v_x + v_base_x * 0.1, v_y + v_base_y * 0.1, white, 10)
+            mplot(v_x + v_base_x * 0.1, v_y + v_base_y * 0.1, white, 10)
         endfor v_x
     endfor v_y
     
     # Layer 4
     for v_y in (v_l4_y1, v_l4_y3, 7)
         for v_x in (v_l4_x1, v_l4_x3, 7)
-            plot(v_x + v_base_x * 0.25, v_y + v_base_y * 0.25, white, 25)
+            mplot(v_x + v_base_x * 0.25, v_y + v_base_y * 0.25, white, 25)
         endfor v_x
     endfor v_y
     
     # Layer 3
     for v_y in (v_l3_y1, v_l3_y3, 10)
         for v_x in (v_l3_x1, v_l3_x3, 10)
-            plot(v_x + v_base_x * 0.45, v_y + v_base_y * 0.45, white, 45)
+            mplot(v_x + v_base_x * 0.45, v_y + v_base_y * 0.45, white, 45)
         endfor v_x
     endfor v_y
     
     # Layer 2
     for v_y in (v_l2_y1, v_l2_y3, 14)
         for v_x in (v_l2_x1, v_l2_x3, 14)
-            plot(v_x + v_base_x * 0.7, v_y + v_base_y * 0.7, white, 70)
+            mplot(v_x + v_base_x * 0.7, v_y + v_base_y * 0.7, white, 70)
         endfor v_x
     endfor v_y
     
     # Layer 1 - Closest
     for v_y in (v_l1_y1, v_l1_y3, 20)
         for v_x in (v_l1_x1, v_l1_x3, 20)
-            plot(v_x + v_base_x * 1.0, v_y + v_base_y * 1.0, white, 90)
+            mplot(v_x + v_base_x * 1.0, v_y + v_base_y * 1.0, white, 90)
         endfor v_x
     endfor v_y
-    
+    mflush()
     end_frame
     
     # Increment angle for next frame

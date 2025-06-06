@@ -117,13 +117,13 @@ while v_running == 1 then
             v_draw_y = floor(v_rel_y)
             
             if v_size <= 1 then
-                plot(v_draw_x, v_draw_y, v_color, v_brightness)
+                mplot(v_draw_x, v_draw_y, v_color, v_brightness)
             else
                 draw_circle(v_draw_x, v_draw_y, v_size, v_color, v_brightness, true)
             endif
         endif
     endfor v_i
-      
+    mflush()  
     end_frame
     
     # Update time - VERY IMPORTANT FOR ANIMATION

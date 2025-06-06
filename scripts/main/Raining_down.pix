@@ -68,7 +68,7 @@ while true then
             v_drop_y[v_i] = v_start_y[v_i] + v_y_diff  # Move slightly toward center Y
             
             # Draw the drop as a single pixel without burnout
-            plot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity)
+            mplot(v_drop_x[v_i], v_drop_y[v_i], blue, v_intensity)
             
             # Update drop height
             v_drop_z[v_i] = v_drop_z[v_i] - 1
@@ -79,7 +79,7 @@ while true then
             endif
         endif
     endfor v_i
-    
+    mflush()
     # End frame to display all drops at once
     end_frame
     

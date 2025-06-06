@@ -443,7 +443,7 @@ def draw_boids {
             if v_prev_x[v_idx] != v_prev_x[v_idx - 1] or v_prev_y[v_idx] != v_prev_y[v_idx - 1] then
                 v_trail_x = round(v_prev_x[v_idx])
                 v_trail_y = round(v_prev_y[v_idx])
-                plot(v_trail_x, v_trail_y, v_color, v_intensity)
+                mplot(v_trail_x, v_trail_y, v_color, v_intensity)
             endif
         endfor v_j
         
@@ -456,14 +456,14 @@ def draw_boids {
         v_heading_deg = degrees(v_heading)
         
         # Draw boid as a small circle
-        plot(v_draw_x, v_draw_y, v_color, 100)
+        mplot(v_draw_x, v_draw_y, v_color, 100)
         
         # Draw small line indicating direction
         v_nose_x = v_draw_x + cos(v_heading) * 2
         v_nose_y = v_draw_y + sin(v_heading) * 2
         draw_line(v_draw_x, v_draw_y, round(v_nose_x), round(v_nose_y), v_color, 100)
     endfor v_i
-   
+    mflush()   
     end_frame
 }
 
@@ -471,8 +471,6 @@ def draw_boids {
 print("Starting Boids Flocking Simulation")
 print(f"Number of boids: {v_num_boids}")
 print(f"Wraparound mode: {v_wraparound}")
-
-throttle(0.8)  # Speed up execution slightly
 
 # Simulation loop
 while 1 then

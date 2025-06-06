@@ -170,13 +170,13 @@ while true then
             endif
             
             # Draw trail and photon with plot
-            plot(v_photon_x[v_i], v_photon_y[v_i], v_photon_color[v_i], 99, 100)
+            mplot(v_photon_x[v_i], v_photon_y[v_i], v_photon_color[v_i], 99, 100)
         endif
         
         # Handle collision state using compound condition
         if v_photon_active[v_i] == 2 then
             # Flash white at collision
-            plot(v_collision_x[v_i], v_collision_y[v_i], 99, 99, 100)
+            mplot(v_collision_x[v_i], v_collision_y[v_i], 99, 99, 100)
             
             v_trail_timer[v_i] = v_trail_timer[v_i] - 1
             if v_trail_timer[v_i] <= 0 then
@@ -269,7 +269,7 @@ while true then
             endif
         endif
     endfor v_i
-    
+    mflush()
     end_frame
     v_rest = random(0.001, .020, 2)
     rest(v_rest)

@@ -63,9 +63,9 @@ while true then
     for v_i in (0, 360, 360/v_sides) then
         v_x = v_center_x + cos(radians(v_i + v_rotation)) * v_radius
         v_y = v_center_y + sin(radians(v_i + v_rotation)) * v_radius
-        plot(v_x, v_y, v_accent_color_number, 99-v_color_intensity, 0.1)
+        mplot(v_x, v_y, v_accent_color_number, 99-v_color_intensity, 0.1)
     endfor v_i
-
+    mflush()
     # Update rotation
     v_rotation = v_rotation + v_speed
     if v_rotation >= 360 then
