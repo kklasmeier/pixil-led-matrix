@@ -149,8 +149,8 @@ ENABLE_PHASE1_FAST_PATH = True       # Cache% - Simple variable lookups (v_varia
 
 # ===== MATH OPTIMIZATIONS =====
 ENABLE_FAST_MATH = True              # FM% - Optimized math expression evaluation
-ENABLE_EXPRESSION_CACHE = False      # C% - Cache results of math expressions
-ENABLE_JIT = False                   # JIT%, Skip%, JIT-Size, JIT-Hit, JIT-Comp, Failed - JIT compilation of expressions
+ENABLE_EXPRESSION_CACHE = False      # False C% - Cache results of math expressions
+ENABLE_JIT = False                   # False JIT%, Skip%, JIT-Size, JIT-Hit, JIT-Comp, Failed - JIT compilation of expressions
 ENABLE_CONDITION_TEMPLATES = True    # Condition Templates - Pre-parsed condition templates for fast boolean evaluation
 
 # ===== DEBUGGING AND MONITORING =====

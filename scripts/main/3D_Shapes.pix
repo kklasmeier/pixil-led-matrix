@@ -1,7 +1,7 @@
 # 3D Shape Animation with Multiple Shapes
 # Global animation controls
 v_speedctrl = 20
-v_maxrotspeed = 0.1
+v_maxrotspeed = 1.0
 v_resttime = 0.015
 v_shapetime = 10      # How long each shape animates (in seconds)
 v_pausetime = .5      # Pause between shapes (in seconds)
@@ -11,9 +11,10 @@ v_intensity = 75      # Shape color intensity
 v_anglex = 0
 v_angley = 0
 v_anglez = 0
-v_rotspeedx = 0.00001 * v_speedctrl
-v_rotspeedy = 0.000015 * v_speedctrl
-v_rotspeedz = 0.000008 * v_speedctrl
+v_frame_counter = 0 
+v_rotspeedx = 0.0015 * v_speedctrl    # Half of 0.003
+v_rotspeedy = 0.0025 * v_speedctrl    # Half of 0.005
+v_rotspeedz = 0.001 * v_speedctrl     # Half of 0.002
 
 # Position and movement
 v_centerx = 32
@@ -388,19 +389,33 @@ def animate_shape {
     endif
     
     # Randomize initial rotation speeds
-    v_rotspeedx = random(-2, 2, 3) / 100000 * v_speedctrl
-    v_rotspeedy = random(-2, 2, 3) / 100000 * v_speedctrl
-    v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
+    v_rotspeedx = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros
+    v_rotspeedy = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros  
+    v_rotspeedz = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros
     
     # Make sure we have some rotation
-    if abs(v_rotspeedx) < 0.00001 then
-        v_rotspeedx = 0.00001
+    if abs(v_rotspeedx) < 0.002 then
+        if v_rotspeedx >= 0 then
+            v_rotspeedx = 0.002
+        else
+            v_rotspeedx = -0.002
+        endif
     endif
-    if abs(v_rotspeedy) < 0.00001 then
-        v_rotspeedy = 0.00001
+
+    if abs(v_rotspeedy) < 0.002 then
+        if v_rotspeedy >= 0 then
+            v_rotspeedy = 0.002
+        else
+            v_rotspeedy = -0.002
+        endif
     endif
-    if abs(v_rotspeedz) < 0.00001 then
-        v_rotspeedz = 0.00001
+
+    if abs(v_rotspeedz) < 0.002 then
+        if v_rotspeedz >= 0 then
+            v_rotspeedz = 0.002
+        else
+            v_rotspeedz = -0.002
+        endif
     endif
     
     # Animation loop
@@ -417,7 +432,15 @@ def animate_shape {
         v_anglex = v_anglex + v_rotspeedx
         v_angley = v_angley + v_rotspeedy
         v_anglez = v_anglez + v_rotspeedz
-        
+
+        # Debug: Check if angles are accumulating (add frame counter first)
+        v_frame_counter = v_frame_counter + 1
+        if v_frame_counter > 50 then
+            v_frame_counter = 0
+            # print(f"Angles: X={v_anglex}, Y={v_angley}, Z={v_anglez}")
+            # print(f"Speeds: X={v_rotspeedx}, Y={v_rotspeedy}, Z={v_rotspeedz}")
+        endif
+
         # Calculate effective size in each direction (reduced influence)
         v_effectivex = (v_maxbound[0] - v_minbound[0]) / 3  # Reduced from 2 to 3
         v_effectivey = (v_maxbound[1] - v_minbound[1]) / 3
@@ -446,18 +469,18 @@ def animate_shape {
         endif
         
         # Randomly change rotation speeds occasionally
-        v_random = random(0, 100, 0)
-        if v_random < 1 then
-            v_rotspeedx = random(-2, 2, 3) / 100000 * v_speedctrl
-        endif
-        if v_random > 98 then
-            v_rotspeedy = random(-2, 2, 3) / 100000 * v_speedctrl
-        endif
-        if v_random > 48 then
-            if v_random < 52 then
-                v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
-            endif
-        endif
+        #v_random = random(0, 100, 0)
+        #if v_random < 1 then
+        #    v_rotspeedx = random(-2, 2, 3) / 100000 * v_speedctrl
+        #endif
+        #if v_random > 98 then
+        #    v_rotspeedy = random(-2, 2, 3) / 100000 * v_speedctrl
+        #endif
+        #if v_random > 48 then
+        #    if v_random < 52 then
+        #        v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
+        #    endif
+        #endif
         
         # Limit rotation speeds
         if v_rotspeedx > v_maxrotspeed then
@@ -540,44 +563,64 @@ def animate_shape {
         # Check for screen boundary collisions using actual shape extents
         if v_maxscreenx > v_displaywidth - v_displaymargin then
             v_speedx = -2.5
-            if v_rotspeedz > 0 then
-                v_rotspeedz = -v_rotspeedz
+            # Right wall: if moving down and spinning clockwise, add counter-clockwise force
+            # if moving down and spinning counter-clockwise, add more counter-clockwise force
+            if v_speedy > 0 then  # Moving down
+                v_rotspeedz = v_rotspeedz - random(0.0005, 0.000625, 3)  # Counter-clockwise force
+            else  # Moving up
+                v_rotspeedz = v_rotspeedz + random(0.0005, 0.000625, 3)  # Clockwise force
             endif
+            v_rotspeedy = v_rotspeedy + random(-0.000625, 0.000625, 3)
+            # print("HIT RIGHT WALL - adding spin")
         endif
+
         if v_minscreenx < v_displaymargin then
             v_speedx = 2.5
-            if v_rotspeedz < 0 then
-                v_rotspeedz = -v_rotspeedz
+            # Left wall: opposite of right wall
+            if v_speedy > 0 then  # Moving down
+                v_rotspeedz = v_rotspeedz + random(0.0005, 0.000625, 3)  # Clockwise force
+            else  # Moving up
+                v_rotspeedz = v_rotspeedz - random(0.0005, 0.000625, 3)  # Counter-clockwise force
             endif
+            v_rotspeedy = v_rotspeedy + random(-0.000625, 0.000625, 3)
+            # print("HIT LEFT WALL - adding spin")
         endif
-        
+
         if v_maxscreeny > v_displayheight - v_displaymargin then
             v_speedy = -2
-            if v_rotspeedx > 0 then
-                v_rotspeedx = -v_rotspeedx
+            # Top wall: if moving right and spinning, physics applies to X rotation
+            if v_speedx > 0 then  # Moving right
+                v_rotspeedx = v_rotspeedx + random(0.0005, 0.000625, 3)  # Forward tumble
+            else  # Moving left
+                v_rotspeedx = v_rotspeedx - random(0.0005, 0.000625, 3)  # Backward tumble
             endif
+            v_rotspeedz = v_rotspeedz + random(-0.000625, 0.000625, 3)
+            # print("HIT TOP WALL - adding spin")
         endif
+
         if v_minscreeny < v_displaymargin then
             v_speedy = 2
-            if v_rotspeedx < 0 then
-                v_rotspeedx = -v_rotspeedx
+            # Bottom wall: opposite of top wall
+            if v_speedx > 0 then  # Moving right
+                v_rotspeedx = v_rotspeedx - random(0.0005, 0.000625, 3)  # Backward tumble
+            else  # Moving left
+                v_rotspeedx = v_rotspeedx + random(0.0005, 0.000625, 3)  # Forward tumble
             endif
+            v_rotspeedz = v_rotspeedz + random(-0.000625, 0.000625, 3)
+            # print("HIT BOTTOM WALL - adding spin")
         endif
-        
+
         # Z-axis boundary check (keeps shape visible)
         if v_posz > 150 then
             v_speedz = -1.5
-            if v_rotspeedy > 0 then
-                v_rotspeedy = -v_rotspeedy
-            endif
+            v_rotspeedy = v_rotspeedy + random(-0.001, 0.001, 3)
+            v_rotspeedx = v_rotspeedx + random(-0.000625, 0.000625, 3)
         endif
         if v_posz < 50 then
             v_speedz = 1.5
-            if v_rotspeedy < 0 then
-                v_rotspeedy = -v_rotspeedy
-            endif
-        endif
-        
+            v_rotspeedy = v_rotspeedy + random(-0.001, 0.001, 3)
+            v_rotspeedx = v_rotspeedx + random(-0.000625, 0.000625, 3)
+        endif        
         # Draw current shape
         if v_vertcount == 4 then
             call draw_tetrahedron
@@ -650,8 +693,9 @@ while true then
         if v_shapes[v_i] == 6 then
             call init_triangular_prism
         endif
-        
+
         call animate_shape
+        # print(f"Initial rotation speeds: X={v_rotspeedx}, Y={v_rotspeedy}, Z={v_rotspeedz}")
         clear()
         rest(v_pausetime)
     endfor v_i
