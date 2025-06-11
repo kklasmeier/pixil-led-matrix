@@ -1,0 +1,244 @@
+# Double Pendulum - Infinite Chaotic Motion with Energy Injection
+# Physics simulation that runs forever with periodic energy boosts
+
+clear()
+
+# Physics settings
+v_length1 = 20    # First arm length
+v_length2 = 18    # Second arm length
+v_gravity = 0.5   # Gravity strength
+v_damping = 0.995 # Energy loss factor
+
+# Starting conditions
+v_angle1 = 1.2    # Starting angle of first pendulum
+v_angle2 = 0.3    # Starting angle of second pendulum
+v_vel1 = 0.05     # Starting velocity of first pendulum
+v_vel2 = -0.03    # Starting velocity of second pendulum
+
+# Energy injection settings
+v_energy_boost = 0.35    # Energy boost amount
+v_boost_interval = 60    # Boost every N frames
+v_min_velocity = 0.08    # Velocity threshold for energy injection
+
+# Blast effect settings
+v_blast_duration = 15    # How long blast effect lasts
+v_blast_particles = 12   # Number of blast particles
+v_blast_active = 0       # Blast timer (0 = no blast)
+
+# Display settings
+v_center_x = 32   # Pivot point
+v_center_y = 21   # Pivot point
+v_trail_length = 50
+
+# Trail arrays
+create_array(v_trail_x, v_trail_length, numeric)
+create_array(v_trail_y, v_trail_length, numeric)
+v_trail_pos = 0
+
+# Blast effect arrays
+create_array(v_blast_x, v_blast_particles, numeric)
+create_array(v_blast_y, v_blast_particles, numeric)
+create_array(v_blast_dx, v_blast_particles, numeric)
+create_array(v_blast_dy, v_blast_particles, numeric)
+
+# Initialize trail
+for v_i in (0, v_trail_length - 1, 1)
+    v_trail_x[v_i] = 0
+    v_trail_y[v_i] = 0
+endfor v_i
+
+# Initialize blast particles
+for v_i in (0, v_blast_particles - 1, 1)
+    v_blast_x[v_i] = v_center_x
+    v_blast_y[v_i] = v_center_y
+    v_blast_dx[v_i] = 0
+    v_blast_dy[v_i] = 0
+endfor v_i
+
+# Calculate pendulum positions
+def calc_positions {
+    # First pendulum bob
+    v_x1_float = v_center_x + v_length1 * sin(v_angle1)
+    v_y1_float = v_center_y + v_length1 * cos(v_angle1)
+    
+    # Second pendulum bob
+    v_x2_float = v_x1_float + v_length2 * sin(v_angle2)
+    v_y2_float = v_y1_float + v_length2 * cos(v_angle2)
+    
+    # Round to integers
+    v_x1 = round(v_x1_float)
+    v_y1 = round(v_y1_float)
+    v_x2 = round(v_x2_float)
+    v_y2 = round(v_y2_float)
+}
+
+# Physics update
+def update_physics {
+    # Calculate accelerations
+    v_accel1 = -v_gravity * sin(v_angle1) / v_length1
+    v_accel2 = -v_gravity * sin(v_angle2) / v_length2
+    
+    # Add coupling between pendulums
+    v_coupling = 0.1
+    v_accel1 = v_accel1 + v_coupling * sin(v_angle2 - v_angle1)
+    v_accel2 = v_accel2 + v_coupling * sin(v_angle1 - v_angle2)
+    
+    # Update velocities
+    v_vel1 = v_vel1 + v_accel1 * 1.0
+    v_vel2 = v_vel2 + v_accel2 * 1.0
+    
+    # Apply damping
+    v_vel1 = v_vel1 * v_damping
+    v_vel2 = v_vel2 * v_damping
+    
+    # Update angles
+    v_angle1 = v_angle1 + v_vel1 * 1.0
+    v_angle2 = v_angle2 + v_vel2 * 1.0
+}
+
+# Energy injection to keep motion going
+def inject_energy {
+    v_total_velocity = abs(v_vel1) + abs(v_vel2)
+    
+    if v_total_velocity < v_min_velocity then
+        v_random_boost1 = random(-v_energy_boost, v_energy_boost, 2)
+        v_random_boost2 = random(-v_energy_boost, v_energy_boost, 2)
+        
+        v_vel1 = v_vel1 + v_random_boost1
+        v_vel2 = v_vel2 + v_random_boost2
+        
+        # Trigger blast effect
+        call trigger_blast
+        
+        # print((f"Energy injection! boost1={v_random_boost1}, boost2={v_random_boost2}")
+    endif
+}
+
+# Trigger visual blast effect
+def trigger_blast {
+    v_blast_active = v_blast_duration
+    
+    # Create radial burst of particles from pivot point
+    for v_i in (0, v_blast_particles - 1, 1)
+        v_angle = v_i * 6.28 / v_blast_particles  # Distribute evenly in circle
+        v_speed = random(2, 6, 1)  # Random speed for each particle
+        
+        v_blast_x[v_i] = v_center_x
+        v_blast_y[v_i] = v_center_y
+        v_blast_dx[v_i] = v_speed * cos(v_angle)
+        v_blast_dy[v_i] = v_speed * sin(v_angle)
+    endfor v_i
+}
+
+# Update and draw blast effect
+def draw_blast {
+    if v_blast_active > 0 then
+        # Update particle positions
+        for v_i in (0, v_blast_particles - 1, 1)
+            v_blast_x[v_i] = v_blast_x[v_i] + v_blast_dx[v_i]
+            v_blast_y[v_i] = v_blast_y[v_i] + v_blast_dy[v_i]
+            
+            # Calculate fade based on remaining time
+            v_fade_intensity = v_blast_active * 100 / v_blast_duration
+            
+            # Draw particle with fading color
+            if v_blast_x[v_i] >= 0 and v_blast_x[v_i] < 64 and v_blast_y[v_i] >= 0 and v_blast_y[v_i] < 64 then
+                if v_blast_active > v_blast_duration * 0.7 then
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], white, v_fade_intensity)
+                elseif v_blast_active > v_blast_duration * 0.4 then
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], yellow, v_fade_intensity)
+                else
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], orange, v_fade_intensity)
+                endif
+            endif
+        endfor v_i
+        mflush()
+        # Countdown blast timer
+        v_blast_active = v_blast_active - 1
+    endif
+}
+
+# Add point to trail
+def add_trail_point {
+    v_trail_x[v_trail_pos] = v_x2
+    v_trail_y[v_trail_pos] = v_y2
+    v_trail_pos = v_trail_pos + 1
+    if v_trail_pos >= v_trail_length then
+        v_trail_pos = 0
+    endif
+}
+
+# Draw fading trail
+def draw_trail {
+    for v_i in (0, v_trail_length - 1, 1)
+        v_trail_intensity = 100 - v_i * 2
+        if v_trail_intensity > 0 then
+            v_trail_idx = v_trail_pos - v_i
+            if v_trail_idx < 0 then
+                v_trail_idx = v_trail_idx + v_trail_length
+            endif
+            
+            if v_trail_x[v_trail_idx] > 0 and v_trail_x[v_trail_idx] < 64 and v_trail_y[v_trail_idx] > 0 and v_trail_y[v_trail_idx] < 64 then
+                if v_i < 15 then
+                    mplot(v_trail_x[v_trail_idx], v_trail_y[v_trail_idx], red, v_trail_intensity)
+                elseif v_i < 30 then
+                    mplot(v_trail_x[v_trail_idx], v_trail_y[v_trail_idx], yellow, v_trail_intensity)
+                else
+                    mplot(v_trail_x[v_trail_idx], v_trail_y[v_trail_idx], blue, v_trail_intensity)
+                endif
+            endif
+        endif
+    endfor v_i
+    mflush()
+}
+
+# Draw the pendulum
+def draw_pendulum {
+    # Draw arms
+    draw_line(v_center_x, v_center_y, v_x1, v_y1, white, 70)
+    draw_line(v_x1, v_y1, v_x2, v_y2, white, 70)
+    
+    # Draw bobs
+    draw_circle(v_center_x, v_center_y, 1, gray, 60, true)
+    draw_circle(v_x1, v_y1, 2, green, 100, true)
+    draw_circle(v_x2, v_y2, 2, red, 100, true)
+}
+
+# Main infinite loop
+# print(("Starting infinite double pendulum with energy injection...")
+
+v_time = 0
+while v_time >= 0 then
+    call update_physics
+    call calc_positions
+    
+    # Inject energy periodically or when motion slows
+    if v_time % v_boost_interval == 0 or (abs(v_vel1) + abs(v_vel2)) < v_min_velocity then
+        call inject_energy
+    endif
+    
+    # Debug every 100 frames
+    if v_time % 100 == 0 then
+        v_total_vel = abs(v_vel1) + abs(v_vel2)
+        # print((f"Frame {v_time}: Total velocity={v_total_vel}")
+    endif
+    
+    # Add to trail
+    if v_time % 3 == 0 then
+        call add_trail_point
+    endif
+    
+    begin_frame
+        call draw_trail
+        call draw_pendulum
+        call draw_blast
+    end_frame
+    
+    v_time = v_time + 1
+    
+    # Reset counter to prevent overflow
+    if v_time > 300000 then
+        v_time = 0
+        # print(("Counter reset - continuing...")
+    endif
+endwhile

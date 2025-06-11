@@ -1,0 +1,278 @@
+# Spring Network - Interconnected Mass-Spring System
+# Physics simulation of masses connected by springs with wave propagation
+
+clear()
+
+# Configuration - adjust for performance
+v_num_masses = 8             # Number of masses in the network
+v_max_connections = 14       # Maximum spring connections
+
+# Physics constants
+v_spring_constant = 0.3      # Spring stiffness
+v_damping = 0.95            # Energy loss factor - Energy loss (lower = more damping)
+v_mass_value = 1.0          # Mass of each node
+v_rest_length = 35          # Natural spring length
+
+# Perturbation settings
+v_perturbation_interval = 180  # Frames between disturbances
+v_perturbation_strength = 8    # Force of disturbances
+v_energy_threshold = 2         # Minimum energy before adding disturbance
+
+# Mass arrays - positions and physics
+create_array(v_mass_x, v_num_masses, numeric)
+create_array(v_mass_y, v_num_masses, numeric)
+create_array(v_mass_vx, v_num_masses, numeric)
+create_array(v_mass_vy, v_num_masses, numeric)
+create_array(v_mass_fx, v_num_masses, numeric)
+create_array(v_mass_fy, v_num_masses, numeric)
+
+# Spring connection arrays
+create_array(v_spring_from, v_max_connections, numeric)
+create_array(v_spring_to, v_max_connections, numeric)
+create_array(v_spring_length, v_max_connections, numeric)
+create_array(v_spring_tension, v_max_connections, numeric)
+v_num_springs = 0
+
+# Color arrays for visualization
+create_array(v_colors, 6, string)
+v_colors[0] = "red"
+v_colors[1] = "blue"  
+v_colors[2] = "green"
+v_colors[3] = "yellow"
+v_colors[4] = "purple"
+v_colors[5] = "cyan"
+
+# Initialize masses in a circular arrangement
+def init_masses {
+    print(f"Initializing {v_num_masses} masses in network...")
+    
+    v_center_x = 32
+    v_center_y = 32
+    v_radius = 18
+    
+    for v_i in (0, v_num_masses - 1, 1)
+        # Arrange in circle with some randomness
+        v_angle = v_i * 6.28 / v_num_masses
+        v_random_offset = random(-3, 3, 1)
+        
+        v_mass_x[v_i] = v_center_x + (v_radius + v_random_offset) * cos(v_angle)
+        v_mass_y[v_i] = v_center_y + (v_radius + v_random_offset) * sin(v_angle)
+        
+        # Start with small random velocities
+        v_mass_vx[v_i] = random(-0.5, 0.5, 2)
+        v_mass_vy[v_i] = random(-0.5, 0.5, 2)
+        
+        # Initialize forces to zero
+        v_mass_fx[v_i] = 0
+        v_mass_fy[v_i] = 0
+        
+        print(f"Mass {v_i}: pos=({v_mass_x[v_i]}, {v_mass_y[v_i]})")
+    endfor v_i
+}
+
+# Create spring connections between masses
+def init_springs {
+    print("Creating spring connections...")
+    v_num_springs = 0
+    
+    # Connect each mass to its neighbors and some distant masses
+    for v_i in (0, v_num_masses - 1, 1)
+        for v_j in (v_i + 1, v_num_masses - 1, 1)
+            # Calculate distance between masses
+            v_dx = v_mass_x[v_j] - v_mass_x[v_i]
+            v_dy = v_mass_y[v_j] - v_mass_y[v_i]
+            v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+            
+            # Connect if within reasonable distance and we have room
+            if v_distance < 30 and v_num_springs < v_max_connections then
+                v_spring_from[v_num_springs] = v_i
+                v_spring_to[v_num_springs] = v_j
+                v_spring_length[v_num_springs] = v_distance
+                v_spring_tension[v_num_springs] = 0
+                
+                print(f"Spring {v_num_springs}: mass {v_i} to mass {v_j} (length={v_distance})")
+                v_num_springs = v_num_springs + 1
+            endif
+        endfor v_j
+    endfor v_i
+    
+    print(f"Created {v_num_springs} spring connections")
+}
+
+# Calculate forces from all springs
+def calculate_spring_forces {
+    # Reset all forces
+    for v_i in (0, v_num_masses - 1, 1)
+        v_mass_fx[v_i] = 0
+        v_mass_fy[v_i] = 0
+    endfor v_i
+    
+    # Calculate spring forces
+    for v_s in (0, v_num_springs - 1, 1)
+        v_from = v_spring_from[v_s]
+        v_to = v_spring_to[v_s]
+        
+        # Calculate current spring vector
+        v_dx = v_mass_x[v_to] - v_mass_x[v_from]
+        v_dy = v_mass_y[v_to] - v_mass_y[v_from]
+        v_current_length = sqrt(v_dx * v_dx + v_dy * v_dy)
+        
+        if v_current_length > 0 then
+            # Normalize spring vector
+            v_nx = v_dx / v_current_length
+            v_ny = v_dy / v_current_length
+            
+            # Calculate spring extension/compression
+            v_extension = v_current_length - v_rest_length
+            v_spring_force = v_spring_constant * v_extension
+            
+            # Store tension for visualization
+            v_spring_tension[v_s] = abs(v_spring_force)
+            
+            # Apply force to both masses (Newton's 3rd law)
+            v_force_x = v_spring_force * v_nx
+            v_force_y = v_spring_force * v_ny
+            
+            v_mass_fx[v_from] = v_mass_fx[v_from] + v_force_x
+            v_mass_fy[v_from] = v_mass_fy[v_from] + v_force_y
+            v_mass_fx[v_to] = v_mass_fx[v_to] - v_force_x
+            v_mass_fy[v_to] = v_mass_fy[v_to] - v_force_y
+        endif
+    endfor v_s
+}
+
+# Update mass positions using physics
+def update_masses {
+    for v_i in (0, v_num_masses - 1, 1)
+        # Apply force to velocity (F = ma, a = F/m)
+        v_mass_vx[v_i] = v_mass_vx[v_i] + v_mass_fx[v_i] / v_mass_value
+        v_mass_vy[v_i] = v_mass_vy[v_i] + v_mass_fy[v_i] / v_mass_value
+        
+        # Apply damping
+        v_mass_vx[v_i] = v_mass_vx[v_i] * v_damping
+        v_mass_vy[v_i] = v_mass_vy[v_i] * v_damping
+        
+        # Update positions
+        v_mass_x[v_i] = v_mass_x[v_i] + v_mass_vx[v_i]
+        v_mass_y[v_i] = v_mass_y[v_i] + v_mass_vy[v_i]
+        
+        # Keep masses on screen with soft boundaries
+        if v_mass_x[v_i] < 5 then
+            v_mass_x[v_i] = 5
+            v_mass_vx[v_i] = abs(v_mass_vx[v_i]) * 0.5
+        endif
+        if v_mass_x[v_i] > 59 then
+            v_mass_x[v_i] = 59
+            v_mass_vx[v_i] = -abs(v_mass_vx[v_i]) * 0.5
+        endif
+        if v_mass_y[v_i] < 5 then
+            v_mass_y[v_i] = 5
+            v_mass_vy[v_i] = abs(v_mass_vy[v_i]) * 0.5
+        endif
+        if v_mass_y[v_i] > 59 then
+            v_mass_y[v_i] = 59
+            v_mass_vy[v_i] = -abs(v_mass_vy[v_i]) * 0.5
+        endif
+    endfor v_i
+}
+
+# Add random perturbation to keep system active
+def add_perturbation {
+    # Calculate total system energy
+    v_total_energy = 0
+    for v_i in (0, v_num_masses - 1, 1)
+        v_speed_sq = v_mass_vx[v_i] * v_mass_vx[v_i] + v_mass_vy[v_i] * v_mass_vy[v_i]
+        v_total_energy = v_total_energy + v_speed_sq
+    endfor v_i
+    
+    # Add perturbation if energy is low
+    if v_total_energy < v_energy_threshold then
+        v_target_mass = random(0, v_num_masses - 1, 0)
+        v_force_angle = random(0, 6.28, 2)
+        v_force_magnitude = random(v_perturbation_strength * 0.5, v_perturbation_strength, 1)
+        
+        v_mass_vx[v_target_mass] = v_mass_vx[v_target_mass] + v_force_magnitude * cos(v_force_angle)
+        v_mass_vy[v_target_mass] = v_mass_vy[v_target_mass] + v_force_magnitude * sin(v_force_angle)
+        
+        print(f"Perturbation applied to mass {v_target_mass}, energy was {v_total_energy}")
+    endif
+}
+
+# Draw spring connections with tension-based colors
+def draw_springs {
+    for v_s in (0, v_num_springs - 1, 1)
+        v_from = v_spring_from[v_s]
+        v_to = v_spring_to[v_s]
+        
+        # Color based on tension
+        v_tension = v_spring_tension[v_s]
+        if v_tension < 1 then
+            draw_line(v_mass_x[v_from], v_mass_y[v_from], v_mass_x[v_to], v_mass_y[v_to], white, 30)
+        elseif v_tension < 3 then
+            draw_line(v_mass_x[v_from], v_mass_y[v_from], v_mass_x[v_to], v_mass_y[v_to], yellow, 50)
+        elseif v_tension < 6 then
+            draw_line(v_mass_x[v_from], v_mass_y[v_from], v_mass_x[v_to], v_mass_y[v_to], orange, 70)
+        else
+            draw_line(v_mass_x[v_from], v_mass_y[v_from], v_mass_x[v_to], v_mass_y[v_to], red, 90)
+        endif
+    endfor v_s
+}
+
+# Draw masses with velocity-based colors and sizes
+def draw_masses {
+    for v_i in (0, v_num_masses - 1, 1)
+        # Calculate speed for visualization
+        v_speed = sqrt(v_mass_vx[v_i] * v_mass_vx[v_i] + v_mass_vy[v_i] * v_mass_vy[v_i])
+        
+        # Size based on speed
+        v_size = 2 + min(2, v_speed)
+        
+        # Intensity based on speed
+        v_intensity = min(100, 60 + v_speed * 15)
+        
+        # Color based on mass index
+        v_color_idx = v_i % 6
+        
+        # Draw mass
+        draw_circle(v_mass_x[v_i], v_mass_y[v_i], v_size, v_colors[v_color_idx], v_intensity, true)
+        
+        # Add white center for definition
+        plot(v_mass_x[v_i], v_mass_y[v_i], white, 80)
+    endfor v_i
+}
+
+# Initialize the spring network
+call init_masses
+call init_springs
+
+print(f"Starting spring network simulation with {v_num_masses} masses and {v_num_springs} springs...")
+print("Watch for wave propagation and oscillation patterns!")
+
+# Main simulation loop
+v_frame = 0
+while v_frame >= 0 then
+    call calculate_spring_forces
+    call update_masses
+    
+    # Add perturbations periodically or when energy is low
+    if v_frame % v_perturbation_interval == 0 or v_frame % 60 == 0 then
+        call add_perturbation
+    endif
+    
+    # Debug info
+    if v_frame % 300 == 0 then
+        print(f"Frame {v_frame}: Network simulation running")
+    endif
+    
+    begin_frame
+        call draw_springs
+        call draw_masses
+    end_frame
+    
+    v_frame = v_frame + 1
+    
+    # Reset frame counter
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+endwhile
