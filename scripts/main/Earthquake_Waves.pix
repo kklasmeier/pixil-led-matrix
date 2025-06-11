@@ -1,0 +1,448 @@
+# Draw background seismic activity
+def draw_background_activity {
+    if v_background_activity == 1 then
+        # Draw seismic monitoring stations
+        for v_st in (0, v_num_stations - 1, 1)
+            # Station base (always visible)
+            mplot(v_station_x[v_st], v_station_y[v_st], white, 40)
+            
+            # Activity indicator
+            if v_station_activity[v_st] > 10 then
+                v_activity_intensity = min(80, v_station_activity[v_st])
+                draw_circle(v_station_x[v_st], v_station_y[v_st], 1, green, v_activity_intensity, true)
+                
+                # High activity indicator
+                if v_station_activity[v_st] > 50 then
+                    draw_circle(v_station_x[v_st], v_station_y[v_st], 2, yellow, v_activity_intensity / 2, false)
+                endif
+            endif
+        endfor v_st
+        
+        # Draw subtle background seismic noise
+        for v_noise in (0, v_noise_level, 1)
+            v_noise_x = random(2, 62, 0)
+            v_noise_y = random(2, 62, 0)
+            v_noise_intensity = random(5, 20, 0)
+            mplot(v_noise_x, v_noise_y, blue, v_noise_intensity)
+        endfor v_noise
+    endif
+    mflush()
+}# Update background seismic activity
+def update_background_activity {
+    # Generate continuous seismic noise
+    v_noise_level = random(0, 15, 0)
+    
+    # Update station activity based on nearby waves
+    for v_st in (0, v_num_stations - 1, 1)
+        v_station_activity[v_st] = v_station_activity[v_st] * 0.9  # Decay
+        
+        # Check for wave activity near this station
+        for v_i in (0, v_max_waves - 1, 1)
+            # Check P-waves
+            if v_p_amplitude[v_i] > 0 then
+                v_dist = sqrt((v_p_x[v_i] - v_station_x[v_st]) * (v_p_x[v_i] - v_station_x[v_st]) + (v_p_y[v_i] - v_station_y[v_st]) * (v_p_y[v_i] - v_station_y[v_st]))
+                if abs(v_dist - v_p_radius[v_i]) < 2 then
+                    v_station_activity[v_st] = v_station_activity[v_st] + v_p_amplitude[v_i] * 20
+                endif
+            endif
+            
+            # Check S-waves
+            if v_s_amplitude[v_i] > 0 then
+                v_dist = sqrt((v_s_x[v_i] - v_station_x[v_st]) * (v_s_x[v_i] - v_station_x[v_st]) + (v_s_y[v_i] - v_station_y[v_st]) * (v_s_y[v_i] - v_station_y[v_st]))
+                if abs(v_dist - v_s_radius[v_i]) < 2 then
+                    v_station_activity[v_st] = v_station_activity[v_st] + v_s_amplitude[v_i] * 25
+                endif
+            endif
+            
+            # Check surface waves
+            if v_surf_amplitude[v_i] > 0 then
+                v_dist = sqrt((v_surf_x[v_i] - v_station_x[v_st]) * (v_surf_x[v_i] - v_station_x[v_st]) + (v_surf_y[v_i] - v_station_y[v_st]) * (v_surf_y[v_i] - v_station_y[v_st]))
+                if abs(v_dist - v_surf_radius[v_i]) < 3 then
+                    v_station_activity[v_st] = v_station_activity[v_st] + v_surf_amplitude[v_i] * 30
+                endif
+            endif
+        endfor v_i
+        
+        # Cap maximum activity
+        if v_station_activity[v_st] > 100 then
+            v_station_activity[v_st] = 100
+        endif
+    endfor v_st
+}# Generate micro earthquake (smaller, more frequent)
+def generate_micro_earthquake {
+    if v_eq_count < v_max_earthquakes then
+        # Random epicenter location
+        v_eq_x[v_eq_count] = random(5, 59, 0)
+        v_eq_y[v_eq_count] = random(5, 59, 0)
+        v_eq_magnitude = random(2, 4, 1)  # Smaller magnitude
+        v_eq_time[v_eq_count] = 0
+        v_eq_active[v_eq_count] = 1
+        
+        # print(f"Micro-quake M{v_eq_magnitude} at ({v_eq_x[v_eq_count]}, {v_eq_y[v_eq_count]})")
+        
+        # Create smaller wave fronts
+        call create_p_wave
+        call create_s_wave  
+        call create_surface_wave
+        
+        v_eq_count = v_eq_count + 1
+    endif
+}# Earthquake Waves - Seismic Wave Propagation
+# Realistic simulation of P-waves, S-waves, and surface waves from earthquakes
+
+clear()
+
+# Configuration
+v_max_earthquakes = 8        # Maximum concurrent earthquakes
+v_max_waves = 50            # Maximum wave fronts per type
+v_earthquake_interval = 240  # Frames between major earthquakes (back to original)
+v_micro_quake_interval = 120 # Frames between micro earthquakes (less frequent)
+v_background_activity = 1    # Enable background seismic noise
+
+# Seismic monitoring stations (fixed points showing activity)
+v_num_stations = 6
+create_array(v_station_x, v_num_stations, numeric)
+create_array(v_station_y, v_num_stations, numeric)
+create_array(v_station_activity, v_num_stations, numeric)
+
+# Background seismic noise
+v_noise_level = 0
+
+# Wave physics - realistic speed ratios
+v_p_wave_speed = 6.0        # P-wave speed (fastest)
+v_s_wave_speed = 3.5        # S-wave speed (medium)
+v_surface_wave_speed = 2.0  # Surface wave speed (slowest, most destructive)
+
+# Wave properties
+v_wave_decay = 0.97         # Amplitude decay per frame
+v_min_amplitude = 0.1       # Minimum visible amplitude
+v_max_radius = 45           # Maximum wave radius
+
+# Earthquake arrays
+create_array(v_eq_x, v_max_earthquakes, numeric)
+create_array(v_eq_y, v_max_earthquakes, numeric)
+create_array(v_eq_magnitude, v_max_earthquakes, numeric)
+create_array(v_eq_time, v_max_earthquakes, numeric)
+create_array(v_eq_active, v_max_earthquakes, numeric)
+
+# P-wave arrays (Primary - fastest, compressional)
+create_array(v_p_x, v_max_waves, numeric)
+create_array(v_p_y, v_max_waves, numeric)
+create_array(v_p_radius, v_max_waves, numeric)
+create_array(v_p_amplitude, v_max_waves, numeric)
+create_array(v_p_eq_id, v_max_waves, numeric)
+
+# S-wave arrays (Secondary - shear waves)
+create_array(v_s_x, v_max_waves, numeric)
+create_array(v_s_y, v_max_waves, numeric)
+create_array(v_s_radius, v_max_waves, numeric)
+create_array(v_s_amplitude, v_max_waves, numeric)
+create_array(v_s_eq_id, v_max_waves, numeric)
+
+# Surface wave arrays (slowest but most destructive)
+create_array(v_surf_x, v_max_waves, numeric)
+create_array(v_surf_y, v_max_waves, numeric)
+create_array(v_surf_radius, v_max_waves, numeric)
+create_array(v_surf_amplitude, v_max_waves, numeric)
+create_array(v_surf_eq_id, v_max_waves, numeric)
+
+# Wave counters
+v_p_count = 0
+v_s_count = 0
+v_surf_count = 0
+v_eq_count = 0
+
+# Initialize arrays
+def init_simulation {
+    # print("Initializing earthquake simulation...")
+    
+    # Initialize earthquake arrays
+    for v_i in (0, v_max_earthquakes - 1, 1)
+        v_eq_x[v_i] = 0
+        v_eq_y[v_i] = 0
+        v_eq_magnitude[v_i] = 0
+        v_eq_time[v_i] = 0
+        v_eq_active[v_i] = 0
+    endfor v_i
+    
+    # Initialize seismic monitoring stations
+    v_station_x[0] = 10
+    v_station_y[0] = 10
+    v_station_x[1] = 54
+    v_station_y[1] = 10  
+    v_station_x[2] = 10
+    v_station_y[2] = 54
+    v_station_x[3] = 54
+    v_station_y[3] = 54
+    v_station_x[4] = 32
+    v_station_y[4] = 16
+    v_station_x[5] = 32
+    v_station_y[5] = 48
+    
+    for v_i in (0, v_num_stations - 1, 1)
+        v_station_activity[v_i] = 0
+    endfor v_i
+    
+    # Initialize wave arrays
+    for v_i in (0, v_max_waves - 1, 1)
+        # P-waves
+        v_p_x[v_i] = 0
+        v_p_y[v_i] = 0
+        v_p_radius[v_i] = 0
+        v_p_amplitude[v_i] = 0
+        v_p_eq_id[v_i] = -1
+        
+        # S-waves
+        v_s_x[v_i] = 0
+        v_s_y[v_i] = 0
+        v_s_radius[v_i] = 0
+        v_s_amplitude[v_i] = 0
+        v_s_eq_id[v_i] = -1
+        
+        # Surface waves
+        v_surf_x[v_i] = 0
+        v_surf_y[v_i] = 0
+        v_surf_radius[v_i] = 0
+        v_surf_amplitude[v_i] = 0
+        v_surf_eq_id[v_i] = -1
+    endfor v_i
+}
+
+# Generate new earthquake
+def generate_earthquake {
+    if v_eq_count < v_max_earthquakes then
+        # Random epicenter location (avoid edges)
+        v_eq_x[v_eq_count] = random(8, 56, 0)
+        v_eq_y[v_eq_count] = random(8, 56, 0)
+        v_eq_magnitude = random(4, 8, 1)  # Richter scale magnitude
+        v_eq_time[v_eq_count] = 0
+        v_eq_active[v_eq_count] = 1
+        
+        # print(f"Earthquake M{v_eq_magnitude} at ({v_eq_x[v_eq_count]}, {v_eq_y[v_eq_count]})")
+        
+        # Create initial wave fronts
+        call create_p_wave
+        call create_s_wave  
+        call create_surface_wave
+        
+        v_eq_count = v_eq_count + 1
+    endif
+}
+
+# Create P-wave (fastest, arrives first)
+def create_p_wave {
+    if v_p_count < v_max_waves then
+        v_p_x[v_p_count] = v_eq_x[v_eq_count]
+        v_p_y[v_p_count] = v_eq_y[v_eq_count]
+        v_p_radius[v_p_count] = 1
+        v_p_amplitude[v_p_count] = v_eq_magnitude * 0.3  # P-waves have smaller amplitude
+        v_p_eq_id[v_p_count] = v_eq_count
+        v_p_count = v_p_count + 1
+    endif
+}
+
+# Create S-wave (medium speed, arrives second)
+def create_s_wave {
+    if v_s_count < v_max_waves then
+        v_s_x[v_s_count] = v_eq_x[v_eq_count]
+        v_s_y[v_s_count] = v_eq_y[v_eq_count]
+        v_s_radius[v_s_count] = 1
+        v_s_amplitude[v_s_count] = v_eq_magnitude * 0.5  # Medium amplitude
+        v_s_eq_id[v_s_count] = v_eq_count
+        v_s_count = v_s_count + 1
+    endif
+}
+
+# Create surface wave (slowest, largest amplitude)
+def create_surface_wave {
+    if v_surf_count < v_max_waves then
+        v_surf_x[v_surf_count] = v_eq_x[v_eq_count]
+        v_surf_y[v_surf_count] = v_eq_y[v_eq_count]
+        v_surf_radius[v_surf_count] = 1
+        v_surf_amplitude[v_surf_count] = v_eq_magnitude * 1.0  # Largest amplitude
+        v_surf_eq_id[v_surf_count] = v_eq_count
+        v_surf_count = v_surf_count + 1
+    endif
+}
+
+# Update all wave propagation
+def update_waves {
+    # Update P-waves (fastest)
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_p_amplitude[v_i] > v_min_amplitude then
+            v_p_radius[v_i] = v_p_radius[v_i] + v_p_wave_speed
+            v_p_amplitude[v_i] = v_p_amplitude[v_i] * v_wave_decay
+            
+            # Remove wave if too large or too weak
+            if v_p_radius[v_i] > v_max_radius or v_p_amplitude[v_i] < v_min_amplitude then
+                v_p_amplitude[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    
+    # Update S-waves (medium speed)
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_s_amplitude[v_i] > v_min_amplitude then
+            v_s_radius[v_i] = v_s_radius[v_i] + v_s_wave_speed
+            v_s_amplitude[v_i] = v_s_amplitude[v_i] * v_wave_decay
+            
+            if v_s_radius[v_i] > v_max_radius or v_s_amplitude[v_i] < v_min_amplitude then
+                v_s_amplitude[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    
+    # Update surface waves (slowest)
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_surf_amplitude[v_i] > v_min_amplitude then
+            v_surf_radius[v_i] = v_surf_radius[v_i] + v_surface_wave_speed
+            v_surf_amplitude[v_i] = v_surf_amplitude[v_i] * v_wave_decay
+            
+            if v_surf_radius[v_i] > v_max_radius or v_surf_amplitude[v_i] < v_min_amplitude then
+                v_surf_amplitude[v_i] = 0
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw P-waves (sharp, fast, blue/white)
+def draw_p_waves {
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_p_amplitude[v_i] > v_min_amplitude then
+            v_intensity = v_p_amplitude[v_i] * 40
+            v_intensity = min(100, max(10, v_intensity))
+            
+            # Draw sharp ring - P-waves are compressional
+            draw_circle(v_p_x[v_i], v_p_y[v_i], v_p_radius[v_i], cyan, v_intensity, false)
+            
+            # Add inner detail for stronger waves
+            if v_p_amplitude[v_i] > 1.5 then
+                draw_circle(v_p_x[v_i], v_p_y[v_i], v_p_radius[v_i] - 1, white, v_intensity / 2, false)
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw S-waves (oscillating, medium speed, yellow/orange)
+def draw_s_waves {
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_s_amplitude[v_i] > v_min_amplitude then
+            v_intensity = v_s_amplitude[v_i] * 35
+            v_intensity = min(100, max(15, v_intensity))
+            
+            # Draw oscillating pattern - S-waves have shear motion
+            draw_circle(v_s_x[v_i], v_s_y[v_i], v_s_radius[v_i], yellow, v_intensity, false)
+            
+            # Add oscillation effect with multiple rings
+            if v_s_amplitude[v_i] > 1.0 then
+                draw_circle(v_s_x[v_i], v_s_y[v_i], v_s_radius[v_i] + 1, orange, v_intensity / 3, false)
+                draw_circle(v_s_x[v_i], v_s_y[v_i], v_s_radius[v_i] - 1, orange, v_intensity / 3, false)
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw surface waves (large, rolling, red/destructive)
+def draw_surface_waves {
+    for v_i in (0, v_max_waves - 1, 1)
+        if v_surf_amplitude[v_i] > v_min_amplitude then
+            v_intensity = v_surf_amplitude[v_i] * 30
+            v_intensity = min(100, max(20, v_intensity))
+            
+            # Draw thick, destructive waves
+            draw_circle(v_surf_x[v_i], v_surf_y[v_i], v_surf_radius[v_i], red, v_intensity, false)
+            draw_circle(v_surf_x[v_i], v_surf_y[v_i], v_surf_radius[v_i] + 1, red, v_intensity / 2, false)
+            
+            # Add inner filled area for strongest waves
+            if v_surf_amplitude[v_i] > 2.0 then
+                draw_circle(v_surf_x[v_i], v_surf_y[v_i], v_surf_radius[v_i] - 2, red, v_intensity / 4, true)
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw earthquake epicenters
+def draw_epicenters {
+    for v_i in (0, v_eq_count - 1, 1)
+        if v_eq_active[v_i] == 1 then
+            # Flash effect at epicenter
+            v_eq_time[v_i] = v_eq_time[v_i] + 1
+            
+            if v_eq_time[v_i] < 30 then
+                v_flash_intensity = 100 - v_eq_time[v_i] * 3
+                draw_circle(v_eq_x[v_i], v_eq_y[v_i], 3, white, v_flash_intensity, true)
+                
+                # Add magnitude indicator
+                if v_eq_magnitude > 6 then
+                    draw_circle(v_eq_x[v_i], v_eq_y[v_i], 5, red, v_flash_intensity / 2, false)
+                endif
+            else
+                # Mark epicenter as finished flashing
+                v_eq_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+}
+
+# Clean up old waves and reset counters periodically
+def cleanup_waves {
+    # Reset wave counters when arrays get full
+    if v_p_count >= v_max_waves then
+        v_p_count = 0
+    endif
+    if v_s_count >= v_max_waves then
+        v_s_count = 0
+    endif
+    if v_surf_count >= v_max_waves then
+        v_surf_count = 0
+    endif
+    
+    # Reset earthquake counter when full
+    if v_eq_count >= v_max_earthquakes then
+        v_eq_count = 0
+    endif
+}
+
+# Initialize simulation
+call init_simulation
+
+# print("Starting earthquake wave simulation...")
+# print("Watch for P-waves (cyan, fast), S-waves (yellow, medium), Surface waves (red, slow)")
+
+# Main simulation loop
+v_frame = 0
+while v_frame >= 0 then
+    call update_waves
+    call update_background_activity
+    call cleanup_waves
+    
+    # Generate major earthquakes periodically
+    if v_frame % v_earthquake_interval == 0 then
+        call generate_earthquake
+    endif
+    
+    # Generate micro earthquakes more frequently
+    if v_frame % v_micro_quake_interval == 0 then
+        call generate_micro_earthquake
+    endif
+    
+    # Debug info
+    if v_frame % 400 == 0 then
+        # print(f"Frame {v_frame}: {v_eq_count} earthquakes, waves: P={v_p_count}, S={v_s_count}, Surface={v_surf_count}")
+    endif
+    
+    begin_frame
+        call draw_background_activity # Background activity first
+        call draw_surface_waves       # Draw slowest waves first (background)
+        call draw_s_waves            # Medium speed waves
+        call draw_p_waves            # Fastest waves on top
+        call draw_epicenters         # Epicenter flashes
+    end_frame
+    
+    v_frame = v_frame + 1
+    
+    # Reset frame counter
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+endwhile

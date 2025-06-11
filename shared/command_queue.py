@@ -81,7 +81,7 @@ class MatrixCommandQueue:
         # Try immediately first
         try:
             # print - this is the one
-            #print(f"[QUEUE] Adding command: {command} (delay: {delay}ms)")
+            # print(f"[QUEUE] Adding command: {command} (delay: {delay}ms)")
             self.command_queue.put_nowait(command_tuple)
             self.last_command_time = time.time() * 1000
             return

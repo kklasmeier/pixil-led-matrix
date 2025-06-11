@@ -1,0 +1,430 @@
+# Check if system needs energy boost
+def check_energy_boost {
+    # Calculate total kinetic energy of all balls
+    v_total_energy = 0
+    for v_i in (0, v_num_balls - 1, 1)
+        v_speed_sq = v_ball_vx[v_i] * v_ball_vx[v_i] + v_ball_vy[v_i] * v_ball_vy[v_i]
+        v_total_energy = v_total_energy + v_speed_sq * v_ball_mass[v_i]
+    endfor v_i
+    
+    # Boost if energy is too low
+    if v_total_energy < v_min_total_energy then
+        call energy_blast
+        print(f"Energy boost triggered! Total energy was: {v_total_energy}")
+    endif
+}
+
+# Create spectacular energy blast
+def energy_blast {
+    # Random blast center position (avoid edges)
+    v_blast_center_x = random(15, 49, 0)
+    v_blast_center_y = random(15, 49, 0)
+    
+    print(f"ENERGY BLAST at ({v_blast_center_x}, {v_blast_center_y})!")
+    sync_queue
+    # Trigger visual blast effect
+    v_blast_active = v_blast_duration
+    
+    # Create radial blast particles from blast center
+    for v_i in (0, v_blast_particles - 1, 1)
+        v_angle = v_i * 6.28 / v_blast_particles
+        v_speed = random(3, 8, 1)
+        
+        v_blast_x[v_i] = v_blast_center_x
+        v_blast_y[v_i] = v_blast_center_y
+        v_blast_dx[v_i] = v_speed * cos(v_angle)
+        v_blast_dy[v_i] = v_speed * sin(v_angle)
+    endfor v_i
+    
+    # Push balls away from blast center with realistic physics
+    for v_i in (0, v_num_balls - 1, 1)
+        # Calculate distance from blast center to ball
+        v_dx = v_ball_x[v_i] - v_blast_center_x
+        v_dy = v_ball_y[v_i] - v_blast_center_y
+        v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+        
+        # Only affect balls within blast radius
+        if v_distance < v_blast_push_radius and v_distance > 0 then
+            # Normalize direction vector
+            v_push_x = v_dx / v_distance
+            v_push_y = v_dy / v_distance
+            
+            # Calculate push force (stronger when closer)
+            v_distance_factor = (v_blast_push_radius - v_distance) / v_blast_push_radius
+            v_push_force = v_blast_push_strength * v_distance_factor
+            
+            # Apply push force to ball velocity
+            v_ball_vx[v_i] = v_ball_vx[v_i] + v_push_x * v_push_force
+            v_ball_vy[v_i] = v_ball_vy[v_i] + v_push_y * v_push_force
+            
+            print(f"  Ball {v_i} pushed with force {v_push_force} at distance {v_distance}")
+        endif
+    endfor v_i
+}
+
+# Draw energy blast effect
+def draw_energy_blast {
+    if v_blast_active > 0 then
+        # Update blast particle positions
+        for v_i in (0, v_blast_particles - 1, 1)
+            v_blast_x[v_i] = v_blast_x[v_i] + v_blast_dx[v_i]
+            v_blast_y[v_i] = v_blast_y[v_i] + v_blast_dy[v_i]
+            
+            # Fade intensity based on remaining time
+            v_fade_intensity = v_blast_active * 100 / v_blast_duration
+            
+            # Draw particle with color progression
+            if v_blast_x[v_i] >= 0 and v_blast_x[v_i] < 64 and v_blast_y[v_i] >= 0 and v_blast_y[v_i] < 64 then
+                if v_blast_active > v_blast_duration * 0.8 then
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], white, v_fade_intensity)
+                elseif v_blast_active > v_blast_duration * 0.5 then
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], cyan, v_fade_intensity)
+                elseif v_blast_active > v_blast_duration * 0.2 then
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], blue, v_fade_intensity)
+                else
+                    mplot(v_blast_x[v_i], v_blast_y[v_i], purple, v_fade_intensity)
+                endif
+            endif
+        endfor v_i
+        
+        # Add central explosion effect at blast center
+        v_explosion_radius = (v_blast_duration - v_blast_active) * 2
+        if v_explosion_radius < 15 then
+            draw_circle(v_blast_center_x, v_blast_center_y, v_explosion_radius, white, v_fade_intensity / 2, false)
+        endif
+        
+        # Draw blast influence radius (fading)
+        if v_blast_active > v_blast_duration * 0.6 then
+            v_radius_intensity = v_fade_intensity / 4
+            draw_circle(v_blast_center_x, v_blast_center_y, v_blast_push_radius, cyan, v_radius_intensity, false)
+        endif
+        
+        # Countdown blast timer
+        v_blast_active = v_blast_active - 1
+    endif
+}# Elastic Collision - Multiple Balls with Realistic Physics
+# Configurable number of balls with elastic collisions and momentum transfer
+
+clear()
+
+# Configuration - adjust these for performance
+v_num_balls = 4          # Number of balls (start with 4, increase if performance allows)
+v_trail_length = 20      # Length of velocity trails
+v_spark_duration = 8     # How long collision sparks last
+
+# Energy boost system
+v_energy_boost_interval = 150   # Boost every N frames
+v_min_total_energy = 75          # Energy threshold for boost
+v_boost_strength = 4            # How much energy to add
+v_blast_particles = 16          # Number of blast particles
+v_blast_duration = 20           # How long blast effect lasts
+v_blast_active = 0              # Blast timer
+v_blast_center_x = 32           # Blast center x (randomized)
+v_blast_center_y = 32           # Blast center y (randomized)
+v_blast_push_radius = 25        # How far blast affects balls
+v_blast_push_strength = 6       # Force of blast on balls
+
+# Physics constants
+v_gravity = 0.02         # Small gravity effect
+v_wall_damping = 0.98    # Energy loss on wall bounces
+v_friction = 0.999       # Air resistance
+
+# Display boundaries
+v_min_x = 2
+v_max_x = 62
+v_min_y = 2  
+v_max_y = 62
+
+# Ball arrays - positions, velocities, properties
+create_array(v_ball_x, v_num_balls, numeric)
+create_array(v_ball_y, v_num_balls, numeric)
+create_array(v_ball_vx, v_num_balls, numeric)
+create_array(v_ball_vy, v_num_balls, numeric)
+create_array(v_ball_radius, v_num_balls, numeric)
+create_array(v_ball_mass, v_num_balls, numeric)
+create_array(v_ball_color, v_num_balls, numeric)
+
+# Trail arrays
+create_array(v_trail_x, v_trail_length * v_num_balls, numeric)
+create_array(v_trail_y, v_trail_length * v_num_balls, numeric)
+create_array(v_trail_age, v_trail_length * v_num_balls, numeric)
+v_trail_index = 0
+
+# Collision spark arrays
+create_array(v_spark_x, 20, numeric)
+create_array(v_spark_y, 20, numeric)
+create_array(v_spark_timer, 20, numeric)
+v_spark_count = 0
+
+# Energy blast arrays
+create_array(v_blast_x, v_blast_particles, numeric)
+create_array(v_blast_y, v_blast_particles, numeric)
+create_array(v_blast_dx, v_blast_particles, numeric)
+create_array(v_blast_dy, v_blast_particles, numeric)
+
+# Color mapping for balls
+create_array(v_colors, 8, string)
+v_colors[0] = "red"
+v_colors[1] = "blue"
+v_colors[2] = "green"
+v_colors[3] = "yellow"
+v_colors[4] = "purple"
+v_colors[5] = "orange"
+v_colors[6] = "cyan"
+v_colors[7] = "white"
+
+# Initialize balls with random positions and properties
+def init_balls {
+    print(f"Initializing {v_num_balls} balls...")
+    
+    for v_i in (0, v_num_balls - 1, 1)
+        # Random position (avoid edges)
+        v_ball_x[v_i] = random(8, 56, 0)
+        v_ball_y[v_i] = random(8, 56, 0)
+        
+        # Random velocity
+        v_ball_vx[v_i] = random(-3, 3, 1)
+        v_ball_vy[v_i] = random(-3, 3, 1)
+        
+        # Random radius (2-4 pixels)
+        v_ball_radius[v_i] = random(2, 4, 0)
+        
+        # Mass based on radius squared
+        v_ball_mass[v_i] = v_ball_radius[v_i] * v_ball_radius[v_i]
+        
+        # Assign color
+        v_ball_color[v_i] = v_i % 8
+        
+        print(f"Ball {v_i}: pos=({v_ball_x[v_i]},{v_ball_y[v_i]}), radius={v_ball_radius[v_i]}, mass={v_ball_mass[v_i]}")
+    endfor v_i
+}
+
+# Initialize trail and spark arrays
+def init_effects {
+    for v_i in (0, v_trail_length * v_num_balls - 1, 1)
+        v_trail_x[v_i] = -1
+        v_trail_y[v_i] = -1
+        v_trail_age[v_i] = 0
+    endfor v_i
+    
+    for v_i in (0, 19, 1)
+        v_spark_x[v_i] = -1
+        v_spark_y[v_i] = -1
+        v_spark_timer[v_i] = 0
+    endfor v_i
+    
+    # Initialize blast particles
+    for v_i in (0, v_blast_particles - 1, 1)
+        v_blast_x[v_i] = v_blast_center_x
+        v_blast_y[v_i] = v_blast_center_y
+        v_blast_dx[v_i] = 0
+        v_blast_dy[v_i] = 0
+    endfor v_i
+}
+
+# Update ball physics
+def update_balls {
+    for v_i in (0, v_num_balls - 1, 1)
+        # Apply gravity
+        v_ball_vy[v_i] = v_ball_vy[v_i] + v_gravity
+        
+        # Apply friction
+        v_ball_vx[v_i] = v_ball_vx[v_i] * v_friction
+        v_ball_vy[v_i] = v_ball_vy[v_i] * v_friction
+        
+        # Update positions
+        v_ball_x[v_i] = v_ball_x[v_i] + v_ball_vx[v_i]
+        v_ball_y[v_i] = v_ball_y[v_i] + v_ball_vy[v_i]
+        
+        # Wall collisions
+        if v_ball_x[v_i] - v_ball_radius[v_i] <= v_min_x then
+            v_ball_x[v_i] = v_min_x + v_ball_radius[v_i]
+            v_ball_vx[v_i] = -v_ball_vx[v_i] * v_wall_damping
+        endif
+        
+        if v_ball_x[v_i] + v_ball_radius[v_i] >= v_max_x then
+            v_ball_x[v_i] = v_max_x - v_ball_radius[v_i]
+            v_ball_vx[v_i] = -v_ball_vx[v_i] * v_wall_damping
+        endif
+        
+        if v_ball_y[v_i] - v_ball_radius[v_i] <= v_min_y then
+            v_ball_y[v_i] = v_min_y + v_ball_radius[v_i]
+            v_ball_vy[v_i] = -v_ball_vy[v_i] * v_wall_damping
+        endif
+        
+        if v_ball_y[v_i] + v_ball_radius[v_i] >= v_max_y then
+            v_ball_y[v_i] = v_max_y - v_ball_radius[v_i]
+            v_ball_vy[v_i] = -v_ball_vy[v_i] * v_wall_damping
+        endif
+    endfor v_i
+}
+
+# Check for ball-to-ball collisions
+def check_collisions {
+    for v_i in (0, v_num_balls - 2, 1)
+        for v_j in (v_i + 1, v_num_balls - 1, 1)
+            # Calculate distance between balls
+            v_dx = v_ball_x[v_j] - v_ball_x[v_i]
+            v_dy = v_ball_y[v_j] - v_ball_y[v_i]
+            v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+            
+            # Check if collision occurred
+            v_min_distance = v_ball_radius[v_i] + v_ball_radius[v_j]
+            if v_distance < v_min_distance and v_distance > 0 then
+                # Normalize collision vector
+                v_nx = v_dx / v_distance
+                v_ny = v_dy / v_distance
+                
+                # Separate balls to prevent overlap
+                v_overlap = v_min_distance - v_distance
+                v_ball_x[v_i] = v_ball_x[v_i] - v_nx * v_overlap * 0.5
+                v_ball_y[v_i] = v_ball_y[v_i] - v_ny * v_overlap * 0.5
+                v_ball_x[v_j] = v_ball_x[v_j] + v_nx * v_overlap * 0.5
+                v_ball_y[v_j] = v_ball_y[v_j] + v_ny * v_overlap * 0.5
+                
+                # Calculate relative velocity
+                v_dvx = v_ball_vx[v_j] - v_ball_vx[v_i]
+                v_dvy = v_ball_vy[v_j] - v_ball_vy[v_i]
+                
+                # Calculate relative velocity along collision normal
+                v_dvn = v_dvx * v_nx + v_dvy * v_ny
+                
+                # Only resolve if balls are moving toward each other
+                if v_dvn < 0 then
+                    # Calculate impulse scalar
+                    v_impulse = 2 * v_dvn / (v_ball_mass[v_i] + v_ball_mass[v_j])
+                    
+                    # Apply impulse to velocities
+                    v_ball_vx[v_i] = v_ball_vx[v_i] + v_impulse * v_ball_mass[v_j] * v_nx
+                    v_ball_vy[v_i] = v_ball_vy[v_i] + v_impulse * v_ball_mass[v_j] * v_ny
+                    v_ball_vx[v_j] = v_ball_vx[v_j] - v_impulse * v_ball_mass[v_i] * v_nx
+                    v_ball_vy[v_j] = v_ball_vy[v_j] - v_impulse * v_ball_mass[v_i] * v_ny
+                    
+                    # Create collision spark
+                    call create_spark
+                endif
+            endif
+        endfor v_j
+    endfor v_i
+}
+
+# Create collision spark effect
+def create_spark {
+    if v_spark_count < 20 then
+        v_spark_x[v_spark_count] = (v_ball_x[v_i] + v_ball_x[v_j]) / 2
+        v_spark_y[v_spark_count] = (v_ball_y[v_i] + v_ball_y[v_j]) / 2
+        v_spark_timer[v_spark_count] = v_spark_duration
+        v_spark_count = v_spark_count + 1
+    endif
+}
+
+# Add ball positions to trails
+def update_trails {
+    for v_i in (0, v_num_balls - 1, 1)
+        v_trail_x[v_trail_index] = v_ball_x[v_i]
+        v_trail_y[v_trail_index] = v_ball_y[v_i]
+        v_trail_age[v_trail_index] = 0
+        v_trail_index = v_trail_index + 1
+        
+        if v_trail_index >= v_trail_length * v_num_balls then
+            v_trail_index = 0
+        endif
+    endfor v_i
+}
+
+# Draw trails with fading
+def draw_trails {
+    for v_i in (0, v_trail_length * v_num_balls - 1, 1)
+        if v_trail_x[v_i] >= 0 then
+            v_trail_age[v_i] = v_trail_age[v_i] + 1
+            v_fade = 80 - v_trail_age[v_i] * 3
+            
+            if v_fade > 0 then
+                v_ball_idx = v_i % v_num_balls
+                mplot(v_trail_x[v_i], v_trail_y[v_i], v_colors[v_ball_color[v_ball_idx]], v_fade)
+            else
+                v_trail_x[v_i] = -1
+            endif
+        endif
+    endfor v_i
+    mflush()
+}
+
+# Draw collision sparks
+def draw_sparks {
+    v_active_sparks = 0
+    for v_i in (0, 19, 1)
+        if v_spark_timer[v_i] > 0 then
+            v_intensity = v_spark_timer[v_i] * 100 / v_spark_duration
+            mplot(v_spark_x[v_i], v_spark_y[v_i], white, v_intensity)
+            draw_circle(v_spark_x[v_i], v_spark_y[v_i], 1, white, v_intensity / 2, false)
+            
+            v_spark_timer[v_i] = v_spark_timer[v_i] - 1
+            v_active_sparks = v_active_sparks + 1
+        endif
+    endfor v_i
+    mflush()
+
+    # Reset spark count when all sparks are done
+    if v_active_sparks == 0 then
+        v_spark_count = 0
+    endif
+}
+
+# Draw balls with speed-based brightness
+def draw_balls {
+    for v_i in (0, v_num_balls - 1, 1)
+        # Calculate speed for brightness
+        v_speed = sqrt(v_ball_vx[v_i] * v_ball_vx[v_i] + v_ball_vy[v_i] * v_ball_vy[v_i])
+        v_intensity = min(100, 60 + v_speed * 10)
+        
+        # Draw ball
+        draw_circle(v_ball_x[v_i], v_ball_y[v_i], v_ball_radius[v_i], v_colors[v_ball_color[v_i]], v_intensity, true)
+        
+        # Draw border for definition
+        draw_circle(v_ball_x[v_i], v_ball_y[v_i], v_ball_radius[v_i], white, 30, false)
+    endfor v_i
+}
+
+# Initialize simulation
+call init_balls
+call init_effects
+
+print(f"Starting elastic collision simulation with {v_num_balls} balls...")
+print("Tip: Adjust v_num_balls at the top if performance is slow")
+
+# Main simulation loop
+v_frame = 0
+while v_frame >= 0 then
+    call update_balls
+    call check_collisions
+    
+    # Check for energy boost (periodic or when energy is low)
+    if v_frame % v_energy_boost_interval == 0 or v_frame % 50 == 0 then
+        call check_energy_boost
+    endif
+    
+    # Update trails every few frames
+    if v_frame % 2 == 0 then
+        call update_trails
+    endif
+    
+    # Debug info every 200 frames
+    if v_frame % 200 == 0 then
+        print(f"Frame {v_frame}: Running with {v_num_balls} balls")
+    endif
+    
+    begin_frame
+        call draw_trails
+        call draw_sparks
+        call draw_balls
+        call draw_energy_blast
+    end_frame
+    
+    v_frame = v_frame + 1
+    
+    # Reset frame counter
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+endwhile
