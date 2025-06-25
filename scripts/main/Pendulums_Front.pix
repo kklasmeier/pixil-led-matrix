@@ -1,0 +1,75 @@
+# Front View Pendulums - True front view looking at pendulums swinging toward/away
+# Pendulums stacked vertically with different string lengths
+
+clear()
+
+# Parameters
+v_num_pendulums = 8
+v_time = 0
+v_mount_x = 32  # Center column
+v_sync_cycle = 40  # Time for one complete sync cycle
+
+# Pendulum arrays
+create_array(v_pendulum_x, 8, numeric)
+create_array(v_pendulum_y, 8, numeric)
+create_array(v_string_length, 8, numeric)
+create_array(v_periods, 8, numeric)
+create_array(v_colors, 8, numeric)
+
+# Initialize pendulums - with synchronized periods for convergence
+for v_i in (0, 7, 1)
+    v_string_length[v_i] = 50 - v_i * 5  # Longer strings (50, 45, 40, 35...)
+    # Calculate periods so they sync up periodically
+    # Each pendulum completes exactly (51 + i) swings in v_sync_cycle time
+    v_periods[v_i] = v_sync_cycle / (51 + v_i)  # Creates convergence pattern
+    v_colors[v_i] = 65 + v_i * 3  # Color gradient
+endfor v_i
+
+# Main animation loop
+while 1 == 1 then
+    begin_frame
+    
+    # Draw mounting bracket at top
+    draw_rectangle(30, 5, 5, 3, 40, 80, true)
+    plot(v_mount_x, 8, 90, 100)  # Mounting point
+    
+    # Draw each pendulum (back to front = longest to shortest)
+    for v_i in (0, 7, 1)
+        # Calculate side-to-side swing with proper arc motion
+        v_swing_angle = sin(v_time / v_periods[v_i]) * 1.2  # Max swing angle in radians
+        
+        # Calculate bob position using proper pendulum arc (string stays same length)
+        v_pendulum_x[v_i] = v_mount_x + sin(v_swing_angle) * v_string_length[v_i]
+        v_pendulum_y[v_i] = 8 + cos(v_swing_angle) * v_string_length[v_i]
+        
+        # Draw string from mount point to bob
+        draw_line(v_mount_x, 8, v_pendulum_x[v_i], v_pendulum_y[v_i], gray, 25)
+        
+        # Draw pendulum bob - radius 2
+        draw_circle(v_pendulum_x[v_i], v_pendulum_y[v_i], 2, v_colors[v_i], 90, true)
+    endfor v_i
+    
+    # Show synchronization indicator when pendulums are aligned
+    v_sync_factor = 0
+    for v_i in (0, 7, 1)
+        v_sync_factor = v_sync_factor + cos(v_time / v_periods[v_i])
+    endfor v_i
+    v_sync_factor = abs(v_sync_factor)
+    
+    # When pendulums are well-synchronized, show visual indicator
+    if v_sync_factor > 6 then
+        # Draw alignment indicator at top
+        v_glow_intensity = (v_sync_factor - 6) * 15
+        if v_glow_intensity > 80 then
+            v_glow_intensity = 80
+        endif
+        draw_circle(32, 3, 3, 95, v_glow_intensity, true)
+    endif
+    
+    end_frame
+    
+    v_time = v_time + 0.06
+    #rest(.1)
+endwhile
+
+sync_queue

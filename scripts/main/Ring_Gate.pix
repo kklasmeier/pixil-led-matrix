@@ -1,0 +1,406 @@
+# Ring Gate - The Expanse inspired portal animation
+# Shows the mysterious alien ring gate with energy effects and ship transits
+
+clear()
+
+# Ring parameters
+v_center_x = 32
+v_center_y = 32
+v_ring_radius = 26
+v_inner_radius = 25
+
+# Animation parameters
+v_frame = 0
+v_transit_timer = 0
+v_transit_active = 0
+v_transit_phase = 0
+v_energy_offset = 0
+v_approach_angle = 0
+v_exit_angle = 0
+
+# Worm effect parameters
+v_worm_active = 0
+v_worm_timer = 0
+v_worm_x = 0
+v_worm_y = 0
+v_worm_dir_x = 0
+v_worm_dir_y = 0
+v_worm_length = 5
+v_worm2_active = 0
+v_worm2_timer = 0
+v_worm2_x = 0
+v_worm2_y = 0
+v_worm2_dir_x = 0
+v_worm2_dir_y = 0
+
+# Energy barrier arrays for the interior
+create_array(v_barrier_x, 80, numeric)
+create_array(v_barrier_y, 80, numeric)
+create_array(v_barrier_intensity, 80, numeric)
+
+# Stars outside the ring (reduced to 15)
+create_array(v_star_x, 15, numeric) 
+create_array(v_star_y, 15, numeric)
+create_array(v_star_intensity, 15, numeric)
+
+# Worm trail arrays (10 pixels long)
+create_array(v_worm_trail_x, 10, numeric)
+create_array(v_worm_trail_y, 10, numeric)
+create_array(v_worm2_trail_x, 10, numeric)
+create_array(v_worm2_trail_y, 10, numeric)
+
+# Initialize energy barrier particles
+for v_i in (0, 79, 1)
+    # Create particles within the ring interior
+    v_angle = random(0, 360, 1)
+    v_radius = random(5, v_inner_radius - 2, 1)
+    v_barrier_x[v_i] = v_center_x + v_radius * cos(radians(v_angle))
+    v_barrier_y[v_i] = v_center_y + v_radius * sin(radians(v_angle))
+    v_barrier_intensity[v_i] = random(40, 70, 0)
+endfor v_i
+
+# Initialize starfield (reduced to 15 stars)
+for v_i in (0, 14, 1)
+    # Create stars outside the ring area
+    v_valid_star = 0
+    v_attempt_count = 0
+    while v_valid_star == 0 then
+        v_star_x[v_i] = random(0, 63, 0)
+        v_star_y[v_i] = random(0, 63, 0)
+        v_attempt_count = v_attempt_count + 1
+        
+        # Check distance from ring center
+        v_dx = v_star_x[v_i] - v_center_x
+        v_dy = v_star_y[v_i] - v_center_y
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        
+        if v_dist > v_ring_radius + 3 then
+            v_valid_star = 1
+            v_star_intensity[v_i] = random(30, 90, 0)
+        endif
+        
+        # Safety break to avoid infinite loop
+        if v_attempt_count > 50 then
+            v_valid_star = 1
+            v_star_intensity[v_i] = random(30, 90, 0)
+        endif
+    endwhile
+endfor v_i
+
+# Main animation loop - run forever
+while 1 == 1 then
+    begin_frame
+    
+    # Draw starfield first (background) 
+    for v_i in (0, 14, 1)
+        # Gentle star twinkling
+        v_twinkle = random(-10, 10, 0)
+        v_final_intensity = v_star_intensity[v_i] + v_twinkle
+        if v_final_intensity < 20 then
+            v_final_intensity = 20
+        endif
+        if v_final_intensity > 100 then
+            v_final_intensity = 100
+        endif
+        
+        plot(v_star_x[v_i], v_star_y[v_i], white, v_final_intensity)
+    endfor v_i
+    
+    # Draw the main ring structure with depth
+    draw_ellipse(v_center_x, v_center_y, v_ring_radius + 2, v_ring_radius - 1, gray, 55, false)
+    draw_circle(v_center_x, v_center_y, v_ring_radius, 67, 85, false)
+    
+    # Energy barrier animation
+    for v_i in (0, 79, 1)
+        # Add some drift to barrier particles
+        v_barrier_x[v_i] = v_barrier_x[v_i] + random(-0.2, 0.2, 1)
+        v_barrier_y[v_i] = v_barrier_y[v_i] + random(-0.2, 0.2, 1)
+        
+        # Keep particles within the ring interior  
+        v_dx = v_barrier_x[v_i] - v_center_x
+        v_dy = v_barrier_y[v_i] - v_center_y
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        
+        if v_dist > v_inner_radius - 1 then
+            v_barrier_x[v_i] = v_center_x + v_dx * (v_inner_radius - 1) / v_dist
+            v_barrier_y[v_i] = v_center_y + v_dy * (v_inner_radius - 1) / v_dist
+        endif
+        
+        # Vary intensity for shimmering effect
+        v_barrier_intensity[v_i] = v_barrier_intensity[v_i] + random(-3, 3, 0)
+        if v_barrier_intensity[v_i] < 30 then
+            v_barrier_intensity[v_i] = 30
+        endif
+        if v_barrier_intensity[v_i] > 80 then
+            v_barrier_intensity[v_i] = 80
+        endif
+        
+        # Draw barrier particle (blue range: 65-75)
+        v_barrier_color = 67 + random(-2, 2, 0)
+        mplot(v_barrier_x[v_i], v_barrier_y[v_i], v_barrier_color, v_barrier_intensity[v_i])
+    endfor v_i
+    
+    # Worm effect - spawn more frequently
+    if v_worm_active == 0 then
+        if random(0, 100, 0) < 8 then
+            v_worm_active = 1
+            v_worm_timer = 0
+            # Random starting position inside ring
+            v_angle = random(0, 360, 1)
+            v_radius = random(8, v_inner_radius - 3, 1)
+            v_worm_x = v_center_x + v_radius * cos(radians(v_angle))
+            v_worm_y = v_center_y + v_radius * sin(radians(v_angle))
+            # Random direction
+            v_dir_angle = random(0, 360, 1)
+            v_worm_dir_x = cos(radians(v_dir_angle)) * 0.5
+            v_worm_dir_y = sin(radians(v_dir_angle)) * 0.5
+            # Initialize trail (10 pixels)
+            for v_t in (0, 9, 1)
+                v_worm_trail_x[v_t] = v_worm_x
+                v_worm_trail_y[v_t] = v_worm_y
+            endfor v_t
+        endif
+    endif
+    
+    # Worm 2 - spawn more frequently 
+    if v_worm2_active == 0 then
+        if random(0, 100, 0) < 5 then
+            v_worm2_active = 1
+            v_worm2_timer = 0
+            # Random starting position inside ring
+            v_angle = random(0, 360, 1)
+            v_radius = random(8, v_inner_radius - 3, 1)
+            v_worm2_x = v_center_x + v_radius * cos(radians(v_angle))
+            v_worm2_y = v_center_y + v_radius * sin(radians(v_angle))
+            # Random direction
+            v_dir_angle = random(0, 360, 1)
+            v_worm2_dir_x = cos(radians(v_dir_angle)) * 0.4
+            v_worm2_dir_y = sin(radians(v_dir_angle)) * 0.4
+            # Initialize trail (10 pixels)
+            for v_t in (0, 9, 1)
+                v_worm2_trail_x[v_t] = v_worm2_x
+                v_worm2_trail_y[v_t] = v_worm2_y
+            endfor v_t
+        endif
+    endif
+    
+    # Update worm 1
+    if v_worm_active == 1 then
+        v_worm_timer = v_worm_timer + 1
+        
+        # Move worm
+        v_worm_x = v_worm_x + v_worm_dir_x
+        v_worm_y = v_worm_y + v_worm_dir_y
+        
+        # Occasionally change direction
+        if random(0, 100, 0) < 15 then
+            v_dir_angle = random(0, 360, 1)
+            v_worm_dir_x = cos(radians(v_dir_angle)) * 0.5
+            v_worm_dir_y = sin(radians(v_dir_angle)) * 0.5
+        endif
+        
+        # Keep worm inside ring
+        v_dx = v_worm_x - v_center_x
+        v_dy = v_worm_y - v_center_y
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        if v_dist > v_inner_radius - 2 then
+            v_worm_x = v_center_x + v_dx * (v_inner_radius - 2) / v_dist
+            v_worm_y = v_center_y + v_dy * (v_inner_radius - 2) / v_dist
+            # Bounce direction
+            v_worm_dir_x = v_worm_dir_x * -1
+            v_worm_dir_y = v_worm_dir_y * -1
+        endif
+        
+        # Update trail (10 pixels)
+        for v_t in (9, 1, -1)
+            v_worm_trail_x[v_t] = v_worm_trail_x[v_t - 1]
+            v_worm_trail_y[v_t] = v_worm_trail_y[v_t - 1]
+        endfor v_t
+        v_worm_trail_x[0] = v_worm_x
+        v_worm_trail_y[0] = v_worm_y
+        
+        # Draw worm trail (10 pixels long)
+        for v_t in (0, 9, 1)
+            v_trail_intensity = 90 - v_t * 8
+            if v_trail_intensity > 20 then
+                mplot(v_worm_trail_x[v_t], v_worm_trail_y[v_t], 72, v_trail_intensity)
+            endif
+        endfor v_t
+        
+        # Worm disappears after 120-240 frames (twice as long)
+        if v_worm_timer > random(120, 240, 0) then
+            v_worm_active = 0
+        endif
+    endif
+    
+    # Update worm 2 (similar but different speed/color)
+    if v_worm2_active == 1 then
+        v_worm2_timer = v_worm2_timer + 1
+        
+        # Move worm
+        v_worm2_x = v_worm2_x + v_worm2_dir_x
+        v_worm2_y = v_worm2_y + v_worm2_dir_y
+        
+        # Occasionally change direction
+        if random(0, 100, 0) < 12 then
+            v_dir_angle = random(0, 360, 1)
+            v_worm2_dir_x = cos(radians(v_dir_angle)) * 0.4
+            v_worm2_dir_y = sin(radians(v_dir_angle)) * 0.4
+        endif
+        
+        # Keep worm inside ring
+        v_dx = v_worm2_x - v_center_x
+        v_dy = v_worm2_y - v_center_y
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        if v_dist > v_inner_radius - 2 then
+            v_worm2_x = v_center_x + v_dx * (v_inner_radius - 2) / v_dist
+            v_worm2_y = v_center_y + v_dy * (v_inner_radius - 2) / v_dist
+            # Bounce direction
+            v_worm2_dir_x = v_worm2_dir_x * -1
+            v_worm2_dir_y = v_worm2_dir_y * -1
+        endif
+        
+        # Update trail (10 pixels)
+        for v_t in (9, 1, -1)
+            v_worm2_trail_x[v_t] = v_worm2_trail_x[v_t - 1]
+            v_worm2_trail_y[v_t] = v_worm2_trail_y[v_t - 1]
+        endfor v_t
+        v_worm2_trail_x[0] = v_worm2_x
+        v_worm2_trail_y[0] = v_worm2_y
+        
+        # Draw worm trail (10 pixels long, slightly different color)
+        for v_t in (0, 9, 1)
+            v_trail_intensity = 85 - v_t * 7
+            if v_trail_intensity > 20 then
+                mplot(v_worm2_trail_x[v_t], v_worm2_trail_y[v_t], 70, v_trail_intensity)
+            endif
+        endfor v_t
+        
+        # Worm disappears after 80-200 frames (twice as long)
+        if v_worm2_timer > random(80, 200, 0) then
+            v_worm2_active = 0
+        endif
+    endif
+    
+    # Check for random transit events
+    if v_transit_active == 0 then
+        if random(0, 100, 0) < 3 then
+            v_transit_active = 1
+            v_transit_phase = 0
+            v_transit_timer = 0
+            # Random approach angle (0-360 degrees)
+            v_approach_angle = random(0, 360, 0)
+            # Exit angle is opposite side (180 degrees away)
+            v_exit_angle = v_approach_angle + 180
+            if v_exit_angle >= 360 then
+                v_exit_angle = v_exit_angle - 360
+            endif
+            #print("TRANSIT EVENT STARTED!")
+            #sync_queue
+        endif
+    endif
+    
+    # Handle transit animation
+    if v_transit_active == 1 then
+        v_transit_timer = v_transit_timer + 1
+        
+        if v_transit_timer < 20 then
+            # Approach phase - energy buildup closer to center to stay inside ring
+            #print(f"Transit phase 1 - Approach (timer: {v_transit_timer})")
+            #sync_queue
+            
+            # Calculate approach position closer to center (inside the ring)
+            v_approach_distance = v_ring_radius - 8
+            v_approach_x = v_center_x + v_approach_distance * cos(radians(v_approach_angle))
+            v_approach_y = v_center_y + v_approach_distance * sin(radians(v_approach_angle))
+            
+            # Create animated expanding ripple (single growing circle)
+            v_ripple_radius = v_transit_timer * 0.8
+            v_ripple_intensity = 85 - v_transit_timer * 2
+            # Clamp intensity to valid range
+            if v_ripple_intensity > 100 then
+                v_ripple_intensity = 100
+            endif
+            if v_ripple_intensity < 15 then
+                v_ripple_intensity = 15
+            endif
+            
+            # Keep ripple small enough to stay inside ring
+            if v_ripple_radius > 0 and v_ripple_radius < 8 then
+                draw_circle(v_approach_x, v_approach_y, v_ripple_radius, 60, v_ripple_intensity, false)
+            endif
+            
+        elseif v_transit_timer < 25 then
+            # Transit flash - bright burst across barrier
+            #print(f"Transit phase 2 - Flash (timer: {v_transit_timer})")
+            #sync_queue
+            
+            # Remove worms during speed limit effect
+            if v_transit_timer == 20 then
+                v_worm_active = 0
+                v_worm2_active = 0
+            endif
+            
+            for v_i in (0, 79, 1)
+                v_flash_intensity = 90 + random(-5, 5, 0)
+                # Clamp flash intensity
+                if v_flash_intensity > 100 then
+                    v_flash_intensity = 100
+                endif
+                v_flash_color = 95  # White
+                mplot(v_barrier_x[v_i], v_barrier_y[v_i], v_flash_color, v_flash_intensity)
+            endfor v_i
+            
+            # Ring response - brighten the ring
+            draw_circle(v_center_x, v_center_y, v_ring_radius, 72, 99, false)
+            
+        elseif v_transit_timer < 40 then
+            # Exit wake at opposite side, also closer to center
+            #print(f"Transit phase 3 - Exit wake (timer: {v_transit_timer})")
+            #sync_queue
+            
+            # Calculate exit position closer to center (inside the ring)
+            v_exit_distance = v_ring_radius - 8
+            v_exit_x = v_center_x + v_exit_distance * cos(radians(v_exit_angle))
+            v_exit_y = v_center_y + v_exit_distance * sin(radians(v_exit_angle))
+            
+            # Create animated expanding wake (single growing circle)
+            v_wake_time = v_transit_timer - 25
+            v_wake_radius = v_wake_time * 0.6
+            v_wake_intensity = 75 - v_wake_time * 3
+            # Clamp wake intensity
+            if v_wake_intensity > 100 then
+                v_wake_intensity = 100
+            endif
+            if v_wake_intensity < 15 then
+                v_wake_intensity = 15
+            endif
+            
+            # Keep wake small enough to stay inside ring
+            if v_wake_radius > 0 and v_wake_radius < 6 then
+                draw_circle(v_exit_x, v_exit_y, v_wake_radius, 65, v_wake_intensity, false)
+            endif
+            
+        else
+            # End transit
+            #print("TRANSIT EVENT ENDED!")
+            #sync_queue
+            v_transit_active = 0
+            v_transit_timer = 0
+        endif
+    endif
+    
+    # Ring ambient glow pulse
+    v_glow_intensity = 40 + 15 * sin(radians(v_frame * 1.5))
+    draw_circle(v_center_x, v_center_y, v_ring_radius + 1, 68, v_glow_intensity, false)
+    
+    mflush()
+    end_frame
+    
+    v_frame = v_frame + 1
+    v_energy_offset = v_energy_offset + 1
+    
+    rest(0.02)
+endwhile
+
+#sync_queue
