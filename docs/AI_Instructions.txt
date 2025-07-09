@@ -1058,8 +1058,7 @@ My current list of scripts are:
 96. Vortex Spiral - Spinning funnel pattern animation
 97. Wave Grid - Undulating coordinate mesh animation
 98. Wormhole - Space-time tunnel visualization
-99. Moire Patterns – Overlapping pattern interference effects
-100. Hex Grid Glow – Radiating hexagonal lattice with center-out symmetry and periodic color shifts
-101. Solar Bloom – Sunburst-style blooms with radial arms and a pulsing center glow; each bloom randomly jitters or stays symmetrical
-
-
+99. Aurora Reactor – Dynamic energy bursts that ripple outward in vibrant, layered color waves, simulating an unstable reactor core
+100. Hex Grid Glow – Radiating hexagonal lattice pattern that pulses from the center with periodic color and intensity shifts
+101. Orbital Wispfield – Smoothly drifting orbs trace elliptical paths around a central point, creating a soft, flowing ambient field
+102. Solar Bloom – Radiating sun-like bursts with pulsing center glow; each bloom randomly exhibits jitter or stays symmetrical throughout its life
