@@ -1,0 +1,135 @@
+v_center_x = 32
+v_center_y = 32
+v_max_blooms = 5
+v_max_arms = 10
+
+create_array(v_bloom_active, v_max_blooms)
+create_array(v_bloom_radius, v_max_blooms)
+create_array(v_bloom_speed, v_max_blooms)
+create_array(v_bloom_color, v_max_blooms, string)
+create_array(v_bloom_arm_count, v_max_blooms)
+create_array(v_bloom_angle_offset, v_max_blooms)
+create_array(v_bloom_center_radius, v_max_blooms)
+create_array(v_bloom_jitter, v_max_blooms)
+create_array(v_bloom_jitter_angle, v_max_blooms * 16)  # Flat array for per-arm jitter
+
+v_frame = 0
+
+# Initialize all blooms as inactive
+for v_i in (0, v_max_blooms - 1, 1)
+    v_bloom_active[v_i] = 0
+endfor v_i
+
+while true then
+    begin_frame(true)
+
+    # Check if any bloom is active for center glow
+    v_any_active = 0
+    for v_i in (0, v_max_blooms - 1, 1)
+        if v_bloom_active[v_i] == 1 then
+            v_any_active = 1
+            break
+        endif
+    endfor v_i
+
+    # Draw center glow if any bloom is active
+    if v_any_active == 1 then
+        v_glow_radius = 1
+        for v_i in (v_max_blooms - 1, 0, -1)
+            if v_bloom_active[v_i] == 1 then
+                v_glow_radius = v_bloom_center_radius[v_i]
+                break
+            endif
+        endfor v_i
+
+        v_b = 70 + sin(radians(v_frame * 5)) * 30
+
+        for v_dx in (-v_glow_radius, v_glow_radius, 1)
+            for v_dy in (-v_glow_radius, v_glow_radius, 1)
+                if v_dx * v_dx + v_dy * v_dy <= v_glow_radius * v_glow_radius then
+                    v_x = v_center_x + v_dx
+                    v_y = v_center_y + v_dy
+                    if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+                        mplot(v_x, v_y, "white", v_b, 30)
+                    endif
+                endif
+            endfor v_dy
+        endfor v_dx
+    endif
+
+    # Occasionally create new bloom
+    if v_frame % 40 == 0 then
+        for v_i in (0, v_max_blooms - 1, 1)
+            if v_bloom_active[v_i] == 0 then
+                v_bloom_active[v_i] = 1
+                v_bloom_radius[v_i] = 1
+                v_bloom_speed[v_i] = random(1, 2, 0)
+                v_bloom_arm_count[v_i] = random(6, 10, 0)
+                v_bloom_angle_offset[v_i] = random(0, 360, 0)
+                v_bloom_center_radius[v_i] = random(1, 3, 0)
+
+                # Randomly decide if this bloom jitters
+                v_jitter = random(0, 1, 0)
+                v_bloom_jitter[v_i] = v_jitter
+
+                # Preassign jitter angles (or zeros if no jitter)
+                for v_arm in (0, 15, 1)
+                    if v_jitter == 1 then
+                        v_bloom_jitter_angle[v_i * 16 + v_arm] = random(-3, 3, 0)
+                    else
+                        v_bloom_jitter_angle[v_i * 16 + v_arm] = 0
+                    endif
+                endfor v_arm
+
+                # Assign bloom color
+                v_ci = random(0, 4, 0)
+                if v_ci == 0 then
+                    v_bloom_color[v_i] = "cyan"
+                elseif v_ci == 1 then
+                    v_bloom_color[v_i] = "orange"
+                elseif v_ci == 2 then
+                    v_bloom_color[v_i] = "yellow"
+                elseif v_ci == 3 then
+                    v_bloom_color[v_i] = "magenta"
+                else
+                    v_bloom_color[v_i] = "white"
+                endif
+                break
+            endif
+        endfor v_i
+    endif
+
+    # Draw all active blooms
+    for v_i in (0, v_max_blooms - 1, 1)
+        if v_bloom_active[v_i] == 1 then
+            v_radius = v_bloom_radius[v_i]
+            v_arms = v_bloom_arm_count[v_i]
+            v_color = v_bloom_color[v_i]
+            v_offset = v_bloom_angle_offset[v_i]
+
+            for v_arm in (0, v_arms - 1, 1)
+                v_base_angle = v_offset + (360 / v_arms) * v_arm
+                v_jitter_angle = v_bloom_jitter_angle[v_i * 16 + v_arm]
+                v_angle_deg = v_base_angle + v_jitter_angle
+
+                v_rad = radians(v_angle_deg)
+                v_x = v_center_x + cos(v_rad) * v_radius
+                v_y = v_center_y + sin(v_rad) * v_radius
+
+                if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+                    mplot(v_x, v_y, v_color, 100, 80)
+                endif
+            endfor v_arm
+
+            v_bloom_radius[v_i] = v_bloom_radius[v_i] + v_bloom_speed[v_i]
+            if v_bloom_radius[v_i] > 64 then
+                v_bloom_active[v_i] = 0
+            endif
+        endif
+    endfor v_i
+
+    mflush()
+    end_frame
+    rest(0.02)
+    v_frame = v_frame + 1
+endwhile

@@ -1,0 +1,89 @@
+throttle(0)
+v_radius = 5
+v_spacing_x = v_radius * 1.5
+v_spacing_y = v_radius * 1.732
+v_rows = 10
+v_cols = 10
+
+create_array(v_hex_x, 100)
+create_array(v_hex_y, 100)
+create_array(v_hex_dist, 100)
+create_array(v_colors, 7, string)
+
+# Define color palette
+v_colors[0] = "cyan"
+v_colors[1] = "magenta"
+v_colors[2] = "yellow"
+v_colors[3] = "lime"
+v_colors[4] = "orange"
+v_colors[5] = "blue"
+v_colors[6] = "violet"
+
+v_index = 0
+
+# Precompute hex centers and distances
+for v_row in (0, v_rows, 1)
+    for v_col in (0, v_cols, 1)
+        v_x = v_col * v_spacing_x
+        v_y = v_row * v_spacing_y
+        if v_row % 2 == 1 then
+            v_x = v_x + v_radius * 0.75
+        endif
+        if v_x >= 0 and v_x <= 64 and v_y >= 0 and v_y <= 64 then
+            v_hex_x[v_index] = v_x
+            v_hex_y[v_index] = v_y
+            v_hex_dist[v_index] = sqrt(pow(v_x - 32, 2) + pow(v_y - 32, 2))
+            v_index = v_index + 1
+        endif
+    endfor v_col
+endfor v_row
+
+# Sort hexes center-out
+for v_i in (0, v_index - 1, 1)
+    for v_j in (0, v_index - v_i - 1, 1)
+        if v_hex_dist[v_j] > v_hex_dist[v_j + 1] then
+            # Swap dist
+            v_temp = v_hex_dist[v_j]
+            v_hex_dist[v_j] = v_hex_dist[v_j + 1]
+            v_hex_dist[v_j + 1] = v_temp
+            # Swap x
+            v_temp = v_hex_x[v_j]
+            v_hex_x[v_j] = v_hex_x[v_j + 1]
+            v_hex_x[v_j + 1] = v_temp
+            # Swap y
+            v_temp = v_hex_y[v_j]
+            v_hex_y[v_j] = v_hex_y[v_j + 1]
+            v_hex_y[v_j + 1] = v_temp
+        endif
+    endfor v_j
+endfor v_i
+
+# Color cycling init
+v_cycle = -1
+v_color_index = 0
+v_color = v_colors[v_color_index]
+v_frame = 0
+
+# 🔁 Run Forever
+while true then
+    v_new_cycle = floor(v_frame / 40)
+
+    # Change color every 5 cycles
+    if v_new_cycle != v_cycle and v_new_cycle % 5 == 0 then
+        v_color_index = random(0, 6, 0)
+        v_color = v_colors[v_color_index]
+        v_cycle = v_new_cycle
+    endif
+
+    begin_frame(true)
+    for v_i in (0, v_index, 1)
+        v_x = v_hex_x[v_i]
+        v_y = v_hex_y[v_i]
+        v_dist = v_hex_dist[v_i]
+        v_pulse = 50 + 50 * sin((v_frame / 8) - v_dist / 5)
+        draw_polygon(v_x, v_y, v_radius, 6, v_color, v_pulse, 0, true)
+    endfor v_i
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

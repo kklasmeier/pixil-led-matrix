@@ -1,0 +1,113 @@
+v_num_wisps = 20
+
+create_array(v_cx, v_num_wisps)
+create_array(v_cy, v_num_wisps)
+create_array(v_angle, v_num_wisps)
+create_array(v_radius_x, v_num_wisps)
+create_array(v_radius_y, v_num_wisps)
+create_array(v_speed, v_num_wisps)
+create_array(v_color, v_num_wisps, string)
+create_array(v_brightness, v_num_wisps)
+create_array(v_flare_timer, v_num_wisps)
+
+v_frame = 0
+
+# Init wisps
+for v_i in (0, v_num_wisps - 1, 1)
+    v_cx[v_i] = random(10, 53, 0)
+    v_cy[v_i] = random(10, 53, 0)
+    v_angle[v_i] = random(0, 360, 0)
+    v_radius_x[v_i] = random(4, 12, 0)
+    v_radius_y[v_i] = random(3, 10, 0)
+    v_speed[v_i] = random(1, 3, 2)
+    v_brightness[v_i] = random(20, 60, 0)
+    v_flare_timer[v_i] = 0
+
+    v_ci = random(0, 4, 0)
+    if v_ci == 0 then
+        v_color[v_i] = "cyan"
+    elseif v_ci == 1 then
+        v_color[v_i] = "magenta"
+    elseif v_ci == 2 then
+        v_color[v_i] = "lime"
+    elseif v_ci == 3 then
+        v_color[v_i] = "orange"
+    else
+        v_color[v_i] = "white"
+    endif
+endfor v_i
+
+while true then
+    begin_frame(true)
+
+    # Drift orbits every 100 frames
+    if v_frame % 100 == 0 then
+        for v_i in (0, v_num_wisps - 1, 1)
+            v_radius_x[v_i] = v_radius_x[v_i] + random(-2, 2, 0)
+            v_radius_y[v_i] = v_radius_y[v_i] + random(-2, 2, 0)
+
+            # Clamp radii safely
+            if v_radius_x[v_i] < 3 then
+                v_radius_x[v_i] = 3
+            endif
+            if v_radius_x[v_i] > 14 then
+                v_radius_x[v_i] = 14
+            endif
+            if v_radius_y[v_i] < 2 then
+                v_radius_y[v_i] = 2
+            endif
+            if v_radius_y[v_i] > 12 then
+                v_radius_y[v_i] = 12
+            endif
+
+            # Slight center drift occasionally
+            if random(0, 4, 0) == 0 then
+                v_cx[v_i] = v_cx[v_i] + random(-1, 1, 0)
+                v_cy[v_i] = v_cy[v_i] + random(-1, 1, 0)
+
+                if v_cx[v_i] < 2 then
+                    v_cx[v_i] = 2
+                endif
+                if v_cx[v_i] > 61 then
+                    v_cx[v_i] = 61
+                endif
+                if v_cy[v_i] < 2 then
+                    v_cy[v_i] = 2
+                endif
+                if v_cy[v_i] > 61 then
+                    v_cy[v_i] = 61
+                endif
+            endif
+        endfor v_i
+    endif
+
+    for v_i in (0, v_num_wisps - 1, 1)
+        v_angle[v_i] = v_angle[v_i] + v_speed[v_i]
+        if v_angle[v_i] > 360 then
+            v_angle[v_i] = v_angle[v_i] - 360
+        endif
+
+        v_rad = radians(v_angle[v_i])
+        v_x = v_cx[v_i] + cos(v_rad) * v_radius_x[v_i]
+        v_y = v_cy[v_i] + sin(v_rad) * v_radius_y[v_i]
+
+        if v_flare_timer[v_i] > 0 then
+            v_flare_timer[v_i] = v_flare_timer[v_i] - 1
+            v_b = 100
+        else
+            v_b = v_brightness[v_i]
+            if random(0, 100, 0) == 0 then
+                v_flare_timer[v_i] = 5
+            endif
+        endif
+
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+            mplot(v_x, v_y, v_color[v_i], v_b, 60)
+        endif
+    endfor v_i
+
+    mflush()
+    end_frame
+    #rest(0.02)
+    v_frame = v_frame + 1
+endwhile

@@ -1,0 +1,129 @@
+v_max_particles = 30
+
+create_array(v_r, v_max_particles)
+create_array(v_theta, v_max_particles)
+create_array(v_bright, v_max_particles)
+create_array(v_speed, v_max_particles)
+create_array(v_spin, v_max_particles)
+create_array(v_color, v_max_particles, string)
+create_array(v_burnout, v_max_particles)
+
+v_frame = 0
+v_override_color = "none"
+v_override_active = 0
+v_long_burnout = 0
+
+# Initial spawn
+for v_i in (0, v_max_particles - 1, 1)
+    v_r[v_i] = random(2, 5, 1)
+    v_theta[v_i] = random(0, 360, 0)
+    v_bright[v_i] = 100
+    v_speed[v_i] = random(0.8, 1.5, 2)
+    v_spin[v_i] = random(6, 15, 0) * (random(0, 1, 0) * 2 - 1)
+
+    if v_override_active != 0 and v_override_color != "none" then
+        v_color[v_i] = v_override_color
+    else
+        v_pi = random(0, 4, 0)
+        if v_pi == 0 then
+            v_color[v_i] = "white"
+        elseif v_pi == 1 then
+            v_color[v_i] = "cyan"
+        elseif v_pi == 2 then
+            v_color[v_i] = "yellow"
+        elseif v_pi == 3 then
+            v_color[v_i] = "magenta"
+        else
+            v_color[v_i] = "orange"
+        endif
+    endif
+
+    if v_long_burnout != 0 then
+        v_burnout[v_i] = 300
+    else
+        v_burnout[v_i] = 40
+    endif
+endfor v_i
+
+while true then
+    begin_frame(true)
+
+    # Override color: every 100 frames, lasts 40
+    if v_frame % 100 == 0 then
+        if random(0, 1, 0) == 1 then
+            v_ci = random(0, 4, 0)
+            if v_ci == 0 then
+                v_override_color = "blue"
+            elseif v_ci == 1 then
+                v_override_color = "lime"
+            elseif v_ci == 2 then
+                v_override_color = "red"
+            elseif v_ci == 3 then
+                v_override_color = "purple"
+            else
+                v_override_color = "none"
+            endif
+            v_override_active = 1
+        endif
+    elseif v_frame % 100 == 40 then
+        v_override_active = 0
+    endif
+
+    # Long burnout: every 200 frames, lasts 20
+    if v_frame % 200 == 0 then
+        if random(0, 1, 0) == 1 then
+            v_long_burnout = 1
+        endif
+    elseif v_frame % 200 == 20 then
+        v_long_burnout = 0
+    endif
+
+    for v_i in (0, v_max_particles - 1, 1)
+        v_theta[v_i] = v_theta[v_i] + v_spin[v_i]
+        v_r[v_i] = v_r[v_i] + v_speed[v_i]
+        v_bright[v_i] = v_bright[v_i] - 2
+
+        v_angle_rad = radians(v_theta[v_i])
+        v_x = 32 + cos(v_angle_rad) * v_r[v_i]
+        v_y = 32 + sin(v_angle_rad) * v_r[v_i]
+
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 and v_bright[v_i] > 0 then
+            mplot(v_x, v_y, v_color[v_i], v_bright[v_i], v_burnout[v_i])
+        else
+            # Respawn
+            v_r[v_i] = random(2, 5, 1)
+            v_theta[v_i] = random(0, 360, 0)
+            v_bright[v_i] = 100
+            v_speed[v_i] = random(0.8, 1.5, 2)
+            v_spin[v_i] = random(6, 15, 0) * (random(0, 1, 0) * 2 - 1)
+
+            if v_override_active != 0 and v_override_color != "none" then
+                v_color[v_i] = v_override_color
+            else
+                v_pi = random(0, 4, 0)
+                if v_pi == 0 then
+                    v_color[v_i] = "white"
+                elseif v_pi == 1 then
+                    v_color[v_i] = "cyan"
+                elseif v_pi == 2 then
+                    v_color[v_i] = "yellow"
+                elseif v_pi == 3 then
+                    v_color[v_i] = "magenta"
+                else
+                    v_color[v_i] = "orange"
+                endif
+            endif
+
+            if v_long_burnout != 0 then
+                v_burnout[v_i] = 300
+            else
+                v_burnout[v_i] = 40
+            endif
+        endif
+    endfor v_i
+
+    mflush()
+    end_frame
+    rest(0.02)
+    v_frame = v_frame + 1
+endwhile
