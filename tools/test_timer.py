@@ -134,7 +134,10 @@ class TelnetPrayerTimer:
                     continue
                 
                 current_time = time.time()
-                time_diff = current_time - self.last_press
+                if self.last_press is not None:
+                    time_diff = current_time - self.last_press
+                else:
+                    time_diff = 0.0
                 rounded_diff = round(time_diff * 100) / 100
                 self.syllable_times.append(rounded_diff)
                 

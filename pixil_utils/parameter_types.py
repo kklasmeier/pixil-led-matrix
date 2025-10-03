@@ -152,7 +152,11 @@ def get_parameter_type(command: str, position: int) -> ParamType:
         raise IndexError(f"Invalid parameter position {position} for command {command}")
     
     param = params[position]
-    return param['type']
+    param_type = param['type']
+    if isinstance(param_type, str):
+        return param_type  # type: ignore
+    else:
+        return str(param_type)  # type: ignore
 
 def split_command_parameters(param_string: str) -> List[str]:
     """

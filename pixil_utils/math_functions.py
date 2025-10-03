@@ -8,6 +8,7 @@ import random
 import time
 import re
 from typing import Dict, Any, Union, Optional, Tuple
+from .variable_registry import VariableRegistry
 from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print)
 from .array_manager import validate_array_access
 from collections import OrderedDict
@@ -49,7 +50,7 @@ def set_current_script_line(line):
     global _current_script_line
     _current_script_line = line
 
-def try_jit_compilation(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float, str]]:
+def try_jit_compilation(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Optional[Union[int, float, str]]:
     """
     Phase 3: JIT compilation with line-based failure caching.
     """
@@ -98,21 +99,8 @@ def try_jit_compilation(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"JIT compilation error for '{expr}': {str(e)}", DEBUG_VERBOSE)
         return None
-            
-    except Exception as e:
-        # Mark this script line as always failing
-        # global current_command
-        global current_command  
-        if current_command:
-            cache_key = hash(current_command)
-            _FAILED_SCRIPT_LINES.add(cache_key)
-        
-        _JIT_COMPILATION_FAILURES += 1
-        if DEBUG_LEVEL >= DEBUG_VERBOSE:
-            debug_print(f"JIT compilation error for '{expr}': {str(e)}", DEBUG_VERBOSE)
-        return None
-    
-def create_cache_key(expr: str, variables: Dict[str, Any]) -> Optional[tuple]:
+               
+def create_cache_key(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Optional[tuple]:
     """
     Create a cache key for expression + relevant variable values.
     Returns None if expression shouldn't be cached.
@@ -333,7 +321,7 @@ def try_fast_array_access(expr: str, variables) -> Optional[Union[int, float, st
                 pass
     return None
 
-def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[int, float]]:
+def try_fast_arithmetic(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Optional[Union[int, float]]:
     """
     Try to evaluate simple arithmetic expressions without using eval().
     Returns None if the expression doesn't match supported patterns.
@@ -347,39 +335,39 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables.get(var_name)) + float(number)
+                result = float(variables[var_name]) + float(number)  # Changed from .get()
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast add: {var_name} + {number} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
                 pass
-    
+
     # Simple variable - number  
     match = SIMPLE_SUB_PATTERN.match(expr)
     if match:
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables.get(var_name)) - float(number)
+                result = float(variables[var_name]) - float(number)  # Changed from .get()
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast sub: {var_name} - {number} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
                 pass
-    
+
     # Simple variable * number
     match = SIMPLE_MUL_PATTERN.match(expr)
     if match:
         var_name, number = match.groups()
         if var_name in variables:
             try:
-                result = float(variables.get(var_name)) * float(number)
+                result = float(variables[var_name]) * float(number)  # Changed from .get()
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast mul: {var_name} * {number} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
                 pass
-    
+
     # Simple variable / number
     match = SIMPLE_DIV_PATTERN.match(expr)
     if match:
@@ -388,14 +376,14 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
             try:
                 divisor = float(number)
                 if divisor != 0:
-                    result = float(variables.get(var_name)) / divisor
+                    result = float(variables[var_name]) / divisor  # Changed from .get()
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Fast div: {var_name} / {number} = {result}", DEBUG_VERBOSE)
                     return result
             except (ValueError, TypeError, ZeroDivisionError):
                 pass
-    
-    # Simple variable % number (very common for array indexing)
+
+    # Simple variable % number
     match = SIMPLE_MOD_PATTERN.match(expr)
     if match:
         var_name, number = match.groups()
@@ -403,40 +391,40 @@ def try_fast_arithmetic(expr: str, variables: Dict[str, Any]) -> Optional[Union[
             try:
                 modulus = float(number)
                 if modulus != 0:
-                    result = float(variables.get(var_name)) % modulus
+                    result = float(variables[var_name]) % modulus  # Changed from .get()
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Fast mod: {var_name} % {number} = {result}", DEBUG_VERBOSE)
                     return result
             except (ValueError, TypeError, ZeroDivisionError):
                 pass
-    
+
     # Two variables: var1 + var2
     match = VAR_ADD_VAR_PATTERN.match(expr)
     if match:
         var1, var2 = match.groups()
         if var1 in variables and var2 in variables:
             try:
-                result = float(variables.get(var1)) + float(variables.get(var2))
+                result = float(variables[var1]) + float(variables[var2])  # Changed from .get()
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast var add: {var1} + {var2} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
                 pass
-    
+
     # Two variables: var1 * var2
     match = VAR_MUL_VAR_PATTERN.match(expr)
     if match:
         var1, var2 = match.groups()
         if var1 in variables and var2 in variables:
             try:
-                result = float(variables.get(var1)) * float(variables.get(var2))
+                result = float(variables[var1]) * float(variables[var2])  # Changed from .get()
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast var mul: {var1} * {var2} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
                 pass
 
-def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int, float, str]:
+def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Union[int, float, str]:
     """
     Evaluate a mathematical or string expression with variable substitution.
     Uses configurable optimization flags to control caching behavior.
@@ -451,7 +439,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
     if not isinstance(expr, str):
         return expr
     if expr.startswith('v_') and expr in variables:
-        return variables.get(expr)
+        return variables[expr]  # Changed from .get(expr)
 
     # ===== PHASE 2 OPTIMIZATION: FAST MATH PATHS (Controlled by flag) =====
     if ENABLE_FAST_MATH and isinstance(expr, str) and not ('&' in expr or '"' in expr or "'" in expr):
@@ -544,6 +532,7 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
                 raise ValueError(f"Array index must be a number, got {type(index)}")
                 
             # Get array value
+            array = variables[array_name]
             value = array[index]
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Array access {array_name}[{index}] = {value}", DEBUG_VERBOSE)
@@ -590,7 +579,8 @@ def evaluate_math_expression(expr: str, variables: Dict[str, Any]) -> Union[int,
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Error evaluating expression: {str(e)}", DEBUG_VERBOSE)
         if expr.startswith('v_') and expr in variables:
-            return variables.get(expr)
+            return variables[expr]  # Changed from .get(expr)
+
         raise ValueError(f"Error evaluating expression '{expr}': {str(e)}")
     # ===== END EVAL() FALLBACK =====
 
@@ -953,7 +943,7 @@ def evaluate_condition(condition, variables):
     except Exception as e:
         raise ValueError(f"Error evaluating compound condition '{condition}': {str(e)}")
 
-def evaluate_string_concatenation(expr: str, variables: Dict[str, Any]) -> str:
+def evaluate_string_concatenation(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> str:
     """
     Evaluate a string expression containing concatenation operators.
     Handles array access, variables, and string literals.
@@ -987,7 +977,8 @@ def evaluate_string_concatenation(expr: str, variables: Dict[str, Any]) -> str:
                 
                 # Evaluate index
                 index = evaluate_math_expression(index_expr, variables)
-                value = array[int(index)]
+                array = variables[array_name]
+                value = array[index]
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Array access result: {value}", DEBUG_VERBOSE)
                 results.append(str(value))
@@ -1072,6 +1063,12 @@ MATH_FUNCTIONS = {
     'random': random_float
 }
 
+def clear_all_math_caches():
+    """Clear all caches for new script."""
+    global _EXPRESSION_RESULT_CACHE, _FAILED_SCRIPT_LINES
+    _EXPRESSION_RESULT_CACHE.clear()
+    _FAILED_SCRIPT_LINES.clear()
+
 # Export symbols
 __all__ = [
     'MATH_FUNCTIONS',
@@ -1079,7 +1076,8 @@ __all__ = [
     'has_math_expression',
     'substitute_variables',
     'evaluate_math_expression',
-    'evaluate_condition'
+    'evaluate_condition',
+    'clear_all_math_caches'
 ]
 
 

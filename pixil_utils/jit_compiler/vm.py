@@ -3,9 +3,10 @@ Virtual machine for executing Pixil JIT bytecode.
 Enhanced with array access and advanced math functions.
 """
 import math
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional, Union, List
 from .bytecode import OpCode, CompiledExpression
 from ..array_manager import PixilArray
+from ..variable_registry import VariableRegistry
 
 class PixilVMError(Exception):
     """VM execution errors."""
@@ -16,8 +17,9 @@ class PixilVM:
     
     def __init__(self):
         self.stack: List[float] = []
-        
-    def execute(self, compiled_expr: CompiledExpression, variables: Dict[str, Any]) -> float:
+
+
+    def execute(self, compiled: CompiledExpression, variables: Union[Dict[str, Any], VariableRegistry]) -> float:
         """
         Execute compiled bytecode with given variables.
         
@@ -32,10 +34,10 @@ class PixilVM:
             PixilVMError: If execution fails
         """
         self.stack.clear()
-        compiled_expr.execution_count += 1
+        compiled.execution_count += 1
         
         try:
-            for instruction in compiled_expr.bytecode:
+            for instruction in compiled.bytecode:
                 self._execute_instruction(instruction, variables)
                 
             if len(self.stack) != 1:

@@ -623,7 +623,6 @@ call define_sprites
 call reset_missiles
 call setup_game_scene
 
-
 # Main game loop
 # Simplified main game loop with fixed game over handling
 while true then

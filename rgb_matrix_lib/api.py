@@ -14,6 +14,9 @@ from .text_effects import TextEffect, EffectModifier
 from .text_renderer import TextRenderer
 from .commands import CommandExecutor  # Added CommandExecutor import
 
+# Performance tuning flag
+USE_PIL_FOR_FRAME_MODE = True  # Set to True to use PIL Image approach\
+
 # Global instance for internal use
 _api_instance: Optional['RGB_Api'] = None
 
@@ -102,7 +105,8 @@ class RGB_Api:
             # Tuple is pre-scaled RGB; apply intensity only if not 100
             if intensity != 100:
                 scale = intensity / 100.0
-                rgb = tuple(int(c * scale) for c in color)
+                r, g, b = color
+                rgb = (int(r * scale), int(g * scale), int(b * scale))
                 debug(f"Scaled RGB tuple {color} at {intensity}% to {rgb}", Level.TRACE, Component.DRAWING)
                 return rgb
             debug(f"Using RGB tuple {color} at {intensity}%", Level.TRACE, Component.DRAWING)
@@ -121,18 +125,28 @@ class RGB_Api:
             self.canvas.Fill(0, 0, 0) # Clears the current canvas if not preserving
 
     def end_frame(self):
+        """End frame mode and display the accumulated drawing."""
         if self.frame_mode:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            for y in range(self.matrix.height):
-                for x in range(self.matrix.width):
-                    r, g, b = self.drawing_buffer[y, x]
-                    self.canvas.SetPixel(x, y, int(r), int(g), int(b))
+            
+            if USE_PIL_FOR_FRAME_MODE:
+                # PIL Image approach (faster in benchmarks, needs production testing)
+                pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
+                self.canvas.SetImage(pil_image)
+            else:
+                # Original approach (stable, proven)
+                for y in range(self.matrix.height):
+                    for x in range(self.matrix.width):
+                        r, g, b = self.drawing_buffer[y, x]
+                        self.canvas.SetPixel(x, y, int(r), int(g), int(b))
+            
             if self.preserve_frame_changes:
                 for x, y, r, g, b in self.current_command_pixels:
                     self.canvas.SetPixel(x, y, r, g, b)
                 self.current_command_pixels.clear()
             else:
                 self.canvas.Fill(0, 0, 0)
+            
             self.refresh_display()
             self.frame_mode = False
             self.preserve_frame_changes = False
@@ -387,7 +401,8 @@ class RGB_Api:
 
         if burnout is not None:
             self.burnout_manager.add_object(
-                ShapeType.POLYGON, (x_center, y_center, radius), list(burnout_points), burnout
+                ShapeType.POLYGON, (x_center, y_center, radius), 
+                list(burnout_points) if burnout_points else [], burnout
             )
 
     def draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, color: Union[str, int], 
@@ -628,8 +643,8 @@ class RGB_Api:
             if sprite.visible:
                 old_cells = get_grid_cells(int(sprite.x), int(sprite.y), sprite.width, sprite.height)
                 self._mark_cells_dirty(old_cells)
-            sprite.x = x
-            sprite.y = y
+            sprite.x = int(x)
+            sprite.y = int(y)
             sprite.visible = True
             new_cells = set(get_grid_cells(int(x), int(y), sprite.width, sprite.height))
             sprite.occupied_cells = new_cells
@@ -667,8 +682,8 @@ class RGB_Api:
             old_cells = get_grid_cells(int(sprite.x), int(sprite.y), sprite.width, sprite.height)
             self._mark_cells_dirty(old_cells)
             # Remove explicit clear to black
-            sprite.x = x
-            sprite.y = y
+            sprite.x = int(x)
+            sprite.y = int(y)
             new_cells = set(get_grid_cells(int(x), int(y), sprite.width, sprite.height))
             sprite.occupied_cells = new_cells
             if not self.frame_mode:

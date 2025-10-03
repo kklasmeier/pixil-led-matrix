@@ -4,6 +4,7 @@ Coordinates between math evaluation and parameter type handling.
 """
 import re   
 from typing import Dict, Any, Union
+from .variable_registry import VariableRegistry
 from .debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print)
 from .math_functions import has_math_expression, evaluate_math_expression
 from .parameter_types import PARAMETER_TYPES, PARAM_INFO_LOOKUP, get_parameter_type, convert_to_type
@@ -39,7 +40,7 @@ def escape_string(s: str) -> str:
     result = result.replace('"', '\\"')
     return result
 
-def format_parameter(value: Any, command: str, position: int, variables: dict) -> str:
+def format_parameter(value: Any, command: str, position: int, variables: Union[Dict[str, Any], VariableRegistry]) -> str:
     """Format parameter value for command string construction."""
     try:
         target_type, is_optional = PARAM_INFO_LOOKUP[command][position]

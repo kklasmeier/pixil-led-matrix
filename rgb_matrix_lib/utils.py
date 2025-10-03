@@ -115,12 +115,12 @@ def generate_spectral_colors() -> Dict[int, Tuple[int, int, int]]:
 # Spectral System (0-99 mapped to 8-bit RGB)
 SPECTRAL_COLORS = generate_spectral_colors()
 
-def get_color_rgb(color: Union[str, int], intensity: int = 100) -> Tuple[int, int, int]:
+def get_color_rgb(color: Union[str, int, Tuple[int, int, int]], intensity: int = 100) -> Tuple[int, int, int]:
     """
     Get RGB values for a color and optional intensity.
     
     Args:
-        color: Named color (str) or spectral number (int, 0-99)
+        color: Named color (str), spectral number (int, 0-99), or RGB tuple
         intensity: Color intensity (0-100), defaults to 100
     
     Returns:
@@ -130,8 +130,11 @@ def get_color_rgb(color: Union[str, int], intensity: int = 100) -> Tuple[int, in
     intensity = max(0, min(100, intensity))
     scale = intensity / 100.0
 
+    # Handle RGB tuple input
+    if isinstance(color, tuple) and len(color) == 3:
+        base_rgb = color
     # Handle spectral colors (numeric input)
-    if isinstance(color, int):
+    elif isinstance(color, int):
         if 0 <= color <= 99:
             base_rgb = SPECTRAL_COLORS[color]
         else:
@@ -147,8 +150,9 @@ def get_color_rgb(color: Union[str, int], intensity: int = 100) -> Tuple[int, in
             debug(f"Unknown color '{color}', defaulting to white", 
                   Level.WARNING, Component.SYSTEM)
     
-    # Apply intensity scaling and ensure integer values
-    return tuple(int(c * scale) for c in base_rgb)
+    # Apply intensity scaling with explicit unpacking to ensure correct return type
+    r, g, b = base_rgb
+    return (int(r * scale), int(g * scale), int(b * scale))
 
 def is_transparent(color: Tuple[int, int, int]) -> bool:
     """Check if a color is the transparent color."""
@@ -234,7 +238,7 @@ def is_cell_empty(buffer: np.ndarray, grid_x: int, grid_y: int) -> bool:
     start_x = grid_x * GRID_SIZE
     start_y = grid_y * GRID_SIZE
     cell = buffer[start_y:start_y + GRID_SIZE, start_x:start_x + GRID_SIZE]
-    return np.all(cell == 0)
+    return bool(np.all(cell == 0))
 
 def polygon_vertices(x_center: int, y_center: int, radius: int, sides: int, rotation: float = 0) -> List[Tuple[int, int]]:
     # Calculate default offset based on number of sides

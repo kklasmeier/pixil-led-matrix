@@ -26,3 +26,6 @@ venv/
 env/
 
 nohup.out
+
+# Database files
+database/data/pixil_metrics.db

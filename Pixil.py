@@ -10,6 +10,7 @@ from shared.mplot_protocol import pack_mplot, encode_buffer
 from pathlib import Path
 from database import PixilMetricsDB
 from rgb_matrix_lib import execute_command
+from typing import Union, Dict, Optional, List
 from pixil_utils.variable_registry import VariableRegistry
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
 from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats, report_condition_template_stats, reset_condition_template_stats)
@@ -23,7 +24,7 @@ from pixil_utils import (ScriptManager, parse_args,
                         set_debug_level,
                         # Terminal handling
                         initialize_terminal, start_terminal, 
-                        stop_terminal, check_spacebar)
+                        stop_terminal, check_spacebar_throttled)
 from pixil_utils.array_manager import PixilArray
 from collections import OrderedDict  # Make sure this is imported
 from pixil_utils.optimization_flags import (
@@ -475,9 +476,9 @@ def on_queue_resume():
 class SpriteContext:
     """Tracks state during sprite definition and commands"""
     def __init__(self):
-        self.in_sprite_definition = False
-        self.current_sprite = None
-        self.sprite_commands = []
+        self.in_sprite_definition: bool = False
+        self.current_sprite: Optional[str] = None   # ✅ str or None
+        self.sprite_commands: List[str] = []        # ✅ explicit list type
 
 def process_script(filename, execute_func=None):
     """
@@ -1051,24 +1052,25 @@ def process_script(filename, execute_func=None):
     def process_sprite_definition(line):
         """Process sprite definition command."""
         match = SPRITE_DEF_PATTERN.match(line)
-        if match:
-            name = match.group(1)
-            # Parse width and height using our new parameter handling
-            width = parse_value(match.group(2), 'define_sprite', 1)  # width is position 1
-            height = parse_value(match.group(3), 'define_sprite', 2)  # height is position 2
-            
-            debug_print(f"Starting sprite definition: {name} ({width}x{height})", DEBUG_VERBOSE)
-            sprite_context.in_sprite_definition = True
-            sprite_context.current_sprite = name
-            sprite_context.sprite_commands = []
-            
-            # Create and send command
-            cmd = f"define_sprite({name}, {width}, {height})"
-            debug_print(f"DEBUG: Sending sprite creation command: {cmd}")
-            execute_command(cmd)
-            debug_print(f"DEBUG: Sprite creation command sent")
-            return True
-        return False
+        if not match:
+            return False   # ✅ Explicit check makes Pylance happy
+
+        name = match.group(1)
+        # Parse width and height using our new parameter handling
+        width = parse_value(match.group(2), 'define_sprite', 1)  # width is position 1
+        height = parse_value(match.group(3), 'define_sprite', 2)  # height is position 2
+
+        debug_print(f"Starting sprite definition: {name} ({width}x{height})", DEBUG_VERBOSE)
+        sprite_context.in_sprite_definition = True
+        sprite_context.current_sprite = name
+        sprite_context.sprite_commands = []
+
+        # Create and send command
+        cmd = f"define_sprite({name}, {width}, {height})"
+        debug_print(f"DEBUG: Sending sprite creation command: {cmd}")
+        execute_command(cmd)
+        debug_print(f"DEBUG: Sprite creation command sent")
+        return True
 
     def process_sprite_command(line):
         """Convert normal drawing commands to sprite drawing commands."""
@@ -1105,42 +1107,54 @@ def process_script(filename, execute_func=None):
     def process_sprite_operation(line):
         """Handle show_sprite, hide_sprite, move_sprite, and dispose_sprite operations."""
         match = SPRITE_OP_PATTERN.match(line)
-        if match:
-            op = match.group(1)
-            name = match.group(2)
-            
-            if op == 'hide' or op == 'dispose':
-                # Check if there's an instance_id parameter
-                instance_id = None
-                if match.group(3):
-                    instance_id = parse_value(match.group(3), f'{op}_sprite', 1)  # instance_id is position 1
-                    
-                # Create command with or without instance_id
-                if instance_id is not None:
-                    cmd = f"{op}_sprite({name}, {instance_id})"
-                else:
-                    cmd = f"{op}_sprite({name})"
+        if not match:
+            return False   # ✅ Pylance knows match is safe after this
+
+        op = match.group(1)
+        name = match.group(2)
+
+
+        if op == 'hide' or op == 'dispose':
+            # Check if there's an instance_id parameter
+            instance_id = None
+            group_3 = match.group(3) if match else None   # ✅ Pylance-safe
+            if group_3:
+                instance_id = parse_value(group_3, f'{op}_sprite', 1)  # instance_id is position 1
+
+            # Create command with or without instance_id
+            if instance_id is not None:
+                cmd = f"{op}_sprite({name}, {instance_id})"
             else:
-                # show or move with required x,y parameters
-                x = parse_value(match.group(3), f'{op}_sprite', 1)  # x is position 1
-                y = parse_value(match.group(4), f'{op}_sprite', 2)  # y is position 2
-                
-                # Check if there's an instance_id parameter
-                instance_id = None
-                if match.group(5):
-                    instance_id = parse_value(match.group(5), f'{op}_sprite', 3)  # instance_id is position 3
-                    
-                # Create command with or without instance_id
-                if instance_id is not None:
-                    cmd = f"{op}_sprite({name}, {x}, {y}, {instance_id})"
-                else:
-                    cmd = f"{op}_sprite({name}, {x}, {y})"
+                cmd = f"{op}_sprite({name})"
+        else:
+            # show or move with required x,y parameters
+            x_group = match.group(3)
+            y_group = match.group(4)
+
+            # Defensive: ensure both groups exist
+            if x_group is None or y_group is None:
+                return False
+
+            x = parse_value(x_group, f'{op}_sprite', 1)  # x is position 1
+            y = parse_value(y_group, f'{op}_sprite', 2)  # y is position 2
             
-            if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                debug_print(f"Sprite operation: {cmd}", DEBUG_VERBOSE)
-            store_frame_command(cmd)
-            return True
-        return False
+            # Check if there's an instance_id parameter
+            instance_id = None
+            group_5 = match.group(5) if match else None   # ✅ Pylance-safe
+            if group_5:
+                instance_id = parse_value(group_5, f'{op}_sprite', 3)  # instance_id is position 3
+                
+            # Create command with or without instance_id
+            if instance_id is not None:
+                cmd = f"{op}_sprite({name}, {x}, {y}, {instance_id})"
+            else:
+                cmd = f"{op}_sprite({name}, {x}, {y})"
+        
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Sprite operation: {cmd}", DEBUG_VERBOSE)
+        store_frame_command(cmd)
+        return True
+
     
     def handle_print_statement(line, variables):
         """Process print statement with f-string and expression support."""
@@ -1203,20 +1217,23 @@ def process_script(filename, execute_func=None):
     def process_lines(line_generator):
         nonlocal normal_exit  # Track script exit status
         global current_command, _metrics, _VAR_FORMAT_CACHE
+    
         for line_number, line in enumerate(line_generator, 1):
             # Increment line counter
             
             _metrics['script_lines_processed'] += 1
             current_command = line
+
             from pixil_utils.math_functions import set_current_script_line
             set_current_script_line(current_command)
-
-            #print("Looping...")
-            if check_spacebar():
+   
+            # Only check spacebar every 100 lines instead of every line
+            if check_spacebar_throttled():
                 print("Spacebar pressed, skipping to next script...")
                 force_timer_expired()
                 normal_exit = False
-                break       
+                break
+
             if is_time_expired():
                 debug_print("Script duration expired", DEBUG_CONCISE)
                 normal_exit = False
@@ -1294,8 +1311,8 @@ def process_script(filename, execute_func=None):
                     raise ValueError(f"Error processing variable assignment: {str(e)}")
                 
             # Procedure definition
-            elif PROCEDURE_DEF_PATTERN.match(line):
-                proc_name = PROCEDURE_DEF_PATTERN.match(line).group(1)
+            elif (proc_def_match := PROCEDURE_DEF_PATTERN.match(line)):
+                proc_name = proc_def_match.group(1)   # ✅ safe
                 proc_commands = []
 
                 for proc_line in line_generator:
@@ -1307,8 +1324,8 @@ def process_script(filename, execute_func=None):
                 debug_print(f"Procedure defined: {proc_name}", DEBUG_SUMMARY)
 
             # Procedure call
-            elif PROCEDURE_CALL_PATTERN.match(line):
-                proc_name = PROCEDURE_CALL_PATTERN.match(line).group(1)
+            elif (proc_match := PROCEDURE_CALL_PATTERN.match(line)):
+                proc_name = proc_match.group(1)   # ✅ safe, because we already checked proc_match
                 if proc_name in procedures:
                     debug_print(f"Calling procedure: {proc_name}", DEBUG_SUMMARY)
                     process_lines(iter(procedures[proc_name]))
@@ -1339,13 +1356,12 @@ def process_script(filename, execute_func=None):
                 debug_print("Ending frame buffer mode", DEBUG_SUMMARY)
 
             # For loop logic
-            elif FOR_LOOP_PATTERN.match(line):
-                match = FOR_LOOP_PATTERN.match(line)
-                loop_var = match.group(1)
+            elif (for_match := FOR_LOOP_PATTERN.match(line)):
+                loop_var = for_match.group(1)
                 
-                start = evaluate_math_expression(match.group(2).strip(), variables)
-                end = evaluate_math_expression(match.group(3).strip(), variables)
-                step = evaluate_math_expression(match.group(4).strip(), variables)
+                start = float(evaluate_math_expression(for_match.group(2).strip(), variables))
+                end = float(evaluate_math_expression(for_match.group(3).strip(), variables))
+                step = float(evaluate_math_expression(for_match.group(4).strip(), variables))
                 
                 loop_block = []
                 for loop_line in line_generator:
@@ -1353,11 +1369,11 @@ def process_script(filename, execute_func=None):
                         break
                     loop_block.append(loop_line.strip())
                 
-                epsilon = 1e-10 if isinstance(step, float) else 0
+                epsilon = 1e-10  # always numeric
                 current_value = start
                 iteration_count = 0
                 while ((step > 0 and current_value <= end + epsilon) or 
-                       (step < 0 and current_value >= end - epsilon)):
+                    (step < 0 and current_value >= end - epsilon)):
                     if is_time_expired():
                         print(f"Line {line_number}: Breaking for loop due to timer expiration")
                         break
@@ -1370,8 +1386,8 @@ def process_script(filename, execute_func=None):
                         break
 
             # while looping
-            elif WHILE_LOOP_PATTERN.match(line):
-                condition = WHILE_LOOP_PATTERN.match(line).group(1)
+            elif (while_match := WHILE_LOOP_PATTERN.match(line)):
+                condition = while_match.group(1)   # ✅ safe, because while_match is guaranteed not None
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Processing while loop with condition: {condition}", DEBUG_VERBOSE)
                 
@@ -1404,8 +1420,8 @@ def process_script(filename, execute_func=None):
                         debug_print(f"Executing while loop body: {condition}", DEBUG_VERBOSE)
                     process_lines(iter(loop_block))
 
-            elif IF_PATTERN.match(line):
-                condition = IF_PATTERN.match(line).group(1)
+            elif (if_match := IF_PATTERN.match(line)):
+                condition = if_match.group(1)   # ✅ safe, Pylance knows if_match isn’t None
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Processing if condition: {condition}", DEBUG_VERBOSE)
                 
@@ -1740,6 +1756,21 @@ def signal_handler(signum, frame):
         print("Shutdown sequence complete.")
         sys.exit(0)
 
+def clear_all_caches_between_scripts():
+    """Clear all optimization caches between scripts."""
+    global _VAR_FORMAT_CACHE
+    
+    # Clear local Pixil.py cache
+    _VAR_FORMAT_CACHE.clear()
+    
+    # Clear math_functions caches
+    from pixil_utils.math_functions import clear_all_math_caches
+    clear_all_math_caches()
+    
+    # Clear condition template cache
+    from pixil_utils.condition_templates import clear_condition_cache
+    clear_condition_cache()
+
 def reset_parse_value_stats():
     """Reset parse value optimization statistics for new script."""
     global _PARSE_VALUE_ATTEMPTS, _VAR_CACHE_HITS, _VAR_CACHE_MISSES
@@ -1761,7 +1792,6 @@ def reset_parse_value_stats():
 
 # Main Execution
 if __name__ == '__main__':
-    queue_instance = None
     queue_monitor = None
     # Set up signal handler
     signal.signal(signal.SIGINT, signal_handler)
@@ -1812,11 +1842,18 @@ if __name__ == '__main__':
                 start_terminal()
                 while scripts:
                     current_script = scripts.pop()
+
+                    # Clear display between scripts
+                    queue_instance.put_command('clear', force_instant=True)
+                    queue_instance.put_command('dispose_all_sprites()', force_instant=True)
+                    queue_instance.wait_until_empty()
+
                     print(f"Current script: {current_script}...")
                     initialize_timer(args.duration)
                     process_script(current_script, execute_command)
                     queue_instance.wait_for_completion()
                     clear_timer()
+                    clear_all_caches_between_scripts() 
             finally:
                 stop_terminal()
                 

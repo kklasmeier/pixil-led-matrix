@@ -3,7 +3,8 @@ JIT expression cache with LRU eviction and performance tracking.
 """
 import time
 from collections import OrderedDict
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+from ..variable_registry import VariableRegistry
 from .compiler import ExpressionCompiler
 from .vm import PixilVM, PixilVMError
 from .bytecode import CompiledExpression
@@ -68,7 +69,7 @@ class JITExpressionCache:
         self._expression_recompile_tracker = set()  # Track recompiled expressions
         self._enabled = True
         
-    def evaluate(self, expression: str, variables: Dict[str, Any]) -> Optional[float]:
+    def evaluate(self, expression: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Optional[float]:
         """
         Evaluate expression using JIT compilation.
         

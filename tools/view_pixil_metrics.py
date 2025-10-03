@@ -11,8 +11,8 @@ from datetime import datetime
 # Add project root to path so we can import from database package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database import PixilMetricsDB
-from database.queries.pixil_queries import PixilQueries
+from ..database import PixilMetricsDB
+from ..database.queries.pixil_queries import PixilQueries
 
 def safe_get_column(row, column_name, default=0):
     """Safely get a column value from sqlite3.Row, handling missing columns."""
@@ -248,7 +248,6 @@ def show_script_runs(count, script_filter=None, verbose=False, resource_constrai
             if script_index > 0:
                 print()  # Add space between scripts
             
-            print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {total_parses:>11} {total_parse_time:>14} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>5} {fm_rate:>5} {cache_rate:>4} {uf_rate:>4} {fast_parse_rate:>5} {var_cache_rate:>6} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
             print(header_line)
             print(separator_line)
             
@@ -259,16 +258,24 @@ def show_script_runs(count, script_filter=None, verbose=False, resource_constrai
                 total_time = f"{row['total_execution_time']:.1f}s"
                 active_time = f"{row['active_execution_time']:.1f}s"
                 queue_wait_time = f"{row['total_execution_time'] - row['active_execution_time']:.1f}s"
+                total_parses = f"{safe_get_column(row, 'parse_value_attempts', 0)}"
+                total_parse_time = f"{safe_get_column(row, 'parse_value_total_time', 0):.3f}s"
                 cmds_per_sec = f"{row['commands_per_second']:.0f}"
                 lines_per_sec = f"{row['lines_per_second']:.0f}"
-                fast_path = f"{row['fast_path_hit_rate']:.0f}%"
-                fast_math = f"{row['fast_math_hit_rate']:.0f}%"
-                cache = f"{row['cache_hit_rate']:.0f}%"
-                parse_val = f"{safe_get_column(row, 'parse_value_hit_rate', 0):.0f}%"
+                fp_rate = f"{row['fast_path_hit_rate']:.0f}%"
+                fm_rate = f"{row['fast_math_hit_rate']:.0f}%"
+                cache_rate = f"{row['cache_hit_rate']:.0f}%"
+                uf_rate = f"{safe_get_column(row, 'ultra_fast_hit_rate', 0):.0f}%"
+                fast_parse_rate = f"{safe_get_column(row, 'fast_path_parse_hit_rate', 0):.0f}%"
+                var_cache_rate = f"{safe_get_column(row, 'var_cache_hit_rate', 0):.0f}%"
                 jit_rate = f"{safe_get_column(row, 'jit_hit_rate', 0):.0f}%"
                 skip_rate = f"{safe_get_column(row, 'jit_skip_efficiency', 0):.0f}%"
+                jit_size = f"{safe_get_column(row, 'jit_cache_size', 0)}"
+                jit_hit_rate = f"{safe_get_column(row, 'jit_cache_utilization', 0):.0f}%"
+                jit_comp_time = f"{safe_get_column(row, 'jit_compilation_time', 0):.3f}s"
+                failed_lines = f"{safe_get_column(row, 'failed_lines_cached', 0)}"
 
-                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {cmds_per_sec:>7} {lines_per_sec:>8} {fast_path:>9} {fast_math:>9} {cache:>6} {parse_val:>9} {jit_rate:>5} {skip_rate:>6}")
+                print(f"{date_str:19} {script:18} {commands:>8} {total_time:>9} {active_time:>8} {queue_wait_time:>9} {total_parses:>11} {total_parse_time:>14} {cmds_per_sec:>8} {lines_per_sec:>8} {fp_rate:>5} {fm_rate:>5} {cache_rate:>4} {uf_rate:>4} {fast_parse_rate:>5} {var_cache_rate:>6} {jit_rate:>5} {skip_rate:>6} {jit_size:>8} {jit_hit_rate:>8} {jit_comp_time:>9} {failed_lines:>6}")
 
     # Summary statistics
     if total_runs > 0:

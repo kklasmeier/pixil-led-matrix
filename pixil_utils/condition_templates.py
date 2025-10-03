@@ -114,14 +114,15 @@ class ConditionTemplate:
     def _preparse_operands(self):
         """Pre-parse both sides to avoid runtime parsing."""
         # Pre-determine if left side is array access
-        if '[' in self.left_var and ']' in self.left_var:
+        if self.left_var is not None and '[' in self.left_var and ']' in self.left_var:
             self.is_array_access = True
             # Parse array components once
-            match = re.match(r'(v_\w+)\[(v_\w+)\]', self.left_var)
-            if match:
-                self.array_name, self.index_var = match.groups()
-                if debug_print and DEBUG_VERBOSE:
-                    debug_print(f"Pre-parsed array access: {self.array_name}[{self.index_var}]", DEBUG_VERBOSE)
+            if isinstance(self.left_var, str):
+                match = re.match(r'(v_\w+)\[(v_\w+)\]', self.left_var)
+                if match:
+                    self.array_name, self.index_var = match.groups()
+                    if debug_print and DEBUG_VERBOSE:
+                        debug_print(f"Pre-parsed array access: {self.array_name}[{self.index_var}]", DEBUG_VERBOSE)
         else:
             self.is_array_access = False
         
@@ -176,6 +177,23 @@ class ConditionTemplate:
             return self._evaluate_compound(variables)
         else:
             raise ValueError(f"Cannot fast evaluate condition type: {self.template_type}")
+
+    def _evaluate_compound(self, variables) -> bool:
+        """Evaluate compound conditions with 'and'/'or'."""
+        if not self.compound_parts or not self.compound_operators:
+            raise ValueError("Compound condition not properly parsed")
+        # Evaluate first condition
+        result = self.compound_parts[0]._evaluate_simple(variables)
+        # Sequentially apply operators and next conditions
+        for i, operator in enumerate(self.compound_operators):
+            next_result = self.compound_parts[i + 1]._evaluate_simple(variables)
+            if operator == 'and':
+                result = result and next_result
+            elif operator == 'or':
+                result = result or next_result
+            else:
+                raise ValueError(f"Unsupported compound operator: {operator}")
+        return result
     
     def _evaluate_simple(self, variables) -> bool:
         """Optimized simple evaluation with pre-parsed data."""
@@ -192,6 +210,8 @@ class ConditionTemplate:
                 raise ValueError(f"Variable '{self.left_var}' not found")
         
         # Fast right side evaluation using pre-parsed data
+        if self.right_value_parsed is None:
+            raise ValueError("Right value could not be parsed")
         value_type, value_data = self.right_value_parsed
         if value_type == 'number':
             right_value = value_data
@@ -205,36 +225,8 @@ class ConditionTemplate:
             right_value = value_data
         
         # Fast comparison using lookup table
-        return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
-    
-    def _evaluate_simple(self, variables) -> bool:
-        """Optimized simple evaluation with pre-parsed data."""
-        
-        # Fast array access path using pre-parsed data
-        if self.is_array_access:
-            array_obj = variables.get(self.array_name)
-            index_val = variables.get(self.index_var)
-            left_value = array_obj[int(index_val)]
-        else:
-            # Simple variable access
-            left_value = variables.get(self.left_var)
-            if left_value is None:
-                raise ValueError(f"Variable '{self.left_var}' not found")
-        
-        # Fast right side evaluation using pre-parsed data
-        value_type, value_data = self.right_value_parsed
-        if value_type == 'number':
-            right_value = value_data
-        elif value_type == 'variable':
-            right_value = variables.get(value_data)
-            if right_value is None:
-                raise ValueError(f"Variable '{value_data}' not found")
-        elif value_type == 'string':
-            right_value = value_data
-        else:
-            right_value = value_data
-        
-        # Fast comparison using lookup table
+        if self.operator is None:
+            raise ValueError("Operator is None and cannot be used for comparison")
         return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
     
     def _evaluate_array_access(self, array_expr: str, variables) -> Any:
@@ -347,9 +339,15 @@ def reset_condition_template_stats():
     _TEMPLATE_HITS = 0
     _TEMPLATE_MISSES = 0
 
+def clear_condition_cache():
+    """Clear condition template cache."""
+    global _CONDITION_TEMPLATES
+    _CONDITION_TEMPLATES.clear()
+
 # Export main functions
 __all__ = [
     'evaluate_condition_fast',
     'get_condition_template_stats',
-    'reset_condition_template_stats'
+    'reset_condition_template_stats',
+    'clear_condition_cache' 
 ]

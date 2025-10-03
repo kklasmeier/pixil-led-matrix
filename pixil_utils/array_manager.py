@@ -133,14 +133,12 @@ class PixilArray:
     def get_formatted_value(self, index: int) -> str:
         """Get value formatted for command usage."""
         value = self[index]
-        if self.array_type == 'string':
-            # Don't add quotes - commands expect raw strings
-            return value
+        # Always return a string
         return str(value)
 
     def get_type(self) -> ArrayType:
         """Get array type."""
-        return self.array_type
+        return self.array_type  # type: ignore
 
 def validate_array_access(array_name: str, index: Any, variables) -> Union[float, str]:
     """

@@ -206,7 +206,7 @@ class CommandExecutor:
             raise
 
     # Command Handlers
-    def _handle_plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, burnout: int = None):
+    def _handle_plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, burnout: Optional[int] = None):
         """Handle plot command."""
         rgb_color = get_color_rgb(color, intensity)
         # Changed: No default burnout - if None is specified, it stays None (never burns out)
@@ -215,7 +215,7 @@ class CommandExecutor:
         self.api.plot(x, y, color, intensity, burnout)
 
     def _handle_draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int], 
-                        intensity: int = 100, burnout: int = None):
+                        intensity: int = 100, burnout: Optional[int] = None):
         """Handle draw_line command."""
         rgb_color = get_color_rgb(color, intensity)
         # Changed: No default burnout - if None is specified, it stays None (never burns out)
@@ -349,7 +349,7 @@ class CommandExecutor:
 
     def _handle_draw_text(self, x: int, y: int, text: Any, font_name: str, font_size: int, 
                             color: Union[str, int], intensity: int = 100, effect: str = "NORMAL", 
-                            modifier: str = None):
+                            modifier: Optional[str] = None):
             """Handle draw_text command."""
             debug(f"Handling draw_text command: '{text}' at ({x}, {y}) in {color} at {intensity}%", 
                 Level.DEBUG, Component.COMMAND)

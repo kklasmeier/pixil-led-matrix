@@ -118,6 +118,10 @@ class TextRenderer:
             pixels = img.load()
             matrix_width = self._api.matrix.width
             matrix_height = self._api.matrix.height
+
+            if pixels is None:
+                # If pixels is None, skip rendering
+                return
             
             for y_offset in range(img.height):
                 plot_y = y + y_offset
@@ -178,14 +182,16 @@ class TextRenderer:
                 text_width, text_height = 1, 5
         else:
             # Existing code for PIL fonts
-            text_width, text_height = font.getsize(text)
+            bbox = font.getbbox(text)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
             
-            img = Image.new('RGB', (text_width, text_height), color=(0, 0, 0))
+            img = Image.new('RGB', (int(text_width), int(text_height)), color=(0, 0, 0))
             draw = ImageDraw.Draw(img)
-            draw.text((0, 0), text, font=font, fill=(255, 255, 255))
+            draw.text((-bbox[0], -bbox[1]), text, font=font, fill=(255, 255, 255))
         
         # Update text bounds tracking
-        self._text_bounds[(x, y)] = TextBounds(x, y, text_width, text_height)
+        self._text_bounds[(x, y)] = TextBounds(x, y, int(text_width), int(text_height))
         
         # Apply the selected effect
         if effect == TextEffect.NORMAL:
@@ -209,8 +215,12 @@ class TextRenderer:
             validate_effect_modifier(effect, modifier)
             self._render_slide(img, x, y, color, modifier)
         elif effect == TextEffect.DISSOLVE:
+            if modifier is None:
+                modifier = EffectModifier.IN
             self._render_dissolve(img, x, y, color, modifier)
         elif effect == TextEffect.WIPE:
+            if modifier is None:
+                modifier = EffectModifier.IN_LEFT  # or another appropriate default
             self._render_wipe(img, x, y, color, modifier)
         else:
             raise NotImplementedError(f"Effect {effect.name} not yet implemented")
@@ -349,6 +359,11 @@ class TextRenderer:
         # Get font and set up parameters
         font = get_font_manager().get_font(font_name, font_size)
         
+        # Check if this is a bitmap font
+        if isinstance(font, BitmapFontAdapter):
+            # Use the dedicated bitmap rendering method
+            return self._render_bitmap_type(text, x, y, color, modifier, font)
+        
         if modifier == EffectModifier.SLOW:
             char_delay = 0.2
         elif modifier == EffectModifier.FAST:
@@ -361,7 +376,9 @@ class TextRenderer:
         
         for char in text:
             current_text += char
-            char_width, text_height = font.getsize(current_text)
+            bbox = font.getbbox(current_text)
+            char_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
             
             # For each animation step in a preserved frame, we need to:
             # 1. Call end_frame() to show the current state
@@ -375,35 +392,35 @@ class TextRenderer:
                 self._api.begin_frame(True)
                 
                 # Draw directly in the new frame
-                temp_img = Image.new('RGB', (char_width, text_height), color=(0, 0, 0))
+                temp_img = Image.new('RGB', (int(char_width), int(text_height)), color=(0, 0, 0))
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.text((0, 0), current_text, font=font, fill=(255, 255, 255))
                 pixels = temp_img.load()
                 
-                for py in range(text_height):
-                    for px in range(char_width):
-                        if pixels[px, py] != (0, 0, 0):
+                for py in range(int(text_height)):
+                    for px in range(int(char_width)):
+                        if pixels is not None and pixels[px, py] != (0, 0, 0):
                             self._api.plot(x + px, y + py, color)
                     
                     # Draw cursor at the end of text
-                    self._api.plot(x + char_width, y + py, cursor_rgb)
+                    self._api.plot(x + int(char_width), y + py, cursor_rgb)
             else:
                 # Not in a frame or just started our own frame
                 # Use standard frame-aware rendering
                 frame_started = self._frame_aware_begin(True)
                 
-                temp_img = Image.new('RGB', (char_width, text_height), color=(0, 0, 0))
+                temp_img = Image.new('RGB', (int(char_width), int(text_height)), color=(0, 0, 0))
                 temp_draw = ImageDraw.Draw(temp_img)
                 temp_draw.text((0, 0), current_text, font=font, fill=(255, 255, 255))
                 pixels = temp_img.load()
                 
-                for py in range(text_height):
-                    for px in range(char_width):
-                        if pixels[px, py] != (0, 0, 0):
+                for py in range(int(text_height)):
+                    for px in range(int(char_width)):
+                        if pixels is not None and pixels[px, py] != (0, 0, 0):
                             self._api.plot(x + px, y + py, color)
                     
                     # Draw cursor at the end of text
-                    self._api.plot(x + char_width, y + py, cursor_rgb)
+                    self._api.plot(x + int(char_width), y + py, cursor_rgb)
                 
                 self._frame_aware_end(frame_started)
             
@@ -415,12 +432,12 @@ class TextRenderer:
                 self._api.end_frame()
                 self._api.begin_frame(True)
                 
-                for cy in range(text_height):
+                for cy in range(int(text_height)):
                     self._api.plot(x + char_width, y + cy, (0, 0, 0))
             else:
                 frame_started = self._frame_aware_begin(True)
                 
-                for cy in range(text_height):
+                for cy in range(int(text_height)):
                     self._api.plot(x + char_width, y + cy, (0, 0, 0))
                     
                 self._frame_aware_end(frame_started)
@@ -437,8 +454,11 @@ class TextRenderer:
         pixels = img.load()
         
         # Gather all lit pixels
-        lit_pixels = [(px, py) for py in range(img.height) for px in range(img.width) 
-                    if pixels[px, py] != (0, 0, 0)]
+        if pixels is None:
+            lit_pixels = []
+        else:
+            lit_pixels = [(px, py) for py in range(img.height) for px in range(img.width) 
+                        if pixels[px, py] != (0, 0, 0)]
         
         # Process pixels one by one with delay
         for px, py in lit_pixels:
@@ -476,8 +496,11 @@ class TextRenderer:
         matrix_width = self._api.matrix.width
         matrix_height = self._api.matrix.height
         pixels = img.load()
-        lit_pixels = [(px, py) for py in range(img.height) for px in range(img.width) 
-                    if pixels[px, py] != (0, 0, 0)]
+        if pixels is None:
+            lit_pixels = []
+        else:
+            lit_pixels = [(px, py) for py in range(img.height) for px in range(img.width) 
+                        if pixels is not None and pixels[px, py] != (0, 0, 0)]
         
         # Calculate start and end positions based on direction
         if modifier == EffectModifier.LEFT:
@@ -557,9 +580,12 @@ class TextRenderer:
             return self._render_normal(img, x, y, color)
         
         pixels = img.load()
-        lit_pixels = [(x + px, y + py) for py in range(img.height) for px in range(img.width) 
-                    if pixels[px, py] != (0, 0, 0) and 
-                    0 <= x + px < self._api.matrix.width and 0 <= y + py < self._api.matrix.height]
+        if pixels is None:
+            lit_pixels = []
+        else:
+            lit_pixels = [(x + px, y + py) for py in range(img.height) for px in range(img.width) 
+                        if pixels[px, py] != (0, 0, 0) and 
+                        0 <= x + px < self._api.matrix.width and 0 <= y + py < self._api.matrix.height]
         
         if modifier == EffectModifier.IN:
             # DISSOLVE IN
@@ -668,9 +694,12 @@ class TextRenderer:
             return self._render_normal(img, x, y, color)
         
         pixels = img.load()
-        lit_pixels = [(x + px, y + py) for py in range(img.height) for px in range(img.width) 
-                    if pixels[px, py] != (0, 0, 0) and 
-                    0 <= x + px < self._api.matrix.width and 0 <= y + py < self._api.matrix.height]
+        if pixels is None:
+            lit_pixels = []
+        else:
+            lit_pixels = [(x + px, y + py) for py in range(img.height) for px in range(img.width) 
+                        if pixels[px, py] != (0, 0, 0) and 
+                        0 <= x + px < self._api.matrix.width and 0 <= y + py < self._api.matrix.height]
 
         is_out = modifier in [EffectModifier.OUT_LEFT, EffectModifier.OUT_RIGHT, 
                             EffectModifier.OUT_UP, EffectModifier.OUT_DOWN]

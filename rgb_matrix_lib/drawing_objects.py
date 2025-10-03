@@ -1,6 +1,6 @@
 from queue import PriorityQueue
 from threading import Thread, Lock
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from enum import Enum
 import time
 
@@ -35,6 +35,8 @@ class DrawingObject:
     def __lt__(self, other):
         return self.removal_time < other.removal_time
 
+if TYPE_CHECKING:
+    from .api import RGB_Api
 class ThreadedBurnoutManager:
     BURNOUT_WAKE_INTERVAL = 0.01  # 10ms
 

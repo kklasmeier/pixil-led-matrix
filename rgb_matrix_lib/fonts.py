@@ -1,6 +1,7 @@
 # fonts.py
 import os
 from PIL import ImageFont
+from PIL.ImageFont import FreeTypeFont
 from typing import Dict, List, Optional, Any, Union
 from .bitmap_font import BitmapFontAdapter  # Import our new adapter
 
@@ -79,7 +80,7 @@ class FontManager:
         except Exception:
             return False
 
-    def get_font(self, font_name: str, size: int) -> Union[ImageFont.ImageFont, BitmapFontAdapter]:
+    def get_font(self, font_name: str, size: int) -> Union[FreeTypeFont, BitmapFontAdapter]:
         """
         Get a font by name and size.
         
@@ -88,7 +89,7 @@ class FontManager:
             size: Font size in pixels
             
         Returns:
-            PIL.ImageFont.ImageFont object or BitmapFontAdapter
+            FreeTypeFont object or BitmapFontAdapter
             
         Raises:
             FontError if font not found or can't be loaded

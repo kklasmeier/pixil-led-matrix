@@ -8,9 +8,12 @@ import tty
 import termios
 import select
 from .debug import debug_print, DEBUG_VERBOSE, DEBUG_CONCISE
+import time
 
 # Global terminal handler state
 _handler = None
+_last_check_time = 0
+_check_interval = 0.05
 
 def initialize_terminal():
     """Initialize global terminal handler for keyboard input."""
@@ -31,6 +34,17 @@ def stop_terminal():
     if _handler:
         _handler.stop()
         _handler = None
+
+def check_spacebar_throttled():
+    """Throttled spacebar check - only polls stdin every 50ms."""
+    global _last_check_time
+    
+    current_time = time.time()
+    if current_time - _last_check_time < _check_interval:
+        return False  # Skip check, too soon
+    
+    _last_check_time = current_time
+    return check_spacebar()
 
 def check_spacebar():
     """
