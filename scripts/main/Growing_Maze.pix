@@ -1,0 +1,658 @@
+# ==========================================
+# Growing Maze with Solver - Alternating Sizes & Algorithms
+# Modes: 1px/3px display, BFS/DFS solving
+# Cycle: Chunky+BFS, Fine+BFS, Chunky+DFS, Fine+DFS
+# ==========================================
+
+# Arrays sized for largest maze (63x63 = 3969 cells)
+create_array(v_maze, 3969, numeric)
+create_array(v_visited, 3969, numeric)
+create_array(v_stack, 3969, numeric)
+create_array(v_queue, 3969, numeric)
+create_array(v_parent, 3969, numeric)
+create_array(v_bfs_visited, 3969, numeric)
+
+# Direction arrays (N, E, S, W)
+create_array(v_dx, 4, numeric)
+create_array(v_dy, 4, numeric)
+v_dx[0] = 0
+v_dy[0] = -1
+v_dx[1] = 1
+v_dy[1] = 0
+v_dx[2] = 0
+v_dy[2] = 1
+v_dx[3] = -1
+v_dy[3] = 0
+
+# Shuffle helper
+create_array(v_dirs, 4, numeric)
+
+# Mode: 0 = detailed (1px), 1 = chunky (3px)
+v_mode = 0
+
+# Solve mode: 0 = BFS, 1 = DFS
+v_solve_mode = 0
+
+# Variables set per mode
+v_maze_size = 63
+v_max_idx = 3968
+v_start_idx = 0
+v_end_idx = 0
+v_bound = 62
+
+# Track previous position (to erase green marker)
+v_prev_x = -1
+v_prev_y = -1
+
+# Drawing procedure for 3px mode (full redraw - used only for cleanup phases)
+def draw_maze_3px {
+    begin_frame
+        for v_my in (0, 20, 1)
+            v_row_base = v_my * 21
+            v_py = v_my * 3
+            for v_mx in (0, 20, 1)
+                v_idx = v_row_base + v_mx
+                v_px = v_mx * 3
+                v_state = v_maze[v_idx]
+                
+                if v_state == 0 then
+                    draw_rectangle(v_px, v_py, 3, 3, navy, 80, true)
+                endif
+                if v_state == 1 then
+                    draw_rectangle(v_px, v_py, 3, 3, black, 100, true)
+                endif
+                if v_state == 2 then
+                    draw_rectangle(v_px, v_py, 3, 3, lime, 100, true)
+                endif
+                if v_state == 3 then
+                    draw_rectangle(v_px, v_py, 3, 3, orange, 15, true)
+                endif
+                if v_state == 4 then
+                    draw_rectangle(v_px, v_py, 3, 3, cyan, 100, true)
+                endif
+                if v_state == 5 then
+                    draw_rectangle(v_px, v_py, 3, 3, red, 100, true)
+                endif
+                if v_state == 6 then
+                    draw_rectangle(v_px, v_py, 3, 3, purple, 60, true)
+                endif
+                if v_state == 7 then
+                    draw_rectangle(v_px, v_py, 3, 3, yellow, 100, true)
+                endif
+                if v_state == 8 then
+                    draw_rectangle(v_px, v_py, 3, 3, magenta, 20, true)
+                endif
+            endfor v_mx
+        endfor v_my
+    end_frame
+}
+
+# Draw initial wall
+def draw_initial_walls {
+    draw_rectangle(0, 0, 64, 64, navy, 80, true)
+}
+
+# Reset procedure
+def reset_maze {
+    for v_i in (0, v_max_idx, 1)
+        v_maze[v_i] = 0
+        v_visited[v_i] = 0
+        v_parent[v_i] = -1
+        v_bfs_visited[v_i] = 0
+        v_stack[v_i] = 0
+        v_queue[v_i] = 0
+    endfor v_i
+}
+
+# ==========================================
+# MAIN INFINITE LOOP
+# ==========================================
+
+v_maze_count = 0    
+
+while 1 == 1 then
+    v_maze_count = v_maze_count + 1
+    
+    # 4-way cycle: 
+    # 1 = Chunky + BFS
+    # 2 = Fine + BFS
+    # 3 = Chunky + DFS
+    # 4 = Fine + DFS
+    v_cycle = v_maze_count % 4
+    
+    # Determine display mode (0=fine/1px, 1=chunky/3px)
+    if v_cycle == 1 or v_cycle == 3 then
+        v_mode = 1
+    else
+        v_mode = 0
+    endif
+    
+    # Determine solve mode (0=BFS, 1=DFS)
+    if v_cycle == 3 or v_cycle == 0 then
+        v_solve_mode = 1
+    else
+        v_solve_mode = 0
+    endif
+    
+    # Configure based on display mode
+    if v_mode == 0 then
+        v_maze_size = 63
+        v_max_idx = 3968
+        v_bound = 62
+        v_start_idx = 1 * 63 + 1
+        v_end_idx = 61 * 63 + 61
+        if v_solve_mode == 0 then
+            print(f"Maze {v_maze_count} - Fine 1px + BFS")
+        else
+            print(f"Maze {v_maze_count} - Fine 1px + DFS")
+        endif
+    endif
+    if v_mode == 1 then
+        v_maze_size = 21
+        v_max_idx = 440
+        v_bound = 20
+        v_start_idx = 1 * 21 + 1
+        v_end_idx = 19 * 21 + 19
+        if v_solve_mode == 0 then
+            print(f"Maze {v_maze_count} - Chunky 3px + BFS")
+        else
+            print(f"Maze {v_maze_count} - Chunky 3px + DFS")
+        endif
+    endif
+    
+    call reset_maze
+    
+    v_curr_x = 1
+    v_curr_y = 1
+    v_prev_x = -1
+    v_prev_y = -1
+    v_idx = v_curr_y * v_maze_size + v_curr_x
+    v_maze[v_idx] = 1
+    v_visited[v_idx] = 1
+    v_stack[0] = v_idx
+    v_stack_ptr = 1
+    
+    # Initial draw
+    if v_mode == 0 then
+        call draw_initial_walls
+        plot(v_curr_x, v_curr_y, lime, 100)
+    endif
+    if v_mode == 1 then
+        call draw_initial_walls
+        draw_rectangle(v_curr_x * 3, v_curr_y * 3, 3, 3, lime, 100, true)
+    endif
+    
+    rest(0.3)
+    
+    # ========================================
+    # PHASE 1: MAZE GENERATION
+    # ========================================
+    
+    v_generating = 1
+    throttle(0.2)
+    
+    while v_generating == 1 then
+        
+        v_idx = v_curr_y * v_maze_size + v_curr_x
+        v_maze[v_idx] = 2
+        
+        # Shuffle directions
+        v_dirs[0] = 0
+        v_dirs[1] = 1
+        v_dirs[2] = 2
+        v_dirs[3] = 3
+        
+        for v_i in (3, 1, -1)
+            v_j = random(0, v_i, 0)
+            v_temp = v_dirs[v_i]
+            v_dirs[v_i] = v_dirs[v_j]
+            v_dirs[v_j] = v_temp
+        endfor v_i
+        
+        v_found = 0
+        
+        for v_d in (0, 3, 1)
+            if v_found == 0 then
+                v_dir = v_dirs[v_d]
+                v_nx = v_curr_x + v_dx[v_dir] * 2
+                v_ny = v_curr_y + v_dy[v_dir] * 2
+                
+                if v_nx > 0 and v_nx < v_bound and v_ny > 0 and v_ny < v_bound then
+                    v_neighbor_idx = v_ny * v_maze_size + v_nx
+                    
+                    if v_visited[v_neighbor_idx] == 0 then
+                        v_found = 1
+                        
+                        v_wall_x = v_curr_x + v_dx[v_dir]
+                        v_wall_y = v_curr_y + v_dy[v_dir]
+                        v_wall_idx = v_wall_y * v_maze_size + v_wall_x
+                        
+                        v_maze[v_wall_idx] = 1
+                        v_maze[v_neighbor_idx] = 1
+                        v_visited[v_neighbor_idx] = 1
+                        
+                        v_idx = v_curr_y * v_maze_size + v_curr_x
+                        v_maze[v_idx] = 1
+                        
+                        v_stack[v_stack_ptr] = v_idx
+                        v_stack_ptr = v_stack_ptr + 1
+                        
+                        # === 1px INCREMENTAL DRAW ===
+                        if v_mode == 0 then
+                            if v_prev_x >= 0 then
+                                plot(v_prev_x, v_prev_y, black, 100)
+                            endif
+                            plot(v_wall_x, v_wall_y, black, 100)
+                            plot(v_curr_x, v_curr_y, black, 100)
+                            plot(v_nx, v_ny, lime, 100)
+                            v_prev_x = v_nx
+                            v_prev_y = v_ny
+                            rest(0.01)
+                        endif
+                        
+                        # === 3px INCREMENTAL DRAW ===
+                        if v_mode == 1 then
+                            if v_prev_x >= 0 then
+                                draw_rectangle(v_prev_x * 3, v_prev_y * 3, 3, 3, black, 100, true)
+                            endif
+                            draw_rectangle(v_wall_x * 3, v_wall_y * 3, 3, 3, black, 100, true)
+                            draw_rectangle(v_curr_x * 3, v_curr_y * 3, 3, 3, black, 100, true)
+                            draw_rectangle(v_nx * 3, v_ny * 3, 3, 3, lime, 100, true)
+                            v_prev_x = v_nx
+                            v_prev_y = v_ny
+                            rest(0.02)
+                        endif
+                        
+                        v_curr_x = v_nx
+                        v_curr_y = v_ny
+                    endif
+                endif
+            endif
+        endfor v_d
+        
+        if v_found == 0 then
+            v_idx = v_curr_y * v_maze_size + v_curr_x
+            v_maze[v_idx] = 3
+            
+            if v_stack_ptr > 0 then
+                v_stack_ptr = v_stack_ptr - 1
+                v_idx = v_stack[v_stack_ptr]
+                v_old_x = v_curr_x
+                v_old_y = v_curr_y
+                v_curr_y = int(v_idx / v_maze_size)
+                v_curr_x = v_idx % v_maze_size
+                v_maze[v_idx] = 3
+                
+                # === 1px INCREMENTAL DRAW (backtrack) ===
+                if v_mode == 0 then
+                    if v_prev_x >= 0 then
+                        plot(v_prev_x, v_prev_y, orange, 15)
+                    endif
+                    plot(v_old_x, v_old_y, orange, 15)
+                    plot(v_curr_x, v_curr_y, lime, 100)
+                    v_prev_x = v_curr_x
+                    v_prev_y = v_curr_y
+                    rest(0.005)
+                endif
+                
+                # === 3px INCREMENTAL DRAW (backtrack) ===
+                if v_mode == 1 then
+                    if v_prev_x >= 0 then
+                        draw_rectangle(v_prev_x * 3, v_prev_y * 3, 3, 3, orange, 15, true)
+                    endif
+                    draw_rectangle(v_old_x * 3, v_old_y * 3, 3, 3, orange, 15, true)
+                    draw_rectangle(v_curr_x * 3, v_curr_y * 3, 3, 3, lime, 100, true)
+                    v_prev_x = v_curr_x
+                    v_prev_y = v_curr_y
+                    rest(0.01)
+                endif
+            else
+                v_generating = 0
+            endif
+        endif
+        
+    endwhile
+    
+    # Clean up - convert backtrack/current to passage
+    for v_i in (0, v_max_idx, 1)
+        if v_maze[v_i] == 3 or v_maze[v_i] == 2 then
+            v_maze[v_i] = 1
+        endif
+    endfor v_i
+    
+    # === 1px: Redraw clean maze (orange -> black) ===
+    if v_mode == 0 then
+        begin_frame(true)
+            for v_my in (0, 62, 1)
+                v_row_base = v_my * 63
+                for v_mx in (0, 62, 1)
+                    v_idx = v_row_base + v_mx
+                    v_state = v_maze[v_idx]
+                    if v_state == 0 then
+                        plot(v_mx, v_my, navy, 80)
+                    endif
+                    if v_state == 1 then
+                        plot(v_mx, v_my, black, 100)
+                    endif
+                endfor v_mx
+            endfor v_my
+            plot(1, 1, cyan, 100)
+            plot(61, 61, red, 100)
+        end_frame
+    endif
+    
+    # === 3px: Redraw clean maze (orange -> black) ===
+    if v_mode == 1 then
+        begin_frame(true)
+            for v_my in (0, 20, 1)
+                v_row_base = v_my * 21
+                v_py = v_my * 3
+                for v_mx in (0, 20, 1)
+                    v_idx = v_row_base + v_mx
+                    v_px = v_mx * 3
+                    v_state = v_maze[v_idx]
+                    if v_state == 0 then
+                        draw_rectangle(v_px, v_py, 3, 3, navy, 80, true)
+                    endif
+                    if v_state == 1 then
+                        draw_rectangle(v_px, v_py, 3, 3, black, 100, true)
+                    endif
+                endfor v_mx
+            endfor v_my
+            draw_rectangle(3, 3, 3, 3, cyan, 100, true)
+            draw_rectangle(57, 57, 3, 3, red, 100, true)
+        end_frame
+    endif
+    
+    # Mark start and end in array
+    v_maze[v_start_idx] = 4
+    v_maze[v_end_idx] = 5
+    
+    rest(1.0)
+    
+    # ========================================
+    # PHASE 2: SOLVING (BFS or DFS)
+    # ========================================
+    
+    v_found_exit = 0
+    throttle(0.3)
+    
+    if v_solve_mode == 0 then
+        # ========================================
+        # BFS SOLVING
+        # ========================================
+        
+        v_queue[0] = v_start_idx
+        v_q_front = 0
+        v_q_back = 1
+        v_bfs_visited[v_start_idx] = 1
+        
+        while v_q_front < v_q_back and v_found_exit == 0 then
+            
+            v_curr_idx = v_queue[v_q_front]
+            v_q_front = v_q_front + 1
+            
+            v_curr_y = int(v_curr_idx / v_maze_size)
+            v_curr_x = v_curr_idx % v_maze_size
+            
+            if v_curr_idx == v_end_idx then
+                v_found_exit = 1
+            else
+                for v_d in (0, 3, 1)
+                    v_nx = v_curr_x + v_dx[v_d]
+                    v_ny = v_curr_y + v_dy[v_d]
+                    
+                    v_in_bounds = 0
+                    if v_nx >= 0 and v_nx <= v_bound and v_ny >= 0 and v_ny <= v_bound then
+                        v_in_bounds = 1
+                    endif
+                    
+                    if v_in_bounds == 1 then
+                        v_neighbor_idx = v_ny * v_maze_size + v_nx
+                        v_neighbor_state = v_maze[v_neighbor_idx]
+                        
+                        if v_bfs_visited[v_neighbor_idx] == 0 then
+                            if v_neighbor_state == 1 or v_neighbor_state == 5 then
+                                v_bfs_visited[v_neighbor_idx] = 1
+                                v_parent[v_neighbor_idx] = v_curr_idx
+                                
+                                v_queue[v_q_back] = v_neighbor_idx
+                                v_q_back = v_q_back + 1
+                                
+                                if v_neighbor_state == 1 then
+                                    v_maze[v_neighbor_idx] = 6
+                                    
+                                    # === 1px INCREMENTAL DRAW (exploring) ===
+                                    if v_mode == 0 then
+                                        plot(v_nx, v_ny, purple, 60)
+                                    endif
+                                    
+                                    # === 3px INCREMENTAL DRAW (exploring) ===
+                                    if v_mode == 1 then
+                                        draw_rectangle(v_nx * 3, v_ny * 3, 3, 3, purple, 60, true)
+                                    endif
+                                endif
+                            endif
+                        endif
+                    endif
+                endfor v_d
+            endif
+            
+            # === 1px: Small rest every few iterations ===
+            if v_mode == 0 then
+                v_draw_check = v_q_front % 8
+                if v_draw_check == 0 then
+                    rest(0.005)
+                endif
+            endif
+            
+            # === 3px: Small rest every few iterations ===
+            if v_mode == 1 then
+                v_draw_check = v_q_front % 3
+                if v_draw_check == 0 then
+                    rest(0.01)
+                endif
+            endif
+        endwhile
+        
+    else
+        # ========================================
+        # DFS SOLVING
+        # ========================================
+        
+        # Reset stack for DFS
+        v_stack[0] = v_start_idx
+        v_stack_ptr = 1
+        v_bfs_visited[v_start_idx] = 1
+        v_parent[v_start_idx] = -1
+        
+        # Track current explorer position for visual
+        v_prev_x = 1
+        v_prev_y = 1
+        
+        while v_stack_ptr > 0 and v_found_exit == 0 then
+            
+            # Pop from stack
+            v_stack_ptr = v_stack_ptr - 1
+            v_curr_idx = v_stack[v_stack_ptr]
+            
+            v_curr_y = int(v_curr_idx / v_maze_size)
+            v_curr_x = v_curr_idx % v_maze_size
+            
+            # Mark as explored (if not start or end)
+            v_curr_state = v_maze[v_curr_idx]
+            if v_curr_state == 1 then
+                v_maze[v_curr_idx] = 6
+                
+                # === 1px INCREMENTAL DRAW (exploring) ===
+                if v_mode == 0 then
+                    # Dim the previous position
+                    if v_prev_x >= 0 then
+                        v_prev_idx = v_prev_y * v_maze_size + v_prev_x
+                        v_prev_state = v_maze[v_prev_idx]
+                        if v_prev_state == 6 then
+                            plot(v_prev_x, v_prev_y, purple, 30)
+                        endif
+                    endif
+                    # Draw current bright
+                    plot(v_curr_x, v_curr_y, purple, 100)
+                    v_prev_x = v_curr_x
+                    v_prev_y = v_curr_y
+                    rest(0.008)
+                endif
+                
+                # === 3px INCREMENTAL DRAW (exploring) ===
+                if v_mode == 1 then
+                    if v_prev_x >= 0 then
+                        v_prev_idx = v_prev_y * v_maze_size + v_prev_x
+                        v_prev_state = v_maze[v_prev_idx]
+                        if v_prev_state == 6 then
+                            draw_rectangle(v_prev_x * 3, v_prev_y * 3, 3, 3, purple, 30, true)
+                        endif
+                    endif
+                    draw_rectangle(v_curr_x * 3, v_curr_y * 3, 3, 3, purple, 100, true)
+                    v_prev_x = v_curr_x
+                    v_prev_y = v_curr_y
+                    rest(0.02)
+                endif
+            endif
+            
+            # Check if we found the exit
+            if v_curr_idx == v_end_idx then
+                v_found_exit = 1
+            else
+                # Push unvisited neighbors onto stack
+                for v_d in (0, 3, 1)
+                    v_nx = v_curr_x + v_dx[v_d]
+                    v_ny = v_curr_y + v_dy[v_d]
+                    
+                    v_in_bounds = 0
+                    if v_nx >= 0 and v_nx <= v_bound and v_ny >= 0 and v_ny <= v_bound then
+                        v_in_bounds = 1
+                    endif
+                    
+                    if v_in_bounds == 1 then
+                        v_neighbor_idx = v_ny * v_maze_size + v_nx
+                        v_neighbor_state = v_maze[v_neighbor_idx]
+                        
+                        if v_bfs_visited[v_neighbor_idx] == 0 then
+                            if v_neighbor_state == 1 or v_neighbor_state == 5 then
+                                v_bfs_visited[v_neighbor_idx] = 1
+                                v_parent[v_neighbor_idx] = v_curr_idx
+                                
+                                v_stack[v_stack_ptr] = v_neighbor_idx
+                                v_stack_ptr = v_stack_ptr + 1
+                            endif
+                        endif
+                    endif
+                endfor v_d
+            endif
+            
+        endwhile
+    endif
+
+    # === 1px: Full redraw before solution trace ===
+    if v_mode == 0 then
+        begin_frame(true)
+            for v_my in (0, 62, 1)
+                v_row_base = v_my * 63
+                for v_mx in (0, 62, 1)
+                    v_idx = v_row_base + v_mx
+                    v_state = v_maze[v_idx]
+                    if v_state == 0 then
+                        plot(v_mx, v_my, navy, 80)
+                    endif
+                    if v_state == 1 then
+                        plot(v_mx, v_my, black, 100)
+                    endif
+                    if v_state == 4 then
+                        plot(v_mx, v_my, cyan, 100)
+                    endif
+                    if v_state == 5 then
+                        plot(v_mx, v_my, red, 15)
+                    endif
+                    if v_state == 6 then
+                        plot(v_mx, v_my, purple, 20)
+                    endif
+                endfor v_mx
+            endfor v_my
+        end_frame
+    endif
+    
+    # === 3px: Full redraw before solution trace ===
+    if v_mode == 1 then
+        begin_frame(true)
+            for v_my in (0, 20, 1)
+                v_row_base = v_my * 21
+                v_py = v_my * 3
+                for v_mx in (0, 20, 1)
+                    v_idx = v_row_base + v_mx
+                    v_px = v_mx * 3
+                    v_state = v_maze[v_idx]
+                    if v_state == 0 then
+                        draw_rectangle(v_px, v_py, 3, 3, navy, 80, true)
+                    endif
+                    if v_state == 1 then
+                        draw_rectangle(v_px, v_py, 3, 3, black, 100, true)
+                    endif
+                    if v_state == 4 then
+                        draw_rectangle(v_px, v_py, 3, 3, cyan, 100, true)
+                    endif
+                    if v_state == 5 then
+                        draw_rectangle(v_px, v_py, 3, 3, red, 100, true)
+                    endif
+                    if v_state == 6 then
+                        draw_rectangle(v_px, v_py, 3, 3, purple, 20, true)
+                    endif
+                endfor v_mx
+            endfor v_my
+        end_frame
+    endif
+    
+    rest(0.5)
+    
+    # ========================================
+    # PHASE 3: TRACE SOLUTION PATH
+    # ========================================
+    
+    if v_found_exit == 1 then
+        v_trace_idx = v_end_idx
+        
+        while v_trace_idx != v_start_idx then
+            if v_trace_idx != v_end_idx then
+                v_maze[v_trace_idx] = 7
+                
+                v_trace_y = int(v_trace_idx / v_maze_size)
+                v_trace_x = v_trace_idx % v_maze_size
+                
+                # === 1px INCREMENTAL DRAW (solution) ===
+                if v_mode == 0 then
+                    plot(v_trace_x, v_trace_y, yellow, 100)
+                    rest(0.008)
+                endif
+                
+                # === 3px INCREMENTAL DRAW (solution) ===
+                if v_mode == 1 then
+                    draw_rectangle(v_trace_x * 3, v_trace_y * 3, 3, 3, yellow, 100, true)
+                    rest(0.04)
+                endif
+            endif
+            
+            v_trace_idx = v_parent[v_trace_idx]
+        endwhile
+        
+        v_maze[v_start_idx] = 7
+        
+        if v_mode == 0 then
+            plot(1, 1, yellow, 100)
+        endif
+        if v_mode == 1 then
+            draw_rectangle(3, 3, 3, 3, yellow, 100, true)
+        endif
+    endif
+    
+    rest(4)
+    clear()
+    rest(0.5)
+    
+endwhile

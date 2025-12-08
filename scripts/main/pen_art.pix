@@ -1,0 +1,582 @@
+# ============================================
+# Script: Pen Shade Bloom (Multi-Style Engine)
+#
+# Styles:
+#   - Original 8 shaded pen styles
+#   - 3 erratic styles with burnout=10 (fast fade)
+#
+# Features:
+# 1. Clear after each style change
+# 2. Thick pen strokes drawn per-step in a single frame
+# 3. Palettes cycle through colors for smoother variance
+# 4. Styles with burnout rest after last nest so the
+#    display can fully fade before switching styles
+# 5. v_force_style lets you lock to a specific style index
+# ============================================
+
+clear()
+throttle(0.6)
+
+# --------------------------------------------
+# CONFIG: style cycling
+# --------------------------------------------
+
+# Force a specific style:
+#   -1 = automatic cycling through all styles
+#    0..10 = lock to that style index for testing
+v_force_style = -1
+
+# Number of pen nests to run per style before changing
+v_style_length = 6
+
+# --------------------------------------------
+# GLOBAL PEN CENTER / MOTION CONFIG
+# --------------------------------------------
+
+v_center_x = 32
+v_center_y = 32
+
+# Center drift: small orbit of the nest center
+v_center_drift_step = 0.2  # how fast center radius grows per style
+v_center_radius_max = 8    # maximum drift radius from screen center
+v_center_r = 0
+v_center_angle = 0
+
+v_max_radius = 40          # max radius for a single pen nest
+v_max_steps = 2500         # safety cap on steps per nest
+
+# --------------------------------------------
+# COLOR PALETTE DEFINITION
+# --------------------------------------------
+
+create_array(v_colors, 10, string)
+v_colors[0] = "red"
+v_colors[1] = "orange"
+v_colors[2] = "gold"
+v_colors[3] = "yellow"
+v_colors[4] = "lime"
+v_colors[5] = "cyan"
+v_colors[6] = "blue"
+v_colors[7] = "purple"
+v_colors[8] = "magenta"
+v_colors[9] = "white"
+
+# Palette mode constants:
+# 0 = FULL_RANDOM   (cycled across full palette 0..9)
+# 1 = WARM_RANDOM   (cycled across warm subset 0..3)
+# 2 = COOL_RANDOM   (cycled across cool subset 4..7)
+# 3 = FULL_MONO     (one color from full palette per style)
+# 4 = COOL_MONO     (one color from cool subset per style)
+# 5 = WARM_MONO     (one color from warm subset per style)
+
+# Sequential palette cursor (for non-mono modes)
+v_palette_cursor = 0
+
+# --------------------------------------------
+# TIGHTNESS PROFILES
+# Values for radius steps are in "hundredths"
+# (e.g., 5 means 0.05 after dividing by 100).
+# --------------------------------------------
+
+# Tightness index:
+# 0 = Tight
+# 1 = Medium
+# 2 = Wild
+
+create_array(v_tight_min_step, 3)
+create_array(v_tight_max_step, 3)
+create_array(v_tight_angle_jitter, 3)
+
+# Tight: slow, close shading
+v_tight_min_step[0] = 3     # 0.03
+v_tight_max_step[0] = 8     # 0.08
+v_tight_angle_jitter[0] = 12
+
+# Medium: moderate spread
+v_tight_min_step[1] = 5     # 0.05
+v_tight_max_step[1] = 20    # 0.20
+v_tight_angle_jitter[1] = 20
+
+# Wild: fast, wiggly scribbles
+v_tight_min_step[2] = 10    # 0.10
+v_tight_max_step[2] = 30    # 0.30
+v_tight_angle_jitter[2] = 30
+
+# --------------------------------------------
+# STYLE DEFINITIONS (0-10)
+#
+# Each style has:
+#   burnout      -> v_style_burnout
+#   tightness    -> v_style_tightness (0/1/2)
+#   symmetry     -> v_style_symmetry  (0/1/2)
+#   thickness    -> v_style_thickness (0/1/2)
+#   palette mode -> v_style_palette   (0..5)
+#
+# Styles 0-7: original shaded pen styles
+# Styles 8-10: erratic pen styles with burnout=10
+# --------------------------------------------
+
+v_style_count = 11
+
+create_array(v_style_burnout,    v_style_count)
+create_array(v_style_tightness,  v_style_count)
+create_array(v_style_symmetry,   v_style_count)
+create_array(v_style_thickness,  v_style_count)
+create_array(v_style_palette,    v_style_count)
+create_array(v_style_name,       v_style_count, string)
+
+# Style 0: Ink Core
+v_style_burnout[0]   = 0          # no burnout
+v_style_tightness[0] = 0          # tight
+v_style_symmetry[0]  = 0          # none
+v_style_thickness[0] = 0          # thin
+v_style_palette[0]   = 1          # warm cycled
+v_style_name[0]      = "Ink Core"
+
+# Style 1: Mirror Glow
+v_style_burnout[1]   = 5000       # 5s
+v_style_tightness[1] = 0          # tight
+v_style_symmetry[1]  = 1          # horizontal
+v_style_thickness[1] = 0          # thin
+v_style_palette[1]   = 1          # warm cycled
+v_style_name[1]      = "Mirror Glow"
+
+# Style 2: Crystal Bloom
+v_style_burnout[2]   = 20000      # 20s
+v_style_tightness[2] = 1          # medium
+v_style_symmetry[2]  = 2          # four-way
+v_style_thickness[2] = 1          # medium
+v_style_palette[2]   = 2          # cool cycled
+v_style_name[2]      = "Crystal Bloom"
+
+# Style 3: Ghost Echo
+v_style_burnout[3]   = 5000       # 5s
+v_style_tightness[3] = 2          # wild
+v_style_symmetry[3]  = 0          # none
+v_style_thickness[3] = 1          # medium
+v_style_palette[3]   = 0          # full cycled
+v_style_name[3]      = "Ghost Echo"
+
+# Style 4: Petal Burst
+v_style_burnout[4]   = 0          # no burnout
+v_style_tightness[4] = 1          # medium
+v_style_symmetry[4]  = 2          # four-way
+v_style_thickness[4] = 2          # thick
+v_style_palette[4]   = 1          # warm cycled
+v_style_name[4]      = "Petal Burst"
+
+# Style 5: Nebula Cloud
+v_style_burnout[5]   = 20000      # 20s
+v_style_tightness[5] = 0          # tight
+v_style_symmetry[5]  = 0          # none
+v_style_thickness[5] = 2          # thick
+v_style_palette[5]   = 4          # cool mono
+v_style_name[5]      = "Nebula Cloud"
+
+# Style 6: Electric Web
+v_style_burnout[6]   = 5000       # 5s
+v_style_tightness[6] = 2          # wild
+v_style_symmetry[6]  = 1          # horizontal
+v_style_thickness[6] = 0          # thin
+v_style_palette[6]   = 0          # full cycled
+v_style_name[6]      = "Electric Web"
+
+# Style 7: Kaleido Storm
+v_style_burnout[7]   = 20000      # 20s
+v_style_tightness[7] = 2          # wild
+v_style_symmetry[7]  = 2          # four-way
+v_style_thickness[7] = 1          # medium
+v_style_palette[7]   = 3          # full mono
+v_style_name[7]      = "Kaleido Storm"
+
+# -------- NEW ERRATIC STYLES (burnout = 10) --------
+
+# Style 8: Erratic Sparkle
+# Wild, thin, full palette, very fast burnout
+v_style_burnout[8]   = 10         # 10 ms
+v_style_tightness[8] = 2          # wild
+v_style_symmetry[8]  = 0          # none
+v_style_thickness[8] = 0          # thin
+v_style_palette[8]   = 0          # full cycled
+v_style_name[8]      = "Erratic Sparkle"
+
+# Style 9: Erratic Mirror
+# Wild, thin, horizontal symmetry, cool colors, very fast burnout
+v_style_burnout[9]   = 10         # 10 ms
+v_style_tightness[9] = 2          # wild
+v_style_symmetry[9]  = 1          # horizontal
+v_style_thickness[9] = 0          # thin
+v_style_palette[9]   = 2          # cool cycled
+v_style_name[9]      = "Erratic Mirror"
+
+# Style 10: Erratic Scribble
+# Wild, medium thickness, four-way symmetry, warm colors, fast burnout
+v_style_burnout[10]   = 10        # 10 ms
+v_style_tightness[10] = 2         # wild
+v_style_symmetry[10]  = 2         # four-way
+v_style_thickness[10] = 1         # medium
+v_style_palette[10]   = 1         # warm cycled
+v_style_name[10]      = "Erratic Scribble"
+
+# --------------------------------------------
+# CURRENT STYLE STATE
+# --------------------------------------------
+
+v_style_index = 0
+v_style_counter = 0
+
+v_current_burnout = 0
+v_min_radius_step = 0
+v_max_radius_step = 0
+v_angle_jitter    = 0
+v_symmetry_mode   = 0
+v_thickness_mode  = 0
+v_palette_mode    = 0
+
+# Mono-color per style
+v_mono_color_index = 0
+v_mono_color = "white"
+
+# Track last style to detect changes (for clear)
+v_last_style_index = -1
+
+# --------------------------------------------
+# HELPER: Apply style parameters
+# - Clears screen when style actually changes
+# - Prints style info once per change
+# --------------------------------------------
+def apply_style {
+
+    if v_force_style >= 0 then
+        v_style_index = v_force_style
+    endif
+
+    if v_style_index < 0 then
+        v_style_index = 0
+    elseif v_style_index >= v_style_count then
+        v_style_index = 0
+    endif
+
+    # If style changed, clear the display
+    if v_style_index != v_last_style_index then
+        clear()
+        v_last_style_index = v_style_index
+    endif
+
+    v_current_burnout = v_style_burnout[v_style_index]
+
+    # Resolve tightness profile
+    v_tight_index = v_style_tightness[v_style_index]
+    v_min_radius_step = v_tight_min_step[v_tight_index]
+    v_max_radius_step = v_tight_max_step[v_tight_index]
+    v_angle_jitter    = v_tight_angle_jitter[v_tight_index]
+
+    # Symmetry, thickness, palette
+    v_symmetry_mode  = v_style_symmetry[v_style_index]
+    v_thickness_mode = v_style_thickness[v_style_index]
+    v_palette_mode   = v_style_palette[v_style_index]
+
+    # Reset palette cursor for new style (for cycled palettes)
+    v_palette_cursor = 0
+
+    # For mono palettes, pick a base color for the whole style
+    if v_palette_mode == 3 then
+        # FULL_MONO: any color from full palette
+        v_mono_color_index = int(random(0, 9, 0))
+        v_mono_color = v_colors[v_mono_color_index]
+    elseif v_palette_mode == 4 then
+        # COOL_MONO: cool subset = indices 4..7
+        v_mono_color_index = int(random(4, 7, 0))
+        v_mono_color = v_colors[v_mono_color_index]
+    elseif v_palette_mode == 5 then
+        # WARM_MONO: warm subset = indices 0..3
+        v_mono_color_index = int(random(0, 3, 0))
+        v_mono_color = v_colors[v_mono_color_index]
+    endif
+
+    print(f"[STYLE] {v_style_index}: {v_style_name[v_style_index]} (burnout={v_current_burnout})")
+}
+
+# --------------------------------------------
+# HELPER: Pick pen color for this nest
+# - Uses cycled palettes for better variance
+# - Mono palettes use v_mono_color
+# --------------------------------------------
+v_pen_color = "white"
+
+def pick_pen_color {
+
+    if v_palette_mode == 0 then
+        # FULL_RANDOM (cycled 0..9)
+        v_color_index = v_palette_cursor
+        v_palette_cursor = v_palette_cursor + 1
+        if v_palette_cursor >= 10 then
+            v_palette_cursor = 0
+        endif
+        v_pen_color = v_colors[v_color_index]
+
+    elseif v_palette_mode == 1 then
+        # WARM_RANDOM (cycled 0..3)
+        v_color_offset = v_palette_cursor
+        v_palette_cursor = v_palette_cursor + 1
+        if v_palette_cursor >= 4 then
+            v_palette_cursor = 0
+        endif
+        v_color_index = 0 + v_color_offset
+        v_pen_color = v_colors[v_color_index]
+
+    elseif v_palette_mode == 2 then
+        # COOL_RANDOM (cycled 4..7)
+        v_color_offset = v_palette_cursor
+        v_palette_cursor = v_palette_cursor + 1
+        if v_palette_cursor >= 4 then
+            v_palette_cursor = 0
+        endif
+        v_color_index = 4 + v_color_offset
+        v_pen_color = v_colors[v_color_index]
+
+    elseif v_palette_mode == 3 then
+        # FULL_MONO
+        v_pen_color = v_mono_color
+
+    elseif v_palette_mode == 4 then
+        # COOL_MONO
+        v_pen_color = v_mono_color
+
+    elseif v_palette_mode == 5 then
+        # WARM_MONO
+        v_pen_color = v_mono_color
+
+    else
+        v_pen_color = "white"
+    endif
+}
+
+# --------------------------------------------
+# HELPER: Safe plot with current burnout & color
+# Uses v_px, v_py as coordinates
+# --------------------------------------------
+v_px = 0
+v_py = 0
+
+def safe_plot {
+    if v_current_burnout > 0 then
+        plot(v_px, v_py, v_pen_color, 100, v_current_burnout)
+    else
+        plot(v_px, v_py, v_pen_color, 100)
+    endif
+}
+
+# --------------------------------------------
+# HELPER: Draw pen point at (v_draw_x, v_draw_y)
+# - Applies thickness only
+# - Symmetry handled in run_pen_nest
+# --------------------------------------------
+v_draw_x = 0
+v_draw_y = 0
+
+def draw_pen_point {
+
+    # Base point
+    v_px = v_draw_x
+    v_py = v_draw_y
+    call safe_plot
+
+    # Thickness mode 1+: cross neighbors
+    if v_thickness_mode >= 1 then
+        v_px = v_draw_x + 1
+        v_py = v_draw_y
+        call safe_plot
+        v_px = v_draw_x - 1
+        v_py = v_draw_y
+        call safe_plot
+        v_px = v_draw_x
+        v_py = v_draw_y + 1
+        call safe_plot
+        v_px = v_draw_x
+        v_py = v_draw_y - 1
+        call safe_plot
+    endif
+
+    # Thickness mode 2+: add diagonals
+    if v_thickness_mode >= 2 then
+        v_px = v_draw_x + 1
+        v_py = v_draw_y + 1
+        call safe_plot
+        v_px = v_draw_x - 1
+        v_py = v_draw_y + 1
+        call safe_plot
+        v_px = v_draw_x + 1
+        v_py = v_draw_y - 1
+        call safe_plot
+        v_px = v_draw_x - 1
+        v_py = v_draw_y - 1
+        call safe_plot
+    endif
+}
+
+# --------------------------------------------
+# PROCEDURE: Run one pen nest
+# - Uses current style settings
+# - Entire symmetric + thick pen stroke per step
+#   is framed in begin_frame(true)/end_frame
+# --------------------------------------------
+def run_pen_nest {
+
+    call pick_pen_color
+
+    # Choose radius step within style’s min/max
+    v_radius_step_raw = random(v_min_radius_step, v_max_radius_step, 0)
+    v_radius_step = v_radius_step_raw / 100
+
+    v_local_angle_jitter = v_angle_jitter
+
+    v_angle = random(0, 360, 1)
+    v_radius = 0
+    v_steps = 0
+    v_misses = 0
+
+    while v_radius < v_max_radius and v_steps < v_max_steps and v_misses < 100 then
+
+        # Angle change
+        v_angle_delta = random(-v_local_angle_jitter, v_local_angle_jitter, 0)
+        v_angle = v_angle + v_angle_delta
+
+        if v_angle >= 360 then
+            v_angle = v_angle - 360
+        elseif v_angle < 0 then
+            v_angle = v_angle + 360
+        endif
+
+        # Outward growth
+        v_radius = v_radius + v_radius_step
+
+        # Convert angle to radians
+        v_rad = radians(v_angle)
+
+        # Base floating-point position
+        v_xf = v_center_x + cos(v_rad) * v_radius
+        v_yf = v_center_y + sin(v_rad) * v_radius
+
+        # Integer coordinates
+        v_x = int(v_xf)
+        v_y = int(v_yf)
+
+        if v_x >= 0 and v_x < 64 and v_y >= 0 and v_y < 64 then
+
+            # Frame this entire pen step so all symmetric
+            # and thick pixels appear in one canvas draw.
+            begin_frame(true)
+
+            if v_symmetry_mode == 0 then
+                # Just base
+                v_draw_x = v_x
+                v_draw_y = v_y
+                call draw_pen_point
+
+            elseif v_symmetry_mode == 1 then
+                # Horizontal mirror
+                v_draw_x = v_x
+                v_draw_y = v_y
+                call draw_pen_point
+
+                v_mx = 63 - v_x
+
+                v_draw_x = v_mx
+                v_draw_y = v_y
+                call draw_pen_point
+
+            elseif v_symmetry_mode == 2 then
+                # Four-way mirror
+                v_draw_x = v_x
+                v_draw_y = v_y
+                call draw_pen_point
+
+                v_mx = 63 - v_x
+                v_my = 63 - v_y
+
+                v_draw_x = v_mx
+                v_draw_y = v_y
+                call draw_pen_point
+
+                v_draw_x = v_x
+                v_draw_y = v_my
+                call draw_pen_point
+
+                v_draw_x = v_mx
+                v_draw_y = v_my
+                call draw_pen_point
+            endif
+
+            end_frame
+
+            v_misses = 0
+        else
+            v_misses = v_misses + 1
+        endif
+
+        v_steps = v_steps + 1
+    endwhile
+}
+
+# --------------------------------------------
+# INITIAL STYLE SETUP
+# --------------------------------------------
+
+if v_force_style >= 0 then
+    v_style_index = v_force_style
+else
+    v_style_index = 0
+endif
+v_style_counter = 0
+
+call apply_style
+
+# --------------------------------------------
+# MAIN LOOP: run endless pen nests, cycling styles
+# With burnout pause before style change
+# --------------------------------------------
+while 1 == 1 then
+
+    # Drift center in a small orbit
+    v_center_angle = v_center_angle + 10
+    if v_center_angle >= 360 then
+        v_center_angle = v_center_angle - 360
+    endif
+
+    v_center_r = v_center_r + v_center_drift_step
+    if v_center_r > v_center_radius_max then
+        v_center_r = 0
+    endif
+
+    v_center_rad = radians(v_center_angle)
+    v_center_x = 32 + int(cos(v_center_rad) * v_center_r)
+    v_center_y = 32 + int(sin(v_center_rad) * v_center_r)
+
+    # Run a single pen nest with current style settings
+    call run_pen_nest
+
+    # Update style counters (unless forced)
+    if v_force_style < 0 then
+        v_style_counter = v_style_counter + 1
+
+        if v_style_counter >= v_style_length then
+            v_style_counter = 0
+
+            # If this style has burnout, rest so we can
+            # watch it fully fade before switching.
+            if v_current_burnout > 0 then
+                v_wait = v_current_burnout / 1000
+                rest(v_wait)
+            endif
+
+            v_style_index = v_style_index + 1
+            if v_style_index >= v_style_count then
+                v_style_index = 0
+            endif
+
+            call apply_style
+        endif
+    endif
+
+endwhile

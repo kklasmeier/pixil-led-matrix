@@ -11,8 +11,8 @@ from datetime import datetime
 # Add project root to path so we can import from database package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from ..database import PixilMetricsDB
-from ..database.queries.pixil_queries import PixilQueries
+from database import PixilMetricsDB
+from database.queries.pixil_queries import PixilQueries
 
 def safe_get_column(row, column_name, default=0):
     """Safely get a column value from sqlite3.Row, handling missing columns."""

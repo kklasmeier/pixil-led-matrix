@@ -1,0 +1,273 @@
+# Jellyfish Drift v6 - Depth Layering
+# Graceful jellyfish swimming across the matrix
+# Multiple jellyfish with staggered timing and depth, runs forever
+
+# Configuration
+v_max_jellyfish = 4
+v_swim_speed = 0.4
+v_sway_amount = 0.2
+v_sway_speed = 0.03
+v_pulse_speed = 0.1
+v_spawn_interval = 50
+v_spawn_variance = 50
+v_base_intensity = 60
+v_intensity_step = 15
+
+# Spawn timer
+v_spawn_timer = 0
+v_next_spawn = 50
+
+# Jellyfish state arrays (sized to 5 for flexibility)
+create_array(v_jx, 5, numeric)
+create_array(v_jy, 5, numeric)
+create_array(v_vx, 5, numeric)
+create_array(v_vy, 5, numeric)
+create_array(v_pulse_phase, 5, numeric)
+create_array(v_pulse_size, 5, numeric)
+create_array(v_pulse_delta, 5, numeric)
+create_array(v_sway_angle, 5, numeric)
+create_array(v_size, 5, numeric)
+create_array(v_active, 5, numeric)
+
+# Pre-calculated bell widths (per jellyfish)
+create_array(v_bw1, 5, numeric)
+create_array(v_bw2, 5, numeric)
+create_array(v_bw3, 5, numeric)
+create_array(v_bw4, 5, numeric)
+
+# Pre-calculated tentacle values
+create_array(v_tspread, 5, numeric)
+create_array(v_tlen0, 5, numeric)
+create_array(v_tlen1, 5, numeric)
+create_array(v_tlen2, 5, numeric)
+create_array(v_tpush, 5, numeric)
+create_array(v_tsway_mult, 5, numeric)
+
+# Cached colors (string arrays)
+create_array(v_bell_col, 5, string)
+create_array(v_tent_col, 5, string)
+
+# Current index
+v_idx = 0
+
+# Calculate size-dependent values for jellyfish at v_idx
+def calc_size_values {
+    v_s = v_size[v_idx]
+    v_bw1[v_idx] = int(2 * v_s)
+    v_bw2[v_idx] = int(5 * v_s)
+    v_bw3[v_idx] = int(6 * v_s)
+    v_bw4[v_idx] = int(4 * v_s)
+    v_tspread[v_idx] = int(2 * v_s)
+    v_tlen_base = random(10, 16, 0) * v_s
+    v_tlen0[v_idx] = int(v_tlen_base * 0.6)
+    v_tlen1[v_idx] = int(v_tlen_base * 0.85)
+    v_tlen2[v_idx] = int(v_tlen_base)
+    v_tpush[v_idx] = int(2 * v_s)
+    v_tsway_mult[v_idx] = 3 * v_s
+}
+
+# Pick random color for jellyfish at v_idx
+def pick_color {
+    v_color_pick = random(1, 4, 0)
+    if v_color_pick == 1 then
+        v_bell_col[v_idx] = "magenta"
+        v_tent_col[v_idx] = "purple"
+    elseif v_color_pick == 2 then
+        v_bell_col[v_idx] = "cyan"
+        v_tent_col[v_idx] = "blue"
+    elseif v_color_pick == 3 then
+        v_bell_col[v_idx] = "purple"
+        v_tent_col[v_idx] = "indigo"
+    else
+        v_bell_col[v_idx] = "coral"
+        v_tent_col[v_idx] = "rose"
+    endif
+}
+
+# Spawn jellyfish at edge (normal spawn)
+def spawn_at_edge {
+    v_spawn_edge = random(1, 4, 0)
+    v_exit_bias = random(-20, 20, 0)
+    if v_spawn_edge == 1 then
+        v_jx[v_idx] = random(15, 49, 0)
+        v_jy[v_idx] = 80
+        v_vx[v_idx] = v_exit_bias / 100
+        v_vy[v_idx] = v_swim_speed * -1
+    elseif v_spawn_edge == 2 then
+        v_jx[v_idx] = random(15, 49, 0)
+        v_jy[v_idx] = -20
+        v_vx[v_idx] = v_exit_bias / 100
+        v_vy[v_idx] = v_swim_speed
+    elseif v_spawn_edge == 3 then
+        v_jx[v_idx] = -15
+        v_jy[v_idx] = random(15, 49, 0)
+        v_vx[v_idx] = v_swim_speed
+        v_vy[v_idx] = v_exit_bias / 100
+    else
+        v_jx[v_idx] = 80
+        v_jy[v_idx] = random(15, 49, 0)
+        v_vx[v_idx] = v_swim_speed * -1
+        v_vy[v_idx] = v_exit_bias / 100
+    endif
+    v_sway_angle[v_idx] = random(0, 628, 0) / 100
+    v_pulse_phase[v_idx] = random(0, 628, 0) / 100
+    v_pulse_size[v_idx] = 0
+    v_pulse_delta[v_idx] = 0
+    v_size[v_idx] = random(60, 130, 0) / 100
+    call calc_size_values
+    call pick_color
+    v_active[v_idx] = 1
+}
+
+# Spawn jellyfish mid-screen (for initial stagger)
+def spawn_mid_screen {
+    v_jx[v_idx] = random(10, 54, 0)
+    v_jy[v_idx] = random(10, 54, 0)
+    v_dir = random(1, 4, 0)
+    v_exit_bias = random(-20, 20, 0)
+    if v_dir == 1 then
+        v_vx[v_idx] = v_exit_bias / 100
+        v_vy[v_idx] = v_swim_speed * -1
+    elseif v_dir == 2 then
+        v_vx[v_idx] = v_exit_bias / 100
+        v_vy[v_idx] = v_swim_speed
+    elseif v_dir == 3 then
+        v_vx[v_idx] = v_swim_speed
+        v_vy[v_idx] = v_exit_bias / 100
+    else
+        v_vx[v_idx] = v_swim_speed * -1
+        v_vy[v_idx] = v_exit_bias / 100
+    endif
+    v_sway_angle[v_idx] = random(0, 628, 0) / 100
+    v_pulse_phase[v_idx] = random(0, 628, 0) / 100
+    v_pulse_size[v_idx] = 0
+    v_pulse_delta[v_idx] = 0
+    v_size[v_idx] = random(60, 130, 0) / 100
+    call calc_size_values
+    call pick_color
+    v_active[v_idx] = 1
+}
+
+# Count active jellyfish
+def count_active {
+    v_count = 0
+    for v_i in (0, v_max_jellyfish - 1, 1)
+        if v_active[v_i] == 1 then
+            v_count = v_count + 1
+        endif
+    endfor v_i
+}
+
+# Find an inactive slot
+def find_free_slot {
+    v_free_slot = -1
+    for v_i in (0, v_max_jellyfish - 1, 1)
+        if v_active[v_i] == 0 and v_free_slot == -1 then
+            v_free_slot = v_i
+        endif
+    endfor v_i
+}
+
+# Initial staggered spawn
+def initial_spawn {
+    v_initial_count = random(1, 2, 0)
+    for v_i in (0, v_initial_count - 1, 1)
+        v_idx = v_i
+        call spawn_mid_screen
+    endfor v_i
+}
+
+# Draw and update one jellyfish
+def process_one {
+    v_cx = int(v_jx[v_idx])
+    v_cy = int(v_jy[v_idx])
+    v_pw = int(v_pulse_size[v_idx])
+    v_bc = v_bell_col[v_idx]
+    v_tc = v_tent_col[v_idx]
+    v_im = min(100, v_base_intensity + v_idx * v_intensity_step)
+    v_i1 = int(60 * v_im / 100)
+    v_i2 = int(70 * v_im / 100)
+    v_i3 = int(80 * v_im / 100)
+    v_i4 = int(90 * v_im / 100)
+    v_i5 = v_im
+    v_it1 = int(70 * v_im / 100)
+    v_it2 = int(80 * v_im / 100)
+    v_it3 = int(90 * v_im / 100)
+    draw_line(v_cx - v_bw1[v_idx] - v_pw, v_cy - 4, v_cx + v_bw1[v_idx] + v_pw, v_cy - 4, v_bc, v_i1)
+    draw_line(v_cx - v_bw2[v_idx] - v_pw, v_cy - 3, v_cx + v_bw2[v_idx] + v_pw, v_cy - 3, v_bc, v_i2)
+    draw_line(v_cx - v_bw3[v_idx] - v_pw, v_cy - 2, v_cx + v_bw3[v_idx] + v_pw, v_cy - 2, v_bc, v_i3)
+    draw_line(v_cx - v_bw3[v_idx] - v_pw, v_cy - 1, v_cx + v_bw3[v_idx] + v_pw, v_cy - 1, v_bc, v_i4)
+    draw_line(v_cx - v_bw3[v_idx] - v_pw, v_cy, v_cx + v_bw3[v_idx] + v_pw, v_cy, v_bc, v_i5)
+    draw_line(v_cx - v_bw2[v_idx] - v_pw, v_cy + 1, v_cx + v_bw2[v_idx] + v_pw, v_cy + 1, v_bc, v_i4)
+    draw_line(v_cx - v_bw4[v_idx] - v_pw, v_cy + 2, v_cx + v_bw4[v_idx] + v_pw, v_cy + 2, v_bc, v_i2)
+    v_base_y = v_cy + 3
+    v_sp = v_tspread[v_idx]
+    v_sa = v_sway_angle[v_idx] * 2
+    v_sm = v_tsway_mult[v_idx]
+    v_sw0 = sin(v_sa) * v_sm
+    v_sw1 = sin(v_sa + 1) * v_sm
+    v_sw2 = sin(v_sa + 2) * v_sm
+    v_sw3 = sin(v_sa + 3) * v_sm
+    v_sw4 = sin(v_sa + 4) * v_sm
+    v_push = 0
+    if v_pulse_delta[v_idx] < 0 then
+        v_push = v_tpush[v_idx]
+    endif
+    v_ax0 = v_cx - v_sp * 2
+    v_ax1 = v_cx - v_sp
+    v_ax2 = v_cx
+    v_ax3 = v_cx + v_sp
+    v_ax4 = v_cx + v_sp * 2
+    draw_line(v_ax0, v_base_y, int(v_ax0 + v_sw0), v_base_y + v_tlen0[v_idx] + v_push, v_tc, v_it1)
+    draw_line(v_ax1, v_base_y, int(v_ax1 + v_sw1), v_base_y + v_tlen1[v_idx] + v_push, v_tc, v_it2)
+    draw_line(v_ax2, v_base_y, int(v_ax2 + v_sw2), v_base_y + v_tlen2[v_idx] + v_push, v_tc, v_it3)
+    draw_line(v_ax3, v_base_y, int(v_ax3 + v_sw3), v_base_y + v_tlen1[v_idx] + v_push, v_tc, v_it2)
+    draw_line(v_ax4, v_base_y, int(v_ax4 + v_sw4), v_base_y + v_tlen0[v_idx] + v_push, v_tc, v_it1)
+    v_sway_angle[v_idx] = v_sway_angle[v_idx] + v_sway_speed
+    v_sway_offset = sin(v_sway_angle[v_idx]) * v_sway_amount
+    v_jx[v_idx] = v_jx[v_idx] + v_vx[v_idx] + v_sway_offset
+    v_jy[v_idx] = v_jy[v_idx] + v_vy[v_idx]
+    v_old_pulse = v_pulse_size[v_idx]
+    v_pulse_phase[v_idx] = v_pulse_phase[v_idx] + v_pulse_speed
+    v_pulse_size[v_idx] = sin(v_pulse_phase[v_idx]) * 2 * v_size[v_idx]
+    v_pulse_delta[v_idx] = v_pulse_size[v_idx] - v_old_pulse
+    if v_jx[v_idx] < -20 or v_jx[v_idx] > 84 then
+        v_active[v_idx] = 0
+    endif
+    if v_jy[v_idx] < -30 or v_jy[v_idx] > 95 then
+        v_active[v_idx] = 0
+    endif
+}
+
+# Timer-based spawn check
+def check_spawn {
+    v_spawn_timer = v_spawn_timer + 1
+    if v_spawn_timer >= v_next_spawn then
+        call count_active
+        if v_count < v_max_jellyfish then
+            call find_free_slot
+            if v_free_slot >= 0 then
+                v_idx = v_free_slot
+                call spawn_at_edge
+            endif
+        endif
+        v_next_spawn = v_spawn_interval + random(v_spawn_variance * -1, v_spawn_variance, 0)
+        v_spawn_timer = 0
+    endif
+}
+
+# Main loop
+clear()
+print("Jellyfish Drift v6 - Starting")
+call initial_spawn
+
+while 1 == 1 then
+    begin_frame
+        for v_idx in (0, v_max_jellyfish - 1, 1)
+            if v_active[v_idx] == 1 then
+                call process_one
+            endif
+        endfor v_idx
+    end_frame
+    call check_spawn
+endwhile

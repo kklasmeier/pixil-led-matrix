@@ -4,10 +4,13 @@
 
 A comprehensive tool for analyzing Pixil script performance data from the database. Provides insights into script execution times, optimization effectiveness, and JIT compilation performance.
 
+*** RUN FROM the root directory ***
+
 ## Basic Usage
 
 ```bash
 python tools/view_pixil_metrics.py [options]
+python tools/view_pixil_metrics.py runs --script "Cloth_simulation.pix"
 ```
 
 ## Command Options

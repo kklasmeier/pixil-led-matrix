@@ -1062,3 +1062,6 @@ My current list of scripts are:
 100. Hex Grid Glow – Radiating hexagonal lattice pattern that pulses from the center with periodic color and intensity shifts
 101. Orbital Wispfield – Smoothly drifting orbs trace elliptical paths around a central point, creating a soft, flowing ambient field
 102. Solar Bloom – Radiating sun-like bursts with pulsing center glow; each bloom randomly exhibits jitter or stays symmetrical throughout its life
+103. Jellyfish - Jellyfish swimming around
+104. Ink in Water - Ink drops spreading out in water
+104. Pen Art - Multiple sequences of pens drawing art

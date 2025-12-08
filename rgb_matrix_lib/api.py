@@ -15,7 +15,7 @@ from .text_renderer import TextRenderer
 from .commands import CommandExecutor  # Added CommandExecutor import
 
 # Performance tuning flag
-USE_PIL_FOR_FRAME_MODE = True  # Set to True to use PIL Image approach\
+USE_PIL_FOR_FRAME_MODE = True  # Set to True to use PIL Image approach
 
 # Global instance for internal use
 _api_instance: Optional['RGB_Api'] = None

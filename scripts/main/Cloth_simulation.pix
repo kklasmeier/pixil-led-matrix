@@ -1,0 +1,315 @@
+# ==========================================
+# Cloth Simulation - Precalculated Constraints
+# Flat arrays for maximum performance
+# ==========================================
+
+# Grid: 6x6 = 36 points
+v_cols = 6
+v_rows = 6
+v_spacing = 9
+v_start_x = 5
+v_start_y = 3
+v_total = 36
+
+# Physics
+v_gravity = 0.4
+v_damping = 0.97
+v_rest = 9
+
+# Position arrays
+create_array(v_px, 36, numeric)
+create_array(v_py, 36, numeric)
+create_array(v_ox, 36, numeric)
+create_array(v_oy, 36, numeric)
+create_array(v_pin, 36, numeric)
+
+# === PRECALCULATED CONSTRAINT PAIRS ===
+# Horizontal: 6 rows × 5 connections = 30 constraints
+# Vertical: 5 rows × 6 connections = 30 constraints
+# Total: 60 constraints
+
+create_array(v_c1, 60, numeric)
+create_array(v_c2, 60, numeric)
+
+# Build constraint pair arrays ONCE
+v_ci = 0
+
+# Horizontal constraints (row by row)
+# Row 0: (0,1), (1,2), (2,3), (3,4), (4,5)
+v_c1[0] = 0
+v_c2[0] = 1
+v_c1[1] = 1
+v_c2[1] = 2
+v_c1[2] = 2
+v_c2[2] = 3
+v_c1[3] = 3
+v_c2[3] = 4
+v_c1[4] = 4
+v_c2[4] = 5
+
+# Row 1: (6,7), (7,8), (8,9), (9,10), (10,11)
+v_c1[5] = 6
+v_c2[5] = 7
+v_c1[6] = 7
+v_c2[6] = 8
+v_c1[7] = 8
+v_c2[7] = 9
+v_c1[8] = 9
+v_c2[8] = 10
+v_c1[9] = 10
+v_c2[9] = 11
+
+# Row 2: (12,13), (13,14), (14,15), (15,16), (16,17)
+v_c1[10] = 12
+v_c2[10] = 13
+v_c1[11] = 13
+v_c2[11] = 14
+v_c1[12] = 14
+v_c2[12] = 15
+v_c1[13] = 15
+v_c2[13] = 16
+v_c1[14] = 16
+v_c2[14] = 17
+
+# Row 3: (18,19), (19,20), (20,21), (21,22), (22,23)
+v_c1[15] = 18
+v_c2[15] = 19
+v_c1[16] = 19
+v_c2[16] = 20
+v_c1[17] = 20
+v_c2[17] = 21
+v_c1[18] = 21
+v_c2[18] = 22
+v_c1[19] = 22
+v_c2[19] = 23
+
+# Row 4: (24,25), (25,26), (26,27), (27,28), (28,29)
+v_c1[20] = 24
+v_c2[20] = 25
+v_c1[21] = 25
+v_c2[21] = 26
+v_c1[22] = 26
+v_c2[22] = 27
+v_c1[23] = 27
+v_c2[23] = 28
+v_c1[24] = 28
+v_c2[24] = 29
+
+# Row 5: (30,31), (31,32), (32,33), (33,34), (34,35)
+v_c1[25] = 30
+v_c2[25] = 31
+v_c1[26] = 31
+v_c2[26] = 32
+v_c1[27] = 32
+v_c2[27] = 33
+v_c1[28] = 33
+v_c2[28] = 34
+v_c1[29] = 34
+v_c2[29] = 35
+
+# Vertical constraints (column by column)
+# Col 0: (0,6), (6,12), (12,18), (18,24), (24,30)
+v_c1[30] = 0
+v_c2[30] = 6
+v_c1[31] = 6
+v_c2[31] = 12
+v_c1[32] = 12
+v_c2[32] = 18
+v_c1[33] = 18
+v_c2[33] = 24
+v_c1[34] = 24
+v_c2[34] = 30
+
+# Col 1: (1,7), (7,13), (13,19), (19,25), (25,31)
+v_c1[35] = 1
+v_c2[35] = 7
+v_c1[36] = 7
+v_c2[36] = 13
+v_c1[37] = 13
+v_c2[37] = 19
+v_c1[38] = 19
+v_c2[38] = 25
+v_c1[39] = 25
+v_c2[39] = 31
+
+# Col 2: (2,8), (8,14), (14,20), (20,26), (26,32)
+v_c1[40] = 2
+v_c2[40] = 8
+v_c1[41] = 8
+v_c2[41] = 14
+v_c1[42] = 14
+v_c2[42] = 20
+v_c1[43] = 20
+v_c2[43] = 26
+v_c1[44] = 26
+v_c2[44] = 32
+
+# Col 3: (3,9), (9,15), (15,21), (21,27), (27,33)
+v_c1[45] = 3
+v_c2[45] = 9
+v_c1[46] = 9
+v_c2[46] = 15
+v_c1[47] = 15
+v_c2[47] = 21
+v_c1[48] = 21
+v_c2[48] = 27
+v_c1[49] = 27
+v_c2[49] = 33
+
+# Col 4: (4,10), (10,16), (16,22), (22,28), (28,34)
+v_c1[50] = 4
+v_c2[50] = 10
+v_c1[51] = 10
+v_c2[51] = 16
+v_c1[52] = 16
+v_c2[52] = 22
+v_c1[53] = 22
+v_c2[53] = 28
+v_c1[54] = 28
+v_c2[54] = 34
+
+# Col 5: (5,11), (11,17), (17,23), (23,29), (29,35)
+v_c1[55] = 5
+v_c2[55] = 11
+v_c1[56] = 11
+v_c2[56] = 17
+v_c1[57] = 17
+v_c2[57] = 23
+v_c1[58] = 23
+v_c2[58] = 29
+v_c1[59] = 29
+v_c2[59] = 35
+
+# Total constraints
+v_num_constraints = 60
+
+# === INITIALIZE POSITIONS ===
+v_idx = 0
+for v_row in (0, 5, 1)
+    for v_col in (0, 5, 1)
+        v_px[v_idx] = v_start_x + v_col * v_spacing
+        v_py[v_idx] = v_start_y + v_row * v_spacing
+        v_ox[v_idx] = v_px[v_idx]
+        v_oy[v_idx] = v_py[v_idx]
+        v_pin[v_idx] = 0
+        v_idx = v_idx + 1
+    endfor v_col
+endfor v_row
+
+# Pin top row points
+v_pin[0] = 1
+v_pin[2] = 1
+v_pin[5] = 1
+
+# Temp variables
+v_x1 = 0
+v_y1 = 0
+v_x2 = 0
+v_y2 = 0
+v_i1 = 0
+v_i2 = 0
+
+# Main loop
+v_frame = 0
+throttle(0.3)
+
+while true then
+    
+    # === VERLET INTEGRATION ===
+    for v_i in (0, 35, 1)
+        if v_pin[v_i] == 0 then
+            v_x1 = v_px[v_i]
+            v_y1 = v_py[v_i]
+            v_vx = (v_x1 - v_ox[v_i]) * v_damping
+            v_vy = (v_y1 - v_oy[v_i]) * v_damping
+            v_ox[v_i] = v_x1
+            v_oy[v_i] = v_y1
+            v_px[v_i] = v_x1 + v_vx
+            v_py[v_i] = v_y1 + v_vy + v_gravity
+        endif
+    endfor v_i
+    
+    # === SINGLE FLAT LOOP FOR ALL CONSTRAINTS ===
+    for v_ci in (0, 59, 1)
+        v_i1 = v_c1[v_ci]
+        v_i2 = v_c2[v_ci]
+        
+        v_x1 = v_px[v_i1]
+        v_y1 = v_py[v_i1]
+        v_x2 = v_px[v_i2]
+        v_y2 = v_py[v_i2]
+        
+        v_dx = v_x2 - v_x1
+        v_dy = v_y2 - v_y1
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        
+        if v_dist > 0.5 then
+            v_diff = (v_dist - v_rest) / v_dist * 0.5
+            v_moveX = v_dx * v_diff
+            v_moveY = v_dy * v_diff
+            
+            if v_pin[v_i1] == 0 then
+                v_px[v_i1] = v_x1 + v_moveX
+                v_py[v_i1] = v_y1 + v_moveY
+            endif
+            if v_pin[v_i2] == 0 then
+                v_px[v_i2] = v_x2 - v_moveX
+                v_py[v_i2] = v_y2 - v_moveY
+            endif
+        endif
+    endfor v_ci
+    
+    # === BOUNDARY CLAMP ===
+#    for v_i in (0, 35, 1)
+#        if v_pin[v_i] == 0 then
+#            v_py[v_i] = min(62, v_py[v_i])
+#            v_px[v_i] = max(1, v_px[v_i])
+#            v_px[v_i] = min(62, v_px[v_i])
+#            if v_py[v_i] > 62 then
+#                v_py[v_i] = 62
+#            endif
+#            if v_px[v_i] < 1 then
+#                v_px[v_i] = 1
+#            endif
+#            if v_px[v_i] > 62 then
+#                v_px[v_i] = 62
+#            endif
+#        endif
+#       endfor v_i
+    
+    # === WIND (occasional) ===
+    v_wc = v_frame % 150
+    if v_wc == 75 then
+        for v_i in (0, 35, 1)
+            if v_pin[v_i] == 0 then
+                v_px[v_i] = v_px[v_i] + 2.5
+            endif
+        endfor v_i
+    endif
+    if v_wc == 100 then
+        for v_i in (0, 35, 1)
+            if v_pin[v_i] == 0 then
+                v_px[v_i] = v_px[v_i] - 2.0
+            endif
+        endfor v_i
+    endif
+    
+    # === RENDER ===
+    begin_frame
+        # All constraints as lines (single loop!)
+        for v_ci in (0, 59, 1)
+            v_i1 = v_c1[v_ci]
+            v_i2 = v_c2[v_ci]
+            draw_line(int(v_px[v_i1]), int(v_py[v_i1]), int(v_px[v_i2]), int(v_py[v_i2]), cyan, 60)
+        endfor v_ci
+        
+        # Pin points
+        mplot(int(v_px[0]), int(v_py[0]), red, 100)
+        mplot(int(v_px[2]), int(v_py[2]), red, 100)
+        mplot(int(v_px[5]), int(v_py[5]), red, 100)
+    end_frame
+    
+    v_frame = v_frame + 1
+endwhile
+
+clear()

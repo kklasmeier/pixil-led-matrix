@@ -1,0 +1,151 @@
+# Ink in Water - Realistic Dark Background
+# Luminous ink drops diffusing in dark water
+# Single drop at a time, runs forever
+
+# Configuration
+v_num_particles = 60
+v_fade_rate = 2
+v_min_speed = 0.3
+v_max_speed = 1.2
+v_drop_pause = 1.5
+
+# Particle arrays
+create_array(v_px, 60, numeric)
+create_array(v_py, 60, numeric)
+create_array(v_vx, 60, numeric)
+create_array(v_vy, 60, numeric)
+create_array(v_intensity, 60, numeric)
+create_array(v_alive, 60, numeric)
+create_array(v_curve_x, 60, numeric)
+create_array(v_curve_y, 60, numeric)
+
+# Main procedure to spawn particles from drop point
+def spawn_particles {
+    for v_i in (0, v_num_particles - 1, 1)
+        v_angle = random(0, 360, 0)
+        v_speed = random(v_min_speed * 100, v_max_speed * 100, 0) / 100
+        v_px[v_i] = v_drop_x
+        v_py[v_i] = v_drop_y
+        v_vx[v_i] = cos(radians(v_angle)) * v_speed
+        v_vy[v_i] = sin(radians(v_angle)) * v_speed
+        v_curve_x[v_i] = random(-15, 15, 0) / 1000
+        v_curve_y[v_i] = random(-15, 15, 0) / 1000
+        v_intensity[v_i] = random(80, 100, 0)
+        v_alive[v_i] = 1
+    endfor v_i
+}
+
+# Update particle positions and intensities
+def update_particles {
+    v_any_alive = 0
+    for v_i in (0, v_num_particles - 1, 1)
+        if v_alive[v_i] == 1 then
+            v_vx[v_i] = v_vx[v_i] * 0.98 + v_curve_x[v_i] + v_drift_x
+            v_vy[v_i] = v_vy[v_i] * 0.98 + v_curve_y[v_i] + v_drift_y
+            if v_swirl_active == 1 then
+                v_dx = v_px[v_i] - v_drop_x
+                v_dy = v_py[v_i] - v_drop_y
+                v_vx[v_i] = v_vx[v_i] + (v_dy * v_swirl_strength * v_swirl_dir * -1)
+                v_vy[v_i] = v_vy[v_i] + (v_dx * v_swirl_strength * v_swirl_dir)
+            endif
+            v_px[v_i] = v_px[v_i] + v_vx[v_i]
+            v_py[v_i] = v_py[v_i] + v_vy[v_i]
+            v_intensity[v_i] = v_intensity[v_i] - v_fade_rate
+            if v_intensity[v_i] <= 0 then
+                v_alive[v_i] = 0
+            else
+                v_any_alive = 1
+            endif
+        endif
+    endfor v_i
+}
+
+# Draw all living particles
+def draw_particles {
+    for v_i in (0, v_num_particles - 1, 1)
+        if v_alive[v_i] == 1 then
+            v_draw_x = int(v_px[v_i])
+            v_draw_y = int(v_py[v_i])
+            v_draw_intensity = int(v_intensity[v_i])
+            if v_draw_intensity > 60 then
+                mplot(v_draw_x, v_draw_y, v_color_bright, v_draw_intensity)
+            elseif v_draw_intensity > 30 then
+                mplot(v_draw_x, v_draw_y, v_color_mid, v_draw_intensity + 20)
+            else
+                mplot(v_draw_x, v_draw_y, v_color_dark, v_draw_intensity + 30)
+            endif
+        endif
+    endfor v_i
+    mflush()
+}
+
+# Select random color palette
+def pick_color {
+    v_color_choice = random(1, 5, 0)
+    if v_color_choice == 1 then
+        v_color_bright = "cyan"
+        v_color_mid = "blue"
+        v_color_dark = "navy"
+    elseif v_color_choice == 2 then
+        v_color_bright = "magenta"
+        v_color_mid = "purple"
+        v_color_dark = "indigo"
+    elseif v_color_choice == 3 then
+        v_color_bright = "lime"
+        v_color_mid = "green"
+        v_color_dark = "forest_green"
+    elseif v_color_choice == 4 then
+        v_color_bright = "orange"
+        v_color_mid = "red"
+        v_color_dark = "maroon"
+    else
+        v_color_bright = "white"
+        v_color_mid = "sky_blue"
+        v_color_dark = "blue"
+    endif
+}
+
+# Pick behavior: 1=normal, 2=drift, 3=swirl
+def pick_behavior {
+    v_drift_x = 0
+    v_drift_y = 0
+    v_swirl_active = 0
+    v_behavior = random(1, 3, 0)
+    if v_behavior == 2 then
+        v_drift_angle = random(0, 360, 0)
+        v_drift_strength = random(15, 40, 0) / 1000
+        v_drift_x = cos(radians(v_drift_angle)) * v_drift_strength
+        v_drift_y = sin(radians(v_drift_angle)) * v_drift_strength
+    elseif v_behavior == 3 then
+        v_swirl_active = 1
+        v_swirl_strength = random(10, 30, 0) / 1000
+        v_swirl_dir_choice = random(0, 1, 0)
+        if v_swirl_dir_choice == 0 then
+            v_swirl_dir = -1
+        else
+            v_swirl_dir = 1
+        endif
+    endif
+}
+
+# Main loop - runs forever
+clear()
+print("Ink in Water - Starting")
+
+while 1 == 1 then
+    v_drop_x = random(15, 48, 0)
+    v_drop_y = random(15, 48, 0)
+    call pick_color
+    call pick_behavior
+    print(f"Drop at ({v_drop_x}, {v_drop_y}) - behavior={v_behavior}")
+    call spawn_particles
+    v_any_alive = 1
+    while v_any_alive == 1 then
+        begin_frame
+            call draw_particles
+        end_frame
+        call update_particles
+    endwhile
+    clear()
+    rest(v_drop_pause)
+endwhile
