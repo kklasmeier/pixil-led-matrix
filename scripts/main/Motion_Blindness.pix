@@ -1,0 +1,183 @@
+# Motion Blindness / Motion-Induced Blindness
+# Stare at the center cross. The peripheral dots may "disappear" perceptually.
+
+# -------------------------
+# Tunables
+# -------------------------
+v_bg_color = "black"
+v_bg_i = 20
+
+# Fixation cross
+v_cross_color = "white"
+v_cross_i = 60
+v_cross_len = 5
+
+# Peripheral targets (static)
+v_target_color = "yellow"
+v_target_i = 95
+v_target_size = 1            # 1 = single pixel; 2 = 2x2
+
+# Rotating mask ring
+v_ring_color_a = "white"
+v_ring_i_a = 35
+v_ring_color_b = "gray"
+v_ring_i_b = 10
+
+v_ring_radius = 18
+v_ring_points = 96
+v_ring_thickness = 2         # 1 or 2 recommended
+
+# Speed control
+v_hold = 0.05                # seconds per frame (lower = faster FPS)
+v_deg_step = 4               # degrees per frame (higher = faster rotation)
+
+# Optional reveal pulse to prove the dots are still being drawn
+v_reveal_enabled = 1
+v_reveal_period = 180        # frames between reveals
+v_reveal_frames = 10         # frames to show reveal box
+v_reveal_color = "red"
+v_reveal_i = 90
+
+# -------------------------
+# Target positions (static)
+# -------------------------
+create_array(v_tx, 4, numeric)
+create_array(v_ty, 4, numeric)
+
+# Three targets (indices 0..2)
+v_tx[0] = 16
+v_ty[0] = 20
+
+v_tx[1] = 48
+v_ty[1] = 18
+
+v_tx[2] = 50
+v_ty[2] = 46
+
+# Poison unused slot so it can never accidentally render
+v_tx[3] = -100
+v_ty[3] = -100
+
+# -------------------------
+# Helpers
+# -------------------------
+def plot_thick {
+    # Inputs (globals): v_px, v_py, v_pc, v_pi2, v_ring_thickness
+    if v_ring_thickness <= 1 then
+        mplot(v_px, v_py, v_pc, v_pi2)
+    else
+        # 2x2 stamp
+        mplot(v_px,     v_py,     v_pc, v_pi2)
+        mplot(v_px + 1, v_py,     v_pc, v_pi2)
+        mplot(v_px,     v_py + 1, v_pc, v_pi2)
+        mplot(v_px + 1, v_py + 1, v_pc, v_pi2)
+    endif
+}
+
+def draw_cross {
+    # Center cross at (32,32)
+    v_cx = 32
+    v_cy = 32
+
+    draw_line(v_cx - v_cross_len, v_cy, v_cx + v_cross_len, v_cy, v_cross_color, v_cross_i)
+    draw_line(v_cx, v_cy - v_cross_len, v_cx, v_cy + v_cross_len, v_cross_color, v_cross_i)
+}
+
+def draw_targets {
+    # IMPORTANT: end value is inclusive in your runtime, so use 0..2
+    for v_t in (0, 2, 1) then
+        v_x = int(v_tx[v_t])
+        v_y = int(v_ty[v_t])
+
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+            if v_target_size <= 1 then
+                mplot(v_x, v_y, v_target_color, v_target_i)
+            else
+                if v_x <= 62 and v_y <= 62 then
+                    mplot(v_x,     v_y,     v_target_color, v_target_i)
+                    mplot(v_x + 1, v_y,     v_target_color, v_target_i)
+                    mplot(v_x,     v_y + 1, v_target_color, v_target_i)
+                    mplot(v_x + 1, v_y + 1, v_target_color, v_target_i)
+                endif
+            endif
+        endif
+    endfor v_t
+}
+
+def draw_reveal_boxes {
+    # IMPORTANT: end value is inclusive in your runtime, so use 0..2
+    for v_t in (0, 2, 1) then
+        v_x = int(v_tx[v_t])
+        v_y = int(v_ty[v_t])
+
+        if v_x >= 2 and v_x <= 61 and v_y >= 2 and v_y <= 61 then
+            draw_rectangle(v_x - 2, v_y - 2, 5, 5, v_reveal_color, v_reveal_i, false)
+        endif
+    endfor v_t
+}
+
+def draw_rotating_ring {
+    v_cx = 32
+    v_cy = 32
+
+    for v_p in (0, v_ring_points, 1) then
+        v_deg = (v_p * (360 / v_ring_points)) + v_rot_deg
+        v_ang = (v_deg * pi) / 180
+
+        v_xf = v_cx + (cos(v_ang) * v_ring_radius)
+        v_yf = v_cy + (sin(v_ang) * v_ring_radius)
+
+        v_px = int(v_xf)
+        v_py = int(v_yf)
+
+        if v_px >= 0 and v_px <= 62 and v_py >= 0 and v_py <= 62 then
+            if int(fmod(v_p, 2)) == 0 then
+                v_pc  = v_ring_color_a
+                v_pi2 = v_ring_i_a
+            else
+                v_pc  = v_ring_color_b
+                v_pi2 = v_ring_i_b
+            endif
+
+            call plot_thick
+        endif
+    endfor v_p
+}
+
+def draw_frame {
+    begin_frame
+
+    draw_rectangle(0, 0, 64, 64, v_bg_color, v_bg_i, true)
+
+    call draw_rotating_ring
+    call draw_targets
+
+    mflush()
+
+    call draw_cross
+
+    if v_reveal_enabled == 1 then
+        if int(fmod(v_frame, v_reveal_period)) < v_reveal_frames then
+            call draw_reveal_boxes
+        endif
+    endif
+
+    end_frame
+}
+
+# -------------------------
+# Main loop
+# -------------------------
+v_frame = 0
+v_rot_deg = 0
+
+while 1 == 1 then
+    call draw_frame
+    rest(v_hold)
+
+    v_frame = v_frame + 1
+    v_rot_deg = v_rot_deg + v_deg_step
+    if v_rot_deg >= 360 then
+        v_rot_deg = v_rot_deg - 360
+    endif
+endwhile

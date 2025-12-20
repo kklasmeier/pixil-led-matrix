@@ -1,0 +1,1739 @@
+# Pachinko Machine Simulation
+# Runs forever, cycling through 24 board designs
+# Boards are shuffled at startup, then repeat in same order forever
+# Optimized with spatial Y-banding for peg collision detection
+
+# ========== PERFORMANCE ==========
+throttle(0)
+
+# ========== CONFIGURABLE SETTINGS ==========
+v_num_balls = 50              # Total number of balls to drop per board
+v_max_balls_active = 8        # Maximum balls on screen at once
+v_gravity = 0.15              # Downward acceleration per frame
+v_bounce_damping = 0.85       # Energy retained after bounce (0-1, higher = bouncier)
+v_drop_interval = 20          # Frames between ball drops
+v_total_boards = 24           # Total number of board designs
+
+# ========== DISPLAY CONSTANTS ==========
+v_left_wall = 3
+v_right_wall = 60
+v_exit_y = 64
+
+# ========== COLOR SYSTEM ==========
+v_wall_brightness = 40
+v_peg_brightness = 70
+
+# ========== PHYSICS CONSTANTS ==========
+v_collision_dist = 2.5        # Distance from peg center to trigger bounce
+v_coll_dist_sq = 6.25         # Pre-computed collision distance squared
+v_bounce_randomness = 0.5     # Random horizontal kick on peg bounce
+v_max_velocity = 3            # Maximum ball speed in any direction
+v_neg_max_velocity = -3       # Pre-computed negative max velocity
+
+# ========== BALL ARRAYS ==========
+create_array(v_ball_x, 13)
+create_array(v_ball_y, 13)
+create_array(v_ball_vx, 13)
+create_array(v_ball_vy, 13)
+create_array(v_ball_active, 13)
+
+# ========== PEG ARRAYS ==========
+create_array(v_peg_x, 45)
+create_array(v_peg_y, 45)
+v_num_pegs = 0
+
+# ========== BAND ARRAYS ==========
+create_array(v_band_start, 8)
+create_array(v_band_end, 8)
+
+# ========== BOARD ORDER ARRAY ==========
+create_array(v_board_order, 24)
+
+# Initialize board order: 0, 1, 2, ... 23
+for v_i in (0, 23, 1)
+    v_board_order[v_i] = v_i
+endfor v_i
+
+# Fisher-Yates shuffle
+for v_i in (23, 1, -1)
+    v_j = random(0, v_i, 0)
+    v_temp = v_board_order[v_i]
+    v_board_order[v_i] = v_board_order[v_j]
+    v_board_order[v_j] = v_temp
+endfor v_i
+
+# ========== DEFINE BALL SPRITE ==========
+define_sprite(ball_sprite, 1, 1)
+    plot(0, 0, white, 100)
+endsprite
+
+# ========== OUTER LOOP - RUNS FOREVER ==========
+v_board_index = 0
+
+while 1 == 1 then
+    
+    v_board_type = v_board_order[v_board_index]
+    
+    # ========== RESET STATE ==========
+    v_balls_dropped = 0
+    v_frame_count = 0
+    v_active_count = 0
+    
+    for v_i in (0, 12, 1)
+        v_was_active = v_ball_active[v_i]
+        if v_was_active > 0 then
+            hide_sprite(ball_sprite, v_i)
+        endif
+        v_ball_active[v_i] = 0
+    endfor v_i
+    
+    for v_i in (0, 7, 1)
+        v_band_start[v_i] = 0
+        v_band_end[v_i] = -1
+    endfor v_i
+    
+    v_num_pegs = 0
+    
+    # ========== BOARD 0: CLASSIC FUNNEL ==========
+    if v_board_type == 0 then
+        v_peg_x[0] = 12
+        v_peg_y[0] = 8
+        v_peg_x[1] = 51
+        v_peg_y[1] = 8
+        v_peg_x[2] = 16
+        v_peg_y[2] = 11
+        v_peg_x[3] = 20
+        v_peg_y[3] = 11
+        v_peg_x[4] = 43
+        v_peg_y[4] = 11
+        v_peg_x[5] = 47
+        v_peg_y[5] = 11
+        v_band_start[1] = 0
+        v_band_end[1] = 5
+        v_peg_x[6] = 32
+        v_peg_y[6] = 16
+        v_peg_x[7] = 27
+        v_peg_y[7] = 20
+        v_peg_x[8] = 37
+        v_peg_y[8] = 20
+        v_band_start[2] = 6
+        v_band_end[2] = 8
+        v_peg_x[9] = 22
+        v_peg_y[9] = 24
+        v_peg_x[10] = 42
+        v_peg_y[10] = 24
+        v_peg_x[11] = 27
+        v_peg_y[11] = 28
+        v_peg_x[12] = 37
+        v_peg_y[12] = 28
+        v_band_start[3] = 9
+        v_band_end[3] = 12
+        v_peg_x[13] = 32
+        v_peg_y[13] = 32
+        v_peg_x[14] = 10
+        v_peg_y[14] = 34
+        v_peg_x[15] = 53
+        v_peg_y[15] = 34
+        v_peg_x[16] = 25
+        v_peg_y[16] = 36
+        v_peg_x[17] = 38
+        v_peg_y[17] = 36
+        v_band_start[4] = 13
+        v_band_end[4] = 17
+        v_peg_x[18] = 10
+        v_peg_y[18] = 40
+        v_peg_x[19] = 53
+        v_peg_y[19] = 40
+        v_peg_x[20] = 32
+        v_peg_y[20] = 40
+        v_peg_x[21] = 18
+        v_peg_y[21] = 44
+        v_peg_x[22] = 45
+        v_peg_y[22] = 44
+        v_peg_x[23] = 10
+        v_peg_y[23] = 46
+        v_peg_x[24] = 53
+        v_peg_y[24] = 46
+        v_band_start[5] = 18
+        v_band_end[5] = 24
+        v_peg_x[25] = 15
+        v_peg_y[25] = 50
+        v_peg_x[26] = 27
+        v_peg_y[26] = 50
+        v_peg_x[27] = 39
+        v_peg_y[27] = 50
+        v_peg_x[28] = 51
+        v_peg_y[28] = 50
+        v_peg_x[29] = 21
+        v_peg_y[29] = 54
+        v_peg_x[30] = 33
+        v_peg_y[30] = 54
+        v_peg_x[31] = 45
+        v_peg_y[31] = 54
+        v_band_start[6] = 25
+        v_band_end[6] = 31
+        v_num_pegs = 32
+        v_wall_color = 50
+        v_peg_color = 25
+    endif
+    
+    # ========== BOARD 1: CHAOS PIT ==========
+    if v_board_type == 1 then
+        v_peg_x[0] = 20
+        v_peg_y[0] = 10
+        v_peg_x[1] = 44
+        v_peg_y[1] = 10
+        v_peg_x[2] = 32
+        v_peg_y[2] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 24
+        v_peg_y[3] = 22
+        v_peg_x[4] = 30
+        v_peg_y[4] = 22
+        v_peg_x[5] = 36
+        v_peg_y[5] = 22
+        v_peg_x[6] = 42
+        v_peg_y[6] = 22
+        v_band_start[2] = 3
+        v_band_end[2] = 6
+        v_peg_x[7] = 27
+        v_peg_y[7] = 26
+        v_peg_x[8] = 33
+        v_peg_y[8] = 26
+        v_peg_x[9] = 39
+        v_peg_y[9] = 26
+        v_peg_x[10] = 24
+        v_peg_y[10] = 30
+        v_peg_x[11] = 30
+        v_peg_y[11] = 30
+        v_peg_x[12] = 36
+        v_peg_y[12] = 30
+        v_peg_x[13] = 42
+        v_peg_y[13] = 30
+        v_band_start[3] = 7
+        v_band_end[3] = 13
+        v_peg_x[14] = 27
+        v_peg_y[14] = 34
+        v_peg_x[15] = 33
+        v_peg_y[15] = 34
+        v_peg_x[16] = 39
+        v_peg_y[16] = 34
+        v_peg_x[17] = 24
+        v_peg_y[17] = 38
+        v_peg_x[18] = 30
+        v_peg_y[18] = 38
+        v_peg_x[19] = 36
+        v_peg_y[19] = 38
+        v_peg_x[20] = 42
+        v_peg_y[20] = 38
+        v_band_start[4] = 14
+        v_band_end[4] = 20
+        v_peg_x[21] = 12
+        v_peg_y[21] = 48
+        v_peg_x[22] = 18
+        v_peg_y[22] = 48
+        v_peg_x[23] = 24
+        v_peg_y[23] = 48
+        v_peg_x[24] = 40
+        v_peg_y[24] = 48
+        v_peg_x[25] = 46
+        v_peg_y[25] = 48
+        v_peg_x[26] = 52
+        v_peg_y[26] = 48
+        v_peg_x[27] = 28
+        v_peg_y[27] = 52
+        v_peg_x[28] = 34
+        v_peg_y[28] = 52
+        v_peg_x[29] = 40
+        v_peg_y[29] = 52
+        v_band_start[6] = 21
+        v_band_end[6] = 29
+        v_num_pegs = 30
+        v_wall_color = 10
+        v_peg_color = 75
+    endif
+    
+    # ========== BOARD 2: SPIRAL DESCENT ==========
+    if v_board_type == 2 then
+        v_peg_x[0] = 15
+        v_peg_y[0] = 10
+        v_peg_x[1] = 22
+        v_peg_y[1] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 1
+        v_peg_x[2] = 29
+        v_peg_y[2] = 18
+        v_peg_x[3] = 36
+        v_peg_y[3] = 22
+        v_band_start[2] = 2
+        v_band_end[2] = 3
+        v_peg_x[4] = 43
+        v_peg_y[4] = 26
+        v_peg_x[5] = 50
+        v_peg_y[5] = 30
+        v_band_start[3] = 4
+        v_band_end[3] = 5
+        v_peg_x[6] = 48
+        v_peg_y[6] = 34
+        v_peg_x[7] = 41
+        v_peg_y[7] = 38
+        v_band_start[4] = 6
+        v_band_end[4] = 7
+        v_peg_x[8] = 34
+        v_peg_y[8] = 42
+        v_peg_x[9] = 27
+        v_peg_y[9] = 46
+        v_band_start[5] = 8
+        v_band_end[5] = 9
+        v_peg_x[10] = 20
+        v_peg_y[10] = 50
+        v_peg_x[11] = 13
+        v_peg_y[11] = 54
+        v_band_start[6] = 10
+        v_band_end[6] = 11
+        v_peg_x[12] = 25
+        v_peg_y[12] = 58
+        v_peg_x[13] = 35
+        v_peg_y[13] = 58
+        v_peg_x[14] = 45
+        v_peg_y[14] = 58
+        v_peg_x[15] = 30
+        v_peg_y[15] = 62
+        v_peg_x[16] = 40
+        v_peg_y[16] = 62
+        v_band_start[7] = 12
+        v_band_end[7] = 16
+        v_num_pegs = 17
+        v_wall_color = 30
+        v_peg_color = 60
+    endif
+    
+    # ========== BOARD 3: PINCH POINTS ==========
+    if v_board_type == 3 then
+        v_peg_x[0] = 10
+        v_peg_y[0] = 10
+        v_peg_x[1] = 20
+        v_peg_y[1] = 10
+        v_peg_x[2] = 32
+        v_peg_y[2] = 10
+        v_peg_x[3] = 44
+        v_peg_y[3] = 10
+        v_peg_x[4] = 54
+        v_peg_y[4] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 4
+        v_peg_x[5] = 16
+        v_peg_y[5] = 16
+        v_peg_x[6] = 26
+        v_peg_y[6] = 16
+        v_peg_x[7] = 38
+        v_peg_y[7] = 16
+        v_peg_x[8] = 48
+        v_peg_y[8] = 16
+        v_peg_x[9] = 22
+        v_peg_y[9] = 22
+        v_peg_x[10] = 32
+        v_peg_y[10] = 22
+        v_peg_x[11] = 42
+        v_peg_y[11] = 22
+        v_band_start[2] = 5
+        v_band_end[2] = 11
+        v_peg_x[12] = 28
+        v_peg_y[12] = 28
+        v_peg_x[13] = 36
+        v_peg_y[13] = 28
+        v_band_start[3] = 12
+        v_band_end[3] = 13
+        v_peg_x[14] = 32
+        v_peg_y[14] = 34
+        v_peg_x[15] = 24
+        v_peg_y[15] = 38
+        v_peg_x[16] = 40
+        v_peg_y[16] = 38
+        v_band_start[4] = 14
+        v_band_end[4] = 16
+        v_peg_x[17] = 16
+        v_peg_y[17] = 42
+        v_peg_x[18] = 48
+        v_peg_y[18] = 42
+        v_band_start[5] = 17
+        v_band_end[5] = 18
+        v_peg_x[19] = 22
+        v_peg_y[19] = 48
+        v_peg_x[20] = 32
+        v_peg_y[20] = 48
+        v_peg_x[21] = 42
+        v_peg_y[21] = 48
+        v_peg_x[22] = 28
+        v_peg_y[22] = 54
+        v_peg_x[23] = 36
+        v_peg_y[23] = 54
+        v_band_start[6] = 19
+        v_band_end[6] = 23
+        v_num_pegs = 24
+        v_wall_color = 85
+        v_peg_color = 40
+    endif
+    
+    # ========== BOARD 4: THE GAUNTLET ==========
+    if v_board_type == 4 then
+        v_peg_x[0] = 25
+        v_peg_y[0] = 10
+        v_peg_x[1] = 38
+        v_peg_y[1] = 10
+        v_peg_x[2] = 25
+        v_peg_y[2] = 14
+        v_peg_x[3] = 38
+        v_peg_y[3] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 3
+        v_peg_x[4] = 25
+        v_peg_y[4] = 18
+        v_peg_x[5] = 38
+        v_peg_y[5] = 18
+        v_peg_x[6] = 25
+        v_peg_y[6] = 22
+        v_peg_x[7] = 38
+        v_peg_y[7] = 22
+        v_band_start[2] = 4
+        v_band_end[2] = 7
+        v_peg_x[8] = 25
+        v_peg_y[8] = 26
+        v_peg_x[9] = 38
+        v_peg_y[9] = 26
+        v_peg_x[10] = 25
+        v_peg_y[10] = 30
+        v_peg_x[11] = 38
+        v_peg_y[11] = 30
+        v_band_start[3] = 8
+        v_band_end[3] = 11
+        v_peg_x[12] = 25
+        v_peg_y[12] = 34
+        v_peg_x[13] = 38
+        v_peg_y[13] = 34
+        v_peg_x[14] = 25
+        v_peg_y[14] = 38
+        v_peg_x[15] = 38
+        v_peg_y[15] = 38
+        v_band_start[4] = 12
+        v_band_end[4] = 15
+        v_peg_x[16] = 25
+        v_peg_y[16] = 42
+        v_peg_x[17] = 38
+        v_peg_y[17] = 42
+        v_peg_x[18] = 25
+        v_peg_y[18] = 46
+        v_peg_x[19] = 38
+        v_peg_y[19] = 46
+        v_band_start[5] = 16
+        v_band_end[5] = 19
+        v_peg_x[20] = 25
+        v_peg_y[20] = 50
+        v_peg_x[21] = 38
+        v_peg_y[21] = 50
+        v_peg_x[22] = 25
+        v_peg_y[22] = 54
+        v_peg_x[23] = 38
+        v_peg_y[23] = 54
+        v_band_start[6] = 20
+        v_band_end[6] = 23
+        v_num_pegs = 24
+        v_wall_color = 70
+        v_peg_color = 15
+    endif
+    
+    # ========== BOARD 5: DIAMOND GRID ==========
+    if v_board_type == 5 then
+        v_peg_x[0] = 16
+        v_peg_y[0] = 10
+        v_peg_x[1] = 32
+        v_peg_y[1] = 10
+        v_peg_x[2] = 48
+        v_peg_y[2] = 10
+        v_peg_x[3] = 24
+        v_peg_y[3] = 15
+        v_peg_x[4] = 40
+        v_peg_y[4] = 15
+        v_band_start[1] = 0
+        v_band_end[1] = 4
+        v_peg_x[5] = 16
+        v_peg_y[5] = 20
+        v_peg_x[6] = 32
+        v_peg_y[6] = 20
+        v_peg_x[7] = 48
+        v_peg_y[7] = 20
+        v_band_start[2] = 5
+        v_band_end[2] = 7
+        v_peg_x[8] = 24
+        v_peg_y[8] = 25
+        v_peg_x[9] = 40
+        v_peg_y[9] = 25
+        v_peg_x[10] = 16
+        v_peg_y[10] = 30
+        v_peg_x[11] = 32
+        v_peg_y[11] = 30
+        v_peg_x[12] = 48
+        v_peg_y[12] = 30
+        v_band_start[3] = 8
+        v_band_end[3] = 12
+        v_peg_x[13] = 24
+        v_peg_y[13] = 35
+        v_peg_x[14] = 40
+        v_peg_y[14] = 35
+        v_band_start[4] = 13
+        v_band_end[4] = 14
+        v_peg_x[15] = 16
+        v_peg_y[15] = 40
+        v_peg_x[16] = 32
+        v_peg_y[16] = 40
+        v_peg_x[17] = 48
+        v_peg_y[17] = 40
+        v_peg_x[18] = 24
+        v_peg_y[18] = 45
+        v_peg_x[19] = 40
+        v_peg_y[19] = 45
+        v_band_start[5] = 15
+        v_band_end[5] = 19
+        v_peg_x[20] = 16
+        v_peg_y[20] = 50
+        v_peg_x[21] = 32
+        v_peg_y[21] = 50
+        v_peg_x[22] = 48
+        v_peg_y[22] = 50
+        v_peg_x[23] = 24
+        v_peg_y[23] = 55
+        v_peg_x[24] = 40
+        v_peg_y[24] = 55
+        v_band_start[6] = 20
+        v_band_end[6] = 24
+        v_num_pegs = 25
+        v_wall_color = 20
+        v_peg_color = 55
+    endif
+    
+    # ========== BOARD 6: WATERFALL ==========
+    if v_board_type == 6 then
+        v_peg_x[0] = 15
+        v_peg_y[0] = 12
+        v_peg_x[1] = 25
+        v_peg_y[1] = 12
+        v_peg_x[2] = 35
+        v_peg_y[2] = 12
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 20
+        v_peg_y[3] = 20
+        v_peg_x[4] = 30
+        v_peg_y[4] = 20
+        v_peg_x[5] = 40
+        v_peg_y[5] = 20
+        v_peg_x[6] = 50
+        v_peg_y[6] = 20
+        v_band_start[2] = 3
+        v_band_end[2] = 6
+        v_peg_x[7] = 12
+        v_peg_y[7] = 28
+        v_peg_x[8] = 24
+        v_peg_y[8] = 28
+        v_peg_x[9] = 36
+        v_peg_y[9] = 28
+        v_peg_x[10] = 48
+        v_peg_y[10] = 28
+        v_band_start[3] = 7
+        v_band_end[3] = 10
+        v_peg_x[11] = 18
+        v_peg_y[11] = 36
+        v_peg_x[12] = 30
+        v_peg_y[12] = 36
+        v_peg_x[13] = 42
+        v_peg_y[13] = 36
+        v_peg_x[14] = 54
+        v_peg_y[14] = 36
+        v_band_start[4] = 11
+        v_band_end[4] = 14
+        v_peg_x[15] = 10
+        v_peg_y[15] = 44
+        v_peg_x[16] = 22
+        v_peg_y[16] = 44
+        v_peg_x[17] = 34
+        v_peg_y[17] = 44
+        v_peg_x[18] = 46
+        v_peg_y[18] = 44
+        v_band_start[5] = 15
+        v_band_end[5] = 18
+        v_peg_x[19] = 16
+        v_peg_y[19] = 52
+        v_peg_x[20] = 28
+        v_peg_y[20] = 52
+        v_peg_x[21] = 40
+        v_peg_y[21] = 52
+        v_peg_x[22] = 52
+        v_peg_y[22] = 52
+        v_band_start[6] = 19
+        v_band_end[6] = 22
+        v_num_pegs = 23
+        v_wall_color = 45
+        v_peg_color = 80
+    endif
+    
+    # ========== BOARD 7: HOURGLASS ==========
+    if v_board_type == 7 then
+        v_peg_x[0] = 10
+        v_peg_y[0] = 10
+        v_peg_x[1] = 20
+        v_peg_y[1] = 10
+        v_peg_x[2] = 32
+        v_peg_y[2] = 10
+        v_peg_x[3] = 44
+        v_peg_y[3] = 10
+        v_peg_x[4] = 54
+        v_peg_y[4] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 4
+        v_peg_x[5] = 18
+        v_peg_y[5] = 20
+        v_peg_x[6] = 32
+        v_peg_y[6] = 20
+        v_peg_x[7] = 46
+        v_peg_y[7] = 20
+        v_band_start[2] = 5
+        v_band_end[2] = 7
+        v_peg_x[8] = 26
+        v_peg_y[8] = 28
+        v_peg_x[9] = 38
+        v_peg_y[9] = 28
+        v_band_start[3] = 8
+        v_band_end[3] = 9
+        v_peg_x[10] = 32
+        v_peg_y[10] = 35
+        v_band_start[4] = 10
+        v_band_end[4] = 10
+        v_peg_x[11] = 26
+        v_peg_y[11] = 42
+        v_peg_x[12] = 38
+        v_peg_y[12] = 42
+        v_band_start[5] = 11
+        v_band_end[5] = 12
+        v_peg_x[13] = 18
+        v_peg_y[13] = 50
+        v_peg_x[14] = 32
+        v_peg_y[14] = 50
+        v_peg_x[15] = 46
+        v_peg_y[15] = 50
+        v_peg_x[16] = 10
+        v_peg_y[16] = 55
+        v_peg_x[17] = 24
+        v_peg_y[17] = 55
+        v_peg_x[18] = 40
+        v_peg_y[18] = 55
+        v_peg_x[19] = 54
+        v_peg_y[19] = 55
+        v_band_start[6] = 13
+        v_band_end[6] = 19
+        v_num_pegs = 20
+        v_wall_color = 60
+        v_peg_color = 95
+    endif
+    
+    # ========== BOARD 8: SCATTER SHOT ==========
+    if v_board_type == 8 then
+        v_peg_x[0] = 18
+        v_peg_y[0] = 9
+        v_peg_x[1] = 42
+        v_peg_y[1] = 11
+        v_peg_x[2] = 30
+        v_peg_y[2] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 12
+        v_peg_y[3] = 17
+        v_peg_x[4] = 50
+        v_peg_y[4] = 19
+        v_peg_x[5] = 25
+        v_peg_y[5] = 22
+        v_peg_x[6] = 38
+        v_peg_y[6] = 23
+        v_band_start[2] = 3
+        v_band_end[2] = 6
+        v_peg_x[7] = 45
+        v_peg_y[7] = 25
+        v_peg_x[8] = 15
+        v_peg_y[8] = 27
+        v_peg_x[9] = 32
+        v_peg_y[9] = 29
+        v_peg_x[10] = 52
+        v_peg_y[10] = 31
+        v_band_start[3] = 7
+        v_band_end[3] = 10
+        v_peg_x[11] = 20
+        v_peg_y[11] = 33
+        v_peg_x[12] = 40
+        v_peg_y[12] = 35
+        v_peg_x[13] = 10
+        v_peg_y[13] = 37
+        v_peg_x[14] = 55
+        v_peg_y[14] = 38
+        v_band_start[4] = 11
+        v_band_end[4] = 14
+        v_peg_x[15] = 28
+        v_peg_y[15] = 41
+        v_peg_x[16] = 48
+        v_peg_y[16] = 43
+        v_peg_x[17] = 16
+        v_peg_y[17] = 45
+        v_peg_x[18] = 36
+        v_peg_y[18] = 47
+        v_band_start[5] = 15
+        v_band_end[5] = 18
+        v_peg_x[19] = 22
+        v_peg_y[19] = 49
+        v_peg_x[20] = 52
+        v_peg_y[20] = 51
+        v_peg_x[21] = 12
+        v_peg_y[21] = 53
+        v_peg_x[22] = 42
+        v_peg_y[22] = 55
+        v_band_start[6] = 19
+        v_band_end[6] = 22
+        v_num_pegs = 23
+        v_wall_color = 5
+        v_peg_color = 35
+    endif
+    
+    # ========== BOARD 9: THE WEDGE ==========
+    if v_board_type == 9 then
+        v_peg_x[0] = 12
+        v_peg_y[0] = 10
+        v_peg_x[1] = 18
+        v_peg_y[1] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 1
+        v_peg_x[2] = 24
+        v_peg_y[2] = 18
+        v_peg_x[3] = 30
+        v_peg_y[3] = 22
+        v_band_start[2] = 2
+        v_band_end[2] = 3
+        v_peg_x[4] = 36
+        v_peg_y[4] = 26
+        v_peg_x[5] = 42
+        v_peg_y[5] = 30
+        v_band_start[3] = 4
+        v_band_end[3] = 5
+        v_peg_x[6] = 48
+        v_peg_y[6] = 34
+        v_peg_x[7] = 54
+        v_peg_y[7] = 38
+        v_band_start[4] = 6
+        v_band_end[4] = 7
+        v_peg_x[8] = 15
+        v_peg_y[8] = 42
+        v_peg_x[9] = 30
+        v_peg_y[9] = 44
+        v_peg_x[10] = 45
+        v_peg_y[10] = 46
+        v_band_start[5] = 8
+        v_band_end[5] = 10
+        v_peg_x[11] = 20
+        v_peg_y[11] = 50
+        v_peg_x[12] = 35
+        v_peg_y[12] = 52
+        v_peg_x[13] = 50
+        v_peg_y[13] = 54
+        v_band_start[6] = 11
+        v_band_end[6] = 13
+        v_num_pegs = 14
+        v_wall_color = 75
+        v_peg_color = 10
+    endif
+    
+    # ========== BOARD 10: DOUBLE HELIX ==========
+    if v_board_type == 10 then
+        v_peg_x[0] = 20
+        v_peg_y[0] = 10
+        v_peg_x[1] = 44
+        v_peg_y[1] = 10
+        v_peg_x[2] = 28
+        v_peg_y[2] = 14
+        v_peg_x[3] = 36
+        v_peg_y[3] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 3
+        v_peg_x[4] = 36
+        v_peg_y[4] = 18
+        v_peg_x[5] = 28
+        v_peg_y[5] = 18
+        v_peg_x[6] = 44
+        v_peg_y[6] = 22
+        v_peg_x[7] = 20
+        v_peg_y[7] = 22
+        v_band_start[2] = 4
+        v_band_end[2] = 7
+        v_peg_x[8] = 28
+        v_peg_y[8] = 26
+        v_peg_x[9] = 36
+        v_peg_y[9] = 26
+        v_peg_x[10] = 20
+        v_peg_y[10] = 30
+        v_peg_x[11] = 44
+        v_peg_y[11] = 30
+        v_band_start[3] = 8
+        v_band_end[3] = 11
+        v_peg_x[12] = 36
+        v_peg_y[12] = 34
+        v_peg_x[13] = 28
+        v_peg_y[13] = 34
+        v_peg_x[14] = 44
+        v_peg_y[14] = 38
+        v_peg_x[15] = 20
+        v_peg_y[15] = 38
+        v_band_start[4] = 12
+        v_band_end[4] = 15
+        v_peg_x[16] = 28
+        v_peg_y[16] = 42
+        v_peg_x[17] = 36
+        v_peg_y[17] = 42
+        v_peg_x[18] = 20
+        v_peg_y[18] = 46
+        v_peg_x[19] = 44
+        v_peg_y[19] = 46
+        v_band_start[5] = 16
+        v_band_end[5] = 19
+        v_peg_x[20] = 36
+        v_peg_y[20] = 50
+        v_peg_x[21] = 28
+        v_peg_y[21] = 50
+        v_peg_x[22] = 44
+        v_peg_y[22] = 54
+        v_peg_x[23] = 20
+        v_peg_y[23] = 54
+        v_band_start[6] = 20
+        v_band_end[6] = 23
+        v_num_pegs = 24
+        v_wall_color = 90
+        v_peg_color = 45
+    endif
+    
+    # ========== BOARD 11: BUMPER ZONES ==========
+    if v_board_type == 11 then
+        v_peg_x[0] = 28
+        v_peg_y[0] = 10
+        v_peg_x[1] = 32
+        v_peg_y[1] = 10
+        v_peg_x[2] = 36
+        v_peg_y[2] = 10
+        v_peg_x[3] = 30
+        v_peg_y[3] = 14
+        v_peg_x[4] = 34
+        v_peg_y[4] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 4
+        v_peg_x[5] = 12
+        v_peg_y[5] = 26
+        v_peg_x[6] = 16
+        v_peg_y[6] = 26
+        v_peg_x[7] = 14
+        v_peg_y[7] = 30
+        v_peg_x[8] = 48
+        v_peg_y[8] = 26
+        v_peg_x[9] = 52
+        v_peg_y[9] = 26
+        v_peg_x[10] = 50
+        v_peg_y[10] = 30
+        v_band_start[3] = 5
+        v_band_end[3] = 10
+        v_peg_x[11] = 18
+        v_peg_y[11] = 42
+        v_peg_x[12] = 22
+        v_peg_y[12] = 42
+        v_peg_x[13] = 20
+        v_peg_y[13] = 46
+        v_peg_x[14] = 42
+        v_peg_y[14] = 42
+        v_peg_x[15] = 46
+        v_peg_y[15] = 42
+        v_peg_x[16] = 44
+        v_peg_y[16] = 46
+        v_band_start[5] = 11
+        v_band_end[5] = 16
+        v_peg_x[17] = 28
+        v_peg_y[17] = 52
+        v_peg_x[18] = 32
+        v_peg_y[18] = 52
+        v_peg_x[19] = 36
+        v_peg_y[19] = 52
+        v_peg_x[20] = 30
+        v_peg_y[20] = 56
+        v_peg_x[21] = 34
+        v_peg_y[21] = 56
+        v_band_start[6] = 17
+        v_band_end[6] = 21
+        v_num_pegs = 22
+        v_wall_color = 35
+        v_peg_color = 65
+    endif
+    
+    # ========== BOARD 12: ZIGZAG ALLEY ==========
+    if v_board_type == 12 then
+        v_peg_x[0] = 15
+        v_peg_y[0] = 10
+        v_peg_x[1] = 22
+        v_peg_y[1] = 12
+        v_peg_x[2] = 29
+        v_peg_y[2] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 48
+        v_peg_y[3] = 18
+        v_peg_x[4] = 41
+        v_peg_y[4] = 20
+        v_peg_x[5] = 34
+        v_peg_y[5] = 22
+        v_band_start[2] = 3
+        v_band_end[2] = 5
+        v_peg_x[6] = 15
+        v_peg_y[6] = 26
+        v_peg_x[7] = 22
+        v_peg_y[7] = 28
+        v_peg_x[8] = 29
+        v_peg_y[8] = 30
+        v_band_start[3] = 6
+        v_band_end[3] = 8
+        v_peg_x[9] = 48
+        v_peg_y[9] = 34
+        v_peg_x[10] = 41
+        v_peg_y[10] = 36
+        v_peg_x[11] = 34
+        v_peg_y[11] = 38
+        v_band_start[4] = 9
+        v_band_end[4] = 11
+        v_peg_x[12] = 15
+        v_peg_y[12] = 42
+        v_peg_x[13] = 22
+        v_peg_y[13] = 44
+        v_peg_x[14] = 29
+        v_peg_y[14] = 46
+        v_band_start[5] = 12
+        v_band_end[5] = 14
+        v_peg_x[15] = 48
+        v_peg_y[15] = 50
+        v_peg_x[16] = 41
+        v_peg_y[16] = 52
+        v_peg_x[17] = 34
+        v_peg_y[17] = 54
+        v_band_start[6] = 15
+        v_band_end[6] = 17
+        v_num_pegs = 18
+        v_wall_color = 15
+        v_peg_color = 85
+    endif
+    
+    # ========== BOARD 13: THE SIEVE ==========
+    if v_board_type == 13 then
+        v_peg_x[0] = 10
+        v_peg_y[0] = 12
+        v_peg_x[1] = 18
+        v_peg_y[1] = 12
+        v_peg_x[2] = 26
+        v_peg_y[2] = 12
+        v_peg_x[3] = 38
+        v_peg_y[3] = 12
+        v_peg_x[4] = 46
+        v_peg_y[4] = 12
+        v_peg_x[5] = 54
+        v_peg_y[5] = 12
+        v_band_start[1] = 0
+        v_band_end[1] = 5
+        v_peg_x[6] = 14
+        v_peg_y[6] = 22
+        v_peg_x[7] = 22
+        v_peg_y[7] = 22
+        v_peg_x[8] = 32
+        v_peg_y[8] = 22
+        v_peg_x[9] = 42
+        v_peg_y[9] = 22
+        v_peg_x[10] = 50
+        v_peg_y[10] = 22
+        v_band_start[2] = 6
+        v_band_end[2] = 10
+        v_peg_x[11] = 10
+        v_peg_y[11] = 34
+        v_peg_x[12] = 18
+        v_peg_y[12] = 34
+        v_peg_x[13] = 26
+        v_peg_y[13] = 34
+        v_peg_x[14] = 38
+        v_peg_y[14] = 34
+        v_peg_x[15] = 46
+        v_peg_y[15] = 34
+        v_peg_x[16] = 54
+        v_peg_y[16] = 34
+        v_band_start[4] = 11
+        v_band_end[4] = 16
+        v_peg_x[17] = 14
+        v_peg_y[17] = 44
+        v_peg_x[18] = 22
+        v_peg_y[18] = 44
+        v_peg_x[19] = 32
+        v_peg_y[19] = 44
+        v_peg_x[20] = 42
+        v_peg_y[20] = 44
+        v_peg_x[21] = 50
+        v_peg_y[21] = 44
+        v_band_start[5] = 17
+        v_band_end[5] = 21
+        v_peg_x[22] = 10
+        v_peg_y[22] = 54
+        v_peg_x[23] = 18
+        v_peg_y[23] = 54
+        v_peg_x[24] = 26
+        v_peg_y[24] = 54
+        v_peg_x[25] = 38
+        v_peg_y[25] = 54
+        v_peg_x[26] = 46
+        v_peg_y[26] = 54
+        v_peg_x[27] = 54
+        v_peg_y[27] = 54
+        v_band_start[6] = 22
+        v_band_end[6] = 27
+        v_num_pegs = 28
+        v_wall_color = 55
+        v_peg_color = 20
+    endif
+    
+    # ========== BOARD 14: PYRAMID ==========
+    if v_board_type == 14 then
+        v_peg_x[0] = 32
+        v_peg_y[0] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 0
+        v_peg_x[1] = 26
+        v_peg_y[1] = 18
+        v_peg_x[2] = 38
+        v_peg_y[2] = 18
+        v_band_start[2] = 1
+        v_band_end[2] = 2
+        v_peg_x[3] = 20
+        v_peg_y[3] = 26
+        v_peg_x[4] = 32
+        v_peg_y[4] = 26
+        v_peg_x[5] = 44
+        v_peg_y[5] = 26
+        v_band_start[3] = 3
+        v_band_end[3] = 5
+        v_peg_x[6] = 14
+        v_peg_y[6] = 34
+        v_peg_x[7] = 26
+        v_peg_y[7] = 34
+        v_peg_x[8] = 38
+        v_peg_y[8] = 34
+        v_peg_x[9] = 50
+        v_peg_y[9] = 34
+        v_band_start[4] = 6
+        v_band_end[4] = 9
+        v_peg_x[10] = 10
+        v_peg_y[10] = 42
+        v_peg_x[11] = 20
+        v_peg_y[11] = 42
+        v_peg_x[12] = 32
+        v_peg_y[12] = 42
+        v_peg_x[13] = 44
+        v_peg_y[13] = 42
+        v_peg_x[14] = 54
+        v_peg_y[14] = 42
+        v_band_start[5] = 10
+        v_band_end[5] = 14
+        v_peg_x[15] = 8
+        v_peg_y[15] = 52
+        v_peg_x[16] = 18
+        v_peg_y[16] = 52
+        v_peg_x[17] = 28
+        v_peg_y[17] = 52
+        v_peg_x[18] = 38
+        v_peg_y[18] = 52
+        v_peg_x[19] = 48
+        v_peg_y[19] = 52
+        v_peg_x[20] = 56
+        v_peg_y[20] = 52
+        v_band_start[6] = 15
+        v_band_end[6] = 20
+        v_num_pegs = 21
+        v_wall_color = 40
+        v_peg_color = 70
+    endif
+    
+    # ========== BOARD 15: INVERTED PYRAMID ==========
+    if v_board_type == 15 then
+        v_peg_x[0] = 8
+        v_peg_y[0] = 10
+        v_peg_x[1] = 18
+        v_peg_y[1] = 10
+        v_peg_x[2] = 28
+        v_peg_y[2] = 10
+        v_peg_x[3] = 38
+        v_peg_y[3] = 10
+        v_peg_x[4] = 48
+        v_peg_y[4] = 10
+        v_peg_x[5] = 56
+        v_peg_y[5] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 5
+        v_peg_x[6] = 12
+        v_peg_y[6] = 20
+        v_peg_x[7] = 22
+        v_peg_y[7] = 20
+        v_peg_x[8] = 32
+        v_peg_y[8] = 20
+        v_peg_x[9] = 42
+        v_peg_y[9] = 20
+        v_peg_x[10] = 52
+        v_peg_y[10] = 20
+        v_band_start[2] = 6
+        v_band_end[2] = 10
+        v_peg_x[11] = 16
+        v_peg_y[11] = 30
+        v_peg_x[12] = 26
+        v_peg_y[12] = 30
+        v_peg_x[13] = 38
+        v_peg_y[13] = 30
+        v_peg_x[14] = 48
+        v_peg_y[14] = 30
+        v_band_start[3] = 11
+        v_band_end[3] = 14
+        v_peg_x[15] = 22
+        v_peg_y[15] = 40
+        v_peg_x[16] = 32
+        v_peg_y[16] = 40
+        v_peg_x[17] = 42
+        v_peg_y[17] = 40
+        v_band_start[5] = 15
+        v_band_end[5] = 17
+        v_peg_x[18] = 27
+        v_peg_y[18] = 50
+        v_peg_x[19] = 37
+        v_peg_y[19] = 50
+        v_band_start[6] = 18
+        v_band_end[6] = 19
+        v_num_pegs = 20
+        v_wall_color = 80
+        v_peg_color = 30
+    endif
+    
+    # ========== BOARD 16: CHECKERBOARD ==========
+    if v_board_type == 16 then
+        v_peg_x[0] = 16
+        v_peg_y[0] = 12
+        v_peg_x[1] = 32
+        v_peg_y[1] = 12
+        v_peg_x[2] = 48
+        v_peg_y[2] = 12
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 24
+        v_peg_y[3] = 22
+        v_peg_x[4] = 40
+        v_peg_y[4] = 22
+        v_band_start[2] = 3
+        v_band_end[2] = 4
+        v_peg_x[5] = 16
+        v_peg_y[5] = 32
+        v_peg_x[6] = 32
+        v_peg_y[6] = 32
+        v_peg_x[7] = 48
+        v_peg_y[7] = 32
+        v_band_start[4] = 5
+        v_band_end[4] = 7
+        v_peg_x[8] = 24
+        v_peg_y[8] = 42
+        v_peg_x[9] = 40
+        v_peg_y[9] = 42
+        v_band_start[5] = 8
+        v_band_end[5] = 9
+        v_peg_x[10] = 16
+        v_peg_y[10] = 52
+        v_peg_x[11] = 32
+        v_peg_y[11] = 52
+        v_peg_x[12] = 48
+        v_peg_y[12] = 52
+        v_band_start[6] = 10
+        v_band_end[6] = 12
+        v_num_pegs = 13
+        v_wall_color = 25
+        v_peg_color = 90
+    endif
+    
+    # ========== BOARD 17: THE MAZE ==========
+    if v_board_type == 17 then
+        v_peg_x[0] = 20
+        v_peg_y[0] = 10
+        v_peg_x[1] = 20
+        v_peg_y[1] = 14
+        v_peg_x[2] = 44
+        v_peg_y[2] = 10
+        v_peg_x[3] = 44
+        v_peg_y[3] = 14
+        v_band_start[1] = 0
+        v_band_end[1] = 3
+        v_peg_x[4] = 20
+        v_peg_y[4] = 18
+        v_peg_x[5] = 20
+        v_peg_y[5] = 22
+        v_peg_x[6] = 44
+        v_peg_y[6] = 18
+        v_peg_x[7] = 44
+        v_peg_y[7] = 22
+        v_band_start[2] = 4
+        v_band_end[2] = 7
+        v_peg_x[8] = 32
+        v_peg_y[8] = 26
+        v_peg_x[9] = 32
+        v_peg_y[9] = 30
+        v_band_start[3] = 8
+        v_band_end[3] = 9
+        v_peg_x[10] = 20
+        v_peg_y[10] = 34
+        v_peg_x[11] = 20
+        v_peg_y[11] = 38
+        v_peg_x[12] = 44
+        v_peg_y[12] = 34
+        v_peg_x[13] = 44
+        v_peg_y[13] = 38
+        v_band_start[4] = 10
+        v_band_end[4] = 13
+        v_peg_x[14] = 20
+        v_peg_y[14] = 42
+        v_peg_x[15] = 20
+        v_peg_y[15] = 46
+        v_peg_x[16] = 44
+        v_peg_y[16] = 42
+        v_peg_x[17] = 44
+        v_peg_y[17] = 46
+        v_band_start[5] = 14
+        v_band_end[5] = 17
+        v_peg_x[18] = 32
+        v_peg_y[18] = 50
+        v_peg_x[19] = 32
+        v_peg_y[19] = 54
+        v_band_start[6] = 18
+        v_band_end[6] = 19
+        v_num_pegs = 20
+        v_wall_color = 65
+        v_peg_color = 5
+    endif
+    
+    # ========== BOARD 18: BUTTERFLY ==========
+    if v_board_type == 18 then
+        v_peg_x[0] = 32
+        v_peg_y[0] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 0
+        v_peg_x[1] = 22
+        v_peg_y[1] = 18
+        v_peg_x[2] = 42
+        v_peg_y[2] = 18
+        v_peg_x[3] = 16
+        v_peg_y[3] = 22
+        v_peg_x[4] = 48
+        v_peg_y[4] = 22
+        v_band_start[2] = 1
+        v_band_end[2] = 4
+        v_peg_x[5] = 12
+        v_peg_y[5] = 26
+        v_peg_x[6] = 52
+        v_peg_y[6] = 26
+        v_peg_x[7] = 10
+        v_peg_y[7] = 30
+        v_peg_x[8] = 54
+        v_peg_y[8] = 30
+        v_band_start[3] = 5
+        v_band_end[3] = 8
+        v_peg_x[9] = 12
+        v_peg_y[9] = 34
+        v_peg_x[10] = 52
+        v_peg_y[10] = 34
+        v_peg_x[11] = 16
+        v_peg_y[11] = 38
+        v_peg_x[12] = 48
+        v_peg_y[12] = 38
+        v_band_start[4] = 9
+        v_band_end[4] = 12
+        v_peg_x[13] = 22
+        v_peg_y[13] = 42
+        v_peg_x[14] = 42
+        v_peg_y[14] = 42
+        v_peg_x[15] = 28
+        v_peg_y[15] = 46
+        v_peg_x[16] = 36
+        v_peg_y[16] = 46
+        v_band_start[5] = 13
+        v_band_end[5] = 16
+        v_peg_x[17] = 32
+        v_peg_y[17] = 52
+        v_band_start[6] = 17
+        v_band_end[6] = 17
+        v_num_pegs = 18
+        v_wall_color = 95
+        v_peg_color = 50
+    endif
+    
+    # ========== BOARD 19: RIPPLE ==========
+    if v_board_type == 19 then
+        v_peg_x[0] = 28
+        v_peg_y[0] = 10
+        v_peg_x[1] = 32
+        v_peg_y[1] = 10
+        v_peg_x[2] = 36
+        v_peg_y[2] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 2
+        v_peg_x[3] = 20
+        v_peg_y[3] = 18
+        v_peg_x[4] = 26
+        v_peg_y[4] = 16
+        v_peg_x[5] = 38
+        v_peg_y[5] = 16
+        v_peg_x[6] = 44
+        v_peg_y[6] = 18
+        v_band_start[2] = 3
+        v_band_end[2] = 6
+        v_peg_x[7] = 14
+        v_peg_y[7] = 26
+        v_peg_x[8] = 20
+        v_peg_y[8] = 24
+        v_peg_x[9] = 44
+        v_peg_y[9] = 24
+        v_peg_x[10] = 50
+        v_peg_y[10] = 26
+        v_band_start[3] = 7
+        v_band_end[3] = 10
+        v_peg_x[11] = 10
+        v_peg_y[11] = 34
+        v_peg_x[12] = 16
+        v_peg_y[12] = 32
+        v_peg_x[13] = 48
+        v_peg_y[13] = 32
+        v_peg_x[14] = 54
+        v_peg_y[14] = 34
+        v_band_start[4] = 11
+        v_band_end[4] = 14
+        v_peg_x[15] = 12
+        v_peg_y[15] = 42
+        v_peg_x[16] = 22
+        v_peg_y[16] = 44
+        v_peg_x[17] = 42
+        v_peg_y[17] = 44
+        v_peg_x[18] = 52
+        v_peg_y[18] = 42
+        v_band_start[5] = 15
+        v_band_end[5] = 18
+        v_peg_x[19] = 18
+        v_peg_y[19] = 52
+        v_peg_x[20] = 28
+        v_peg_y[20] = 54
+        v_peg_x[21] = 36
+        v_peg_y[21] = 54
+        v_peg_x[22] = 46
+        v_peg_y[22] = 52
+        v_band_start[6] = 19
+        v_band_end[6] = 22
+        v_num_pegs = 23
+        v_wall_color = 8
+        v_peg_color = 42
+    endif
+    
+    # ========== BOARD 20: SPLIT DECISION ==========
+    if v_board_type == 20 then
+        v_peg_x[0] = 32
+        v_peg_y[0] = 8
+        v_band_start[1] = 0
+        v_band_end[1] = 0
+        v_peg_x[1] = 24
+        v_peg_y[1] = 16
+        v_peg_x[2] = 40
+        v_peg_y[2] = 16
+        v_band_start[2] = 1
+        v_band_end[2] = 2
+        v_peg_x[3] = 16
+        v_peg_y[3] = 24
+        v_peg_x[4] = 28
+        v_peg_y[4] = 24
+        v_peg_x[5] = 36
+        v_peg_y[5] = 24
+        v_peg_x[6] = 48
+        v_peg_y[6] = 24
+        v_band_start[3] = 3
+        v_band_end[3] = 6
+        v_peg_x[7] = 12
+        v_peg_y[7] = 32
+        v_peg_x[8] = 24
+        v_peg_y[8] = 32
+        v_peg_x[9] = 40
+        v_peg_y[9] = 32
+        v_peg_x[10] = 52
+        v_peg_y[10] = 32
+        v_band_start[4] = 7
+        v_band_end[4] = 10
+        v_peg_x[11] = 10
+        v_peg_y[11] = 40
+        v_peg_x[12] = 18
+        v_peg_y[12] = 40
+        v_peg_x[13] = 28
+        v_peg_y[13] = 40
+        v_peg_x[14] = 36
+        v_peg_y[14] = 40
+        v_peg_x[15] = 46
+        v_peg_y[15] = 40
+        v_peg_x[16] = 54
+        v_peg_y[16] = 40
+        v_band_start[5] = 11
+        v_band_end[5] = 16
+        v_peg_x[17] = 14
+        v_peg_y[17] = 50
+        v_peg_x[18] = 26
+        v_peg_y[18] = 50
+        v_peg_x[19] = 38
+        v_peg_y[19] = 50
+        v_peg_x[20] = 50
+        v_peg_y[20] = 50
+        v_band_start[6] = 17
+        v_band_end[6] = 20
+        v_num_pegs = 21
+        v_wall_color = 72
+        v_peg_color = 18
+    endif
+    
+    # ========== BOARD 21: THE COMB ==========
+    if v_board_type == 21 then
+        v_peg_x[0] = 12
+        v_peg_y[0] = 10
+        v_peg_x[1] = 24
+        v_peg_y[1] = 10
+        v_peg_x[2] = 36
+        v_peg_y[2] = 10
+        v_peg_x[3] = 48
+        v_peg_y[3] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 3
+        v_peg_x[4] = 12
+        v_peg_y[4] = 20
+        v_peg_x[5] = 24
+        v_peg_y[5] = 20
+        v_peg_x[6] = 36
+        v_peg_y[6] = 20
+        v_peg_x[7] = 48
+        v_peg_y[7] = 20
+        v_band_start[2] = 4
+        v_band_end[2] = 7
+        v_peg_x[8] = 12
+        v_peg_y[8] = 30
+        v_peg_x[9] = 24
+        v_peg_y[9] = 30
+        v_peg_x[10] = 36
+        v_peg_y[10] = 30
+        v_peg_x[11] = 48
+        v_peg_y[11] = 30
+        v_band_start[3] = 8
+        v_band_end[3] = 11
+        v_peg_x[12] = 12
+        v_peg_y[12] = 40
+        v_peg_x[13] = 24
+        v_peg_y[13] = 40
+        v_peg_x[14] = 36
+        v_peg_y[14] = 40
+        v_peg_x[15] = 48
+        v_peg_y[15] = 40
+        v_band_start[5] = 12
+        v_band_end[5] = 15
+        v_peg_x[16] = 12
+        v_peg_y[16] = 50
+        v_peg_x[17] = 24
+        v_peg_y[17] = 50
+        v_peg_x[18] = 36
+        v_peg_y[18] = 50
+        v_peg_x[19] = 48
+        v_peg_y[19] = 50
+        v_band_start[6] = 16
+        v_band_end[6] = 19
+        v_num_pegs = 20
+        v_wall_color = 38
+        v_peg_color = 78
+    endif
+    
+    # ========== BOARD 22: OFFSET ROWS ==========
+    if v_board_type == 22 then
+        v_peg_x[0] = 12
+        v_peg_y[0] = 10
+        v_peg_x[1] = 24
+        v_peg_y[1] = 10
+        v_peg_x[2] = 36
+        v_peg_y[2] = 10
+        v_peg_x[3] = 48
+        v_peg_y[3] = 10
+        v_band_start[1] = 0
+        v_band_end[1] = 3
+        v_peg_x[4] = 18
+        v_peg_y[4] = 20
+        v_peg_x[5] = 30
+        v_peg_y[5] = 20
+        v_peg_x[6] = 42
+        v_peg_y[6] = 20
+        v_band_start[2] = 4
+        v_band_end[2] = 6
+        v_peg_x[7] = 12
+        v_peg_y[7] = 30
+        v_peg_x[8] = 24
+        v_peg_y[8] = 30
+        v_peg_x[9] = 36
+        v_peg_y[9] = 30
+        v_peg_x[10] = 48
+        v_peg_y[10] = 30
+        v_band_start[3] = 7
+        v_band_end[3] = 10
+        v_peg_x[11] = 18
+        v_peg_y[11] = 40
+        v_peg_x[12] = 30
+        v_peg_y[12] = 40
+        v_peg_x[13] = 42
+        v_peg_y[13] = 40
+        v_band_start[5] = 11
+        v_band_end[5] = 13
+        v_peg_x[14] = 12
+        v_peg_y[14] = 50
+        v_peg_x[15] = 24
+        v_peg_y[15] = 50
+        v_peg_x[16] = 36
+        v_peg_y[16] = 50
+        v_peg_x[17] = 48
+        v_peg_y[17] = 50
+        v_band_start[6] = 14
+        v_band_end[6] = 17
+        v_num_pegs = 18
+        v_wall_color = 58
+        v_peg_color = 12
+    endif
+    
+    # ========== BOARD 23: SPARSE FIELD ==========
+    if v_board_type == 23 then
+        v_peg_x[0] = 32
+        v_peg_y[0] = 12
+        v_band_start[1] = 0
+        v_band_end[1] = 0
+        v_peg_x[1] = 18
+        v_peg_y[1] = 28
+        v_peg_x[2] = 46
+        v_peg_y[2] = 28
+        v_band_start[3] = 1
+        v_band_end[3] = 2
+        v_peg_x[3] = 12
+        v_peg_y[3] = 44
+        v_peg_x[4] = 32
+        v_peg_y[4] = 42
+        v_peg_x[5] = 52
+        v_peg_y[5] = 44
+        v_band_start[5] = 3
+        v_band_end[5] = 5
+        v_peg_x[6] = 20
+        v_peg_y[6] = 54
+        v_peg_x[7] = 38
+        v_peg_y[7] = 52
+        v_peg_x[8] = 50
+        v_peg_y[8] = 55
+        v_band_start[6] = 6
+        v_band_end[6] = 8
+        v_num_pegs = 9
+        v_wall_color = 48
+        v_peg_color = 88
+    endif
+    
+    # ========== DRAW STATIC BACKGROUND ==========
+    v_peg_end = v_num_pegs - 1
+    
+    clear()
+    
+    draw_line(0, 0, 0, 63, v_wall_color, 10)
+    draw_line(1, 0, 1, 63, v_wall_color, 20)
+    draw_line(2, 0, 2, 63, v_wall_color, 30)
+    draw_line(v_left_wall, 0, v_left_wall, 63, v_wall_color, v_wall_brightness)
+    
+    draw_line(63, 0, 63, 63, v_wall_color, 10)
+    draw_line(62, 0, 62, 63, v_wall_color, 20)
+    draw_line(61, 0, 61, 63, v_wall_color, 30)
+    draw_line(v_right_wall, 0, v_right_wall, 63, v_wall_color, v_wall_brightness)
+    
+    for v_p in (0, v_peg_end, 1)
+        v_px = v_peg_x[v_p]
+        v_py = v_peg_y[v_p]
+        draw_circle(v_px, v_py, 1, v_peg_color, v_peg_brightness, true)
+    endfor v_p
+    
+    # ========== BALL DROP LOOP ==========
+    v_running = 1
+    while v_running == 1 then
+        
+        v_should_drop = v_frame_count % v_drop_interval
+        if v_should_drop == 0 then
+            if v_balls_dropped < v_num_balls then
+                if v_active_count < v_max_balls_active then
+                    v_found_slot = -1
+                    for v_slot in (0, 12, 1)
+                        if v_found_slot == -1 then
+                            v_slot_status = v_ball_active[v_slot]
+                            if v_slot_status < 1 then
+                                v_found_slot = v_slot
+                            endif
+                        endif
+                    endfor v_slot
+                    
+                    if v_found_slot >= 0 then
+                        v_ball_active[v_found_slot] = 1
+                        v_ball_x[v_found_slot] = random(v_left_wall + 5, v_right_wall - 5, 1)
+                        v_ball_y[v_found_slot] = 2
+                        v_ball_vx[v_found_slot] = random(-0.5, 0.5, 2)
+                        v_ball_vy[v_found_slot] = 0
+                        v_balls_dropped = v_balls_dropped + 1
+                        v_active_count = v_active_count + 1
+                        v_bx = floor(v_ball_x[v_found_slot])
+                        v_by = floor(v_ball_y[v_found_slot])
+                        show_sprite(ball_sprite, v_bx, v_by, v_found_slot)
+                    endif
+                endif
+            endif
+        endif
+        
+        # ========== UPDATE BALLS ==========
+        for v_b in (0, 12, 1)
+            v_is_active = v_ball_active[v_b]
+            if v_is_active > 0 then
+                v_vy = v_ball_vy[v_b] + v_gravity
+                v_vx = v_ball_vx[v_b]
+                
+                if v_vy > v_max_velocity then
+                    v_vy = v_max_velocity
+                endif
+                if v_vx > v_max_velocity then
+                    v_vx = v_max_velocity
+                endif
+                if v_vx < v_neg_max_velocity then
+                    v_vx = v_neg_max_velocity
+                endif
+                
+                v_x = v_ball_x[v_b] + v_vx
+                v_y = v_ball_y[v_b] + v_vy
+                
+                if v_x <= v_left_wall + 1 then
+                    v_x = v_left_wall + 2
+                    v_vx = -v_vx * v_bounce_damping
+                endif
+                
+                if v_x >= v_right_wall - 1 then
+                    v_x = v_right_wall - 2
+                    v_vx = -v_vx * v_bounce_damping
+                endif
+                
+                # Banded peg collision
+                v_ball_band = floor(v_y / 8)
+                if v_ball_band < 0 then
+                    v_ball_band = 0
+                endif
+                if v_ball_band > 7 then
+                    v_ball_band = 7
+                endif
+                
+                if v_vy >= 0 then
+                    v_adj_band = v_ball_band + 1
+                    if v_adj_band > 7 then
+                        v_adj_band = 7
+                    endif
+                else
+                    v_adj_band = v_ball_band - 1
+                    if v_adj_band < 0 then
+                        v_adj_band = 0
+                    endif
+                endif
+                
+                v_pc_start = v_band_start[v_ball_band]
+                v_pc_end = v_band_end[v_ball_band]
+                if v_pc_end >= v_pc_start then
+                    for v_pc in (v_pc_start, v_pc_end, 1)
+                        v_dx = v_x - v_peg_x[v_pc]
+                        v_dy = v_y - v_peg_y[v_pc]
+                        v_dist_sq = v_dx * v_dx + v_dy * v_dy
+                        if v_dist_sq < v_coll_dist_sq then
+                            v_dist = sqrt(v_dist_sq)
+                            if v_dist > 0.1 then
+                                v_nx = v_dx / v_dist
+                                v_ny = v_dy / v_dist
+                                v_x = v_peg_x[v_pc] + v_nx * v_collision_dist
+                                v_y = v_peg_y[v_pc] + v_ny * v_collision_dist
+                                v_dot = v_vx * v_nx + v_vy * v_ny
+                                v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
+                                v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
+                                v_rand_kick = random(-v_bounce_randomness, v_bounce_randomness, 2)
+                                v_vx = v_vx + v_rand_kick
+                            endif
+                        endif
+                    endfor v_pc
+                endif
+                
+                if v_adj_band != v_ball_band then
+                    v_pc_start = v_band_start[v_adj_band]
+                    v_pc_end = v_band_end[v_adj_band]
+                    if v_pc_end >= v_pc_start then
+                        for v_pc in (v_pc_start, v_pc_end, 1)
+                            v_dx = v_x - v_peg_x[v_pc]
+                            v_dy = v_y - v_peg_y[v_pc]
+                            v_dist_sq = v_dx * v_dx + v_dy * v_dy
+                            if v_dist_sq < v_coll_dist_sq then
+                                v_dist = sqrt(v_dist_sq)
+                                if v_dist > 0.1 then
+                                    v_nx = v_dx / v_dist
+                                    v_ny = v_dy / v_dist
+                                    v_x = v_peg_x[v_pc] + v_nx * v_collision_dist
+                                    v_y = v_peg_y[v_pc] + v_ny * v_collision_dist
+                                    v_dot = v_vx * v_nx + v_vy * v_ny
+                                    v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
+                                    v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
+                                    v_rand_kick = random(-v_bounce_randomness, v_bounce_randomness, 2)
+                                    v_vx = v_vx + v_rand_kick
+                                endif
+                            endif
+                        endfor v_pc
+                    endif
+                endif
+                
+                v_ball_x[v_b] = v_x
+                v_ball_y[v_b] = v_y
+                v_ball_vx[v_b] = v_vx
+                v_ball_vy[v_b] = v_vy
+                
+                if v_y > v_exit_y then
+                    v_ball_active[v_b] = 0
+                    hide_sprite(ball_sprite, v_b)
+                else
+                    v_bx_draw = floor(v_x)
+                    v_by_draw = floor(v_y)
+                    move_sprite(ball_sprite, v_bx_draw, v_by_draw, v_b)
+                endif
+            endif
+        endfor v_b
+        
+        v_active_count = v_ball_active[0] + v_ball_active[1] + v_ball_active[2] + v_ball_active[3] + v_ball_active[4] + v_ball_active[5] + v_ball_active[6] + v_ball_active[7] + v_ball_active[8] + v_ball_active[9] + v_ball_active[10] + v_ball_active[11] + v_ball_active[12]
+        
+        v_frame_count = v_frame_count + 1
+        
+        if v_balls_dropped >= v_num_balls then
+            if v_active_count == 0 then
+                v_running = 0
+            endif
+        endif
+        
+    endwhile
+    
+    # ========== NEXT BOARD ==========
+    v_board_index = v_board_index + 1
+    if v_board_index > 23 then
+        v_board_index = 0
+    endif
+    
+endwhile

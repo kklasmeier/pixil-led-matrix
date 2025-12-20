@@ -1,0 +1,808 @@
+# Building Construction - Dynamic Version
+# Randomized buildings with different styles, sizes, and features
+# Runs forever, each cycle builds a unique building
+
+# Ground and sky
+v_ground_y = 58
+
+# Building parameters (will be randomized)
+v_building_left = 12
+v_building_width = 36
+v_building_right = 48
+v_floor_height = 7
+v_num_floors = 6
+v_building_bottom = v_ground_y
+v_building_top = 16
+
+# Foundation
+v_foundation_depth = 4
+v_foundation_top = v_ground_y - v_foundation_depth
+
+# Column positions
+v_num_columns = 4
+v_column_spacing = 12
+create_array(v_column_x, 6, numeric)
+
+# Crane parameters
+v_crane_base_x = 52
+v_crane_mast_height = 20
+v_crane_arm_length = 30
+v_crane_angle = 180
+v_crane_cable_length = 10
+v_hook_x = 0
+v_hook_y = 0
+v_min_clearance = 18
+
+# Current construction state
+v_current_floor = 0
+
+# Style parameters (will be randomized)
+v_building_style = 1
+v_window_color = "sky_blue"
+v_steel_color = "gray"
+v_concrete_color = "dark_gray"
+v_do_night_scene = 1
+v_do_sunset = 0
+
+# ============================================
+# RANDOMIZATION PROCEDURE
+# ============================================
+def randomize_building {
+    # Random building style (1=Office, 2=Apartment, 3=Industrial, 4=Modern Glass)
+    v_building_style = random(1, 4, 0)
+    
+    # Random height (6-8 floors)
+    v_num_floors = random(5, 7, 0)
+    
+    # Random width (1=narrow, 2=medium, 3=wide)
+    v_width_choice = random(1, 3, 0)
+    
+    if v_width_choice == 1 then
+        # Narrow
+        v_building_width = 28
+        v_num_columns = 3
+    elseif v_width_choice == 2 then
+        # Medium
+        v_building_width = 36
+        v_num_columns = 4
+    else
+        # Wide
+        v_building_width = 44
+        v_num_columns = 5
+    endif
+    
+    # Center the building
+    v_building_left = 32 - v_building_width / 2
+    v_building_right = v_building_left + v_building_width
+    
+    # Calculate column spacing and positions
+    v_column_spacing = v_building_width / (v_num_columns - 1)
+    for v_i in (0, v_num_columns - 1, 1)
+        v_column_x[v_i] = v_building_left + v_i * v_column_spacing
+    endfor v_i
+    
+    # Calculate building top
+    v_building_top = v_building_bottom - (v_num_floors * v_floor_height)
+    
+    # Update crane position based on building width
+    v_crane_base_x = v_building_right + 4
+    v_crane_mast_height = 20
+    
+    # Style-specific settings
+    if v_building_style == 1 then
+        # Office tower - blue glass
+        v_window_color = "sky_blue"
+        print("Style: Office Tower")
+    elseif v_building_style == 2 then
+        # Apartment - teal windows, smaller
+        v_window_color = "teal"
+        print("Style: Apartment Building")
+    elseif v_building_style == 3 then
+        # Industrial - dark gray windows
+        v_window_color = "dark_gray"
+        print("Style: Industrial Warehouse")
+    else
+        # Modern glass - cyan, more glass
+        v_window_color = "cyan"
+        print("Style: Modern Glass Tower")
+    endif
+    
+    # Random time of day ending (60% night, 20% sunset, 20% day)
+    v_time_choice = random(1, 10, 0)
+    if v_time_choice <= 6 then
+        v_do_night_scene = 1
+        v_do_sunset = 0
+    elseif v_time_choice <= 8 then
+        v_do_night_scene = 1
+        v_do_sunset = 1
+    else
+        v_do_night_scene = 0
+        v_do_sunset = 0
+    endif
+    
+    print(f"Floors: {v_num_floors}, Width: {v_building_width}")
+}
+
+# ============================================
+# DRAWING PROCEDURES
+# ============================================
+
+def draw_background {
+    # Sky
+    draw_rectangle(0, 0, 64, v_ground_y, sky_blue, 40, true)
+    draw_rectangle(0, 0, 64, 20, sky_blue, 30, true)
+    
+    # Ground
+    draw_rectangle(0, v_ground_y, 64, 6, standard_brown, 70, true)
+    draw_rectangle(0, v_ground_y, 64, 2, green, 50, true)
+    
+    # Distant buildings silhouette
+    draw_rectangle(0, v_ground_y - 15, 6, 15, dark_gray, 30, true)
+    draw_rectangle(58, v_ground_y - 18, 6, 18, dark_gray, 30, true)
+}
+
+def draw_foundation {
+    draw_rectangle(v_building_left - 2, v_foundation_top, v_building_width + 4, v_foundation_depth, v_concrete_color, 80, true)
+    draw_line(v_building_left - 2, v_foundation_top, v_building_right + 2, v_foundation_top, gray, 60)
+}
+
+def draw_steel_frame {
+    v_frame_top = v_building_bottom - (v_current_floor * v_floor_height)
+    
+    for v_c in (0, v_num_columns - 1, 1)
+        v_cx = v_column_x[v_c]
+        draw_line(v_cx, v_building_bottom, v_cx, v_frame_top, v_steel_color, 80)
+    endfor v_c
+    
+    for v_f in (1, v_current_floor, 1)
+        v_beam_y = v_building_bottom - (v_f * v_floor_height)
+        draw_line(v_building_left, v_beam_y, v_building_right, v_beam_y, v_steel_color, 70)
+    endfor v_f
+}
+
+def draw_floors {
+    for v_f in (1, v_current_floor - 1, 1)
+        v_floor_top = v_building_bottom - (v_f * v_floor_height)
+        
+        # Floor slab
+        draw_rectangle(v_building_left, v_floor_top, v_building_width, 2, v_concrete_color, 60, true)
+        
+        # Windows based on style
+        if v_building_style == 1 then
+            # Office - standard windows
+            for v_w in (0, v_num_columns - 2, 1)
+                v_win_left = v_column_x[v_w] + 2
+                v_win_width = v_column_spacing - 4
+                v_win_top = v_floor_top + 2
+                v_win_height = v_floor_height - 3
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 50, true)
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 40, false)
+            endfor v_w
+        elseif v_building_style == 2 then
+            # Apartment - smaller windows with balconies
+            for v_w in (0, v_num_columns - 2, 1)
+                v_win_left = v_column_x[v_w] + 3
+                v_win_width = v_column_spacing - 6
+                v_win_top = v_floor_top + 2
+                v_win_height = v_floor_height - 4
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 45, true)
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 50, false)
+                # Balcony rail
+                v_bal_y = v_floor_top + v_floor_height - 2
+                draw_line(v_column_x[v_w] + 1, v_bal_y, v_column_x[v_w] + v_column_spacing - 1, v_bal_y, gray, 60)
+            endfor v_w
+        elseif v_building_style == 3 then
+            # Industrial - fewer, larger windows
+            for v_w in (0, v_num_columns - 2, 2)
+                v_win_left = v_column_x[v_w] + 1
+                v_win_width = v_column_spacing * 2 - 2
+                if v_win_left + v_win_width > v_building_right - 1 then
+                    v_win_width = v_building_right - v_win_left - 1
+                endif
+                v_win_top = v_floor_top + 3
+                v_win_height = v_floor_height - 4
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 40, true)
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 50, false)
+            endfor v_w
+        else
+            # Modern glass - full width glass
+            for v_w in (0, v_num_columns - 2, 1)
+                v_win_left = v_column_x[v_w] + 1
+                v_win_width = v_column_spacing - 2
+                v_win_top = v_floor_top + 2
+                v_win_height = v_floor_height - 2
+                draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 55, true)
+                # Minimal frame
+                draw_line(v_win_left, v_win_top, v_win_left, v_win_top + v_win_height, gray, 30)
+            endfor v_w
+        endif
+    endfor v_f
+}
+
+def draw_crane {
+    v_mast_bottom = v_ground_y
+    v_mast_top = v_ground_y - v_crane_mast_height
+    draw_line(v_crane_base_x, v_mast_bottom, v_crane_base_x, v_mast_top, yellow, 90)
+    draw_line(v_crane_base_x + 2, v_mast_bottom, v_crane_base_x + 2, v_mast_top, yellow, 90)
+    
+    for v_b in (0, v_crane_mast_height - 4, 8)
+        v_brace_y = v_mast_bottom - v_b
+        draw_line(v_crane_base_x, v_brace_y, v_crane_base_x + 2, v_brace_y - 4, yellow, 70)
+        draw_line(v_crane_base_x + 2, v_brace_y, v_crane_base_x, v_brace_y - 4, yellow, 70)
+    endfor v_b
+    
+    v_arm_y = v_mast_top + 2
+    v_arm_left = v_crane_base_x - v_crane_arm_length
+    v_arm_right = v_crane_base_x + 8
+    draw_line(v_arm_left, v_arm_y, v_arm_right, v_arm_y, yellow, 90)
+    draw_line(v_crane_base_x + 1, v_mast_top, v_arm_left + 5, v_arm_y, yellow, 60)
+    draw_line(v_crane_base_x + 1, v_mast_top, v_arm_right - 2, v_arm_y, yellow, 60)
+    
+    draw_rectangle(v_arm_right - 4, v_arm_y + 1, 6, 4, v_concrete_color, 80, true)
+    
+    v_trolley_pos = (v_crane_angle - 90) / 90
+    if v_trolley_pos < 0 then
+        v_trolley_pos = 0
+    endif
+    if v_trolley_pos > 1 then
+        v_trolley_pos = 1
+    endif
+    v_trolley_x = v_arm_left + 5 + v_trolley_pos * (v_crane_arm_length - 10)
+    
+    draw_rectangle(v_trolley_x - 1, v_arm_y + 1, 3, 2, orange, 90, true)
+    
+    v_hook_x = v_trolley_x
+    v_hook_y = v_arm_y + 3 + v_crane_cable_length
+    draw_line(v_trolley_x, v_arm_y + 3, v_hook_x, v_hook_y, gray, 80)
+    draw_rectangle(v_hook_x - 1, v_hook_y, 3, 2, orange, 100, true)
+}
+
+def draw_lifted_beam {
+    draw_line(v_hook_x - 4, v_hook_y + 2, v_hook_x + 4, v_hook_y + 2, v_steel_color, 100)
+}
+
+def draw_workers {
+    if v_current_floor > 0 then
+        v_worker_y = v_building_bottom - (v_current_floor * v_floor_height) - 1
+        v_w1_x = v_building_left + 5 + (v_current_floor * 3) % 10
+        v_w2_x = v_building_left + 15 + (v_current_floor * 7) % 8
+        plot(v_w1_x, v_worker_y, yellow, 100)
+        plot(v_w1_x, v_worker_y - 1, orange, 100)
+        plot(v_w2_x, v_worker_y, yellow, 100)
+        plot(v_w2_x, v_worker_y - 1, red, 100)
+    endif
+}
+
+def check_and_extend_crane {
+    v_floor_top = v_building_bottom - (v_current_floor * v_floor_height)
+    v_required_height = v_building_bottom - v_floor_top + v_min_clearance
+    
+    if v_crane_mast_height < v_required_height then
+        for v_new_height in (v_crane_mast_height, v_required_height, 2)
+            v_crane_mast_height = v_new_height
+            begin_frame
+                call draw_background
+                call draw_foundation
+                v_temp_floor = v_current_floor - 1
+                v_save_floor = v_current_floor
+                v_current_floor = v_temp_floor
+                call draw_steel_frame
+                call draw_floors
+                v_current_floor = v_save_floor
+                call draw_crane
+            end_frame
+            rest(0.08)
+        endfor v_new_height
+        
+        v_crane_mast_height = v_required_height
+        rest(0.2)
+    endif
+}
+
+# ============================================
+# CONSTRUCTION SEQUENCE
+# ============================================
+
+def build_floor {
+    # Crane swings to pick up beam
+    for v_crane_angle in (180, 90, -10)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            call draw_crane
+        end_frame
+        rest(0.04)
+    endfor v_crane_angle
+    
+    # Lower cable
+    for v_crane_cable_length in (10, 25, 3)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            call draw_crane
+        end_frame
+        rest(0.04)
+    endfor v_crane_cable_length
+    
+    # Lift beam
+    v_crane_angle = 90
+    for v_crane_cable_length in (25, 10, -3)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            call draw_crane
+            call draw_lifted_beam
+        end_frame
+        rest(0.04)
+    endfor v_crane_cable_length
+    
+    # Swing to building
+    v_crane_cable_length = 10
+    for v_crane_angle in (90, 150, 8)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            call draw_crane
+            call draw_lifted_beam
+        end_frame
+        rest(0.04)
+    endfor v_crane_angle
+    
+    # Lower beam into place
+    v_target_cable = 10 + (v_num_floors - v_current_floor) * 5
+    v_crane_angle = 150
+    for v_crane_cable_length in (10, v_target_cable, 2)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            call draw_crane
+            call draw_lifted_beam
+        end_frame
+        rest(0.03)
+    endfor v_crane_cable_length
+    
+    # Build columns
+    v_frame_bottom = v_building_bottom - ((v_current_floor - 1) * v_floor_height)
+    v_frame_top = v_building_bottom - (v_current_floor * v_floor_height)
+    
+    for v_col_progress in (v_frame_bottom, v_frame_top, -1)
+        begin_frame
+            call draw_background
+            call draw_foundation
+            v_temp_floor = v_current_floor - 1
+            v_save_floor = v_current_floor
+            v_current_floor = v_temp_floor
+            call draw_steel_frame
+            call draw_floors
+            v_current_floor = v_save_floor
+            for v_c in (0, v_num_columns - 1, 1)
+                v_cx = v_column_x[v_c]
+                draw_line(v_cx, v_frame_bottom, v_cx, v_col_progress, v_steel_color, 80)
+            endfor v_c
+            call draw_crane
+            call draw_workers
+        end_frame
+        rest(0.02)
+    endfor v_col_progress
+    
+    # Welding flash
+    begin_frame
+        call draw_background
+        call draw_foundation
+        call draw_steel_frame
+        call draw_floors
+        draw_line(v_building_left, v_frame_top, v_building_right, v_frame_top, white, 100)
+        call draw_crane
+        call draw_workers
+    end_frame
+    rest(0.1)
+    
+    begin_frame
+        call draw_background
+        call draw_foundation
+        call draw_steel_frame
+        call draw_floors
+        call draw_crane
+        call draw_workers
+    end_frame
+    rest(0.2)
+}
+
+def install_windows {
+    for v_finish_floor in (1, v_num_floors, 1)
+        v_floor_top = v_building_bottom - (v_finish_floor * v_floor_height)
+        
+        begin_frame
+            call draw_background
+            call draw_foundation
+            call draw_steel_frame
+            
+            # Previously finished floors
+            for v_f in (1, v_finish_floor - 1, 1)
+                v_ft = v_building_bottom - (v_f * v_floor_height)
+                draw_rectangle(v_building_left, v_ft, v_building_width, 2, v_concrete_color, 60, true)
+                
+                # Windows by style
+                if v_building_style == 1 then
+                    for v_w in (0, v_num_columns - 2, 1)
+                        v_win_left = v_column_x[v_w] + 2
+                        v_win_width = v_column_spacing - 4
+                        v_win_top = v_ft + 2
+                        v_win_height = v_floor_height - 3
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 50, true)
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 40, false)
+                    endfor v_w
+                elseif v_building_style == 2 then
+                    for v_w in (0, v_num_columns - 2, 1)
+                        v_win_left = v_column_x[v_w] + 3
+                        v_win_width = v_column_spacing - 6
+                        v_win_top = v_ft + 2
+                        v_win_height = v_floor_height - 4
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 45, true)
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 50, false)
+                        v_bal_y = v_ft + v_floor_height - 2
+                        draw_line(v_column_x[v_w] + 1, v_bal_y, v_column_x[v_w] + v_column_spacing - 1, v_bal_y, gray, 60)
+                    endfor v_w
+                elseif v_building_style == 3 then
+                    for v_w in (0, v_num_columns - 2, 2)
+                        v_win_left = v_column_x[v_w] + 1
+                        v_win_width = v_column_spacing * 2 - 2
+                        if v_win_left + v_win_width > v_building_right - 1 then
+                            v_win_width = v_building_right - v_win_left - 1
+                        endif
+                        v_win_top = v_ft + 3
+                        v_win_height = v_floor_height - 4
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 40, true)
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 50, false)
+                    endfor v_w
+                else
+                    for v_w in (0, v_num_columns - 2, 1)
+                        v_win_left = v_column_x[v_w] + 1
+                        v_win_width = v_column_spacing - 2
+                        v_win_top = v_ft + 2
+                        v_win_height = v_floor_height - 2
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, v_window_color, 55, true)
+                        draw_line(v_win_left, v_win_top, v_win_left, v_win_top + v_win_height, gray, 30)
+                    endfor v_w
+                endif
+            endfor v_f
+            
+            # Current floor slab
+            draw_rectangle(v_building_left, v_floor_top, v_building_width, 2, v_concrete_color, 60, true)
+            call draw_crane
+        end_frame
+        rest(0.1)
+    endfor v_finish_floor
+}
+
+def add_rooftop {
+    v_roof_y = v_building_top
+    
+    begin_frame
+        call draw_background
+        call draw_foundation
+        call draw_steel_frame
+        call draw_floors
+        draw_rectangle(v_building_left - 1, v_roof_y - 1, v_building_width + 2, 2, v_concrete_color, 70, true)
+        call draw_crane
+    end_frame
+    rest(0.3)
+    
+    begin_frame
+        call draw_background
+        call draw_foundation
+        call draw_steel_frame
+        call draw_floors
+        draw_rectangle(v_building_left - 1, v_roof_y - 1, v_building_width + 2, 2, v_concrete_color, 70, true)
+        # Rooftop equipment varies by style
+        if v_building_style == 1 then
+            draw_rectangle(v_building_left + 5, v_roof_y - 4, 4, 3, gray, 60, true)
+            draw_rectangle(v_building_left + 15, v_roof_y - 3, 3, 2, gray, 50, true)
+        elseif v_building_style == 2 then
+            draw_rectangle(v_building_left + 3, v_roof_y - 3, 3, 2, gray, 55, true)
+            draw_rectangle(v_building_right - 8, v_roof_y - 3, 3, 2, gray, 55, true)
+        elseif v_building_style == 3 then
+            draw_rectangle(v_building_left + 4, v_roof_y - 5, 6, 4, gray, 65, true)
+            draw_line(v_building_left + 7, v_roof_y - 5, v_building_left + 7, v_roof_y - 8, gray, 70)
+        else
+            draw_rectangle(v_building_left + v_building_width / 2 - 2, v_roof_y - 4, 4, 3, gray, 50, true)
+        endif
+        # Antenna
+        draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, red, 80)
+        call draw_crane
+    end_frame
+    rest(0.5)
+}
+
+# ============================================
+# SUNSET TRANSITION
+# ============================================
+
+def do_sunset_transition {
+    print("Sunset...")
+    
+    for v_sun in (0, 5, 1)
+        begin_frame
+            # Orange/pink sky gradient
+            v_orange_int = 30 + v_sun * 8
+            draw_rectangle(0, 0, 64, 25, orange, v_orange_int, true)
+            draw_rectangle(0, 15, 64, v_ground_y - 15, coral, v_orange_int - 10, true)
+            draw_rectangle(0, v_ground_y - 10, 64, 10, magenta, 20, true)
+            
+            # Ground
+            draw_rectangle(0, v_ground_y, 64, 6, standard_brown, 60 - v_sun * 5, true)
+            
+            # Distant buildings
+            draw_rectangle(0, v_ground_y - 15, 6, 15, dark_gray, 25, true)
+            draw_rectangle(58, v_ground_y - 18, 6, 18, dark_gray, 25, true)
+            
+            call draw_foundation
+            call draw_steel_frame
+            call draw_floors
+            
+            v_roof_y = v_building_top
+            draw_rectangle(v_building_left - 1, v_roof_y - 1, v_building_width + 2, 2, v_concrete_color, 60, true)
+            if v_building_style == 1 then
+                draw_rectangle(v_building_left + 5, v_roof_y - 4, 4, 3, gray, 50, true)
+                draw_rectangle(v_building_left + 15, v_roof_y - 3, 3, 2, gray, 45, true)
+            elseif v_building_style == 2 then
+                draw_rectangle(v_building_left + 3, v_roof_y - 3, 3, 2, gray, 50, true)
+                draw_rectangle(v_building_right - 8, v_roof_y - 3, 3, 2, gray, 50, true)
+            elseif v_building_style == 3 then
+                draw_rectangle(v_building_left + 4, v_roof_y - 5, 6, 4, gray, 55, true)
+            else
+                draw_rectangle(v_building_left + v_building_width / 2 - 2, v_roof_y - 4, 4, 3, gray, 45, true)
+            endif
+            draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, red, 70)
+        end_frame
+        rest(0.4)
+    endfor v_sun
+}
+
+# ============================================
+# NIGHT TRANSITION
+# ============================================
+
+def do_night_transition {
+    print("Night falls...")
+    v_roof_y = v_building_top
+    
+    for v_night in (0, 5, 1)
+        v_sky_dark = 40 - v_night * 7
+        
+        begin_frame
+            draw_rectangle(0, 0, 64, v_ground_y, navy, v_sky_dark, true)
+            draw_rectangle(0, v_ground_y, 64, 6, standard_brown, 50 - v_night * 5, true)
+            
+            draw_rectangle(0, v_ground_y - 15, 6, 15, dark_gray, 20, true)
+            draw_rectangle(58, v_ground_y - 18, 6, 18, dark_gray, 20, true)
+            
+            call draw_foundation
+            call draw_steel_frame
+            
+            v_glow = 30 + v_night * 14
+            for v_f in (1, v_num_floors, 1)
+                v_floor_top = v_building_bottom - (v_f * v_floor_height)
+                draw_rectangle(v_building_left, v_floor_top, v_building_width, 2, v_concrete_color, 40, true)
+                
+                # Lit windows pattern varies
+                for v_w in (0, v_num_columns - 2, 1)
+                    v_win_left = v_column_x[v_w] + 2
+                    v_win_width = v_column_spacing - 4
+                    v_win_top = v_floor_top + 2
+                    v_win_height = v_floor_height - 3
+                    
+                    v_lit = (v_f + v_w) % 3
+                    if v_lit < 2 then
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, yellow, v_glow, true)
+                    else
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, navy, 30, true)
+                    endif
+                    draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 30, false)
+                endfor v_w
+            endfor v_f
+            
+            draw_rectangle(v_building_left - 1, v_roof_y - 1, v_building_width + 2, 2, v_concrete_color, 50, true)
+            if v_night % 2 == 0 then
+                draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, red, 60)
+                plot(v_building_right - 5, v_roof_y - 6, red, 100)
+            else
+                draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, maroon, 40)
+            endif
+            
+            if v_night > 2 then
+                plot(2, v_ground_y - 10, yellow, 50)
+                plot(4, v_ground_y - 8, yellow, 40)
+                plot(59, v_ground_y - 12, yellow, 50)
+                plot(60, v_ground_y - 8, yellow, 45)
+            endif
+        end_frame
+        rest(0.4)
+    endfor v_night
+    
+    # Blinking lights
+    for v_blink in (0, 6, 1)
+        begin_frame
+            draw_rectangle(0, 0, 64, v_ground_y, navy, 15, true)
+            plot(5, 8, white, 60)
+            plot(20, 5, white, 50)
+            plot(45, 12, white, 55)
+            
+            draw_rectangle(0, v_ground_y, 64, 6, standard_brown, 25, true)
+            draw_rectangle(0, v_ground_y - 15, 6, 15, dark_gray, 15, true)
+            draw_rectangle(58, v_ground_y - 18, 6, 18, dark_gray, 15, true)
+            plot(2, v_ground_y - 10, yellow, 50)
+            plot(59, v_ground_y - 12, yellow, 50)
+            
+            call draw_foundation
+            call draw_steel_frame
+            
+            for v_f in (1, v_num_floors, 1)
+                v_floor_top = v_building_bottom - (v_f * v_floor_height)
+                draw_rectangle(v_building_left, v_floor_top, v_building_width, 2, v_concrete_color, 35, true)
+                for v_w in (0, v_num_columns - 2, 1)
+                    v_win_left = v_column_x[v_w] + 2
+                    v_win_width = v_column_spacing - 4
+                    v_win_top = v_floor_top + 2
+                    v_win_height = v_floor_height - 3
+                    v_lit = (v_f + v_w + v_blink / 2) % 3
+                    if v_lit < 2 then
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, yellow, 80, true)
+                    else
+                        draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, navy, 25, true)
+                    endif
+                    draw_rectangle(v_win_left, v_win_top, v_win_width, v_win_height, gray, 25, false)
+                endfor v_w
+            endfor v_f
+            
+            draw_rectangle(v_building_left - 1, v_roof_y - 1, v_building_width + 2, 2, v_concrete_color, 40, true)
+            if v_blink % 2 == 0 then
+                draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, red, 50)
+                plot(v_building_right - 5, v_roof_y - 6, red, 100)
+            else
+                draw_line(v_building_right - 5, v_roof_y - 1, v_building_right - 5, v_roof_y - 6, maroon, 30)
+            endif
+        end_frame
+        rest(0.5)
+    endfor v_blink
+}
+
+# ============================================
+# FADE OUT
+# ============================================
+
+def fade_out {
+    print("Fade out...")
+    
+    for v_fade in (100, 0, -20)
+        begin_frame
+            draw_rectangle(0, 0, 64, 64, black, 100 - v_fade, true)
+        end_frame
+        rest(0.15)
+    endfor v_fade
+    
+    rest(0.5)
+}
+
+# ============================================
+# MAIN LOOP - RUNS FOREVER
+# ============================================
+
+print("=== DYNAMIC BUILDING CONSTRUCTION ===")
+
+v_running = 1
+v_building_count = 0
+
+while v_running == 1 then
+    v_building_count = v_building_count + 1
+    print(f"=== Building #{v_building_count} ===")
+    
+    # Randomize this building
+    call randomize_building
+    
+    # Show title
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, black, 100, true)
+        draw_text(8, 20, "NEW PROJECT", tiny64_font, 8, white, 80)
+        if v_building_style == 1 then
+            draw_text(8, 35, "OFFICE TOWER", tiny64_font, 7, sky_blue, 70)
+        elseif v_building_style == 2 then
+            draw_text(8, 35, "APARTMENTS", tiny64_font, 7, teal, 70)
+        elseif v_building_style == 3 then
+            draw_text(8, 35, "INDUSTRIAL", tiny64_font, 7, gray, 70)
+        else
+            draw_text(8, 35, "GLASS TOWER", tiny64_font, 7, cyan, 70)
+        endif
+    end_frame
+    rest(2)
+    
+    # Initial scene
+    begin_frame
+        call draw_background
+    end_frame
+    rest(0.5)
+    
+    # Excavation
+    for v_dig in (0, v_foundation_depth, 1)
+        begin_frame
+            call draw_background
+            draw_rectangle(v_building_left - 2, v_ground_y - v_dig, v_building_width + 4, v_dig, standard_brown, 40, true)
+        end_frame
+        rest(0.15)
+    endfor v_dig
+    
+    # Pour foundation
+    for v_pour in (0, v_foundation_depth, 1)
+        begin_frame
+            call draw_background
+            draw_rectangle(v_building_left - 2, v_ground_y - v_pour, v_building_width + 4, v_pour, v_concrete_color, 80, true)
+        end_frame
+        rest(0.15)
+    endfor v_pour
+    
+    rest(0.3)
+    
+    # Build each floor
+    for v_current_floor in (1, v_num_floors, 1)
+        print(f"Building floor {v_current_floor}...")
+        call check_and_extend_crane
+        call build_floor
+    endfor v_current_floor
+    
+    # Install windows
+    print("Installing windows...")
+    v_current_floor = v_num_floors
+    call install_windows
+    
+    # Add rooftop
+    print("Adding rooftop...")
+    call add_rooftop
+    
+    print("Construction complete!")
+    rest(1)
+    
+    # Time of day transitions
+    if v_do_sunset == 1 then
+        call do_sunset_transition
+    endif
+    
+    if v_do_night_scene == 1 then
+        call do_night_transition
+    else
+        rest(2)
+    endif
+    
+    # Fade out and reset
+    call fade_out
+    
+endwhile

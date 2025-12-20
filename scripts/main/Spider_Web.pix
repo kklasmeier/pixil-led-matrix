@@ -1,0 +1,233 @@
+# Spider Web Builder
+# Creates a realistic spider web with radial spokes and connecting rings
+# on a 64x64 LED matrix
+
+while true then
+
+clear()
+
+# ============================================
+# Configuration
+# ============================================
+v_min_spokes = 5
+v_max_spokes = 7
+v_min_rings = 5
+v_max_rings = 7
+
+# Spoke intensity (bright structural lines)
+v_spoke_intensity = 92
+
+# Ring intensity range (inner bright, outer dim)
+v_ring_inner_intensity = 100
+v_ring_outer_intensity = 55
+
+# Gap probability (0-100, percentage chance to skip a segment)
+v_gap_chance = 12
+
+# ============================================
+# Generate random center point (biased toward center)
+# ============================================
+v_center_x = random(28, 36, 0)
+v_center_y = random(28, 36, 0)
+
+# ============================================
+# Determine number of spokes and rings
+# ============================================
+v_num_spokes = random(v_min_spokes, v_max_spokes, 0)
+v_num_rings = random(v_min_rings, v_max_rings, 0)
+
+# ============================================
+# Create arrays for spoke angles and edge points
+# ============================================
+create_array(v_spoke_angles, 10)
+create_array(v_spoke_end_x, 10)
+create_array(v_spoke_end_y, 10)
+
+# ============================================
+# Calculate spoke angles with variation
+# Distribute evenly around 360 degrees with ±18 degree variation
+# ============================================
+v_base_angle_step = 360 / v_num_spokes
+
+for v_i in (0, v_num_spokes - 1, 1)
+    v_base_angle = v_i * v_base_angle_step
+    v_variation = random(-18, 18, 0)
+    v_spoke_angles[v_i] = v_base_angle + v_variation
+endfor v_i
+
+# ============================================
+# Calculate edge intersection points for each spoke
+# Uses ray marching to find where spoke hits matrix edge
+# ============================================
+for v_i in (0, v_num_spokes - 1, 1)
+    v_angle_rad = v_spoke_angles[v_i] * pi / 180
+    v_cos_a = cos(v_angle_rad)
+    v_sin_a = sin(v_angle_rad)
+    
+    # Find distance to each edge and pick the smallest positive one
+    v_dist_to_edge = 100
+    
+    # Check right edge (x = 63)
+    if v_cos_a > 0.001 then
+        v_t = (63 - v_center_x) / v_cos_a
+        if v_t > 0 then
+            if v_t < v_dist_to_edge then
+                v_dist_to_edge = v_t
+            endif
+        endif
+    endif
+    
+    # Check left edge (x = 0)
+    if v_cos_a < -0.001 then
+        v_t = (0 - v_center_x) / v_cos_a
+        if v_t > 0 then
+            if v_t < v_dist_to_edge then
+                v_dist_to_edge = v_t
+            endif
+        endif
+    endif
+    
+    # Check bottom edge (y = 63)
+    if v_sin_a > 0.001 then
+        v_t = (63 - v_center_y) / v_sin_a
+        if v_t > 0 then
+            if v_t < v_dist_to_edge then
+                v_dist_to_edge = v_t
+            endif
+        endif
+    endif
+    
+    # Check top edge (y = 0)
+    if v_sin_a < -0.001 then
+        v_t = (0 - v_center_y) / v_sin_a
+        if v_t > 0 then
+            if v_t < v_dist_to_edge then
+                v_dist_to_edge = v_t
+            endif
+        endif
+    endif
+    
+    # Calculate end point
+    v_spoke_end_x[v_i] = round(v_center_x + v_cos_a * v_dist_to_edge)
+    v_spoke_end_y[v_i] = round(v_center_y + v_sin_a * v_dist_to_edge)
+    
+    # Clamp to bounds
+    if v_spoke_end_x[v_i] < 0 then
+        v_spoke_end_x[v_i] = 0
+    endif
+    if v_spoke_end_x[v_i] > 63 then
+        v_spoke_end_x[v_i] = 63
+    endif
+    if v_spoke_end_y[v_i] < 0 then
+        v_spoke_end_y[v_i] = 0
+    endif
+    if v_spoke_end_y[v_i] > 63 then
+        v_spoke_end_y[v_i] = 63
+    endif
+endfor v_i
+
+# ============================================
+# Draw the radial spokes
+# ============================================
+for v_i in (0, v_num_spokes - 1, 1)
+    draw_line(v_center_x, v_center_y, v_spoke_end_x[v_i], v_spoke_end_y[v_i], white, v_spoke_intensity)
+endfor v_i
+
+# ============================================
+# Calculate maximum safe radius (85% of distance to nearest edge)
+# ============================================
+v_dist_left = v_center_x
+v_dist_right = 63 - v_center_x
+v_dist_top = v_center_y
+v_dist_bottom = 63 - v_center_y
+
+v_min_dist = v_dist_left
+if v_dist_right < v_min_dist then
+    v_min_dist = v_dist_right
+endif
+if v_dist_top < v_min_dist then
+    v_min_dist = v_dist_top
+endif
+if v_dist_bottom < v_min_dist then
+    v_min_dist = v_dist_bottom
+endif
+
+v_max_radius = v_min_dist * 0.95
+
+# Minimum radius (start rings close to center)
+v_min_radius = 4
+
+# ============================================
+# Create arrays for ring intersection points
+# ============================================
+create_array(v_ring_x, 10)
+create_array(v_ring_y, 10)
+
+# ============================================
+# Draw the connecting rings
+# ============================================
+v_radius_step = (v_max_radius - v_min_radius) / v_num_rings
+
+for v_ring in (0, v_num_rings - 1, 1)
+    # Calculate base radius for this ring with minimal variation
+    v_base_radius = v_min_radius + (v_ring + 1) * v_radius_step
+    v_radius_var = random(-3, 3, 0) / 100
+    v_ring_radius = v_base_radius * (1 + v_radius_var)
+    
+    # Calculate intensity (inner rings brighter, outer rings dimmer)
+    v_ring_progress = v_ring / (v_num_rings - 1)
+    v_intensity = v_ring_inner_intensity - (v_ring_progress * (v_ring_inner_intensity - v_ring_outer_intensity))
+    v_intensity = round(v_intensity)
+    
+    # Calculate intersection points on each spoke for this ring
+    for v_j in (0, v_num_spokes - 1, 1)
+        v_angle_rad = v_spoke_angles[v_j] * pi / 180
+        
+        # Add small variation to each intersection point
+        v_point_var_x = random(-2, 2, 0)
+        v_point_var_y = random(-2, 2, 0)
+        
+        v_ring_x[v_j] = round(v_center_x + cos(v_angle_rad) * v_ring_radius) + v_point_var_x
+        v_ring_y[v_j] = round(v_center_y + sin(v_angle_rad) * v_ring_radius) + v_point_var_y
+        
+        # Clamp to bounds
+        if v_ring_x[v_j] < 0 then
+            v_ring_x[v_j] = 0
+        endif
+        if v_ring_x[v_j] > 63 then
+            v_ring_x[v_j] = 63
+        endif
+        if v_ring_y[v_j] < 0 then
+            v_ring_y[v_j] = 0
+        endif
+        if v_ring_y[v_j] > 63 then
+            v_ring_y[v_j] = 63
+        endif
+    endfor v_j
+    
+    # Draw lines connecting consecutive intersection points
+    for v_j in (0, v_num_spokes - 1, 1)
+        # Randomly skip some segments for organic look
+        v_skip_roll = random(0, 100, 0)
+        if v_skip_roll > v_gap_chance then
+            # Calculate next index (wrap around to 0)
+            v_next = v_j + 1
+            if v_next >= v_num_spokes then
+                v_next = 0
+            endif
+            
+            draw_line(v_ring_x[v_j], v_ring_y[v_j], v_ring_x[v_next], v_ring_y[v_next], white, v_intensity)
+        endif
+    endfor v_j
+endfor v_ring
+
+# ============================================
+# Add a small center highlight
+# ============================================
+plot(v_center_x, v_center_y, white, 100)
+
+# Keep the web displayed
+sync_queue
+rest(8)
+
+endwhile

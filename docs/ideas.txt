@@ -1,0 +1,50 @@
+Looking at your impressive collection of 109 scripts, here are some fresh ideas that would complement what you already have:
+
+## Biological/Natural Phenomena
+6. **Slime Mold Pathfinding** - Organic network optimization
+7. **Bacterial Colony Growth** - Expanding circular colonies with competition
+8. **Coral Reef Growth** - Branching structures with color variation
+9. **DNA Helix Rotation** - Double helix unwinding and rotating
+10. **Mitosis** - Cell division animation
+
+## Mechanical/Industrial
+11. **Pachinko Machine** - Balls dropping through pegs (you have physics already)
+12. **Factory Conveyor** - Items moving, getting processed, sorted
+13. **Piston Engine** - Synchronized pistons firing
+14. **Pulley System** - Connected wheels and ropes lifting objects
+15. **Lock & Key Mechanism** - Tumblers aligning to unlock
+
+## Games & Puzzles
+16. **Tetris** - Classic falling blocks
+17. **Lights Out** - Toggle puzzle solver
+18. **15-Puzzle Solver** - Sliding tile puzzle
+19. **Minesweeper** - Game board with reveals
+20. **Sudoku Solver Visualization** - Backtracking algorithm
+
+## Abstract/Mathematical
+21. **Fourier Series Builder** - Building complex waves from simple ones
+22. **Prime Number Spiral** - Ulam spiral pattern
+23. **Collatz Conjecture Visualizer** - Path visualization
+24. **Mandelbrot Zoom** - Zooming into fractal
+25. **Strange Attractors** - Lorenz, Rössler attractors
+
+## Text/Communication
+26. **Typewriter Effect** - Letters appearing one by one with carriage return
+27. **Binary Counter** - Visual binary number progression
+28. **Morse Code Transmitter** - Blinking dot-dash patterns
+29. **Spectrum Analyzer** - Audio-reactive frequency bars (if you add audio input)
+
+## Nostalgic/Retro
+30. **DVD Logo Bounce** - The classic screensaver corner hit
+31. **Windows Pipes Screensaver** - 3D pipe building
+32. **Falling Sand Game** - Powder game physics
+33. **Brick Breaker** - Breakout-style game
+
+## Unique Concepts
+34. **Turmite** - Turing machine on 2D grid creating patterns
+35. **Langton's Ant** - Simple rules creating complex behavior
+36. **Reaction Diffusion** - Gray-Scott or Turing patterns
+37. **Physarum Transport** - Slime mold network formation
+38. **Hexagonal Conway's Life** - Game of Life on hex grid
+
+Which categories interest you most? I can help you build any of these, and they'd each bring something unique to your collection.

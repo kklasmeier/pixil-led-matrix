@@ -1,0 +1,785 @@
+# Bridge Building
+# Multiple bridge types with construction and truck load test
+# Blue = compression, Orange/Red = tension
+
+# Bridge parameters
+v_bridge_left = 4
+v_bridge_right = 59
+v_bridge_top = 25
+v_bridge_bottom = 35
+v_bridge_width = v_bridge_right - v_bridge_left
+v_segment_count = 6
+v_segment_width = v_bridge_width / v_segment_count
+
+# Ground and water
+v_ground_y = 55
+v_water_y = 45
+
+# Colors
+v_steel_color = "gray"
+v_stone_color = "dark_gray"
+
+# Truck parameters
+v_truck_x = -12
+v_truck_y = v_bridge_top - 8
+v_truck_width = 12
+
+# Arrays for truss node positions
+create_array(v_bottom_x, 7, numeric)
+create_array(v_bottom_y, 7, numeric)
+create_array(v_top_x, 7, numeric)
+create_array(v_top_y, 7, numeric)
+create_array(v_stress, 20, numeric)
+
+# Current bridge type (1=Pratt, 2=Warren, 3=Howe, 4=Arch, 5=K-Truss)
+v_bridge_type = 1
+
+# Initialize node positions
+for v_i in (0, 6, 1)
+    v_bottom_x[v_i] = v_bridge_left + v_i * v_segment_width
+    v_bottom_y[v_i] = v_bridge_bottom
+    v_top_x[v_i] = v_bridge_left + v_i * v_segment_width
+    v_top_y[v_i] = v_bridge_top
+    v_stress[v_i] = 50
+    v_stress[v_i + 7] = 50
+endfor v_i
+
+for v_i in (14, 19, 1)
+    v_stress[v_i] = 50
+endfor v_i
+
+# Procedure to draw background
+def draw_background {
+    draw_rectangle(0, 0, 64, v_water_y, navy, 30, true)
+    draw_rectangle(0, v_water_y, 64, 20, blue, 50, true)
+    draw_rectangle(0, v_water_y, 64, 2, cyan, 30, true)
+    draw_rectangle(0, v_ground_y, 10, 9, standard_brown, 70, true)
+    draw_rectangle(0, v_ground_y, 10, 2, green, 60, true)
+    draw_rectangle(54, v_ground_y, 10, 9, standard_brown, 70, true)
+    draw_rectangle(54, v_ground_y, 10, 2, green, 60, true)
+}
+
+# Procedure to draw pillars
+def draw_pillars {
+    draw_rectangle(2, v_bridge_bottom, 6, v_ground_y - v_bridge_bottom, v_stone_color, 80, true)
+    draw_rectangle(1, v_bridge_bottom, 8, 2, v_stone_color, 90, true)
+    draw_rectangle(56, v_bridge_bottom, 6, v_ground_y - v_bridge_bottom, v_stone_color, 80, true)
+    draw_rectangle(55, v_bridge_bottom, 8, 2, v_stone_color, 90, true)
+}
+
+# Get stress color
+def get_stress_color {
+    if v_s < 30 then
+        v_member_color = "blue"
+        v_member_intensity = 100
+    elseif v_s < 40 then
+        v_member_color = "cyan"
+        v_member_intensity = 80
+    elseif v_s < 50 then
+        v_member_color = "sky_blue"
+        v_member_intensity = 70
+    elseif v_s < 55 then
+        v_member_color = "gray"
+        v_member_intensity = 70
+    elseif v_s < 65 then
+        v_member_color = "yellow"
+        v_member_intensity = 70
+    elseif v_s < 80 then
+        v_member_color = "orange"
+        v_member_intensity = 85
+    else
+        v_member_color = "red"
+        v_member_intensity = 100
+    endif
+}
+
+# Draw road deck
+def draw_deck {
+    draw_rectangle(v_bridge_left, v_bridge_top - 2, v_bridge_width, 3, dark_gray, 60, true)
+    draw_line(v_bridge_left, v_bridge_top - 2, v_bridge_right, v_bridge_top - 2, gray, 40)
+}
+
+# Draw truck
+def draw_truck {
+    draw_rectangle(v_truck_x, v_truck_y, 8, 4, red, 80, true)
+    draw_rectangle(v_truck_x, v_truck_y, 8, 4, maroon, 60, false)
+    draw_rectangle(v_truck_x + 8, v_truck_y + 1, 3, 3, red, 90, true)
+    draw_rectangle(v_truck_x + 9, v_truck_y + 1, 2, 2, sky_blue, 70, true)
+    draw_circle(v_truck_x + 2, v_truck_y + 5, 1, black, 100, true)
+    draw_circle(v_truck_x + 6, v_truck_y + 5, 1, black, 100, true)
+    draw_circle(v_truck_x + 9, v_truck_y + 5, 1, black, 100, true)
+}
+
+# Calculate stress based on truck position
+def calculate_stress {
+    v_truck_center = v_truck_x + v_truck_width / 2
+    
+    for v_i in (0, 19, 1)
+        v_stress[v_i] = 50
+    endfor v_i
+    
+    if v_truck_center > v_bridge_left and v_truck_center < v_bridge_right then
+        v_pos = (v_truck_center - v_bridge_left) / v_bridge_width
+        v_seg = floor(v_pos * v_segment_count)
+        if v_seg > 5 then
+            v_seg = 5
+        endif
+        if v_seg < 0 then
+            v_seg = 0
+        endif
+        
+        v_center_factor = 1 - abs(v_pos - 0.5) * 2
+        
+        for v_i in (0, 5, 1)
+            v_dist = abs(v_i - v_seg)
+            if v_dist < 3 then
+                v_stress[v_i] = 50 + (30 - v_dist * 10) * v_center_factor
+            endif
+        endfor v_i
+        
+        for v_i in (0, 5, 1)
+            v_dist = abs(v_i - v_seg)
+            if v_dist < 3 then
+                v_stress[v_i + 7] = 50 - (30 - v_dist * 10) * v_center_factor
+            endif
+        endfor v_i
+        
+        v_stress[14] = 50 - 25 * v_center_factor
+        v_stress[15] = 50 + 20 * v_center_factor
+        v_stress[16] = 50 + 25 * v_center_factor
+        v_stress[17] = 50 + 20 * v_center_factor
+    endif
+}
+
+# ============================================
+# PRATT TRUSS
+# ============================================
+def draw_pratt_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i]
+        call get_stress_color
+        v_x1 = v_bottom_x[v_i]
+        v_y1 = v_bottom_y[v_i]
+        v_next = v_i + 1
+        v_x2 = v_bottom_x[v_next]
+        v_y2 = v_bottom_y[v_next]
+        draw_line(v_x1, v_y1, v_x2, v_y2, v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i + 7]
+        call get_stress_color
+        v_x1 = v_top_x[v_i]
+        v_y1 = v_top_y[v_i]
+        v_next = v_i + 1
+        v_x2 = v_top_x[v_next]
+        v_y2 = v_top_y[v_next]
+        draw_line(v_x1, v_y1, v_x2, v_y2, v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        v_s = v_stress[14]
+        call get_stress_color
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Diagonals sloping toward center
+    for v_i in (0, 5, 1)
+        v_s = v_stress[15 + v_i / 2]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+}
+
+def build_pratt_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_x1 = v_bottom_x[v_i]
+            v_y1 = v_bottom_y[v_i]
+            v_next = v_i + 1
+            v_x2 = v_bottom_x[v_next]
+            draw_line(v_x1, v_y1, v_x2, v_y1, white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_x1, v_y1, v_x2, v_y1, v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_x1 = v_top_x[v_i]
+            v_y1 = v_top_y[v_i]
+            v_next = v_i + 1
+            v_x2 = v_top_x[v_next]
+            draw_line(v_x1, v_y1, v_x2, v_y1, white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_x1, v_y1, v_x2, v_y1, v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Diagonals
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+}
+
+# ============================================
+# WARREN TRUSS (zigzag, no verticals)
+# ============================================
+def draw_warren_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i + 7]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Zigzag diagonals - up then down alternating
+    for v_i in (0, 5, 1)
+        v_s = v_stress[15 + v_i / 2]
+        call get_stress_color
+        v_next = v_i + 1
+        # Upward diagonal
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], v_member_color, v_member_intensity)
+        # Downward diagonal
+        if v_i < 5 then
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_member_color, v_member_intensity)
+        endif
+    endfor v_i
+}
+
+def build_warren_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Zigzag diagonals
+    for v_i in (0, 5, 1)
+        v_next = v_i + 1
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], white, 100)
+        end_frame
+        rest(0.06)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_next], v_top_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.06)
+        if v_i < 5 then
+            begin_frame(true)
+                draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], white, 100)
+            end_frame
+            rest(0.06)
+            begin_frame(true)
+                draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_steel_color, 70)
+            end_frame
+            rest(0.06)
+        endif
+    endfor v_i
+}
+
+# ============================================
+# HOWE TRUSS (diagonals slope away from center)
+# ============================================
+def draw_howe_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i + 7]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        v_s = v_stress[14]
+        call get_stress_color
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Diagonals sloping away from center (opposite of Pratt)
+    for v_i in (0, 5, 1)
+        v_s = v_stress[15 + v_i / 2]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+}
+
+def build_howe_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Diagonals (opposite direction from Pratt)
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+}
+
+# ============================================
+# ARCH BRIDGE
+# ============================================
+def draw_arch_truss {
+    # Road deck (top)
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_bottom_x[v_i], v_bridge_top, v_bottom_x[v_next], v_bridge_top, v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Arch curve using segments
+    v_arch_segments = 12
+    v_prev_ax = v_bridge_left
+    v_prev_ay = v_bridge_top
+    
+    for v_i in (1, v_arch_segments, 1)
+        v_s = v_stress[7 + v_i / 3]
+        call get_stress_color
+        v_t = v_i / v_arch_segments
+        v_ax = v_bridge_left + v_t * v_bridge_width
+        # Parabolic arch
+        v_arch_depth = 18
+        v_ay = v_bridge_top + v_arch_depth * 4 * v_t * (1 - v_t)
+        draw_line(v_prev_ax, v_prev_ay, v_ax, v_ay, v_member_color, v_member_intensity)
+        v_prev_ax = v_ax
+        v_prev_ay = v_ay
+    endfor v_i
+    
+    # Vertical suspenders from deck to arch
+    for v_i in (1, 5, 1)
+        v_s = v_stress[14]
+        call get_stress_color
+        v_t = v_i / 6
+        v_ax = v_bridge_left + v_t * v_bridge_width
+        v_arch_depth = 18
+        v_ay = v_bridge_top + v_arch_depth * 4 * v_t * (1 - v_t)
+        draw_line(v_ax, v_bridge_top, v_ax, v_ay, v_member_color, v_member_intensity)
+    endfor v_i
+}
+
+def build_arch_truss {
+    # Build arch first
+    v_arch_segments = 12
+    v_prev_ax = v_bridge_left
+    v_prev_ay = v_bridge_top
+    
+    for v_i in (1, v_arch_segments, 1)
+        v_t = v_i / v_arch_segments
+        v_ax = v_bridge_left + v_t * v_bridge_width
+        v_arch_depth = 18
+        v_ay = v_bridge_top + v_arch_depth * 4 * v_t * (1 - v_t)
+        begin_frame(true)
+            draw_line(v_prev_ax, v_prev_ay, v_ax, v_ay, white, 100)
+        end_frame
+        rest(0.06)
+        begin_frame(true)
+            draw_line(v_prev_ax, v_prev_ay, v_ax, v_ay, v_steel_color, 70)
+        end_frame
+        rest(0.06)
+        v_prev_ax = v_ax
+        v_prev_ay = v_ay
+    endfor v_i
+    
+    # Vertical suspenders
+    for v_i in (1, 5, 1)
+        v_t = v_i / 6
+        v_ax = v_bridge_left + v_t * v_bridge_width
+        v_arch_depth = 18
+        v_ay = v_bridge_top + v_arch_depth * 4 * v_t * (1 - v_t)
+        begin_frame(true)
+            draw_line(v_ax, v_bridge_top, v_ax, v_ay, white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_ax, v_bridge_top, v_ax, v_ay, v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Road deck
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_bottom_x[v_i], v_bridge_top, v_bottom_x[v_next], v_bridge_top, white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bridge_top, v_bottom_x[v_next], v_bridge_top, v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+}
+
+# ============================================
+# K-TRUSS
+# ============================================
+def draw_k_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        v_s = v_stress[v_i + 7]
+        call get_stress_color
+        v_next = v_i + 1
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        v_s = v_stress[14]
+        call get_stress_color
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_member_color, v_member_intensity)
+    endfor v_i
+    
+    # K diagonals - two diagonals meeting at midpoint of vertical
+    v_mid_y = (v_bridge_top + v_bridge_bottom) / 2
+    for v_i in (0, 5, 1)
+        v_s = v_stress[15 + v_i / 2]
+        call get_stress_color
+        v_next = v_i + 1
+        # Upper K diagonal
+        draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_mid_y, v_member_color, v_member_intensity)
+        # Lower K diagonal
+        draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_mid_y, v_member_color, v_member_intensity)
+    endfor v_i
+}
+
+def build_k_truss {
+    # Bottom chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Verticals
+    for v_i in (0, 6, 1)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # Top chord
+    for v_i in (0, 5, 1)
+        begin_frame(true)
+            v_next = v_i + 1
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], white, 100)
+        end_frame
+        rest(0.08)
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], v_steel_color, 70)
+        end_frame
+        rest(0.08)
+    endfor v_i
+    
+    # K diagonals
+    v_mid_y = (v_bridge_top + v_bridge_bottom) / 2
+    for v_i in (0, 5, 1)
+        v_next = v_i + 1
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_mid_y, white, 100)
+        end_frame
+        rest(0.06)
+        begin_frame(true)
+            draw_line(v_top_x[v_i], v_top_y[v_i], v_bottom_x[v_next], v_mid_y, v_steel_color, 70)
+        end_frame
+        rest(0.06)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_mid_y, white, 100)
+        end_frame
+        rest(0.06)
+        begin_frame(true)
+            draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_mid_y, v_steel_color, 70)
+        end_frame
+        rest(0.06)
+    endfor v_i
+}
+
+# ============================================
+# GENERIC DRAW/BUILD BASED ON TYPE
+# ============================================
+def draw_current_truss {
+    if v_bridge_type == 1 then
+        call draw_pratt_truss
+    elseif v_bridge_type == 2 then
+        call draw_warren_truss
+    elseif v_bridge_type == 3 then
+        call draw_howe_truss
+    elseif v_bridge_type == 4 then
+        call draw_arch_truss
+    elseif v_bridge_type == 5 then
+        call draw_k_truss
+    endif
+}
+
+def build_current_truss {
+    if v_bridge_type == 1 then
+        call build_pratt_truss
+    elseif v_bridge_type == 2 then
+        call build_warren_truss
+    elseif v_bridge_type == 3 then
+        call build_howe_truss
+    elseif v_bridge_type == 4 then
+        call build_arch_truss
+    elseif v_bridge_type == 5 then
+        call build_k_truss
+    endif
+}
+
+# ============================================
+# TRUCK CROSSING PROCEDURE
+# ============================================
+def truck_crossing {
+    v_truck_x = -12
+    v_crossing = 1
+    
+    while v_crossing == 1 then
+        call calculate_stress
+        
+        begin_frame
+            call draw_background
+            call draw_pillars
+            call draw_current_truss
+            call draw_deck
+            call draw_truck
+        end_frame
+        
+        v_truck_x = v_truck_x + 0.6
+        v_truck_y = v_bridge_top - 8
+        
+        if v_truck_x > 68 then
+            v_crossing = 0
+        endif
+    endwhile
+}
+
+# ============================================
+# DECONSTRUCTION ANIMATION
+# ============================================
+def deconstruct_bridge {
+    # Fade out effect
+    for v_fade in (70, 10, -15)
+        begin_frame
+            call draw_background
+            call draw_pillars
+            # Draw truss in fading color
+            for v_i in (0, 5, 1)
+                v_next = v_i + 1
+                draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_bottom_x[v_next], v_bottom_y[v_next], gray, v_fade)
+                draw_line(v_top_x[v_i], v_top_y[v_i], v_top_x[v_next], v_top_y[v_next], gray, v_fade)
+            endfor v_i
+            for v_i in (0, 6, 1)
+                draw_line(v_bottom_x[v_i], v_bottom_y[v_i], v_top_x[v_i], v_top_y[v_i], gray, v_fade)
+            endfor v_i
+        end_frame
+        rest(0.15)
+    endfor v_fade
+    
+    # Clear to just background and pillars
+    begin_frame
+        call draw_background
+        call draw_pillars
+    end_frame
+    rest(0.5)
+}
+
+# ============================================
+# MAIN LOOP - CYCLE THROUGH BRIDGE TYPES
+# ============================================
+
+v_running = 1
+while v_running == 1 then
+    
+    for v_bridge_type in (1, 5, 1)
+        # Display bridge type name
+        begin_frame
+            call draw_background
+            call draw_pillars
+            if v_bridge_type == 1 then
+                draw_text(8, 5, "PRATT TRUSS", piboto-regular, 8, white, 90)
+            elseif v_bridge_type == 2 then
+                draw_text(6, 5, "WARREN TRUSS", piboto-regular, 8, white, 90)
+            elseif v_bridge_type == 3 then
+                draw_text(10, 5, "HOWE TRUSS", piboto-regular, 8, white, 90)
+            elseif v_bridge_type == 4 then
+                draw_text(8, 5, "ARCH BRIDGE", piboto-regular, 8, white, 90)
+            elseif v_bridge_type == 5 then
+                draw_text(14, 5, "K-TRUSS", piboto-regular, 8, white, 90)
+            endif
+        end_frame
+        rest(1.5)
+        
+        # Build the bridge
+        begin_frame
+            call draw_background
+            call draw_pillars
+        end_frame
+        rest(0.3)
+        
+        call build_current_truss
+        
+        # Add deck
+        begin_frame(true)
+            call draw_deck
+        end_frame
+        rest(0.5)
+        
+        # Truck crossing
+        call truck_crossing
+        
+        # Reset stresses
+        for v_i in (0, 19, 1)
+            v_stress[v_i] = 50
+        endfor v_i
+        
+        # Show completed bridge briefly
+        begin_frame
+            call draw_background
+            call draw_pillars
+            call draw_current_truss
+            call draw_deck
+        end_frame
+        rest(1)
+        
+        # Deconstruct before next bridge
+        if v_bridge_type < 5 then
+            call deconstruct_bridge
+        endif
+        
+    endfor v_bridge_type
+    
+    # Brief pause before restarting cycle
+    rest(2)
+    call deconstruct_bridge
+    
+endwhile

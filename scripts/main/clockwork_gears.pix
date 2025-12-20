@@ -1,0 +1,180 @@
+# Clockwork Gears
+# Interlocking gears that mesh correctly with teeth alignment
+# The central gear drives all connected gears
+
+# Gear parameters
+# For gears to mesh: distance between centers = radius1 + radius2 + tooth_length
+# For teeth to interlock: gear2 angle offset = (180 / teeth) degrees
+
+v_tooth_length = 3
+
+# Gear 1 (center, driving gear) - 8 teeth
+v_gear1_x = 32
+v_gear1_y = 32
+v_gear1_radius = 12
+v_gear1_teeth = 8
+v_gear1_angle = 0
+v_gear1_speed = 1.5
+v_gear1_color = "gold"
+
+# Gear 2 (right side) - 6 teeth
+# Distance = r1 + r2 + 2*tooth_length = 12 + 10 + 6 = 28
+v_gear2_radius = 10
+v_gear2_teeth = 6
+v_gear2_x = v_gear1_x + v_gear1_radius + v_gear2_radius + v_tooth_length * 2
+v_gear2_y = 32
+v_gear2_angle = 180 / v_gear2_teeth
+v_gear2_color = "cyan"
+
+# Gear 3 (left side) - 6 teeth
+v_gear3_radius = 10
+v_gear3_teeth = 6
+v_gear3_x = v_gear1_x - v_gear1_radius - v_gear3_radius - v_tooth_length * 2
+v_gear3_y = 32
+v_gear3_angle = 180 / v_gear3_teeth
+v_gear3_color = "coral"
+
+# Gear 4 (bottom, driven by gear 1) - 10 teeth
+v_gear4_radius = 14
+v_gear4_teeth = 10
+v_gear4_x = 32
+v_gear4_y = v_gear1_y + v_gear1_radius + v_gear4_radius + v_tooth_length * 2 - 1
+v_gear4_angle = 180 / v_gear4_teeth + 180 / v_gear1_teeth
+v_gear4_color = "lime"
+
+# Procedure to draw a single gear
+def draw_gear {
+    # Uses: v_gx, v_gy, v_gradius, v_gteeth, v_gangle, v_gcolor
+    
+    # Draw the main gear body (darker fill)
+    draw_circle(v_gx, v_gy, v_gradius - 1, v_gcolor, 35, true)
+    
+    # Draw gear outline
+    draw_circle(v_gx, v_gy, v_gradius, v_gcolor, 70, false)
+    
+    # Draw inner ring for detail
+    draw_circle(v_gx, v_gy, v_gradius - 3, v_gcolor, 50, false)
+    
+    # Draw center hub
+    draw_circle(v_gx, v_gy, 2, white, 90, true)
+    draw_circle(v_gx, v_gy, 1, dark_gray, 100, true)
+    
+    # Draw teeth around the gear
+    v_tooth_angle = v_gangle
+    v_angle_step = 360 / v_gteeth
+    
+    for v_t in (0, v_gteeth - 1, 1)
+        # Calculate tooth base position on gear edge
+        v_rad = radians(v_tooth_angle)
+        v_base_x = v_gx + cos(v_rad) * v_gradius
+        v_base_y = v_gy + sin(v_rad) * v_gradius
+        
+        # Calculate tooth tip position
+        v_tip_x = v_gx + cos(v_rad) * (v_gradius + v_tooth_length)
+        v_tip_y = v_gy + sin(v_rad) * (v_gradius + v_tooth_length)
+        
+        # Draw rectangular tooth with width
+        # Calculate perpendicular direction for tooth width
+        v_perp_rad = radians(v_tooth_angle + 90)
+        v_half_width = 1.5
+        
+        # Base corners
+        v_base_left_x = v_base_x + cos(v_perp_rad) * v_half_width
+        v_base_left_y = v_base_y + sin(v_perp_rad) * v_half_width
+        v_base_right_x = v_base_x - cos(v_perp_rad) * v_half_width
+        v_base_right_y = v_base_y - sin(v_perp_rad) * v_half_width
+        
+        # Tip corners
+        v_tip_left_x = v_tip_x + cos(v_perp_rad) * v_half_width
+        v_tip_left_y = v_tip_y + sin(v_perp_rad) * v_half_width
+        v_tip_right_x = v_tip_x - cos(v_perp_rad) * v_half_width
+        v_tip_right_y = v_tip_y - sin(v_perp_rad) * v_half_width
+        
+        # Draw tooth outline
+        draw_line(v_base_left_x, v_base_left_y, v_tip_left_x, v_tip_left_y, v_gcolor, 80)
+        draw_line(v_base_right_x, v_base_right_y, v_tip_right_x, v_tip_right_y, v_gcolor, 80)
+        draw_line(v_tip_left_x, v_tip_left_y, v_tip_right_x, v_tip_right_y, v_gcolor, 80)
+        
+        # Fill tooth center
+        draw_line(v_base_x, v_base_y, v_tip_x, v_tip_y, v_gcolor, 60)
+        
+        v_tooth_angle = v_tooth_angle + v_angle_step
+    endfor v_t
+}
+
+# Main animation loop
+v_running = 1
+while v_running == 1 then
+    begin_frame
+    
+    # Dark background
+    draw_rectangle(0, 0, 64, 64, black, 100, true)
+    
+    # Draw decorative corner accents
+    draw_line(0, 0, 8, 0, bronze, 50)
+    draw_line(0, 0, 0, 8, bronze, 50)
+    draw_line(63, 0, 55, 0, bronze, 50)
+    draw_line(63, 0, 63, 8, bronze, 50)
+    draw_line(0, 63, 8, 63, bronze, 50)
+    draw_line(0, 63, 0, 55, bronze, 50)
+    draw_line(63, 63, 55, 63, bronze, 50)
+    draw_line(63, 63, 63, 55, bronze, 50)
+    
+    # Update gear 1 angle (driver)
+    v_gear1_angle = v_gear1_angle + v_gear1_speed
+    if v_gear1_angle >= 360 then
+        v_gear1_angle = v_gear1_angle - 360
+    endif
+    
+    # Gear 2: opposite direction, ratio = teeth1/teeth2
+    # Base offset + rotation from gear 1
+    v_ratio = v_gear1_teeth / v_gear2_teeth
+    v_gear2_angle = (180 / v_gear2_teeth) - (v_gear1_angle * v_ratio)
+    
+    # Gear 3: opposite direction from gear 1 (minus because it meshes on left side)
+    v_ratio = v_gear1_teeth / v_gear3_teeth
+    v_gear3_angle = (180 / v_gear3_teeth) - (v_gear1_angle * v_ratio)
+    
+    # Gear 4: opposite direction from gear 1, with phase offset for interlocking
+    v_ratio = v_gear1_teeth / v_gear4_teeth
+    v_gear4_angle = (180 / v_gear4_teeth) + (150 / v_gear1_teeth) - (v_gear1_angle * v_ratio)
+    
+    # Draw gear 4 first (bottom, largest, in back)
+    v_gx = v_gear4_x
+    v_gy = v_gear4_y
+    v_gradius = v_gear4_radius
+    v_gteeth = v_gear4_teeth
+    v_gangle = v_gear4_angle
+    v_gcolor = v_gear4_color
+    call draw_gear
+    
+    # Draw gear 2 (right)
+    v_gx = v_gear2_x
+    v_gy = v_gear2_y
+    v_gradius = v_gear2_radius
+    v_gteeth = v_gear2_teeth
+    v_gangle = v_gear2_angle
+    v_gcolor = v_gear2_color
+    call draw_gear
+    
+    # Draw gear 3 (left)
+    v_gx = v_gear3_x
+    v_gy = v_gear3_y
+    v_gradius = v_gear3_radius
+    v_gteeth = v_gear3_teeth
+    v_gangle = v_gear3_angle
+    v_gcolor = v_gear3_color
+    call draw_gear
+    
+    # Draw gear 1 last (center, on top)
+    v_gx = v_gear1_x
+    v_gy = v_gear1_y
+    v_gradius = v_gear1_radius
+    v_gteeth = v_gear1_teeth
+    v_gangle = v_gear1_angle
+    v_gcolor = v_gear1_color
+    call draw_gear
+    
+    end_frame
+ 
+endwhile

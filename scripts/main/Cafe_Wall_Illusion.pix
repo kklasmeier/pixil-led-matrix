@@ -1,0 +1,90 @@
+# Cafe Wall Illusion (64x64)
+# Staggered brick rows with thin mortar lines that *appear* slanted.
+
+# --- Tunables ---
+v_tile_w = 10
+v_tile_h = 6
+v_mortar  = 1
+v_step_y  = v_tile_h + v_mortar
+v_half    = v_tile_w / 2
+
+# Colors / intensity
+v_mortar_color = "gray"
+v_mortar_i = 35
+v_dark = "black"
+v_light = "white"
+v_brick_i = 80
+
+# Animation (set v_animate = 0 for static)
+v_animate = 1
+v_shift_max = 100      # small drift amount (0..4) looks good
+v_hold = 0.88        # seconds per frame
+
+def draw_cafe_wall_frame {
+    begin_frame
+
+    # Mortar background
+    draw_rectangle(0, 0, 64, 64, v_mortar_color, v_mortar_i, true)
+
+    v_rows = int(64 / v_step_y) + 2
+
+    # We draw enough bricks to cover screen + margins on both sides
+    v_cols = int(64 / v_tile_w) + 6
+
+    # Smooth pixel offset inside a tile (0..tile_w-1)
+    v_shift_in = int(fmod(v_shift, v_tile_w))
+
+    # Whole-tile phase (increments every tile width)
+    v_phase = int(v_shift / v_tile_w)
+
+    for v_row in (0, v_rows, 1) then
+        v_y = v_row * v_step_y
+
+        # Alternate row offset (classic cafe wall)
+        if int(fmod(v_row, 2)) == 0 then
+            v_row_off = 0
+        else
+            v_row_off = v_half
+        endif
+
+        # Start drawing from a guaranteed-offscreen-left position
+        v_start_x = - (v_tile_w * 3) + v_row_off - v_shift_in
+
+        for v_col in (0, v_cols, 1) then
+            v_x = v_start_x + (v_col * v_tile_w)
+
+            # Color parity must incorporate scrolling phase so pattern doesn't "flip jump"
+            if int(fmod(v_col + v_phase, 2)) == 0 then
+                v_c = v_dark
+            else
+                v_c = v_light
+            endif
+
+            # Draw only if it overlaps screen
+            if v_x > -v_tile_w and v_x < 64 then
+                draw_rectangle(v_x, v_y, v_tile_w, v_tile_h, v_c, v_brick_i, true)
+            endif
+        endfor v_col
+    endfor v_row
+
+    end_frame
+}
+
+
+
+# --- Run ---
+if v_animate == 0 then
+    v_shift = 0
+    call draw_cafe_wall_frame
+    rest(10)
+else
+    v_shift = 0
+    while 1 == 1 then
+        call draw_cafe_wall_frame
+        rest(v_hold)
+
+        # 1 pixel per frame leftward scroll (increase = move left in our math)
+        v_shift = v_shift + 1
+    endwhile
+endif
+

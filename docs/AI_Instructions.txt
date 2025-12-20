@@ -78,6 +78,8 @@ create_array(v_array, size)           # Create numeric array (default)
 create_array(v_array, size, numeric)        # same as above, but perscribed
 create_array(v_array, size, string)   # Create string array
 
+The arrays are 0-indexed with "size", so valid indices are 0 to "size". 
+
 Array Assignment:
 # Numeric arrays
 v_array[0] = 10                 # Direct numeric value
@@ -1064,4 +1066,11 @@ My current list of scripts are:
 102. Solar Bloom – Radiating sun-like bursts with pulsing center glow; each bloom randomly exhibits jitter or stays symmetrical throughout its life
 103. Jellyfish - Jellyfish swimming around
 104. Ink in Water - Ink drops spreading out in water
-104. Pen Art - Multiple sequences of pens drawing art
+105. Pen Art - Multiple sequences of pens drawing art
+106. Maze builder and solver - Builds random mazes and then solves them
+107. Clockwork Gears - Interlocking gears turning together
+108. Building Construction - Watch buildings being built in a city
+109. Bridge Building - Watch varous bridges being built and then see how they are stressed when trucks drive over them
+110. Pachinko Machine - Simulates a pachinko machine with different boards
+111. Cafe Wall Illusion - Shows a scrolling Wall
+112. Motion Blindness - An optical illusion where yellow dots disappear
