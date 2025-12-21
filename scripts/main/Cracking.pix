@@ -1,0 +1,314 @@
+# Crack Propagation
+# Simulates cracks spreading from an impact point with various styles
+# Each sequence generates unique patterns
+
+while true then
+
+clear()
+
+# ============================================
+# Random parameters for this sequence
+# ============================================
+
+# Impact point - anywhere on the display
+v_impact_x = random(10, 53, 0)
+v_impact_y = random(10, 53, 0)
+
+# Crack style: 0=glass, 1=ice, 2=shatter
+v_style = random(0, 2, 0)
+
+# Number of initial cracks from impact
+v_num_cracks = random(3, 8, 0)
+
+# Branch probability (0-100)
+v_branch_chance = random(10, 50, 0)
+
+# Branch angle range
+v_branch_angle_min = random(20, 35, 0)
+v_branch_angle_max = random(40, 60, 0)
+
+# Growth speed (delay in ms between steps)
+v_base_speed = random(40, 120, 0)
+
+# Max crack length before forced branch or stop
+v_max_segment = random(8, 20, 0)
+
+# Color palette: 0=white/gray, 1=ice blue, 2=amber
+v_palette = random(0, 2, 0)
+
+# ============================================
+# Set up colors based on palette
+# ============================================
+create_array(v_colors, 3, string)
+create_array(v_intensities, 3)
+
+if v_palette == 0 then
+    v_colors[0] = "white"
+    v_colors[1] = "white"
+    v_colors[2] = "gray"
+    v_intensities[0] = 100
+    v_intensities[1] = 80
+    v_intensities[2] = 60
+elseif v_palette == 1 then
+    v_colors[0] = "cyan"
+    v_colors[1] = "light_gray"
+    v_colors[2] = "white"
+    v_intensities[0] = 100
+    v_intensities[1] = 85
+    v_intensities[2] = 70
+else
+    v_colors[0] = "orange"
+    v_colors[1] = "yellow"
+    v_colors[2] = "brown"
+    v_intensities[0] = 100
+    v_intensities[1] = 80
+    v_intensities[2] = 60
+endif
+
+# ============================================
+# Impact flash - animate ball hitting glass with gravity physics
+# Ball accelerates as it falls toward the glass
+# Shown as shrinking (far away = big, close = small point of impact)
+# ============================================
+
+# Ball approaching (shrinking) - delays get shorter simulating acceleration
+draw_circle(v_impact_x, v_impact_y, 5, v_colors[0], 60, true)
+rest(0.18)
+clear()
+draw_circle(v_impact_x, v_impact_y, 4, v_colors[0], 70, true)
+rest(0.12)
+clear()
+draw_circle(v_impact_x, v_impact_y, 3, v_colors[0], 80, true)
+rest(0.08)
+clear()
+draw_circle(v_impact_x, v_impact_y, 2, v_colors[0], 90, true)
+rest(0.05)
+clear()
+draw_circle(v_impact_x, v_impact_y, 1, v_colors[0], 95, true)
+rest(0.03)
+clear()
+
+# Impact - single pixel hit
+plot(v_impact_x, v_impact_y, v_colors[0], 100)
+
+# ============================================
+# Initialize crack arrays
+# Max 30 simultaneous crack tips
+# ============================================
+v_max_tips = 30
+
+create_array(v_tip_x, v_max_tips)
+create_array(v_tip_y, v_max_tips)
+create_array(v_tip_angle, v_max_tips)
+create_array(v_tip_active, v_max_tips)
+create_array(v_tip_length, v_max_tips)
+create_array(v_tip_speed, v_max_tips)
+create_array(v_tip_color_idx, v_max_tips)
+
+create_array(v_tip_branch_rate, v_max_tips)
+
+# Initialize all tips as inactive
+for v_i in (0, v_max_tips - 1, 1)
+    v_tip_active[v_i] = 0
+endfor v_i
+
+# ============================================
+# Create initial cracks radiating from impact
+# ============================================
+v_angle_step = 360 / v_num_cracks
+v_active_count = v_num_cracks
+
+for v_i in (0, v_num_cracks - 1, 1)
+    v_tip_x[v_i] = v_impact_x
+    v_tip_y[v_i] = v_impact_y
+    v_base_angle = v_i * v_angle_step
+    v_angle_vary = random(-15, 15, 0)
+    v_tip_angle[v_i] = v_base_angle + v_angle_vary
+    v_tip_active[v_i] = 1
+    v_tip_length[v_i] = 0
+    v_tip_speed[v_i] = random(30, 100, 0)
+    v_tip_color_idx[v_i] = 0
+    v_tip_branch_rate[v_i] = random(5, 60, 0)
+endfor v_i
+
+# ============================================
+# Grow cracks until all are inactive or coverage limit reached
+# ============================================
+v_growing = 1
+v_step_count = 0
+v_max_steps = 150
+v_total_length = 0
+v_max_total_length = random(300, 600, 0)
+
+while v_growing == 1 and v_step_count < v_max_steps and v_total_length < v_max_total_length then
+    v_step_count = v_step_count + 1
+    v_any_active = 0
+    
+    for v_i in (0, v_max_tips - 1, 1)
+        if v_tip_active[v_i] == 1 then
+            v_any_active = 1
+            
+            # Check if this tip moves this step (based on its speed)
+            v_speed_roll = random(0, 100, 0)
+            if v_speed_roll < v_tip_speed[v_i] then
+                
+                # Store current position
+                v_old_x = v_tip_x[v_i]
+                v_old_y = v_tip_y[v_i]
+                
+                # Add some wander to angle based on style
+                if v_style == 0 then
+                    # Glass: fairly straight
+                    v_wander = random(-8, 8, 0)
+                elseif v_style == 1 then
+                    # Ice: moderate wander
+                    v_wander = random(-20, 20, 0)
+                else
+                    # Shatter: jagged
+                    v_wander = random(-35, 35, 0)
+                endif
+                
+                v_tip_angle[v_i] = v_tip_angle[v_i] + v_wander
+                
+                # Calculate new position
+                v_angle_rad = v_tip_angle[v_i] * pi / 180
+                v_step_size = random(1, 3, 0)
+                v_new_x = v_old_x + round(cos(v_angle_rad) * v_step_size)
+                v_new_y = v_old_y + round(sin(v_angle_rad) * v_step_size)
+                
+                # Check bounds - stop if hitting edge
+                if v_new_x < 0 or v_new_x > 63 or v_new_y < 0 or v_new_y > 63 then
+                    v_tip_active[v_i] = 0
+                else
+                    # Draw the crack segment
+                    v_c_idx = v_tip_color_idx[v_i]
+                    v_c_str = v_colors[v_c_idx]
+                    v_c_int = v_intensities[v_c_idx]
+                    draw_line(round(v_old_x), round(v_old_y), v_new_x, v_new_y, v_c_str, v_c_int)
+                    
+                    # Update tip position and track total length
+                    v_tip_x[v_i] = v_new_x
+                    v_tip_y[v_i] = v_new_y
+                    v_tip_length[v_i] = v_tip_length[v_i] + v_step_size
+                    v_total_length = v_total_length + v_step_size
+                    
+                    # Fade color as crack extends
+                    if v_tip_length[v_i] > 15 and v_tip_color_idx[v_i] == 0 then
+                        v_tip_color_idx[v_i] = 1
+                    endif
+                    if v_tip_length[v_i] > 30 and v_tip_color_idx[v_i] == 1 then
+                        v_tip_color_idx[v_i] = 2
+                    endif
+                    
+                    # Check for branching - use this tip's branch rate
+                    v_branch_roll = random(0, 100, 0)
+                    v_do_branch = 0
+                    
+                    # Style affects branch behavior
+                    if v_style == 2 then
+                        # Shatter: branch more often
+                        v_adj_branch_chance = v_tip_branch_rate[v_i] + 20
+                    else
+                        v_adj_branch_chance = v_tip_branch_rate[v_i]
+                    endif
+                    
+                    # Must have traveled minimum distance before branching
+                    if v_tip_length[v_i] > 5 and v_branch_roll < v_adj_branch_chance then
+                        v_do_branch = 1
+                    endif
+                    
+                    # Force branch if segment too long
+                    if v_tip_length[v_i] > v_max_segment then
+                        v_do_branch = 1
+                    endif
+                    
+                    if v_do_branch == 1 then
+                        # Find an inactive slot for new branch
+                        v_found_slot = 0
+                        v_slot = 0
+                        for v_j in (0, v_max_tips - 1, 1)
+                            if v_tip_active[v_j] == 0 and v_found_slot == 0 then
+                                v_found_slot = 1
+                                v_slot = v_j
+                            endif
+                        endfor v_j
+                        
+                        if v_found_slot == 1 then
+                            # Create new branch
+                            v_branch_angle_off = random(v_branch_angle_min, v_branch_angle_max, 0)
+                            v_branch_dir = random(0, 1, 0)
+                            if v_branch_dir == 0 then
+                                v_branch_angle_off = 0 - v_branch_angle_off
+                            endif
+                            
+                            v_tip_x[v_slot] = v_new_x
+                            v_tip_y[v_slot] = v_new_y
+                            v_tip_angle[v_slot] = v_tip_angle[v_i] + v_branch_angle_off
+                            v_tip_active[v_slot] = 1
+                            v_tip_length[v_slot] = 0
+                            v_tip_speed[v_slot] = random(20, 90, 0)
+                            v_tip_color_idx[v_slot] = v_tip_color_idx[v_i]
+                            v_tip_branch_rate[v_slot] = random(5, 60, 0)
+                            
+                            # Reset current tip length
+                            v_tip_length[v_i] = 0
+                        endif
+                    endif
+                    
+                    # Random chance to stop (exhaustion)
+                    v_stop_roll = random(0, 100, 0)
+                    if v_tip_length[v_i] > 25 and v_stop_roll < 10 then
+                        v_tip_active[v_i] = 0
+                    endif
+                endif
+            endif
+        endif
+    endfor v_i
+    
+    # Check if any tips still active
+    if v_any_active == 0 then
+        v_growing = 0
+    endif
+    
+    rest(v_base_speed / 1000)
+endwhile
+
+# ============================================
+# Glass style: add circular connector cracks
+# ============================================
+if v_style == 0 then
+    v_num_rings = random(1, 3, 0)
+    for v_r in (1, v_num_rings, 1)
+        v_ring_radius = v_r * random(8, 15, 0)
+        v_arc_start = random(0, 60, 0)
+        v_arc_length = random(40, 120, 0)
+        
+        # Draw arc segments
+        v_arc_end = v_arc_start + v_arc_length
+        for v_a in (v_arc_start, v_arc_end, 8)
+            v_a1_rad = v_a * pi / 180
+            v_a2_rad = (v_a + 8) * pi / 180
+            
+            v_x1 = v_impact_x + round(cos(v_a1_rad) * v_ring_radius)
+            v_y1 = v_impact_y + round(sin(v_a1_rad) * v_ring_radius)
+            v_x2 = v_impact_x + round(cos(v_a2_rad) * v_ring_radius)
+            v_y2 = v_impact_y + round(sin(v_a2_rad) * v_ring_radius)
+            
+            # Check bounds
+            if v_x1 >= 0 and v_x1 <= 63 and v_y1 >= 0 and v_y1 <= 63 then
+                if v_x2 >= 0 and v_x2 <= 63 and v_y2 >= 0 and v_y2 <= 63 then
+                    draw_line(v_x1, v_y1, v_x2, v_y2, v_colors[1], v_intensities[1])
+                    rest(0.03)
+                endif
+            endif
+        endfor v_a
+    endfor v_r
+endif
+
+# ============================================
+# Hold completed pattern
+# ============================================
+sync_queue
+rest(random(5, 8, 0))
+
+endwhile
