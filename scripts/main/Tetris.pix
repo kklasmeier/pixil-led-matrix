@@ -1,0 +1,650 @@
+# Tetris
+# Self-playing Tetris with AI that's slightly imperfect
+# Classic 10x20 playfield, 3x3 pixel blocks
+
+throttle(0.5)
+
+while true then
+
+clear()
+
+# ============================================
+# Title Screen
+# ============================================
+draw_text(9, 25, "TETRIS", piboto-regular, 14, cyan, 100)
+rest(1.5)
+draw_text(9, 25, "TETRIS", piboto-regular, 14, cyan, 100, DISSOLVE, OUT)
+clear_text(9, 25)
+rest(0.5)
+clear()
+draw_text(10, 15, "G A M E", piboto-regular, 12, red, 100, WIPE, IN_LEFT)
+draw_text(12, 35, "O V E R", piboto-regular, 12, red, 100, WIPE, IN_RIGHT)
+rest(3)
+clear_text(8, 15)
+clear_text(8, 35)
+rest(0.5)
+clear()
+
+# ============================================
+# Game constants
+# ============================================
+v_block_size = 3
+v_field_width = 10
+v_field_height = 20
+v_field_x = 2
+v_field_y = 2
+
+# Preview area
+v_preview_x = 38
+v_preview_y = 20
+
+# Speed settings (delay in ms between drops)
+v_start_speed = 150
+v_min_speed = 40
+v_speed_decrease = 20
+v_lines_per_level = 5
+
+# ============================================
+# Precompute pow2 divisors for bit extraction
+# pow2[0] = 2^15 ... pow2[15] = 2^0
+# ============================================
+create_array(v_pow2, 16)
+for v_i in (0, 15, 1)
+    v_pow2[v_i] = pow(2, 15 - v_i)
+endfor v_i
+
+# ============================================
+# Tetromino definitions
+# Flattened:
+# v_piece_shapes[piece*4 + rot]
+# piece: 0=I,1=O,2=T,3=S,4=Z,5=J,6=L
+# ============================================
+create_array(v_piece_shapes, 28)
+
+# I
+v_piece_shapes[0] = 3840
+v_piece_shapes[1] = 17476
+v_piece_shapes[2] = 3840
+v_piece_shapes[3] = 17476
+
+# O
+v_piece_shapes[4] = 1632
+v_piece_shapes[5] = 1632
+v_piece_shapes[6] = 1632
+v_piece_shapes[7] = 1632
+
+# T
+v_piece_shapes[8]  = 3648
+v_piece_shapes[9]  = 19520
+v_piece_shapes[10] = 1248
+v_piece_shapes[11] = 17984
+
+# S
+v_piece_shapes[12] = 1728
+v_piece_shapes[13] = 17952
+v_piece_shapes[14] = 1728
+v_piece_shapes[15] = 17952
+
+# Z
+v_piece_shapes[16] = 3168
+v_piece_shapes[17] = 9792
+v_piece_shapes[18] = 3168
+v_piece_shapes[19] = 9792
+
+# J
+v_piece_shapes[20] = 2272
+v_piece_shapes[21] = 50240
+v_piece_shapes[22] = 3616
+v_piece_shapes[23] = 17600
+
+# L
+v_piece_shapes[24] = 736
+v_piece_shapes[25] = 17600
+v_piece_shapes[26] = 3712
+v_piece_shapes[27] = 50240
+
+# Piece colors
+create_array(v_piece_colors, 7, string)
+v_piece_colors[0] = "cyan"
+v_piece_colors[1] = "yellow"
+v_piece_colors[2] = "magenta"
+v_piece_colors[3] = "green"
+v_piece_colors[4] = "red"
+v_piece_colors[5] = "blue"
+v_piece_colors[6] = "orange"
+
+# ============================================
+# Precompute occupied block lists for each (piece, rot)
+# v_blk_cnt[idx] = number of blocks (usually 4)
+# v_blk_x[idx*4 + i], v_blk_y[idx*4 + i] for i=0..3
+# Also compute min/max dx for legal X range
+# ============================================
+create_array(v_blk_cnt, 28)
+create_array(v_blk_x, 28 * 4)
+create_array(v_blk_y, 28 * 4)
+
+create_array(v_min_dx, 28)
+create_array(v_max_dx, 28)
+
+for v_idx in (0, 27, 1)
+    v_shape = v_piece_shapes[v_idx]
+
+    # init min/max
+    v_min_dx[v_idx] = 99
+    v_max_dx[v_idx] = -99
+
+    v_count = 0
+
+    for v_py in (0, 3, 1)
+        for v_px in (0, 3, 1)
+            v_bit_pos = v_py * 4 + v_px
+            v_bit_val = floor(v_shape / v_pow2[v_bit_pos]) % 2
+
+            if v_bit_val == 1 then
+                v_blk_x[v_idx * 4 + v_count] = v_px
+                v_blk_y[v_idx * 4 + v_count] = v_py
+
+                if v_px < v_min_dx[v_idx] then
+                    v_min_dx[v_idx] = v_px
+                endif
+                if v_px > v_max_dx[v_idx] then
+                    v_max_dx[v_idx] = v_px
+                endif
+
+                v_count = v_count + 1
+            endif
+        endfor v_px
+    endfor v_py
+
+    v_blk_cnt[v_idx] = v_count
+endfor v_idx
+
+# ============================================
+# Playfield array (0 = empty, 1-7 = piece color index+1)
+# ============================================
+v_field_size = v_field_width * v_field_height
+create_array(v_field, 200)
+for v_i in (0, v_field_size - 1, 1)
+    v_field[v_i] = 0
+endfor v_i
+
+# ============================================
+# Draw border + UI
+# ============================================
+v_border_right = v_field_x + v_field_width * v_block_size
+v_border_bottom = v_field_y + v_field_height * v_block_size
+draw_line(v_field_x - 1, v_field_y - 1, v_field_x - 1, v_border_bottom, white, 60)
+draw_line(v_border_right, v_field_y - 1, v_border_right, v_border_bottom, white, 60)
+draw_line(v_field_x - 1, v_border_bottom, v_border_right, v_border_bottom, white, 60)
+
+draw_text(35, 2, "TETRIS", tiny64_font, 6, cyan, 100)
+draw_text(38, 12, "NEXT", tiny64_font, 6, white, 70)
+draw_rectangle(v_preview_x - 1, v_preview_y - 1, 14, 14, white, 40, false)
+
+draw_text(38, 36, "LINES", tiny64_font, 6, white, 70)
+v_lines_display_y = 43
+draw_text(38, v_lines_display_y, "0", tiny64_font, 6, yellow, 100)
+
+draw_text(38, 50, "LEVEL", tiny64_font, 6, white, 70)
+v_level_display_y = 57
+draw_text(38, v_level_display_y, "1", tiny64_font, 6, green, 100)
+
+# ============================================
+# Game variables
+# ============================================
+v_game_over = 0
+v_lines_cleared = 0
+v_level = 1
+v_current_speed = v_start_speed
+
+v_current_piece = 0
+v_current_rot = 0
+v_current_x = 0
+v_current_y = 0
+v_next_piece = random(0, 6, 0)
+
+# Previous position tracking for erase
+v_prev_x = 0
+v_prev_y = 0
+v_prev_rot = 0
+v_prev_piece = 0
+v_first_draw = 1
+
+# ============================================
+# Helper note:
+# We intentionally avoid 4x4 scans + pow() in hot loops.
+# We use precomputed block lists (4 iterations).
+# ============================================
+
+# ============================================
+# Main game loop
+# ============================================
+while v_game_over == 0 then
+
+    # Spawn new piece
+    v_current_piece = v_next_piece
+    v_next_piece = random(0, 6, 0)
+
+    v_current_rot = 0
+    v_current_x = 3
+    v_current_y = 0
+
+    # Draw next piece preview
+    draw_rectangle(v_preview_x, v_preview_y, 12, 12, black, 100, true)
+
+    v_preview_color = v_piece_colors[v_next_piece]
+    v_preview_idx = v_next_piece * 4 + 0
+
+    # Draw preview via precomputed blocks
+    v_cnt = v_blk_cnt[v_preview_idx]
+    for v_i in (0, v_cnt - 1, 1)
+        v_px = v_blk_x[v_preview_idx * 4 + v_i]
+        v_py = v_blk_y[v_preview_idx * 4 + v_i]
+        v_draw_x = v_preview_x + v_px * v_block_size
+        v_draw_y = v_preview_y + v_py * v_block_size
+        draw_rectangle(v_draw_x, v_draw_y, v_block_size, v_block_size, v_preview_color, 90, true)
+    endfor v_i
+
+    # Spawn blocked check (game over)
+    v_spawn_blocked = 0
+    v_idx = v_current_piece * 4 + v_current_rot
+    v_cnt = v_blk_cnt[v_idx]
+
+    for v_i in (0, v_cnt - 1, 1)
+        v_px = v_blk_x[v_idx * 4 + v_i]
+        v_py = v_blk_y[v_idx * 4 + v_i]
+
+        v_check_x = v_current_x + v_px
+        v_check_y = v_current_y + v_py
+
+        # bounds + collision
+        if v_check_x < 0 or v_check_x >= v_field_width then
+            v_spawn_blocked = 1
+        endif
+
+        if v_spawn_blocked == 0 and v_check_y >= 0 then
+            v_field_idx = v_check_y * v_field_width + v_check_x
+            if v_field[v_field_idx] != 0 then
+                v_spawn_blocked = 1
+            endif
+        endif
+    endfor v_i
+
+    if v_spawn_blocked == 1 then
+        v_game_over = 1
+    endif
+
+    # ============================================
+    # AI: Decide best placement (optimized)
+    # - No per-piece if ladders
+    # - X range restricted to legal positions for that rotation
+    # - Collision checks use only 4 blocks
+    # ============================================
+    v_best_x = v_current_x
+    v_best_rot = 0
+    v_best_score = -9999
+
+    for v_try_rot in (0, 3, 1)
+        v_try_idx = v_current_piece * 4 + v_try_rot
+        v_cnt = v_blk_cnt[v_try_idx]
+
+        v_x_min = 0 - v_min_dx[v_try_idx]
+        v_x_max = (v_field_width - 1) - v_max_dx[v_try_idx]
+
+        for v_try_x in (v_x_min, v_x_max, 1)
+
+            # Simulate drop (still stepwise, but each step uses 4 blocks only)
+            v_try_y = 0
+            v_can_drop = 1
+
+            while v_can_drop == 1 then
+                v_next_y = v_try_y + 1
+                v_collision = 0
+
+                for v_i in (0, v_cnt - 1, 1)
+                    v_px = v_blk_x[v_try_idx * 4 + v_i]
+                    v_py = v_blk_y[v_try_idx * 4 + v_i]
+
+                    v_check_x = v_try_x + v_px
+                    v_check_y = v_next_y + v_py
+
+                    if v_check_y >= v_field_height then
+                        v_collision = 1
+                    endif
+
+                    if v_collision == 0 then
+                        v_field_idx = v_check_y * v_field_width + v_check_x
+                        if v_field[v_field_idx] != 0 then
+                            v_collision = 1
+                        endif
+                    endif
+                endfor v_i
+
+                if v_collision == 1 then
+                    v_can_drop = 0
+                else
+                    v_try_y = v_next_y
+                endif
+            endwhile
+
+            # Valid placement check (mostly redundant due to x range, but keep y>=0)
+            v_valid = 1
+            for v_i in (0, v_cnt - 1, 1)
+                v_py = v_blk_y[v_try_idx * 4 + v_i]
+                if v_try_y + v_py < 0 then
+                    v_valid = 0
+                endif
+            endfor v_i
+
+            if v_valid == 1 then
+                # Score (same idea, fewer loops)
+                v_score = v_try_y * 10
+
+                v_center_dist = abs(v_try_x - 4)
+                if v_center_dist <= 1 then
+                    v_score = v_score + 5
+                elseif v_center_dist >= 3 then
+                    v_score = v_score + 3
+                endif
+
+                # Support count
+                v_support = 0
+                for v_i in (0, v_cnt - 1, 1)
+                    v_px = v_blk_x[v_try_idx * 4 + v_i]
+                    v_py = v_blk_y[v_try_idx * 4 + v_i]
+
+                    v_below_x = v_try_x + v_px
+                    v_below_y = v_try_y + v_py + 1
+
+                    if v_below_y < v_field_height then
+                        v_below_idx = v_below_y * v_field_width + v_below_x
+                        if v_field[v_below_idx] != 0 then
+                            v_support = v_support + 1
+                        endif
+                    else
+                        v_support = v_support + 1
+                    endif
+                endfor v_i
+
+                v_score = v_score + v_support * 3
+                v_score = v_score + random(-10, 5, 0)
+
+                if v_score > v_best_score then
+                    v_best_score = v_score
+                    v_best_x = v_try_x
+                    v_best_rot = v_try_rot
+                endif
+            endif
+
+        endfor v_try_x
+    endfor v_try_rot
+
+    # ============================================
+    # Piece falling loop
+    # ============================================
+    v_piece_active = 1
+    v_target_rot = v_best_rot
+    v_target_x = v_best_x
+
+    v_prev_x = v_current_x
+    v_prev_y = v_current_y
+    v_prev_rot = v_current_rot
+    v_prev_piece = v_current_piece
+    v_first_draw = 1
+
+    while v_piece_active == 1 and v_game_over == 0 then
+
+        v_idx = v_current_piece * 4 + v_current_rot
+        v_cnt = v_blk_cnt[v_idx]
+        v_piece_color = v_piece_colors[v_current_piece]
+
+        begin_frame(true)
+
+        # Erase previous (4 blocks)
+        if v_first_draw == 0 then
+            v_prev_idx = v_prev_piece * 4 + v_prev_rot
+            v_prev_cnt = v_blk_cnt[v_prev_idx]
+
+            for v_i in (0, v_prev_cnt - 1, 1)
+                v_px = v_blk_x[v_prev_idx * 4 + v_i]
+                v_py = v_blk_y[v_prev_idx * 4 + v_i]
+                if v_prev_y + v_py >= 0 then
+                    v_erase_x = v_field_x + (v_prev_x + v_px) * v_block_size
+                    v_erase_y = v_field_y + (v_prev_y + v_py) * v_block_size
+                    draw_rectangle(v_erase_x, v_erase_y, v_block_size, v_block_size, black, 100, true)
+                endif
+            endfor v_i
+        endif
+
+        # Draw current (4 blocks)
+        for v_i in (0, v_cnt - 1, 1)
+            v_px = v_blk_x[v_idx * 4 + v_i]
+            v_py = v_blk_y[v_idx * 4 + v_i]
+            if v_current_y + v_py >= 0 then
+                v_draw_x = v_field_x + (v_current_x + v_px) * v_block_size
+                v_draw_y = v_field_y + (v_current_y + v_py) * v_block_size
+                draw_rectangle(v_draw_x, v_draw_y, v_block_size, v_block_size, v_piece_color, 90, true)
+            endif
+        endfor v_i
+
+        end_frame
+
+        v_prev_x = v_current_x
+        v_prev_y = v_current_y
+        v_prev_rot = v_current_rot
+        v_prev_piece = v_current_piece
+        v_first_draw = 0
+
+        rest(v_current_speed / 1000)
+
+        # Rotate toward target (safe rotate)
+        if v_current_rot != v_target_rot then
+            v_old_rot = v_current_rot
+            v_new_rot = v_current_rot + 1
+            if v_new_rot > 3 then
+                v_new_rot = 0
+            endif
+
+            v_test_idx = v_current_piece * 4 + v_new_rot
+            v_test_cnt = v_blk_cnt[v_test_idx]
+            v_ok = 1
+
+            for v_i in (0, v_test_cnt - 1, 1)
+                v_px = v_blk_x[v_test_idx * 4 + v_i]
+                v_py = v_blk_y[v_test_idx * 4 + v_i]
+                v_check_x = v_current_x + v_px
+                v_check_y = v_current_y + v_py
+
+                if v_check_x < 0 or v_check_x >= v_field_width then
+                    v_ok = 0
+                endif
+
+                if v_ok == 1 and v_check_y >= 0 then
+                    v_field_idx = v_check_y * v_field_width + v_check_x
+                    if v_field[v_field_idx] != 0 then
+                        v_ok = 0
+                    endif
+                endif
+            endfor v_i
+
+            if v_ok == 1 then
+                v_current_rot = v_new_rot
+            else
+                v_current_rot = v_old_rot
+            endif
+        endif
+
+        # Move toward target X (safe move)
+        v_move_dir = 0
+        if v_current_x < v_target_x then
+            v_move_dir = 1
+        elseif v_current_x > v_target_x then
+            v_move_dir = -1
+        endif
+
+        if v_move_dir != 0 then
+            v_old_x = v_current_x
+            v_new_x = v_current_x + v_move_dir
+
+            v_ok = 1
+            for v_i in (0, v_cnt - 1, 1)
+                v_px = v_blk_x[v_idx * 4 + v_i]
+                v_py = v_blk_y[v_idx * 4 + v_i]
+                v_check_x = v_new_x + v_px
+                v_check_y = v_current_y + v_py
+
+                if v_check_x < 0 or v_check_x >= v_field_width then
+                    v_ok = 0
+                endif
+
+                if v_ok == 1 and v_check_y >= 0 then
+                    v_field_idx = v_check_y * v_field_width + v_check_x
+                    if v_field[v_field_idx] != 0 then
+                        v_ok = 0
+                    endif
+                endif
+            endfor v_i
+
+            if v_ok == 1 then
+                v_current_x = v_new_x
+            else
+                v_current_x = v_old_x
+            endif
+        endif
+
+        # Drop one step if possible
+        v_next_y = v_current_y + 1
+        v_collision = 0
+
+        for v_i in (0, v_cnt - 1, 1)
+            v_px = v_blk_x[v_idx * 4 + v_i]
+            v_py = v_blk_y[v_idx * 4 + v_i]
+            v_check_x = v_current_x + v_px
+            v_check_y = v_next_y + v_py
+
+            if v_check_y >= v_field_height then
+                v_collision = 1
+            endif
+
+            if v_collision == 0 and v_check_y >= 0 then
+                v_field_idx = v_check_y * v_field_width + v_check_x
+                if v_field[v_field_idx] != 0 then
+                    v_collision = 1
+                endif
+            endif
+        endfor v_i
+
+        if v_collision == 0 then
+            v_current_y = v_next_y
+        else
+            # Lock piece
+            v_piece_active = 0
+            for v_i in (0, v_cnt - 1, 1)
+                v_px = v_blk_x[v_idx * 4 + v_i]
+                v_py = v_blk_y[v_idx * 4 + v_i]
+                v_lock_x = v_current_x + v_px
+                v_lock_y = v_current_y + v_py
+
+                if v_lock_y >= 0 then
+                    v_field_idx = v_lock_y * v_field_width + v_lock_x
+                    v_field[v_field_idx] = v_current_piece + 1
+
+                    v_draw_x = v_field_x + v_lock_x * v_block_size
+                    v_draw_y = v_field_y + v_lock_y * v_block_size
+                    draw_rectangle(v_draw_x, v_draw_y, v_block_size, v_block_size, v_piece_color, 90, true)
+                endif
+            endfor v_i
+        endif
+
+    endwhile
+
+    # ============================================
+    # Line clear (bottom -> top to avoid skipping)
+    # ============================================
+    v_lines_this_turn = 0
+
+    for v_row in (v_field_height - 1, 0, -1)
+        v_line_complete = 1
+
+        for v_col in (0, v_field_width - 1, 1)
+            v_field_idx = v_row * v_field_width + v_col
+            if v_field[v_field_idx] == 0 then
+                v_line_complete = 0
+            endif
+        endfor v_col
+
+        if v_line_complete == 1 then
+            v_lines_this_turn = v_lines_this_turn + 1
+
+            # Shift down
+            for v_move_row in (v_row, 1, -1)
+                for v_col in (0, v_field_width - 1, 1)
+                    v_dest_idx = v_move_row * v_field_width + v_col
+                    v_src_idx = (v_move_row - 1) * v_field_width + v_col
+                    v_field[v_dest_idx] = v_field[v_src_idx]
+                endfor v_col
+            endfor v_move_row
+
+            # Clear top row
+            for v_col in (0, v_field_width - 1, 1)
+                v_field[v_col] = 0
+            endfor v_col
+
+            # Redraw field (simple)
+            begin_frame(true)
+            for v_ry in (0, v_field_height - 1, 1)
+                for v_rx in (0, v_field_width - 1, 1)
+                    v_field_idx = v_ry * v_field_width + v_rx
+                    v_draw_x = v_field_x + v_rx * v_block_size
+                    v_draw_y = v_field_y + v_ry * v_block_size
+
+                    if v_field[v_field_idx] == 0 then
+                        draw_rectangle(v_draw_x, v_draw_y, v_block_size, v_block_size, black, 100, true)
+                    else
+                        v_block_color = v_piece_colors[v_field[v_field_idx] - 1]
+                        draw_rectangle(v_draw_x, v_draw_y, v_block_size, v_block_size, v_block_color, 90, true)
+                    endif
+                endfor v_rx
+            endfor v_ry
+            end_frame
+
+            # re-check same row after shift
+            v_row = v_row + 1
+        endif
+    endfor v_row
+
+    # Update stats + speed
+    if v_lines_this_turn > 0 then
+        v_lines_cleared = v_lines_cleared + v_lines_this_turn
+
+        v_new_level = floor(v_lines_cleared / v_lines_per_level) + 1
+        v_current_speed = v_start_speed - (v_new_level - 1) * v_speed_decrease
+        if v_current_speed < v_min_speed then
+            v_current_speed = v_min_speed
+        endif
+
+        draw_rectangle(38, v_lines_display_y, 25, 8, black, 100, true)
+        draw_text(38, v_lines_display_y, str(v_lines_cleared), tiny64_font, 6, yellow, 100)
+
+        if v_new_level != v_level then
+            v_level = v_new_level
+            draw_rectangle(38, v_level_display_y, 25, 8, black, 100, true)
+            draw_text(38, v_level_display_y, v_level, tiny64_font, 6, green, 100)
+        endif
+    endif
+
+endwhile
+
+# ============================================
+# Game Over
+# ============================================
+rest(1)
+clear()
+draw_text(8, 15, "G A M E", piboto-regular, 12, red, 100, WIPE, IN_LEFT)
+draw_text(8, 35, "O V E R", piboto-regular, 12, red, 100, WIPE, IN_RIGHT)
+rest(3)
+clear_text(8, 15)
+clear_text(8, 35)
+rest(0.5)
+
+endwhile

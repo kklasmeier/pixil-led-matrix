@@ -1,0 +1,490 @@
+# Atari Breakout
+# Self-playing brick breaker game with AI paddle
+# Random layouts, classic rainbow colors, increasing difficulty
+
+throttle(0.5)
+
+# ============================================
+# Pattern shuffle system - play all 15 before repeating
+# ============================================
+create_array(v_pattern_order, 15)
+v_pattern_index = 15
+
+while true then
+
+# Check if we need to reshuffle patterns
+if v_pattern_index >= 15 then
+    # Initialize pattern order
+    for v_i in (0, 14, 1)
+        v_pattern_order[v_i] = v_i
+    endfor v_i
+    
+    # Fisher-Yates shuffle
+    for v_i in (14, 1, -1)
+        v_rand_idx = random(0, v_i, 0)
+        # Swap
+        v_temp = v_pattern_order[v_i]
+        v_pattern_order[v_i] = v_pattern_order[v_rand_idx]
+        v_pattern_order[v_rand_idx] = v_temp
+    endfor v_i
+    
+    v_pattern_index = 0
+endif
+
+# Get next pattern from shuffled order
+v_pattern = v_pattern_order[v_pattern_index]
+v_pattern_index = v_pattern_index + 1
+
+clear()
+dispose_all_sprites()
+
+# ============================================
+# Title Screen
+# ============================================
+draw_text(1, 25, "BREAKOUT", piboto-regular, 12, cyan, 100)
+rest(1.5)
+draw_text(1, 25, "BREAKOUT", piboto-regular, 12, cyan, 100, DISSOLVE, OUT)
+clear_text(1, 25)
+rest(0.5)
+clear()
+
+# ============================================
+# Game constants
+# ============================================
+v_screen_width = 64
+v_screen_height = 64
+
+# Paddle settings
+v_paddle_width = 10
+v_paddle_height = 2
+v_paddle_y = 60
+v_paddle_x = 27
+v_paddle_speed = 2
+v_paddle_lag = random(2, 5, 0)
+
+# Ball settings
+v_ball_x = 32
+v_ball_y = 50
+v_ball_dx = random(0, 1, 0)
+if v_ball_dx == 0 then
+    v_ball_dx = -1
+else
+    v_ball_dx = 1
+endif
+v_ball_dy = -1
+v_ball_speed = 1
+v_speed_increase_interval = 10
+v_bricks_hit = 0
+
+# Brick settings
+v_brick_width = 8
+v_brick_height = 3
+v_brick_rows = 6
+v_brick_cols = 8
+v_brick_top = 4
+v_brick_gap = 0
+
+# ============================================
+# Brick colors (classic Atari rainbow - bottom to top)
+# ============================================
+create_array(v_row_colors, 6, string)
+v_row_colors[0] = "blue"
+v_row_colors[1] = "green"
+v_row_colors[2] = "yellow"
+v_row_colors[3] = "orange"
+v_row_colors[4] = "red"
+v_row_colors[5] = "magenta"
+
+# ============================================
+# Create brick array (1 = exists, 0 = destroyed)
+# ============================================
+v_total_bricks = v_brick_rows * v_brick_cols
+create_array(v_bricks, 48)
+
+# Pattern is already set from shuffle system above
+
+# Initialize all bricks based on pattern
+for v_row in (0, v_brick_rows - 1, 1)
+    for v_col in (0, v_brick_cols - 1, 1)
+        v_idx = v_row * v_brick_cols + v_col
+        v_bricks[v_idx] = 0
+        
+        # Pattern 0: Full grid
+        if v_pattern == 0 then
+            v_bricks[v_idx] = 1
+        endif
+        
+        # Pattern 1: Checkerboard
+        if v_pattern == 1 then
+            v_checker = (v_row + v_col) % 2
+            if v_checker == 0 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 2: Diamond
+        if v_pattern == 2 then
+            v_center_row = 2.5
+            v_center_col = 3.5
+            v_dist_row = abs(v_row - v_center_row)
+            v_dist_col = abs(v_col - v_center_col)
+            v_diamond_dist = v_dist_row + v_dist_col
+            if v_diamond_dist <= 4 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 3: Pyramid (wide at top)
+        if v_pattern == 3 then
+            v_half_width = 4 - v_row * 0.5
+            v_dist_from_center = abs(v_col - 3.5)
+            if v_dist_from_center <= v_half_width then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 4: Border (outer edges only)
+        if v_pattern == 4 then
+            if v_row == 0 or v_row == v_brick_rows - 1 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_col == 0 or v_col == v_brick_cols - 1 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 5: Horizontal stripes
+        if v_pattern == 5 then
+            v_stripe = v_row % 2
+            if v_stripe == 0 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 6: Vertical stripes
+        if v_pattern == 6 then
+            v_stripe = v_col % 2
+            if v_stripe == 0 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 7: Inverted pyramid (wide at bottom)
+        if v_pattern == 7 then
+            v_half_width = 1 + v_row * 0.5
+            v_dist_from_center = abs(v_col - 3.5)
+            if v_dist_from_center <= v_half_width then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 8: Two columns
+        if v_pattern == 8 then
+            if v_col == 1 or v_col == 2 or v_col == 5 or v_col == 6 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 9: Center block
+        if v_pattern == 9 then
+            if v_row >= 1 and v_row <= 4 then
+                if v_col >= 2 and v_col <= 5 then
+                    v_bricks[v_idx] = 1
+                endif
+            endif
+        endif
+        
+        # Pattern 10: X pattern
+        if v_pattern == 10 then
+            if v_row == v_col or v_row == 7 - v_col then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == v_col - 1 or v_row == 6 - v_col then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 11: Corners
+        if v_pattern == 11 then
+            if v_row <= 2 and v_col <= 2 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row <= 2 and v_col >= 5 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row >= 3 and v_col <= 2 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row >= 3 and v_col >= 5 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 12: Hourglass
+        if v_pattern == 12 then
+            v_width_at_row = abs(v_row - 2.5) + 1
+            v_dist_from_center = abs(v_col - 3.5)
+            if v_dist_from_center <= v_width_at_row then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 13: Zigzag
+        if v_pattern == 13 then
+            v_offset = (v_row % 2) * 2
+            v_zigzag_col = v_col + v_offset
+            v_zigzag_check = v_zigzag_col % 4
+            if v_zigzag_check < 2 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+        # Pattern 14: Scattered blocks (fixed pattern)
+        if v_pattern == 14 then
+            if v_row == 0 and v_col % 2 == 0 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == 1 and v_col % 2 == 1 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == 2 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == 3 and v_col % 2 == 0 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == 4 and v_col % 2 == 1 then
+                v_bricks[v_idx] = 1
+            endif
+            if v_row == 5 then
+                v_bricks[v_idx] = 1
+            endif
+        endif
+        
+    endfor v_col
+endfor v_row
+
+# Count remaining bricks
+v_bricks_remaining = 0
+for v_i in (0, v_total_bricks - 1, 1)
+    if v_bricks[v_i] == 1 then
+        v_bricks_remaining = v_bricks_remaining + 1
+    endif
+endfor v_i
+
+# Ensure at least some bricks exist
+if v_bricks_remaining < 8 then
+    for v_i in (0, 15, 1)
+        if v_bricks[v_i] == 0 then
+            v_bricks[v_i] = 1
+            v_bricks_remaining = v_bricks_remaining + 1
+        endif
+    endfor v_i
+endif
+
+# ============================================
+# Draw bricks to background (only once)
+# ============================================
+for v_row in (0, v_brick_rows - 1, 1)
+    for v_col in (0, v_brick_cols - 1, 1)
+        v_idx = v_row * v_brick_cols + v_col
+        if v_bricks[v_idx] == 1 then
+            v_bx = v_col * v_brick_width
+            v_by = v_brick_top + v_row * (v_brick_height + v_brick_gap)
+            v_color = v_row_colors[v_row]
+            draw_rectangle(v_bx, v_by, v_brick_width - 1, v_brick_height, v_color, 90, true)
+        endif
+    endfor v_col
+endfor v_row
+
+# ============================================
+# Define sprites for ball and paddle
+# ============================================
+define_sprite(paddle_sprite, v_paddle_width, v_paddle_height)
+    draw_rectangle(0, 0, v_paddle_width, v_paddle_height, white, 100, true)
+endsprite
+
+define_sprite(ball_sprite, 1, 1)
+    plot(0, 0, white, 100)
+endsprite
+
+# Show sprites at initial positions
+show_sprite(paddle_sprite, v_paddle_x, v_paddle_y)
+show_sprite(ball_sprite, v_ball_x, v_ball_y)
+
+# ============================================
+# Game loop
+# ============================================
+v_game_active = 1
+
+while v_game_active == 1 then
+    
+    # ============================================
+    # AI Paddle movement with lag
+    # ============================================
+    v_target_x = v_ball_x - v_paddle_width / 2
+    
+    if v_ball_dy > 0 then
+        v_frames_to_paddle = (v_paddle_y - v_ball_y) / v_ball_speed
+        v_predicted_x = v_ball_x + v_ball_dx * v_frames_to_paddle * v_ball_speed
+        v_target_x = v_predicted_x - v_paddle_width / 2
+    endif
+    
+    if v_target_x < 0 then
+        v_target_x = 0
+    endif
+    if v_target_x > v_screen_width - v_paddle_width then
+        v_target_x = v_screen_width - v_paddle_width
+    endif
+    
+    v_diff = v_target_x - v_paddle_x
+    v_paddle_moved = 0
+    if v_diff > v_paddle_lag then
+        v_paddle_x = v_paddle_x + v_paddle_speed
+        v_paddle_moved = 1
+    elseif v_diff < 0 - v_paddle_lag then
+        v_paddle_x = v_paddle_x - v_paddle_speed
+        v_paddle_moved = 1
+    endif
+    
+    if v_paddle_x < 0 then
+        v_paddle_x = 0
+    endif
+    if v_paddle_x > v_screen_width - v_paddle_width then
+        v_paddle_x = v_screen_width - v_paddle_width
+    endif
+    
+    # Move paddle sprite if it moved
+    if v_paddle_moved == 1 then
+        move_sprite(paddle_sprite, v_paddle_x, v_paddle_y)
+    endif
+    
+    # ============================================
+    # Ball movement
+    # ============================================
+    v_new_ball_x = v_ball_x + v_ball_dx * v_ball_speed
+    v_new_ball_y = v_ball_y + v_ball_dy * v_ball_speed
+    
+    # Wall collisions (left/right)
+    if v_new_ball_x <= 0 then
+        v_new_ball_x = 0
+        v_ball_dx = 0 - v_ball_dx
+    endif
+    if v_new_ball_x >= v_screen_width - 1 then
+        v_new_ball_x = v_screen_width - 1
+        v_ball_dx = 0 - v_ball_dx
+    endif
+    
+    # Ceiling collision
+    if v_new_ball_y <= 0 then
+        v_new_ball_y = 0
+        v_ball_dy = 0 - v_ball_dy
+    endif
+    
+    # Paddle collision
+    if v_new_ball_y >= v_paddle_y - 1 and v_ball_y < v_paddle_y then
+        if v_new_ball_x >= v_paddle_x and v_new_ball_x <= v_paddle_x + v_paddle_width then
+            v_new_ball_y = v_paddle_y - 1
+            v_ball_dy = 0 - v_ball_dy
+            
+            # Adjust angle based on where ball hits paddle
+            v_hit_pos = (v_new_ball_x - v_paddle_x) / v_paddle_width
+            if v_hit_pos < 0.3 then
+                v_ball_dx = -2
+            elseif v_hit_pos < 0.45 then
+                v_ball_dx = -1
+            elseif v_hit_pos < 0.55 then
+                v_ball_dx = v_ball_dx
+            elseif v_hit_pos < 0.7 then
+                v_ball_dx = 1
+            else
+                v_ball_dx = 2
+            endif
+        endif
+    endif
+    
+    # Ball lost (missed paddle)
+    if v_new_ball_y >= v_screen_height then
+        v_ball_x = 32
+        v_ball_y = 50
+        v_ball_dy = -1
+        v_ball_dx = random(0, 1, 0)
+        if v_ball_dx == 0 then
+            v_ball_dx = -1
+        endif
+        v_ball_speed = 1
+        v_new_ball_x = v_ball_x
+        v_new_ball_y = v_ball_y
+        move_sprite(ball_sprite, v_ball_x, v_ball_y)
+        rest(0.5)
+    endif
+    
+    # ============================================
+    # Brick collisions
+    # ============================================
+    for v_row in (0, v_brick_rows - 1, 1)
+        for v_col in (0, v_brick_cols - 1, 1)
+            v_idx = v_row * v_brick_cols + v_col
+            if v_bricks[v_idx] == 1 then
+                v_bx = v_col * v_brick_width
+                v_by = v_brick_top + v_row * (v_brick_height + v_brick_gap)
+                
+                # Check collision
+                if v_new_ball_x >= v_bx and v_new_ball_x < v_bx + v_brick_width then
+                    if v_new_ball_y >= v_by and v_new_ball_y < v_by + v_brick_height then
+                        # Hit this brick
+                        v_bricks[v_idx] = 0
+                        v_bricks_remaining = v_bricks_remaining - 1
+                        v_bricks_hit = v_bricks_hit + 1
+                        
+                        # Erase brick from background
+                        draw_rectangle(v_bx, v_by, v_brick_width - 1, v_brick_height, black, 100, true)
+                        
+                        # Bounce
+                        v_ball_dy = 0 - v_ball_dy
+                        
+                        # Increase speed periodically
+                        if v_bricks_hit >= v_speed_increase_interval then
+                            v_bricks_hit = 0
+                            if v_ball_speed < 2 then
+                                v_ball_speed = v_ball_speed + 0.5
+                            endif
+                        endif
+                    endif
+                endif
+            endif
+        endfor v_col
+    endfor v_row
+    
+    # Update ball position
+    v_ball_x = v_new_ball_x
+    v_ball_y = v_new_ball_y
+    
+    # Move ball sprite
+    move_sprite(ball_sprite, round(v_ball_x), round(v_ball_y))
+    
+    # ============================================
+    # Check win condition
+    # ============================================
+    if v_bricks_remaining <= 0 then
+        v_game_active = 0
+    endif
+    
+endwhile
+
+# Hide sprites before win screen
+hide_sprite(paddle_sprite)
+hide_sprite(ball_sprite)
+
+# Victory screen
+rest(0.5)
+clear()
+draw_text(18, 15, "Y O U", piboto-regular, 12, yellow, 100, WIPE, IN_LEFT)
+draw_text(18, 35, "W I N", piboto-regular, 12, yellow, 100, WIPE, IN_RIGHT)
+rest(3)
+clear_text(18, 15)
+clear_text(18, 35)
+rest(0.5)
+
+endwhile
+

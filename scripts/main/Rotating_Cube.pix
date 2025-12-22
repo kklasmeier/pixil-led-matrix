@@ -1,0 +1,293 @@
+# Rotating Cube
+# Wireframe cube rotating in 3D space with depth-based coloring
+# Creates the classic "flip inside-out" optical illusion
+# Fluid transitions between parameter sets
+
+# Center of display
+v_cx = 32
+v_cy = 32
+
+# ============================================
+# Define cube vertices (8 corners)
+# Cube centered at origin, size 1, will be scaled
+# ============================================
+create_array(v_cube_x, 8)
+create_array(v_cube_y, 8)
+create_array(v_cube_z, 8)
+
+# Front face (z = 1)
+v_cube_x[0] = -1
+v_cube_y[0] = -1
+v_cube_z[0] = 1
+
+v_cube_x[1] = 1
+v_cube_y[1] = -1
+v_cube_z[1] = 1
+
+v_cube_x[2] = 1
+v_cube_y[2] = 1
+v_cube_z[2] = 1
+
+v_cube_x[3] = -1
+v_cube_y[3] = 1
+v_cube_z[3] = 1
+
+# Back face (z = -1)
+v_cube_x[4] = -1
+v_cube_y[4] = -1
+v_cube_z[4] = -1
+
+v_cube_x[5] = 1
+v_cube_y[5] = -1
+v_cube_z[5] = -1
+
+v_cube_x[6] = 1
+v_cube_y[6] = 1
+v_cube_z[6] = -1
+
+v_cube_x[7] = -1
+v_cube_y[7] = 1
+v_cube_z[7] = -1
+
+# Arrays for rotated and projected coordinates
+create_array(v_rot_x, 8)
+create_array(v_rot_y, 8)
+create_array(v_rot_z, 8)
+create_array(v_screen_x, 8)
+create_array(v_screen_y, 8)
+
+# Edge definitions (12 edges, each defined by 2 vertex indices)
+create_array(v_edge_a, 12)
+create_array(v_edge_b, 12)
+
+# Front face edges
+v_edge_a[0] = 0
+v_edge_b[0] = 1
+v_edge_a[1] = 1
+v_edge_b[1] = 2
+v_edge_a[2] = 2
+v_edge_b[2] = 3
+v_edge_a[3] = 3
+v_edge_b[3] = 0
+
+# Back face edges
+v_edge_a[4] = 4
+v_edge_b[4] = 5
+v_edge_a[5] = 5
+v_edge_b[5] = 6
+v_edge_a[6] = 6
+v_edge_b[6] = 7
+v_edge_a[7] = 7
+v_edge_b[7] = 4
+
+# Connecting edges
+v_edge_a[8] = 0
+v_edge_b[8] = 4
+v_edge_a[9] = 1
+v_edge_b[9] = 5
+v_edge_a[10] = 2
+v_edge_b[10] = 6
+v_edge_a[11] = 3
+v_edge_b[11] = 7
+
+# Color palettes stored as arrays
+create_array(v_front_colors, 4, string)
+create_array(v_back_colors, 4, string)
+v_front_colors[0] = "white"
+v_back_colors[0] = "gray"
+v_front_colors[1] = "cyan"
+v_back_colors[1] = "blue"
+v_front_colors[2] = "lime"
+v_back_colors[2] = "green"
+v_front_colors[3] = "orange"
+v_back_colors[3] = "red"
+
+# ============================================
+# Initialize current parameters
+# ============================================
+v_size = random(15, 25, 0)
+v_rot_speed_y = random(2, 5, 0)
+v_rot_speed_x = random(1, 3, 0)
+
+v_dir_y = random(0, 1, 0)
+if v_dir_y == 0 then
+    v_rot_speed_y = 0 - v_rot_speed_y
+endif
+
+v_dir_x = random(0, 1, 0)
+if v_dir_x == 0 then
+    v_rot_speed_x = 0 - v_rot_speed_x
+endif
+
+v_palette = random(0, 3, 0)
+v_front_color = v_front_colors[v_palette]
+v_back_color = v_back_colors[v_palette]
+
+# Target parameters (start same as current)
+v_target_size = v_size
+v_target_speed_y = v_rot_speed_y
+v_target_speed_x = v_rot_speed_x
+
+# Current rotation angles (continuous, never reset)
+v_angle_x = 0
+v_angle_y = 0
+
+# Frame counter and transition control
+v_frame_count = 0
+v_next_transition = random(150, 300, 0)
+v_transitioning = 0
+v_transition_frames = 30
+
+# Frame delay
+v_delay = random(0, 30, 0)
+
+# ============================================
+# Main animation loop - runs forever
+# ============================================
+while true then
+    
+    v_frame_count = v_frame_count + 1
+    
+    # ============================================
+    # Check if time to start new transition
+    # ============================================
+    if v_frame_count >= v_next_transition and v_transitioning == 0 then
+        v_transitioning = v_transition_frames
+        
+        # Pick new target parameters
+        v_target_size = random(15, 25, 0)
+        v_target_speed_y = random(2, 5, 0)
+        v_target_speed_x = random(1, 3, 0)
+        
+        v_dir_y = random(0, 1, 0)
+        if v_dir_y == 0 then
+            v_target_speed_y = 0 - v_target_speed_y
+        endif
+        
+        v_dir_x = random(0, 1, 0)
+        if v_dir_x == 0 then
+            v_target_speed_x = 0 - v_target_speed_x
+        endif
+        
+        # New color palette
+        v_palette = random(0, 3, 0)
+        v_front_color = v_front_colors[v_palette]
+        v_back_color = v_back_colors[v_palette]
+        
+        # New delay
+        v_delay = random(0, 30, 0)
+    endif
+    
+    # ============================================
+    # Interpolate parameters during transition
+    # ============================================
+    if v_transitioning > 0 then
+        # Ease toward targets
+        v_size = v_size + (v_target_size - v_size) / 8
+        v_rot_speed_y = v_rot_speed_y + (v_target_speed_y - v_rot_speed_y) / 8
+        v_rot_speed_x = v_rot_speed_x + (v_target_speed_x - v_rot_speed_x) / 8
+        
+        v_transitioning = v_transitioning - 1
+        
+        # When transition complete, schedule next one
+        if v_transitioning == 0 then
+            v_frame_count = 0
+            v_next_transition = random(150, 300, 0)
+        endif
+    endif
+    
+    # Convert angles to radians
+    v_rad_x = v_angle_x * pi / 180
+    v_rad_y = v_angle_y * pi / 180
+    
+    # Precompute trig values
+    v_cos_x = cos(v_rad_x)
+    v_sin_x = sin(v_rad_x)
+    v_cos_y = cos(v_rad_y)
+    v_sin_y = sin(v_rad_y)
+    
+    # ============================================
+    # Rotate and project each vertex
+    # ============================================
+    for v_i in (0, 7, 1)
+        # Get original vertex scaled by size
+        v_x = v_cube_x[v_i] * v_size
+        v_y = v_cube_y[v_i] * v_size
+        v_z = v_cube_z[v_i] * v_size
+        
+        # Rotate around Y axis
+        v_temp_x = v_x * v_cos_y - v_z * v_sin_y
+        v_temp_z = v_x * v_sin_y + v_z * v_cos_y
+        v_x = v_temp_x
+        v_z = v_temp_z
+        
+        # Rotate around X axis
+        v_temp_y = v_y * v_cos_x - v_z * v_sin_x
+        v_temp_z = v_y * v_sin_x + v_z * v_cos_x
+        v_y = v_temp_y
+        v_z = v_temp_z
+        
+        # Store rotated coordinates
+        v_rot_x[v_i] = v_x
+        v_rot_y[v_i] = v_y
+        v_rot_z[v_i] = v_z
+        
+        # Project to 2D (simple orthographic projection)
+        v_screen_x[v_i] = round(v_cx + v_x)
+        v_screen_y[v_i] = round(v_cy + v_y)
+    endfor v_i
+    
+    # ============================================
+    # Draw edges with depth-based coloring
+    # ============================================
+    begin_frame
+    for v_e in (0, 11, 1)
+        v_a = v_edge_a[v_e]
+        v_b = v_edge_b[v_e]
+        
+        # Calculate average Z depth of this edge
+        v_avg_z = (v_rot_z[v_a] + v_rot_z[v_b]) / 2
+        
+        # Determine color and intensity based on depth
+        # Positive Z = front (closer), negative Z = back (further)
+        if v_avg_z > 0 then
+            v_edge_color = v_front_color
+            v_edge_int = 70 + round(v_avg_z / v_size * 30)
+        else
+            v_edge_color = v_back_color
+            v_edge_int = 50 + round((v_avg_z + v_size) / v_size * 20)
+        endif
+        
+        # Clamp intensity
+        if v_edge_int > 100 then
+            v_edge_int = 100
+        endif
+        if v_edge_int < 30 then
+            v_edge_int = 30
+        endif
+        
+        # Draw the edge
+        draw_line(v_screen_x[v_a], v_screen_y[v_a], v_screen_x[v_b], v_screen_y[v_b], v_edge_color, v_edge_int)
+    endfor v_e
+    end_frame
+    
+    # Update rotation angles
+    v_angle_x = v_angle_x + v_rot_speed_x
+    v_angle_y = v_angle_y + v_rot_speed_y
+    
+    # Keep angles in bounds
+    if v_angle_x > 360 then
+        v_angle_x = v_angle_x - 360
+    endif
+    if v_angle_x < 0 then
+        v_angle_x = v_angle_x + 360
+    endif
+    if v_angle_y > 360 then
+        v_angle_y = v_angle_y - 360
+    endif
+    if v_angle_y < 0 then
+        v_angle_y = v_angle_y + 360
+    endif
+    
+    rest(v_delay / 1000)
+endwhile
