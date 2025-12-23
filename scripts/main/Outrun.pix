@@ -1,0 +1,341 @@
+# ============================================
+# OUTRUN DRIVING v2: Proper Vanishing Point Curve
+# 64x64 LED Matrix - Optimized Performance
+# ============================================
+
+throttle(0.3)
+
+# -----------------------------
+# Display Config
+# -----------------------------
+v_w = 64
+v_h = 64
+v_cx = 32
+
+v_horizon_y = 32
+v_bottom_y = 63
+v_span = v_bottom_y - v_horizon_y
+
+# Grid config
+v_grid_lines = 10
+v_road_half_bottom = 30
+
+# Perspective / motion
+v_z_near = 0.8
+v_z_far = 10.0
+v_z_speed = 0.2
+v_focal = v_span * v_z_near
+
+# Sun config
+v_sun_base_x = 32
+v_sun_y = 20
+v_sun_r = 12
+
+# -----------------------------
+# Road curve - vanishing point moves
+# -----------------------------
+v_vanish_x = 32
+v_vanish_offset = 0.0
+v_curve_speed = 0.4
+v_curve_max = 14.0
+v_curve_timer = 0
+v_curve_hold = 60
+v_curve_state = 0
+
+# Curve segments for smooth road bending
+v_road_segments = 12
+
+# -----------------------------
+# Hills - horizon oscillates up/down
+# -----------------------------
+v_hill_angle = 0.0
+v_hill_speed = 0.04
+v_hill_amount = 6
+v_horizon_base = 32
+
+# -----------------------------
+# Depth lines array
+# -----------------------------
+create_array(v_z, 10)
+
+v_i = 0
+while v_i < v_grid_lines then
+    v_z[v_i] = v_z_near + (v_i * ((v_z_far - v_z_near) / v_grid_lines))
+    v_i = v_i + 1
+endwhile
+
+# -----------------------------
+# Main loop
+# -----------------------------
+while true then
+
+    begin_frame(true)
+
+    # Calculate dynamic horizon for hills
+    v_horizon_y = v_horizon_base + floor(sin(v_hill_angle) * v_hill_amount)
+    v_span = v_bottom_y - v_horizon_y
+    v_focal = v_span * v_z_near
+    
+    # Sun moves slightly with hills (1/4 the amount)
+    v_sun_y_current = v_sun_y + floor(sin(v_hill_angle) * v_hill_amount * 0.25)
+
+    # Calculate vanishing point for this frame
+    # Sun moves OPPOSITmagentaE to road curve (turning right = sun goes left)
+    # Sun moves at 1/4 the rate of road curve
+    v_vanish_x = v_cx + floor(v_vanish_offset)
+    v_sun_x = v_sun_base_x - floor(v_vanish_offset * 0.25)
+
+    # ----------------------------------------
+    # Sky - black background
+    # ----------------------------------------
+    draw_rectangle(0, 0, 64, v_horizon_y + 1, black, 100, true)
+
+    # Horizon glow lines
+    draw_line(0, v_horizon_y - 3, 63, v_horizon_y - 3, purple, 20)
+    draw_line(0, v_horizon_y - 2, 63, v_horizon_y - 2, purple, 35)
+    draw_line(0, v_horizon_y - 1, 63, v_horizon_y - 1, magenta, 45)
+    draw_line(0, v_horizon_y, 63, v_horizon_y, cyan, 30)
+
+    # ----------------------------------------
+    # Neon sun (classic Outrun style)
+    # Bottom half: alternating dark/darker purple stripes
+    # Top half: solid orange/yellow
+    # ----------------------------------------
+    v_sy = -v_sun_r
+    while v_sy <= v_sun_r then
+        v_yy = v_sy * v_sy
+        v_rr = v_sun_r * v_sun_r
+        v_xspan = floor(sqrt(v_rr - v_yy))
+
+        v_y = v_sun_y_current + v_sy
+        if v_y >= 0 and v_y < v_horizon_y then
+            v_x1 = v_sun_x - v_xspan
+            v_x2 = v_sun_x + v_xspan
+            
+            if v_x1 < 0 then
+                v_x1 = 0
+            endif
+            if v_x2 > 63 then
+                v_x2 = 63
+            endif
+
+            # Top half of sun (v_sy =< 0): solid orange/yellow gradient
+            # Bottom half (v_sy > 0): alternating dark/darker purple stripes
+            if v_sy < 0 then
+                # Top half - solid warm colors
+                v_fade = abs(v_sy) / v_sun_r
+                if v_fade > 0.6 then
+                    draw_line(v_x1, v_y, v_x2, v_y, yellow, 75)
+                else
+                    draw_line(v_x1, v_y, v_x2, v_y, orange, 60)
+                endif
+            elseif v_sy == 0 then
+                draw_line(v_x1, v_y, v_x2, v_y, orange, 35)
+            else
+                # Bottom half - alternating dark purple and darker purple rows
+                if floor(v_sy / 2) * 2 == v_sy then
+                    draw_line(v_x1, v_y, v_x2, v_y, purple, 50)
+                else
+                    draw_line(v_x1, v_y, v_x2, v_y, magenta, 55)
+                endif
+
+
+
+
+            endif
+        endif
+
+        v_sy = v_sy + 1
+    endwhile
+
+    # ----------------------------------------
+    # Ground fill - single rectangle
+    # ----------------------------------------
+    draw_rectangle(0, v_horizon_y + 1, 64, 32, black, 100, true)
+
+    # ----------------------------------------
+    # Road edge lines (silver) - CURVED segments
+    # Curve bends more near camera, less at horizon
+    # ----------------------------------------
+    v_left_bottom = v_cx - v_road_half_bottom
+    v_right_bottom = v_cx + v_road_half_bottom
+    
+    # Draw curved road edges as connected segments
+    v_seg = 0
+    while v_seg < v_road_segments then
+        # Calculate depth for this segment and next
+        v_d1 = v_seg / v_road_segments
+        v_d2 = (v_seg + 1) / v_road_segments
+        
+        # Y positions (from horizon to bottom)
+        v_y1 = v_horizon_y + floor(v_d1 * v_span)
+        v_y2 = v_horizon_y + floor(v_d2 * v_span)
+        
+        # Curve offset uses squared depth for parabolic bend
+        # More curve near camera (high depth), less at horizon
+        v_curve1 = v_vanish_offset * v_d1 * v_d1
+        v_curve2 = v_vanish_offset * v_d2 * v_d2
+        
+        # Left edge X positions with curve
+        v_x1_left = v_vanish_x + floor((v_left_bottom - v_vanish_x) * v_d1) + floor(v_curve1 * 0.3)
+        v_x2_left = v_vanish_x + floor((v_left_bottom - v_vanish_x) * v_d2) + floor(v_curve2 * 0.3)
+        
+        # Right edge X positions with curve
+        v_x1_right = v_vanish_x + floor((v_right_bottom - v_vanish_x) * v_d1) + floor(v_curve1 * 0.3)
+        v_x2_right = v_vanish_x + floor((v_right_bottom - v_vanish_x) * v_d2) + floor(v_curve2 * 0.3)
+        
+        # Draw left edge segment
+        draw_line(v_x1_left, v_y1, v_x2_left, v_y2, silver, 70)
+        
+        # Draw right edge segment
+        draw_line(v_x1_right, v_y1, v_x2_right, v_y2, silver, 70)
+        
+        v_seg = v_seg + 1
+    endwhile
+
+    # ----------------------------------------
+    # Horizontal grid lines with center dashes
+    # ----------------------------------------
+    v_i = 0
+    while v_i < v_grid_lines then
+        v_cur_z = v_z[v_i]
+
+        if v_cur_z > v_z_near then
+            v_projected_y = v_horizon_y + floor(v_focal / v_cur_z)
+
+            if v_projected_y > v_horizon_y and v_projected_y <= v_bottom_y then
+                # Depth factor 0-1
+                v_depth = (v_projected_y - v_horizon_y) / v_span
+                
+                # Curve offset at this depth (parabolic)
+                v_curve_at_y = v_vanish_offset * v_depth * v_depth * 0.3
+                
+                # Interpolate x positions based on depth + curve
+                v_line_left = v_vanish_x + floor((v_left_bottom - v_vanish_x) * v_depth) + floor(v_curve_at_y)
+                v_line_right = v_vanish_x + floor((v_right_bottom - v_vanish_x) * v_depth) + floor(v_curve_at_y)
+                
+                # Clamp to screen
+                if v_line_left < 0 then
+                    v_line_left = 0
+                endif
+                if v_line_right > 63 then
+                    v_line_right = 63
+                endif
+
+                # Draw horizontal grid line
+                v_intensity = 18 + floor(v_depth * 22)
+                draw_line(v_line_left, v_projected_y, v_line_right, v_projected_y, cyan, v_intensity)
+
+                # Center dash (every other line)
+                if floor(v_i / 2) * 2 == v_i then
+                    v_center_x = floor((v_line_left + v_line_right) / 2)
+                    v_dash_half = floor(v_depth * 2)
+                    if v_dash_half < 1 then
+                        v_dash_half = 1
+                    endif
+                    draw_line(v_center_x - v_dash_half, v_projected_y, v_center_x + v_dash_half, v_projected_y, yellow, 75)
+                endif
+            endif
+        endif
+
+        v_i = v_i + 1
+    endwhile
+
+    # ----------------------------------------
+    # Roadside accents (sparse for performance)
+    # ----------------------------------------
+    v_scan = v_horizon_y + 6
+    while v_scan <= v_bottom_y then
+        v_depth = (v_scan - v_horizon_y) / v_span
+        v_curve_at_y = v_vanish_offset * v_depth * v_depth * 0.3
+        v_line_left = v_vanish_x + floor((v_left_bottom - v_vanish_x) * v_depth) + floor(v_curve_at_y)
+        v_line_right = v_vanish_x + floor((v_right_bottom - v_vanish_x) * v_depth) + floor(v_curve_at_y)
+        
+        # Alternating stripes
+        v_stripe = floor(v_scan / 4)
+        if floor(v_stripe / 2) * 2 == v_stripe then
+            if v_line_left > 3 then
+                draw_line(0, v_scan, v_line_left - 3, v_scan, purple, 18)
+            endif
+            if v_line_right < 60 then
+                draw_line(v_line_right + 3, v_scan, 63, v_scan, purple, 18)
+            endif
+        endif
+        
+        v_scan = v_scan + 4
+    endwhile
+
+    end_frame
+
+    # ----------------------------------------
+    # Animate depth lines
+    # ----------------------------------------
+    v_i = 0
+    while v_i < v_grid_lines then
+        v_z[v_i] = v_z[v_i] - v_z_speed
+        if v_z[v_i] <= v_z_near then
+            v_z[v_i] = v_z[v_i] + (v_z_far - v_z_near)
+        endif
+        v_i = v_i + 1
+    endwhile
+
+    # ----------------------------------------
+    # Animate vanishing point curve
+    # ----------------------------------------
+    if v_curve_state == 0 then
+        v_vanish_offset = v_vanish_offset + v_curve_speed
+        if v_vanish_offset >= v_curve_max then
+            v_vanish_offset = v_curve_max
+            v_curve_state = 1
+            v_curve_timer = 0
+        endif
+    endif
+
+    if v_curve_state == 1 then
+        v_curve_timer = v_curve_timer + 1
+        if v_curve_timer >= v_curve_hold then
+            v_curve_state = 2
+        endif
+    endif
+
+    if v_curve_state == 2 then
+        v_vanish_offset = v_vanish_offset - v_curve_speed
+        if v_vanish_offset <= 0 then
+            v_vanish_offset = 0
+            v_curve_state = 3
+        endif
+    endif
+
+    if v_curve_state == 3 then
+        v_vanish_offset = v_vanish_offset - v_curve_speed
+        if v_vanish_offset <= -v_curve_max then
+            v_vanish_offset = -v_curve_max
+            v_curve_state = 4
+            v_curve_timer = 0
+        endif
+    endif
+
+    if v_curve_state == 4 then
+        v_curve_timer = v_curve_timer + 1
+        if v_curve_timer >= v_curve_hold then
+            v_curve_state = 5
+        endif
+    endif
+
+    if v_curve_state == 5 then
+        v_vanish_offset = v_vanish_offset + v_curve_speed
+        if v_vanish_offset >= 0 then
+            v_vanish_offset = 0
+            v_curve_state = 0
+        endif
+    endif
+
+    # ----------------------------------------
+    # Animate hills (continuous sine wave)
+    # ----------------------------------------
+    v_hill_angle = v_hill_angle + v_hill_speed
+    if v_hill_angle > 6.28318 then
+        v_hill_angle = v_hill_angle - 6.28318
+    endif
+
+endwhile
