@@ -1,0 +1,332 @@
+# ================================================================
+# Arc Sprite Test - Proper Sprite Usage
+# Tests drawing arcs into sprites and moving them around
+# ================================================================
+
+clear()
+print("Arc Sprite Animation Test")
+sync_queue
+
+# ================================================================
+# Test 1: Simple Arc Sprite - Smiley Face
+# ================================================================
+
+# Define smiley face sprite with arc smile
+define_sprite(smiley, 24, 24)
+    draw_circle(12, 12, 10, yellow, 100, true)
+    draw_circle(8, 9, 2, black, 100, true)
+    draw_circle(16, 9, 2, black, 100, true)
+    draw_arc(8, 14, 16, 14, -4, black, 100, false)
+endsprite
+
+sync_queue
+
+# Show smiley and move it across the screen
+show_sprite(smiley, 0, 20, 0)
+
+for v_x = 0 to 40
+    move_sprite(smiley, 0, v_x, 20)
+    rest(0.05)
+next
+
+rest(1)
+
+# Move it back
+for v_x = 40 to 0 step -1
+    move_sprite(smiley, 0, v_x, 20)
+    rest(0.05)
+next
+
+hide_sprite(smiley, 0)
+sync_queue
+rest(1)
+
+# ================================================================
+# Test 2: Multiple Arc Sprites - Rainbow Arcs
+# ================================================================
+
+clear()
+print("Multiple Arc Sprites")
+sync_queue
+
+# Define different colored arc sprites
+define_sprite(arc_red, 30, 20)
+    draw_arc(5, 15, 25, 15, 12, red, 100, false)
+endsprite
+
+define_sprite(arc_green, 30, 20)
+    draw_arc(5, 15, 25, 15, 12, green, 100, false)
+endsprite
+
+define_sprite(arc_blue, 30, 20)
+    draw_arc(5, 15, 25, 15, 12, blue, 100, false)
+endsprite
+
+sync_queue
+
+# Show all three arcs stacked
+show_sprite(arc_red, 17, 10, 0)
+show_sprite(arc_green, 17, 20, 1)
+show_sprite(arc_blue, 17, 30, 2)
+
+rest(2)
+
+# Move them in a wave pattern
+for v_i = 0 to 50
+    v_offset1 = sin(v_i * 0.2) * 5
+    v_offset2 = sin(v_i * 0.2 + 1) * 5
+    v_offset3 = sin(v_i * 0.2 + 2) * 5
+    
+    move_sprite(arc_red, 0, 17 + v_offset1, 10)
+    move_sprite(arc_green, 1, 17 + v_offset2, 20)
+    move_sprite(arc_blue, 2, 17 + v_offset3, 30)
+    
+    rest(0.05)
+next
+
+hide_sprite(arc_red, 0)
+hide_sprite(arc_green, 1)
+hide_sprite(arc_blue, 2)
+sync_queue
+rest(1)
+
+# ================================================================
+# Test 3: Filled Arc Sprite - Pac-Man
+# ================================================================
+
+clear()
+print("Pac-Man Sprite")
+sync_queue
+
+# Define Pac-Man sprite (closed mouth)
+define_sprite(pacman_closed, 20, 20)
+    draw_circle(10, 10, 9, yellow, 100, true)
+    plot(7, 7, black, 100)
+endsprite
+
+# Define Pac-Man sprite (open mouth)
+define_sprite(pacman_open, 20, 20)
+    draw_circle(10, 10, 9, yellow, 100, true)
+    draw_arc(10, 10, 19, 10, 4, black, 100, true)
+    draw_arc(10, 10, 19, 10, -4, black, 100, true)
+    plot(7, 7, black, 100)
+endsprite
+
+sync_queue
+
+# Animate Pac-Man chomping while moving
+v_x = 0
+v_mouth_open = 0
+
+for v_i = 0 to 60
+    # Toggle mouth open/closed every 5 frames
+    if v_i % 5 == 0 then
+        if v_mouth_open == 0 then
+            hide_sprite(pacman_closed, 0)
+            show_sprite(pacman_open, v_x, 22, 0)
+            v_mouth_open = 1
+        else
+            hide_sprite(pacman_open, 0)
+            show_sprite(pacman_closed, v_x, 22, 0)
+            v_mouth_open = 0
+        endif
+    endif
+    
+    # Move Pac-Man forward
+    v_x = v_x + 0.7
+    if v_mouth_open == 0 then
+        move_sprite(pacman_closed, 0, v_x, 22)
+    else
+        move_sprite(pacman_open, 0, v_x, 22)
+    endif
+    
+    rest(0.05)
+next
+
+hide_sprite(pacman_closed, 0)
+hide_sprite(pacman_open, 0)
+sync_queue
+rest(1)
+
+# ================================================================
+# Test 4: Bouncing Ball with Arc Highlight
+# ================================================================
+
+clear()
+print("Bouncing Ball with Arc")
+sync_queue
+
+# Define ball sprite with arc highlight
+define_sprite(ball, 16, 16)
+    draw_circle(8, 8, 7, red, 100, true)
+    draw_arc(4, 5, 10, 5, 4, white, 80, true)
+endsprite
+
+sync_queue
+
+# Bounce physics
+v_x = 24
+v_y = 0
+v_vel_y = 0
+v_gravity = 0.5
+
+show_sprite(ball, v_x, v_y, 0)
+
+for v_i = 0 to 100
+    # Apply gravity
+    v_vel_y = v_vel_y + v_gravity
+    v_y = v_y + v_vel_y
+    
+    # Bounce off bottom
+    if v_y > 48 then
+        v_y = 48
+        v_vel_y = v_vel_y * -0.7
+    endif
+    
+    # Update position
+    move_sprite(ball, 0, v_x, v_y)
+    rest(0.03)
+next
+
+hide_sprite(ball, 0)
+sync_queue
+rest(1)
+
+# ================================================================
+# Test 5: Multiple Ball Instances
+# ================================================================
+
+clear()
+print("Multiple Bouncing Balls")
+sync_queue
+
+# Create multiple ball instances with different colors
+define_sprite(ball_red, 12, 12)
+    draw_circle(6, 6, 5, red, 100, true)
+    draw_arc(3, 3, 8, 3, 3, white, 70, true)
+endsprite
+
+define_sprite(ball_green, 12, 12)
+    draw_circle(6, 6, 5, green, 100, true)
+    draw_arc(3, 3, 8, 3, 3, white, 70, true)
+endsprite
+
+define_sprite(ball_blue, 12, 12)
+    draw_circle(6, 6, 5, blue, 100, true)
+    draw_arc(3, 3, 8, 3, 3, white, 70, true)
+endsprite
+
+sync_queue
+
+# Initialize 3 balls
+v_num_balls = 3
+create_array(v_ball_y, v_num_balls)
+create_array(v_ball_vel, v_num_balls)
+
+v_ball_y[0] = 0
+v_ball_y[1] = 5
+v_ball_y[2] = 10
+
+v_ball_vel[0] = 0
+v_ball_vel[1] = 0
+v_ball_vel[2] = 0
+
+# Show all balls
+show_sprite(ball_red, 10, v_ball_y[0], 0)
+show_sprite(ball_green, 26, v_ball_y[1], 1)
+show_sprite(ball_blue, 42, v_ball_y[2], 2)
+
+# Animate bouncing
+for v_frame = 0 to 150
+    # Update each ball
+    for v_i = 0 to 2
+        # Apply gravity
+        v_ball_vel[v_i] = v_ball_vel[v_i] + 0.4
+        v_ball_y[v_i] = v_ball_y[v_i] + v_ball_vel[v_i]
+        
+        # Bounce
+        if v_ball_y[v_i] > 52 then
+            v_ball_y[v_i] = 52
+            v_ball_vel[v_i] = v_ball_vel[v_i] * -0.75
+        endif
+    next
+    
+    # Update sprite positions
+    move_sprite(ball_red, 0, 10, v_ball_y[0])
+    move_sprite(ball_green, 1, 26, v_ball_y[1])
+    move_sprite(ball_blue, 2, 42, v_ball_y[2])
+    
+    rest(0.03)
+next
+
+hide_sprite(ball_red, 0)
+hide_sprite(ball_green, 1)
+hide_sprite(ball_blue, 2)
+sync_queue
+rest(1)
+
+# ================================================================
+# Test 6: Moon Phases with Arcs
+# ================================================================
+
+clear()
+print("Moon Phases")
+sync_queue
+
+# Define different moon phase sprites
+define_sprite(moon_full, 18, 18)
+    draw_circle(9, 9, 8, white, 100, true)
+endsprite
+
+define_sprite(moon_waning, 18, 18)
+    draw_circle(9, 9, 8, white, 100, true)
+    draw_arc(9, 1, 9, 17, -5, black, 100, true)
+endsprite
+
+define_sprite(moon_half, 18, 18)
+    draw_circle(9, 9, 8, white, 100, true)
+    draw_arc(9, 1, 9, 17, 0, black, 100, true)
+endsprite
+
+define_sprite(moon_crescent, 18, 18)
+    draw_circle(9, 9, 8, white, 100, true)
+    draw_arc(9, 1, 9, 17, 5, black, 100, true)
+endsprite
+
+sync_queue
+
+# Show phases in sequence
+show_sprite(moon_full, 5, 23, 0)
+rest(1)
+
+hide_sprite(moon_full, 0)
+show_sprite(moon_waning, 17, 23, 1)
+rest(1)
+
+hide_sprite(moon_waning, 1)
+show_sprite(moon_half, 29, 23, 2)
+rest(1)
+
+hide_sprite(moon_half, 2)
+show_sprite(moon_crescent, 41, 23, 3)
+rest(2)
+
+# Hide all
+hide_sprite(moon_crescent, 3)
+sync_queue
+
+# ================================================================
+# Test Complete
+# ================================================================
+
+clear()
+print("Arc Sprite Test Complete!")
+
+# Draw checkmark with arcs
+draw_circle(32, 32, 15, green, 100, true)
+draw_arc(24, 32, 30, 36, -5, white, 100, false)
+draw_arc(30, 36, 42, 24, -8, white, 100, false)
+
+sync_queue
+rest(3)
+clear()

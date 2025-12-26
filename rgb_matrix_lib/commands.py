@@ -20,6 +20,7 @@ class CommandExecutor:
             'draw_circle': self._handle_draw_circle,
             'draw_polygon': self._handle_draw_polygon,
             'draw_ellipse': self._handle_draw_ellipse,
+            'draw_arc': self._handle_draw_arc,
             'define_sprite': self._handle_define_sprite,
             'sprite_draw': self._handle_sprite_draw,
             'show_sprite': self._handle_show_sprite,
@@ -255,6 +256,16 @@ class CommandExecutor:
             Level.DEBUG, Component.COMMAND)
         self.api.draw_ellipse(x_center, y_center, x_radius, y_radius, color, 
                             intensity, fill, rotation, burnout)
+
+    def _handle_draw_arc(self, x1: int, y1: int, x2: int, y2: int, bulge: float,
+                         color: Union[str, int], intensity: int = 100, fill: bool = False,
+                         burnout: Optional[int] = None):
+        """Handle draw_arc command."""
+        debug(f"Handling draw_arc command: ({x1}, {y1}) to ({x2}, {y2}), bulge={bulge}, "
+              f"in {color} at {intensity}%, fill={fill}, "
+              f"burnout {burnout if burnout is not None else 'None (permanent)'}", 
+              Level.DEBUG, Component.COMMAND)
+        self.api.draw_arc(x1, y1, x2, y2, bulge, color, intensity, fill, burnout)
         
     def _handle_define_sprite(self, name: str, width: int, height: int):
         """Handle define_sprite command."""
@@ -296,6 +307,11 @@ class CommandExecutor:
             fill = args[6] if len(args) > 6 else False
             rotation = float(args[7]) if len(args) > 7 else 0
             self.api.draw_to_sprite(name, cmd, x, y, x_radius, y_radius, color, intensity, fill, rotation)
+        elif cmd == 'draw_arc' and len(args) >= 6:
+            x1, y1, x2, y2, arc_height, color = args[:6]
+            intensity = int(args[6]) if len(args) > 6 else 100
+            fill = args[7] if len(args) > 7 else False
+            self.api.draw_to_sprite(name, cmd, x1, y1, x2, y2, arc_height, color, intensity, fill)
         elif cmd == 'clear':
             self.api.draw_to_sprite(name, cmd)
         else:

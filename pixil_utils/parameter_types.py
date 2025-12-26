@@ -50,6 +50,17 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'filled', 'type': 'bool', 'position': 5},
         {'name': 'duration', 'type': 'float', 'position': 6, 'optional': True}
     ],
+    'draw_arc': [
+        {'name': 'x1', 'type': 'int', 'position': 0},
+        {'name': 'y1', 'type': 'int', 'position': 1},
+        {'name': 'x2', 'type': 'int', 'position': 2},
+        {'name': 'y2', 'type': 'int', 'position': 3},
+        {'name': 'bulge', 'type': 'float', 'position': 4},
+        {'name': 'color', 'type': 'color', 'position': 5},
+        {'name': 'intensity', 'type': 'int', 'position': 6, 'optional': True, 'default': '100'},
+        {'name': 'filled', 'type': 'bool', 'position': 7, 'optional': True, 'default': 'false'},
+        {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True}
+    ],
     'rest': [
         {'name': 'duration', 'type': 'float', 'position': 0}
     ],

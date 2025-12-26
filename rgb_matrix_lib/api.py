@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 import math
 from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager
-from .utils import get_color_rgb, polygon_vertices, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells  # Added get_grid_cells
+from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells
 from typing import Optional, List, Tuple, Union, Any
 from .debug import debug, Level, Component
 from .sprite import MatrixSprite, SpriteManager
@@ -569,6 +569,54 @@ class RGB_Api:
                 list(points), burnout
             )
 
+    def draw_arc(self, x1: int, y1: int, x2: int, y2: int, bulge: float, color: Union[str, int],
+                 intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
+        """
+        Draw an arc defined by two endpoints and a bulge value.
+        
+        The arc curves between the start point (x1, y1) and end point (x2, y2).
+        The bulge parameter controls how much the arc curves away from the straight 
+        line (chord) between the endpoints.
+        
+        Args:
+            x1, y1: Start point of the arc
+            x2, y2: End point of the arc
+            bulge: Perpendicular distance from chord midpoint to arc peak
+                   - Positive: curves to port (left when traveling start→end)
+                   - Negative: curves to starboard (right when traveling start→end)
+                   - Zero: draws a straight line
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            fill: If True, fills the chord area between arc and straight line (default False)
+            burnout: Duration in milliseconds before the arc fades (None for permanent)
+        """
+        rgb_color = self._get_color(color, intensity)
+        
+        debug(f"Drawing arc: ({x1},{y1}) to ({x2},{y2}), bulge={bulge}, "
+              f"color={color} at {intensity}%, fill={fill}, "
+              f"burnout={burnout if burnout is not None else 'None (permanent)'}", 
+              Level.DEBUG, Component.DRAWING)
+        
+        # Get all points for the arc (outline or filled)
+        points = arc_points(x1, y1, x2, y2, bulge, filled=fill)
+        
+        # Draw all points to the buffer
+        drawn_points = []
+        for px, py in points:
+            if 0 <= px < self.matrix.width and 0 <= py < self.matrix.height:
+                self._draw_to_buffers(px, py, rgb_color[0], rgb_color[1], rgb_color[2])
+                drawn_points.append((px, py))
+        
+        self._maybe_swap_buffer()
+        
+        # Register with burnout manager if duration specified
+        if burnout is not None:
+            self.burnout_manager.add_object(
+                ShapeType.ARC, (x1, y1, x2, y2, bulge), drawn_points, burnout
+            )
+        
+        debug(f"Arc drawn with {len(drawn_points)} pixels", Level.TRACE, Component.DRAWING)
+
     def draw_text(self, x: int, y: int, text: Any, font_name: str, font_size: int, 
                 color: Union[str, int], intensity: int = 100, effect: Union[str, TextEffect] = "NORMAL",
                 modifier: Optional[Union[str, EffectModifier]] = None) -> None:
@@ -802,6 +850,11 @@ class RGB_Api:
                 rotation = float(args[7]) if len(args) > 7 else 0
                 sprite.draw_ellipse(int(x), int(y), int(x_radius), int(y_radius), 
                                 color, intensity, fill, rotation)
+            elif command == 'draw_arc' and len(args) >= 6:
+                x1, y1, x2, y2, arc_height, color = args[:6]
+                intensity = int(args[6]) if len(args) > 6 else 100
+                fill = bool(args[7]) if len(args) > 7 else False
+                sprite.draw_arc(int(x1), int(y1), int(x2), int(y2), float(arc_height), color, intensity, fill)
             elif command == 'clear':
                 sprite.clear()
             else:

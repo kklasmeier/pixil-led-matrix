@@ -283,3 +283,241 @@ def rotate_points(points: List[Tuple[int, int]], x_center: int, y_center: int,
         rotated.append((rx + x_center, ry + y_center))
     
     return rotated
+
+
+def arc_points(x1: int, y1: int, x2: int, y2: int, bulge: float, 
+               filled: bool = False) -> List[Tuple[int, int]]:
+    """
+    Calculate pixel coordinates for an arc defined by two endpoints and a bulge value.
+    
+    The arc is defined by:
+    - Start point (x1, y1)
+    - End point (x2, y2)
+    - Bulge: perpendicular distance from chord midpoint to arc peak
+      - Positive bulge: arc curves to port (left when traveling from start to end)
+      - Negative bulge: arc curves to starboard (right)
+      - Zero bulge: straight line
+    
+    Args:
+        x1, y1: Start point coordinates
+        x2, y2: End point coordinates
+        bulge: Perpendicular distance from chord to arc peak
+        filled: If True, fill the chord area (between arc and straight chord line)
+    
+    Returns:
+        List of (x, y) pixel coordinates
+    """
+    points = set()
+    
+    # Handle degenerate case: bulge = 0 means straight line
+    if abs(bulge) < 0.001:
+        debug(f"Arc with zero bulge - drawing straight line from ({x1},{y1}) to ({x2},{y2})", 
+              Level.TRACE, Component.DRAWING)
+        return _line_points(x1, y1, x2, y2)
+    
+    # Calculate chord properties
+    chord_dx = x2 - x1
+    chord_dy = y2 - y1
+    chord_length = math.sqrt(chord_dx * chord_dx + chord_dy * chord_dy)
+    
+    # Handle degenerate case: start and end are the same point
+    if chord_length < 0.001:
+        debug(f"Arc with coincident endpoints - returning single point", 
+              Level.TRACE, Component.DRAWING)
+        return [(round(x1), round(y1))]
+    
+    # Chord midpoint
+    mx = (x1 + x2) / 2.0
+    my = (y1 + y2) / 2.0
+    
+    # Unit vector along chord
+    ux = chord_dx / chord_length
+    uy = chord_dy / chord_length
+    
+    # Perpendicular unit vector (rotated 90° counterclockwise = "port" side)
+    # When traveling from start to end, port is to the left
+    px = -uy
+    py = ux
+    
+    # The arc peak point (on the arc, perpendicular to chord midpoint)
+    # Positive bulge = port side, negative = starboard side
+    peak_x = mx + px * bulge
+    peak_y = my + py * bulge
+    
+    # Now find the circle center and radius
+    # The center lies on the perpendicular bisector of the chord
+    # and is equidistant from start, end, and peak
+    
+    # Using the relationship between chord, sagitta (bulge), and radius:
+    # For a chord of length L with sagitta h:
+    # radius = (L²/4 + h²) / (2|h|)
+    half_chord = chord_length / 2.0
+    abs_bulge = abs(bulge)
+    radius = (half_chord * half_chord + abs_bulge * abs_bulge) / (2.0 * abs_bulge)
+    
+    # Distance from chord midpoint to center (along perpendicular)
+    # center_dist = radius - |bulge| (center is on opposite side of chord from peak)
+    center_dist = radius - abs_bulge
+    
+    # Center position: move from midpoint toward the peak, then continue past it
+    # Actually: center is on the OPPOSITE side of the chord from the peak
+    # If bulge > 0 (peak on port side), center is on starboard side
+    cx = mx - px * bulge / abs_bulge * center_dist
+    cy = my - py * bulge / abs_bulge * center_dist
+    
+    debug(f"Arc: chord_len={chord_length:.2f}, bulge={bulge:.2f}, radius={radius:.2f}, "
+          f"center=({cx:.2f},{cy:.2f})", Level.TRACE, Component.DRAWING)
+    
+    # Calculate start and end angles from center
+    start_angle = math.atan2(y1 - cy, x1 - cx)
+    end_angle = math.atan2(y2 - cy, x2 - cx)
+    
+    # Determine sweep direction based on bulge sign
+    # Positive bulge (port side curve): we need to go the "short way" that passes through peak
+    # We need to determine if we should go clockwise or counterclockwise
+    
+    # Calculate the angle to the peak point
+    peak_angle = math.atan2(peak_y - cy, peak_x - cx)
+    
+    # Normalize angles to [0, 2π)
+    def normalize_angle(a):
+        while a < 0:
+            a += 2 * math.pi
+        while a >= 2 * math.pi:
+            a -= 2 * math.pi
+        return a
+    
+    start_angle_norm = normalize_angle(start_angle)
+    end_angle_norm = normalize_angle(end_angle)
+    peak_angle_norm = normalize_angle(peak_angle)
+    
+    # Determine if going counterclockwise from start to end passes through peak
+    def angle_between_ccw(start, end, test):
+        """Check if test angle is between start and end going counterclockwise"""
+        if start <= end:
+            return start <= test <= end
+        else:
+            return test >= start or test <= end
+    
+    ccw_passes_peak = angle_between_ccw(start_angle_norm, end_angle_norm, peak_angle_norm)
+    
+    # Choose direction that passes through the peak
+    if ccw_passes_peak:
+        # Go counterclockwise
+        if end_angle_norm < start_angle_norm:
+            end_angle_norm += 2 * math.pi
+        sweep = end_angle_norm - start_angle_norm
+        direction = 1  # counterclockwise
+    else:
+        # Go clockwise
+        if start_angle_norm < end_angle_norm:
+            start_angle_norm += 2 * math.pi
+        sweep = start_angle_norm - end_angle_norm
+        direction = -1  # clockwise
+    
+    # Number of steps based on arc length
+    arc_length = abs(sweep) * radius
+    num_steps = max(int(arc_length * 2), 20)  # At least 20 steps, ~0.5 pixel per step
+    
+    debug(f"Arc sweep: {math.degrees(sweep):.1f}° in {num_steps} steps, direction={direction}", 
+          Level.TRACE, Component.DRAWING)
+    
+    # Generate arc points
+    arc_outline = []
+    for i in range(num_steps + 1):
+        t = i / num_steps
+        if direction == 1:
+            angle = start_angle + t * sweep
+        else:
+            angle = start_angle - t * sweep
+        
+        px_arc = round(cx + radius * math.cos(angle))
+        py_arc = round(cy + radius * math.sin(angle))
+        arc_outline.append((px_arc, py_arc))
+        points.add((px_arc, py_arc))
+    
+    if filled:
+        # Chord fill: fill the area between the arc and the straight chord line
+        # Use scanline fill algorithm
+        
+        # Get chord line points
+        chord_points = _line_points(x1, y1, x2, y2)
+        
+        # Build a closed polygon: arc points + chord points (reversed to close)
+        # Actually, we just need the arc outline - the chord closes it
+        polygon = arc_outline.copy()
+        
+        # Find bounding box
+        all_x = [p[0] for p in polygon]
+        all_y = [p[1] for p in polygon]
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        
+        # Scanline fill between arc and chord
+        for y in range(min_y, max_y + 1):
+            # Find arc intersections at this y
+            arc_intersections = []
+            for i in range(len(arc_outline) - 1):
+                ax1, ay1 = arc_outline[i]
+                ax2, ay2 = arc_outline[i + 1]
+                if (ay1 <= y < ay2) or (ay2 <= y < ay1):
+                    if ay2 != ay1:
+                        t = (y - ay1) / (ay2 - ay1)
+                        x_intersect = ax1 + t * (ax2 - ax1)
+                        arc_intersections.append(x_intersect)
+            
+            # Find chord intersection at this y
+            chord_intersections = []
+            if (y1 <= y < y2) or (y2 <= y < y1):
+                if y2 != y1:
+                    t = (y - y1) / (y2 - y1)
+                    x_intersect = x1 + t * (x2 - x1)
+                    chord_intersections.append(x_intersect)
+            
+            # Combine and sort all intersections
+            all_intersections = arc_intersections + chord_intersections
+            if len(all_intersections) >= 2:
+                all_intersections.sort()
+                # Fill between pairs
+                for i in range(0, len(all_intersections) - 1, 2):
+                    x_start = int(round(all_intersections[i]))
+                    x_end = int(round(all_intersections[i + 1]))
+                    for x in range(x_start, x_end + 1):
+                        points.add((x, y))
+    
+    return list(points)
+
+
+def _line_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
+    """
+    Generate points along a line using Bresenham's algorithm.
+    
+    Args:
+        x0, y0: Start point
+        x1, y1: End point
+    
+    Returns:
+        List of (x, y) coordinates along the line
+    """
+    points = []
+    
+    dx = abs(x1 - x0)
+    dy = -abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx + dy
+    
+    x, y = x0, y0
+    while True:
+        points.append((x, y))
+        if x == x1 and y == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x += sx
+        if e2 <= dx:
+            err += dx
+            y += sy
+    
+    return points

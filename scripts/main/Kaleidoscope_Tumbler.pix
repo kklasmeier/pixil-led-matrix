@@ -1,6 +1,6 @@
-# Kaleidoscope Tumbler v2 - Optimized
-# Reduced for/if overhead, pre-calculated angles, simplified physics
-# Runs forever, fading between sequences
+# Kaleidoscope Tumbler v2 - Optimized (Drop-in Replacement)
+# Adds: per-sequence BLOOM / CONTRACT modes with soft wrap + fade-in/fade-out
+# Render-only transform (keeps physics intact, preserves fluid drift)
 
 # ============================================================
 # CONFIGURABLE SETTINGS
@@ -21,7 +21,7 @@ v_wedge_color1 = "navy"
 v_wedge_color2 = "dark_gray"
 v_wedge_intensity = 25
 
-throttle(0.3)
+throttle(0.6)
 
 # ============================================================
 # CONSTANTS
@@ -39,6 +39,16 @@ create_array(v_seg_sin, 8)
 create_array(v_seg_mirror, 8)
 
 # ============================================================
+# WEDGE GEOMETRY CACHE (max 8 symmetry)
+# Pre-calculated wedge boundary points at v_max_radius
+# plus per-wedge arc bulge and per-wedge color
+# ============================================================
+create_array(v_wedge_x, 9)
+create_array(v_wedge_y, 9)
+create_array(v_wedge_bulge, 8)
+create_array(v_wedge_color, 8, string)
+
+# ============================================================
 # OBJECT ARRAYS (max 10 objects)
 # ============================================================
 create_array(v_obj_x, 10)
@@ -54,6 +64,18 @@ create_array(v_obj_intensity, 10)
 
 # Color palette array (8 colors per palette for more diversity)
 create_array(v_pal_colors, 8, string)
+
+# ============================================================
+# BLOOM / CONTRACT STATE (render-only; keeps physics intact)
+# ============================================================
+create_array(v_obj_phase, 10)          # per-object offset [0..1)
+create_array(v_obj_fade_mul, 10)       # per-object fade multiplier 0..1
+
+v_motion_mode = 0                     # 0=OSCILLATE, 1=BLOOM, 2=CONTRACT
+v_global_phase = 0.0                  # 0..1
+v_phase_step = 0.008                  # bloom/contract speed (tune)
+v_wrap_band_px = 10                   # fade band in pixels near center/edge (tune)
+v_band = 0.20                         # derived each sequence: wrap_band_px / v_max_radius
 
 # ============================================================
 # SEQUENCE STATE
@@ -118,111 +140,198 @@ def calc_segment_angles {
 }
 
 # ------------------------------
+# Pre-calculate wedge boundary points + arc bulges at v_max_radius
+# Called once per sequence (after v_symmetry and v_wedge_angle are set)
+# Removes trig + cross-product work from the per-frame draw_wedges path
+# ------------------------------
+def calc_wedge_geometry {
+    # Wedge endpoint cache at the outer radius
+    v_wedge_x[0] = v_center_x + v_max_radius * v_seg_cos[0]
+    v_wedge_y[0] = v_center_y + v_max_radius * v_seg_sin[0]
+    v_wedge_x[1] = v_center_x + v_max_radius * v_seg_cos[1]
+    v_wedge_y[1] = v_center_y + v_max_radius * v_seg_sin[1]
+    v_wedge_x[2] = v_center_x + v_max_radius * v_seg_cos[2]
+    v_wedge_y[2] = v_center_y + v_max_radius * v_seg_sin[2]
+    v_wedge_x[3] = v_center_x + v_max_radius * v_seg_cos[3]
+    v_wedge_y[3] = v_center_y + v_max_radius * v_seg_sin[3]
+    v_wedge_x[4] = v_center_x + v_max_radius * v_seg_cos[4]
+    v_wedge_y[4] = v_center_y + v_max_radius * v_seg_sin[4]
+    v_wedge_x[5] = v_center_x + v_max_radius * v_seg_cos[5]
+    v_wedge_y[5] = v_center_y + v_max_radius * v_seg_sin[5]
+    v_wedge_x[6] = v_center_x + v_max_radius * v_seg_cos[6]
+    v_wedge_y[6] = v_center_y + v_max_radius * v_seg_sin[6]
+    v_wedge_x[7] = v_center_x + v_max_radius * v_seg_cos[7]
+    v_wedge_y[7] = v_center_y + v_max_radius * v_seg_sin[7]
+
+    # Close loop
+    v_wedge_x[8] = v_wedge_x[0]
+    v_wedge_y[8] = v_wedge_y[0]
+
+    # Alternate wedge colors
+    v_wedge_color[0] = v_wedge_color1
+    v_wedge_color[1] = v_wedge_color2
+    v_wedge_color[2] = v_wedge_color1
+    v_wedge_color[3] = v_wedge_color2
+    v_wedge_color[4] = v_wedge_color1
+    v_wedge_color[5] = v_wedge_color2
+    v_wedge_color[6] = v_wedge_color1
+    v_wedge_color[7] = v_wedge_color2
+
+    # Arc bulge magnitude (sagitta) for this wedge angle
+    v_theta = v_wedge_angle_rad
+    v_sag = v_max_radius * (1 - cos(v_theta / 2))
+
+    # Precompute bulge sign so arcs curve OUTWARD (away from center)
+
+    # Wedge 0
+    v_x1 = v_wedge_x[0]
+    v_y1 = v_wedge_y[0]
+    v_x2 = v_wedge_x[1]
+    v_y2 = v_wedge_y[1]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[0] = -v_sag
+    else
+        v_wedge_bulge[0] = v_sag
+    endif
+
+    # Wedge 1
+    v_x1 = v_wedge_x[1]
+    v_y1 = v_wedge_y[1]
+    v_x2 = v_wedge_x[2]
+    v_y2 = v_wedge_y[2]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[1] = -v_sag
+    else
+        v_wedge_bulge[1] = v_sag
+    endif
+
+    # Wedge 2
+    v_x1 = v_wedge_x[2]
+    v_y1 = v_wedge_y[2]
+    v_x2 = v_wedge_x[3]
+    v_y2 = v_wedge_y[3]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[2] = -v_sag
+    else
+        v_wedge_bulge[2] = v_sag
+    endif
+
+    # Wedge 3
+    v_x1 = v_wedge_x[3]
+    v_y1 = v_wedge_y[3]
+    v_x2 = v_wedge_x[4]
+    v_y2 = v_wedge_y[4]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[3] = -v_sag
+    else
+        v_wedge_bulge[3] = v_sag
+    endif
+
+    # Wedge 4
+    v_x1 = v_wedge_x[4]
+    v_y1 = v_wedge_y[4]
+    v_x2 = v_wedge_x[5]
+    v_y2 = v_wedge_y[5]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[4] = -v_sag
+    else
+        v_wedge_bulge[4] = v_sag
+    endif
+
+    # Wedge 5
+    v_x1 = v_wedge_x[5]
+    v_y1 = v_wedge_y[5]
+    v_x2 = v_wedge_x[6]
+    v_y2 = v_wedge_y[6]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[5] = -v_sag
+    else
+        v_wedge_bulge[5] = v_sag
+    endif
+
+    # Wedge 6
+    v_x1 = v_wedge_x[6]
+    v_y1 = v_wedge_y[6]
+    v_x2 = v_wedge_x[7]
+    v_y2 = v_wedge_y[7]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[6] = -v_sag
+    else
+        v_wedge_bulge[6] = v_sag
+    endif
+
+    # Wedge 7
+    v_x1 = v_wedge_x[7]
+    v_y1 = v_wedge_y[7]
+    v_x2 = v_wedge_x[8]
+    v_y2 = v_wedge_y[8]
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_cx = v_center_x - v_x1
+    v_cy = v_center_y - v_y1
+    v_cross = v_dx * v_cy - v_dy * v_cx
+    if v_cross > 0 then
+        v_wedge_bulge[7] = -v_sag
+    else
+        v_wedge_bulge[7] = v_sag
+    endif
+}
+
+# ------------------------------
 # Draw alternating wedge backgrounds
-# Uses triangles from center to edge
+# Uses triangles from center to edge + an outer arc
 # ------------------------------
 def draw_wedges {
     v_wedge_inten = v_wedge_intensity * v_fade_multiplier / 100
-    
-    # Draw wedge 0
-    v_w_angle1 = 0
-    v_w_angle2 = v_wedge_angle
-    v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-    v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-    v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-    v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-    draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color1, v_wedge_inten)
-    draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-    draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-    
-    # Draw wedge 1
-    v_w_angle1 = v_wedge_angle
-    v_w_angle2 = v_wedge_angle * 2
-    v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-    v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-    v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-    v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-    draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color2, v_wedge_inten)
-    draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-    draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-    
-    # Draw wedge 2
-    if v_symmetry > 2 then
-        v_w_angle1 = v_wedge_angle * 2
-        v_w_angle2 = v_wedge_angle * 3
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color1, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-    endif
-    
-    # Draw wedge 3
-    if v_symmetry > 3 then
-        v_w_angle1 = v_wedge_angle * 3
-        v_w_angle2 = v_wedge_angle * 4
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color2, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-    endif
-    
-    # Draw wedge 4
-    if v_symmetry > 4 then
-        v_w_angle1 = v_wedge_angle * 4
-        v_w_angle2 = v_wedge_angle * 5
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color1, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-    endif
-    
-    # Draw wedge 5
-    if v_symmetry > 5 then
-        v_w_angle1 = v_wedge_angle * 5
-        v_w_angle2 = v_wedge_angle * 6
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color2, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-    endif
-    
-    # Draw wedge 6
-    if v_symmetry > 6 then
-        v_w_angle1 = v_wedge_angle * 6
-        v_w_angle2 = v_wedge_angle * 7
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color1, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color1, v_wedge_inten)
-    endif
-    
-    # Draw wedge 7
-    if v_symmetry > 7 then
-        v_w_angle1 = v_wedge_angle * 7
-        v_w_angle2 = v_wedge_angle * 8
-        v_wx1 = v_center_x + v_max_radius * cos(radians(v_w_angle1))
-        v_wy1 = v_center_y + v_max_radius * sin(radians(v_w_angle1))
-        v_wx2 = v_center_x + v_max_radius * cos(radians(v_w_angle2))
-        v_wy2 = v_center_y + v_max_radius * sin(radians(v_w_angle2))
-        draw_line(v_center_x, v_center_y, v_wx1, v_wy1, v_wedge_color2, v_wedge_inten)
-        draw_line(v_center_x, v_center_y, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-        draw_line(v_wx1, v_wy1, v_wx2, v_wy2, v_wedge_color2, v_wedge_inten)
-    endif
+
+    for v_wi in (0, v_symmetry - 1, 1)
+        v_wi2 = v_wi + 1
+
+        v_x1 = v_wedge_x[v_wi]
+        v_y1 = v_wedge_y[v_wi]
+        v_x2 = v_wedge_x[v_wi2]
+        v_y2 = v_wedge_y[v_wi2]
+        v_color = v_wedge_color[v_wi]
+
+        draw_line(v_center_x, v_center_y, v_x1, v_y1, v_color, v_wedge_inten)
+        draw_line(v_center_x, v_center_y, v_x2, v_y2, v_color, v_wedge_inten)
+        draw_arc(v_x1, v_y1, v_x2, v_y2, v_wedge_bulge[v_wi], v_color, v_wedge_inten, false)
+    endfor v_wi
 }
 
 # ------------------------------
@@ -369,31 +478,52 @@ def init_sequence {
     
     call setup_palette
     call calc_segment_angles
-    
-    print(f"Sequence: sym={v_symmetry} obj={v_num_objects} wedge={v_wedge_angle} drift={v_do_drift} spin={v_do_spin} speed={v_motion_speed}")
+    call calc_wedge_geometry
+
+    # ------------------------------------------------
+    # Motion mode per sequence: OSCILLATE / BLOOM / CONTRACT
+    # (render-only; preserves physics fluidity)
+    # ------------------------------------------------
+    v_r = random(0, 99, 0)
+    if v_r < 35 then
+        v_motion_mode = 0      # OSCILLATE
+    elseif v_r < 68 then
+        v_motion_mode = 1      # BLOOM
+    else
+        v_motion_mode = 2      # CONTRACT
+    endif
+
+    # Fade band expressed in phase units (0..1)
+    v_band = v_wrap_band_px / v_max_radius
+    if v_band < 0.03 then
+        v_band = 0.03
+    endif
+    if v_band > 0.35 then
+        v_band = 0.35
+    endif
+
+    # Reset phase driver each sequence
+    v_global_phase = 0.0
+
+    print(f"Sequence: sym={v_symmetry} obj={v_num_objects} wedge={v_wedge_angle} drift={v_do_drift} spin={v_do_spin} speed={v_motion_speed} mode={v_motion_mode}")
 }
 
 # ------------------------------
 # Initialize single object within primary wedge
-# Uses polar coordinates: random angle 0 to wedge_angle, random radius
 # v_io_idx must be set before calling
 # ------------------------------
 def init_single_object {
-    # Random position in polar coords within wedge
     v_init_r = random(5, v_max_radius - 4, 0)
     v_init_angle = random(5, v_wedge_angle - 5, 0)
     v_obj_x[v_io_idx] = v_center_x + v_init_r * cos(radians(v_init_angle))
     v_obj_y[v_io_idx] = v_center_y + v_init_r * sin(radians(v_init_angle))
     
-    # Random velocity (will be constrained by wedge bounce)
     v_obj_vx[v_io_idx] = random(-10, 10, 1) / 10.0 * v_motion_speed
     v_obj_vy[v_io_idx] = random(-10, 10, 1) / 10.0 * v_motion_speed
     
-    # Rotation
     v_obj_angle[v_io_idx] = random(0, 359, 0)
     v_obj_spin[v_io_idx] = random(-20, 20, 0) / 10.0 * v_motion_speed
     
-    # Appearance
     v_obj_size[v_io_idx] = random(2, 4, 0)
     v_obj_shape[v_io_idx] = random(1, 3, 0)
     v_obj_color_idx[v_io_idx] = random(0, 7, 0)
@@ -424,24 +554,26 @@ def init_objects {
     call init_single_object
     v_io_idx = 9
     call init_single_object
+
+    # Stagger bloom/contract wrap so objects never cluster/pop together
+    for v_i in (0, 9, 1)
+        v_obj_phase[v_i] = random(0, 1, 3)
+        v_obj_fade_mul[v_i] = 1.0
+    endfor v_i
 }
 
 # ------------------------------
 # Update single object physics (called with v_ui set)
-# Constrains to primary wedge (0 to wedge_angle) and circular boundary
 # ------------------------------
 def update_single_object {
-    # Drift movement
     if v_do_drift == 1 then
         v_obj_x[v_ui] = v_obj_x[v_ui] + v_obj_vx[v_ui]
         v_obj_y[v_ui] = v_obj_y[v_ui] + v_obj_vy[v_ui]
         
-        # Get position relative to center
         v_bdx = v_obj_x[v_ui] - v_center_x
         v_bdy = v_obj_y[v_ui] - v_center_y
         v_dist_sq = v_bdx * v_bdx + v_bdy * v_bdy
         
-        # Circular boundary check
         v_limit = v_max_radius - v_obj_size[v_ui]
         v_limit_sq = v_limit * v_limit
         
@@ -450,45 +582,32 @@ def update_single_object {
             v_norm_x = v_bdx / v_dist
             v_norm_y = v_bdy / v_dist
             
-            # Reflect velocity off circular boundary
             v_dot = v_obj_vx[v_ui] * v_norm_x + v_obj_vy[v_ui] * v_norm_y
             v_obj_vx[v_ui] = v_obj_vx[v_ui] - 2 * v_dot * v_norm_x
             v_obj_vy[v_ui] = v_obj_vy[v_ui] - 2 * v_dot * v_norm_y
             
-            # Push back inside circle
             v_obj_x[v_ui] = v_center_x + v_norm_x * (v_limit - 1)
             v_obj_y[v_ui] = v_center_y + v_norm_y * (v_limit - 1)
             
-            # Recalculate relative position
             v_bdx = v_obj_x[v_ui] - v_center_x
             v_bdy = v_obj_y[v_ui] - v_center_y
         endif
         
-        # Wedge angle boundary check
-        # Calculate current angle (atan2 returns radians)
         v_cur_angle = atan2(v_bdy, v_bdx)
         
-        # Check if below angle 0 (negative angle)
         if v_cur_angle < 0 then
-            # Reflect off the 0-degree edge (horizontal, pointing right)
-            # Normal is (0, -1) for line y=0 from center going right
             v_obj_vy[v_ui] = abs(v_obj_vy[v_ui])
             v_obj_y[v_ui] = v_center_y + 1
         endif
         
-        # Check if above wedge angle
         if v_cur_angle > v_wedge_angle_rad then
-            # Reflect off the upper wedge edge
-            # The normal perpendicular to this edge points "down" into the wedge
             v_edge_nx = sin(v_wedge_angle_rad)
             v_edge_ny = 0 - cos(v_wedge_angle_rad)
             
-            # Reflect velocity
             v_dot = v_obj_vx[v_ui] * v_edge_nx + v_obj_vy[v_ui] * v_edge_ny
             v_obj_vx[v_ui] = v_obj_vx[v_ui] - 2 * v_dot * v_edge_nx
             v_obj_vy[v_ui] = v_obj_vy[v_ui] - 2 * v_dot * v_edge_ny
             
-            # Push back inside wedge
             v_cur_dist = sqrt(v_bdx * v_bdx + v_bdy * v_bdy)
             v_new_angle = v_wedge_angle_rad - 0.05
             v_obj_x[v_ui] = v_center_x + v_cur_dist * cos(v_new_angle)
@@ -496,7 +615,6 @@ def update_single_object {
         endif
     endif
     
-    # Spin rotation
     if v_do_spin == 1 then
         v_obj_angle[v_ui] = v_obj_angle[v_ui] + v_obj_spin[v_ui]
     endif
@@ -548,6 +666,46 @@ def update_objects {
 }
 
 # ------------------------------
+# Update bloom/contract phase + per-object fade multipliers
+# Render-only: does NOT affect physics positions
+# ------------------------------
+def update_bloom_contract {
+    if v_motion_mode == 1 or v_motion_mode == 2 then
+        v_global_phase = v_global_phase + v_phase_step
+        if v_global_phase >= 1 then
+            v_global_phase = v_global_phase - 1
+        endif
+    endif
+
+    for v_i in (0, v_num_objects - 1, 1)
+        v_p = v_global_phase + v_obj_phase[v_i]
+        if v_p >= 1 then
+            v_p = v_p - 1
+        endif
+
+        v_mul = 1.0
+
+        if v_p < v_band then
+            v_mul = v_p / v_band
+        endif
+
+        v_edge = 1 - v_band
+        if v_p > v_edge then
+            v_mul = (1 - v_p) / v_band
+        endif
+
+        if v_mul < 0 then
+            v_mul = 0
+        endif
+        if v_mul > 1 then
+            v_mul = 1
+        endif
+
+        v_obj_fade_mul[v_i] = v_mul
+    endfor v_i
+}
+
+# ------------------------------
 # Draw one object at one segment position
 # v_dx, v_dy = position, v_di = object index
 # ------------------------------
@@ -556,11 +714,15 @@ def draw_at_segment {
     v_draw_color = v_pal_colors[v_col_i]
     v_obj_inten = v_obj_intensity[v_di]
     v_draw_inten = v_obj_inten * v_fade_multiplier / 100
+
+    if v_motion_mode == 1 or v_motion_mode == 2 then
+        v_draw_inten = v_draw_inten * v_obj_fade_mul[v_di]
+    endif
+
     v_draw_size = v_obj_size[v_di]
     v_draw_angle = v_obj_angle[v_di]
     v_draw_shape = v_obj_shape[v_di]
     
-    # Shape 1: circle, 2: triangle, 3: hexagon
     if v_draw_shape == 1 then
         draw_circle(v_dx, v_dy, v_draw_size, v_draw_color, v_draw_inten, true)
     endif
@@ -581,10 +743,28 @@ def draw_object_symmetric {
     v_oy = v_obj_y[v_di]
     v_rel_x = v_ox - v_center_x
     v_rel_y = v_oy - v_center_y
+
+    # Render-only bloom/contract scaling (preserves drift physics)
+    v_scale = 1.0
+    if v_motion_mode == 1 or v_motion_mode == 2 then
+        v_p = v_global_phase + v_obj_phase[v_di]
+        if v_p >= 1 then
+            v_p = v_p - 1
+        endif
+
+        if v_motion_mode == 1 then
+            v_scale = v_p
+        else
+            v_scale = 1 - v_p
+        endif
+    endif
+
+    v_rel_x = v_rel_x * v_scale
+    v_rel_y = v_rel_y * v_scale
     
-    # Segment 0 - always draw original
-    v_dx = v_ox
-    v_dy = v_oy
+    # Segment 0
+    v_dx = v_center_x + v_rel_x
+    v_dy = v_center_y + v_rel_y
     call draw_at_segment
     
     # Segment 1
@@ -678,10 +858,8 @@ def draw_object_symmetric {
 def draw_frame {
     begin_frame
     
-    # Draw wedge backgrounds first
     call draw_wedges
     
-    # Draw objects (always at least 1)
     v_di = 0
     call draw_object_symmetric
     
@@ -753,7 +931,6 @@ def fade_in {
 # ============================================================
 # MAIN LOOP
 # ============================================================
-
 print("Kaleidoscope Tumbler v2 starting...")
 
 while 1 == 1 then
@@ -765,6 +942,7 @@ while 1 == 1 then
     
     for v_frame in (0, v_total_frames, 1)
         call update_objects
+        call update_bloom_contract
         call draw_frame
         rest(v_frame_delay)
     endfor v_frame

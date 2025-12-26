@@ -16,6 +16,12 @@ Drawing Commands
 * clear() - Clears the display
 * draw_polygon(x, y, radius, sides, color, [intensity], [rotation], [filled], [duration]) - Draws a polygon with a defined number of sides that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated.
 * draw_ellipse(x_center, y_center, x_radius, y_radius, color, [intensity], [fill], [rotation], [burnout]) - Draws an ellipse that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated
+* draw_arc(x1, y1, x2, y2, bulge, color, [intensity], [filled], [duration])
+    Understanding Bulge parameter: The bulge value represents the perpendicular distance from the chord (straight line between endpoints) to the arc's peak:
+        Positive bulge: Arc curves to the port side (left when traveling from start to end)
+        Negative bulge: Arc curves to the starboard side (right when traveling from start to end)
+        Zero bulge: Draws a straight line
+        Larger absolute values: More pronounced curve
 
 Note: When the burnout is not specified, then the shape will stay displayed until the matrix is cleared
 
@@ -68,6 +74,24 @@ draw_ellipse(32, 32, 10, 5, red, 100, false, 0, 2000)
 # Standalone filled ellipse with variables
 v_x = 32
 draw_ellipse(v_x, v_x, 15, 8, blue, 75, true, v_x * 1.5, 3000)
+
+# Basic arc curving upward
+draw_arc(10, 32, 54, 32, 15, red)
+
+# Arc curving downward
+draw_arc(10, 32, 54, 32, -15, blue)
+
+# Filled arc at 75% intensity
+draw_arc(10, 32, 54, 32, 12, cyan, 75, true)
+
+# Arc with 2-second burnout
+draw_arc(10, 32, 54, 32, 15, white, 100, false, 2000)
+
+# Subtle curve (small bulge)
+draw_arc(0, 32, 63, 32, 5, green)
+
+# Dramatic curve (large bulge)
+draw_arc(0, 32, 63, 32, 25, orange)
 
 Arrays
 ------

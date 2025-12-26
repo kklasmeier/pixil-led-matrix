@@ -1,0 +1,45 @@
+# ================================================================
+# TEST 19: Sprite with Arc - Pac-Man Animation
+# ================================================================
+clear()
+print("TEST 19: Pac-Man Animation")
+sync_queue
+
+# Animate Pac-Man opening and closing mouth
+define_sprite(pacman, 24, 24)
+sync_queue
+
+for v_mouth = 0 to 10
+    # Clear sprite
+    sprite_draw(pacman, draw_rectangle, 0, 0, 24, 24, 0, 100, true)
+    
+    # Draw Pac-Man body
+    sprite_draw(pacman, draw_circle, 12, 12, 10, yellow, 100, true)
+    
+    # Draw mouth (arc)
+    v_mouth_height = v_mouth
+    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, v_mouth_height, black, 100, true)
+    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, -v_mouth_height, black, 100, true)
+    
+    show_sprite(pacman, 20, 20, 0)
+    rest(0.1)
+next
+
+# Close mouth
+for v_mouth = 10 to 0 step -1
+    sprite_draw(pacman, draw_rectangle, 0, 0, 24, 24, 0, 100, true)
+    sprite_draw(pacman, draw_circle, 12, 12, 10, yellow, 100, true)
+    
+    v_mouth_height = v_mouth
+    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, v_mouth_height, black, 100, true)
+    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, -v_mouth_height, black, 100, true)
+    
+    show_sprite(pacman, 20, 20, 0)
+    rest(0.1)
+next
+
+rest(5)
+sync_queue
+hide_sprite(pacman, 0)
+dispose_sprite(pacman, 0)
+sync_queue

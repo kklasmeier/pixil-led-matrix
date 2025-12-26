@@ -1077,7 +1077,7 @@ def process_script(filename, execute_func=None):
         command_match = COMMAND_PATTERN.match(line)
         if command_match:
             cmd_name = command_match.group(1)
-            valid_commands = ['plot', 'draw_line', 'draw_rectangle', 'draw_circle', 'draw_polygon', 'draw_text', 'draw_ellipse']
+            valid_commands = ['plot', 'draw_line', 'draw_rectangle', 'draw_circle', 'draw_polygon', 'draw_text', 'draw_ellipse', 'draw_arc']
             if cmd_name not in valid_commands:
                 debug_print(f"Warning: '{cmd_name}' is not a valid drawing command for sprite definition", DEBUG_CONCISE)
                 return

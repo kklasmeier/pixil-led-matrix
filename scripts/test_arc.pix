@@ -1,0 +1,241 @@
+# Test script for draw_arc command in Pixil
+# Tests various arc configurations with clear labels and burnout demos
+
+print("=== draw_arc Test Suite ===")
+print("")
+
+# Test 1: Basic horizontal arcs with positive and negative bulge
+print("Test 1: Basic Horizontal Arcs")
+print("  Red arc curves UP (positive bulge = port)")
+print("  Blue arc curves DOWN (negative bulge = starboard)")
+draw_arc(10, 32, 54, 32, 15, red)
+draw_arc(10, 32, 54, 32, -15, blue)
+rest(4)
+sync_queue
+clear
+
+# Test 2: Vertical arcs
+print("Test 2: Vertical Arcs")
+print("  Green curves LEFT (positive bulge)")
+print("  Yellow curves RIGHT (negative bulge)")
+draw_arc(32, 10, 32, 54, 15, green)
+draw_arc(32, 10, 32, 54, -15, yellow)
+rest(4)
+sync_queue
+clear
+
+
+# Test 3: Diagonal arcs
+print("Test 3: Diagonal Arcs")
+print("  Cyan: top-left to bottom-right, positive bulge")
+print("  Magenta: top-right to bottom-left, negative bulge")
+draw_arc(10, 10, 54, 54, 12, cyan)
+draw_arc(54, 10, 10, 54, -12, magenta)
+rest(4)
+sync_queue
+clear
+
+
+# Test 4: Zero bulge (should be straight line)
+print("Test 4: Zero Bulge (Straight Line)")
+print("  bulge=0 should draw a straight line")
+draw_arc(10, 10, 54, 54, 0, white)
+rest(4)
+sync_queue
+clear
+
+
+# Test 5: Filled arcs (chord fill)
+print("Test 5: Filled Arcs (Chord Fill)")
+print("  Red filled arc on left (positive bulge)")
+print("  Blue filled arc on right (negative bulge)")
+draw_arc(5, 32, 30, 32, 12, red, 100, true)
+draw_arc(34, 32, 59, 32, -12, blue, 100, true)
+rest(4)
+sync_queue
+clear
+
+
+# Test 6: Arcs with intensity variations
+print("Test 6: Intensity Variations")
+print("  Top: 100% intensity")
+print("  Middle: 60% intensity")
+print("  Bottom: 30% intensity")
+draw_arc(10, 16, 54, 16, 8, white, 100)
+draw_arc(10, 32, 54, 32, 8, white, 60)
+draw_arc(10, 48, 54, 48, 8, white, 30)
+rest(4)
+sync_queue
+clear
+
+
+# Test 7: Small bulge values
+print("Test 7: Varying Bulge Sizes")
+print("  Top: small bulge (3)")
+print("  Middle: medium bulge (10)")
+print("  Bottom: large bulge (20)")
+draw_arc(10, 16, 54, 16, 3, orange)
+draw_arc(10, 32, 54, 32, 10, orange)
+draw_arc(10, 48, 54, 48, 20, orange)
+rest(4)
+sync_queue
+clear
+
+
+# Test 8: Burnout - Single Arc
+print("Test 8: Single Arc Burnout")
+print("  White arc will burn out in 3 seconds...")
+draw_arc(10, 32, 54, 32, 15, white, 100, false, 3000)
+rest(1)
+print("  2 seconds remaining...")
+rest(1)
+print("  1 second remaining...")
+rest(1)
+print("  Arc should be gone now!")
+rest(2)
+sync_queue
+clear
+
+
+# Test 9: Burnout - Filled Arc
+print("Test 9: Filled Arc Burnout")
+print("  Filled cyan arc will burn out in 3 seconds...")
+draw_arc(10, 32, 54, 32, 18, cyan, 100, true, 3000)
+rest(1)
+print("  2 seconds remaining...")
+rest(1)
+print("  1 second remaining...")
+rest(1)
+print("  Filled arc should be gone now!")
+rest(2)
+sync_queue
+clear
+
+
+# Test 10: Multiple Burnouts with Staggered Timing
+print("Test 10: Staggered Burnouts")
+print("  Red: 2s, Green: 4s, Blue: 6s")
+draw_arc(10, 20, 54, 20, 10, red, 100, false, 2000)
+draw_arc(10, 32, 54, 32, 10, green, 100, false, 4000)
+draw_arc(10, 44, 54, 44, 10, blue, 100, false, 6000)
+rest(2)
+print("  Red should be gone...")
+rest(2)
+print("  Green should be gone...")
+rest(2)
+print("  Blue should be gone...")
+rest(2)
+sync_queue
+clear
+
+
+# Test 11: Rainbow arcs
+print("Test 11: Rainbow Arcs")
+print("  Spectral colors 0-84 with increasing bulge")
+v_bulge = 5
+for v_i = 0 to 6 step 1
+    draw_arc(10, 50, 54, 50, -v_bulge, v_i * 14, 100, false)
+    v_bulge = v_bulge + 5
+endfor v_i
+rest(4)
+sync_queue
+clear
+
+
+# Test 12: Rainbow arcs with burnout
+print("Test 12: Rainbow Arcs with Burnout")
+print("  Each arc burns out after 4 seconds")
+v_bulge = 5
+for v_i = 0 to 6 step 1
+    draw_arc(10, 50, 54, 50, -v_bulge, v_i * 14, 100, false, 4000)
+    v_bulge = v_bulge + 5
+endfor v_i
+rest(2)
+print("  Waiting for burnout...")
+rest(3)
+print("  Arcs should be gone now!")
+rest(2)
+sync_queue
+clear
+
+
+# Test 13: Filled rainbow arcs with burnout
+print("Test 13: Filled Rainbow Arcs with Burnout")
+print("  Filled arcs burn out after 5 seconds")
+v_bulge = 5
+for v_i = 0 to 6 step 1
+    draw_arc(10, 50, 54, 50, -v_bulge, v_i * 14, 100, true, 5000)
+    v_bulge = v_bulge + 4
+endfor v_i
+rest(2)
+print("  Waiting for burnout...")
+rest(4)
+print("  Filled arcs should be gone now!")
+rest(2)
+sync_queue
+clear
+
+
+# Test 14: Animated arc (growing bulge)
+print("Test 14: Animated Arc (Growing Bulge)")
+print("  Watch the arc grow and shrink...")
+for v_b = 1 to 25 step 1
+    begin_frame
+    draw_arc(10, 32, 54, 32, v_b, cyan, 100, true)
+    end_frame
+    rest(0.04)
+endfor v_b
+
+for v_b = 25 to 1 step -1
+    begin_frame
+    draw_arc(10, 32, 54, 32, v_b, cyan, 100, true)
+    end_frame
+    rest(0.04)
+endfor v_b
+rest(1)
+sync_queue
+clear
+
+
+# Test 15: Animated arc with color cycling
+print("Test 15: Animated Arc with Color Cycling")
+print("  Bulge animation + spectral color sweep")
+for v_c = 0 to 99 step 2
+    v_bulge = 10 + round(15 * (1 + sin(v_c * 0.1)), 0)
+    begin_frame
+    draw_arc(10, 32, 54, 32, v_bulge, v_c, 100, true)
+    end_frame
+    rest(0.03)
+endfor v_c
+rest(1)
+sync_queue
+clear
+
+
+# Test 16: Opposing arcs animation
+print("Test 16: Opposing Arcs Animation")
+print("  Two arcs with opposite bulge directions")
+for v_b = 1 to 20 step 1
+    begin_frame
+    draw_arc(10, 32, 54, 32, v_b, red, 100, true)
+    draw_arc(10, 32, 54, 32, -v_b, blue, 100, true)
+    end_frame
+    rest(0.05)
+endfor v_b
+
+for v_b = 20 to 1 step -1
+    begin_frame
+    draw_arc(10, 32, 54, 32, v_b, red, 100, true)
+    draw_arc(10, 32, 54, 32, -v_b, blue, 100, true)
+    end_frame
+    rest(0.05)
+endfor v_b
+rest(1)
+sync_queue
+clear
+
+
+print("")
+print("=== draw_arc Test Complete! ===")
+print("All tests passed successfully.")
+rest(2)

@@ -11,6 +11,7 @@ class ShapeType(Enum):
     CIRCLE = 4
     POLYGON = 5
     ELLIPSE = 6
+    ARC = 7  # Added arc support
 
 class Region:
     def __init__(self, shape_type: ShapeType, bounds: tuple):

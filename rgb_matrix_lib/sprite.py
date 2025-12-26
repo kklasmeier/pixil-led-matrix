@@ -402,14 +402,177 @@ class MatrixSprite:
         debug(f"Ellipse complete on sprite '{self.name}', {points_drawn} points drawn", 
             Level.TRACE, Component.SPRITE)
 
+    def draw_arc(self, x1: int, y1: int, x2: int, y2: int, arc_height: float, 
+                    color: Union[str, int, Tuple[int, int, int]], intensity: int = 100, fill: bool = False):
+            """
+            Draw an arc in the sprite buffer from (x1, y1) to (x2, y2) with specified arc height.
+            
+            Args:
+                x1, y1: Start point of the arc
+                x2, y2: End point of the arc
+                arc_height: Perpendicular distance from chord to arc peak (in pixels)
+                        Positive = arc curves to port side (left when traveling from start to end)
+                        Negative = arc curves to starboard side (right when traveling from start to end)
+                        Zero = straight line
+                color: Color name, spectral value, or RGB tuple
+                intensity: Brightness 0-100
+                fill: If True, fills the curved segment area
+            """
+            import math
+            
+            debug(f"Drawing arc on sprite '{self.name}' from ({x1},{y1}) to ({x2},{y2}) "
+                f"with height {arc_height} and color {color} at {intensity}%", 
+                Level.DEBUG, Component.SPRITE)
+            
+            intensity = max(0, min(100, intensity))
+            from .utils import get_color_rgb
+            rgb_color = get_color_rgb(color, 100)  # Full brightness
+            points_drawn = 0
+            
+            # Special case: arc_height = 0 means straight line
+            if arc_height == 0:
+                self.draw_line(x1, y1, x2, y2, color, intensity)
+                return
+            
+            # Calculate chord length and midpoint
+            chord_length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            
+            if chord_length == 0:
+                # Degenerate case: start and end points are the same
+                self.plot(x1, y1, color, intensity)
+                return
+            
+            # Midpoint of chord
+            mid_x = (x1 + x2) / 2
+            mid_y = (y1 + y2) / 2
+            
+            # Vector from start to end (chord direction)
+            chord_dx = x2 - x1
+            chord_dy = y2 - y1
+            
+            # Perpendicular vector (normalized) - rotated 90 degrees counterclockwise
+            perp_dx = -chord_dy / chord_length
+            perp_dy = chord_dx / chord_length
+            
+            # Calculate radius and center using the sagitta (arc height) formula
+            half_chord = chord_length / 2
+            radius = (arc_height**2 + half_chord**2) / (2 * abs(arc_height))
+            
+            # Distance from chord midpoint to circle center
+            center_dist = math.sqrt(radius**2 - half_chord**2)
+            
+            # Adjust sign based on arc_height direction
+            if arc_height < 0:
+                center_dist = -center_dist
+            
+            # Circle center is perpendicular to chord midpoint
+            center_x = mid_x + perp_dx * center_dist
+            center_y = mid_y + perp_dy * center_dist
+            
+            # Calculate start and end angles
+            start_angle = math.atan2(y1 - center_y, x1 - center_x)
+            end_angle = math.atan2(y2 - center_y, x2 - center_x)
+            
+            # Determine sweep direction and angle range
+            angle_diff = end_angle - start_angle
+            
+            # Normalize angle difference to [-π, π]
+            while angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
+            
+            # If arc_height is positive, we want counterclockwise arc
+            # If arc_height is negative, we want clockwise arc
+            if arc_height > 0 and angle_diff < 0:
+                angle_diff += 2 * math.pi
+            elif arc_height < 0 and angle_diff > 0:
+                angle_diff -= 2 * math.pi
+            
+            # Calculate number of steps based on arc length
+            arc_length = abs(radius * angle_diff)
+            num_steps = max(int(arc_length) + 1, 2)
+            
+            # Draw the arc outline
+            for i in range(num_steps + 1):
+                t = i / num_steps
+                angle = start_angle + t * angle_diff
+                
+                x = int(center_x + radius * math.cos(angle))
+                y = int(center_y + radius * math.sin(angle))
+                
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    self.buffer[y, x] = rgb_color
+                    self.intensity_buffer[y, x] = intensity
+                    points_drawn += 1
+            
+            # Fill the arc segment if requested
+            if fill:
+                # Get bounding box
+                min_x = max(0, int(min(x1, x2, center_x - radius)) - 1)
+                max_x = min(self.width - 1, int(max(x1, x2, center_x + radius)) + 1)
+                min_y = max(0, int(min(y1, y2, center_y - radius)) - 1)
+                max_y = min(self.height - 1, int(max(y1, y2, center_y + radius)) + 1)
+                
+                # For each scanline, find if point is in the segment
+                for y in range(min_y, max_y + 1):
+                    for x in range(min_x, max_x + 1):
+                        dx = x - center_x
+                        dy = y - center_y
+                        dist = math.sqrt(dx**2 + dy**2)
+                        
+                        if dist <= radius:
+                            # Point is inside circle, check if it's in our arc segment
+                            point_angle = math.atan2(dy, dx)
+                            
+                            # Normalize to [0, 2π]
+                            if point_angle < 0:
+                                point_angle += 2 * math.pi
+                            test_start = start_angle
+                            if test_start < 0:
+                                test_start += 2 * math.pi
+                            test_end = end_angle
+                            if test_end < 0:
+                                test_end += 2 * math.pi
+                            
+                            # Check if point is in arc range
+                            in_arc = False
+                            if angle_diff > 0:
+                                # Counterclockwise arc
+                                if test_start <= test_end:
+                                    in_arc = test_start <= point_angle <= test_end
+                                else:
+                                    in_arc = point_angle >= test_start or point_angle <= test_end
+                            else:
+                                # Clockwise arc
+                                if test_start >= test_end:
+                                    in_arc = test_end <= point_angle <= test_start
+                                else:
+                                    in_arc = point_angle <= test_start or point_angle >= test_end
+                            
+                            if in_arc:
+                                # Also check that point is on the correct side of the chord
+                                to_mid_x = mid_x - x
+                                to_mid_y = mid_y - y
+                                
+                                # Check if on same side as center
+                                cross1 = perp_dx * to_mid_y - perp_dy * to_mid_x
+                                cross2 = perp_dx * (center_y - mid_y) - perp_dy * (center_x - mid_x)
+                                
+                                if cross1 * cross2 >= 0:
+                                    self.buffer[y, x] = rgb_color
+                                    self.intensity_buffer[y, x] = intensity
+                                    points_drawn += 1
+            
+            debug(f"Arc complete on sprite '{self.name}', {points_drawn} points drawn", 
+                Level.TRACE, Component.SPRITE)
+
     def clear(self):
         """Clear sprite buffer with transparent color."""
         self.buffer[:, :] = TRANSPARENT_COLOR
         self.intensity_buffer[:, :] = 100  # Reset intensity to default
         debug(f"Sprite '{self.name}' cleared with transparent color", Level.DEBUG, Component.SPRITE)
                 
-
-
 class SpriteManager:
     def __init__(self):
         """Initialize the sprite manager."""
