@@ -373,54 +373,81 @@ endif
 
 Sprite Operations
 =================
-Define Sprite:
+
+Define Sprite (Single-Cel):
+```
 define_sprite(sprite1, 10, 10)     # name, width, height
     plot(2, 2, red)                # Draw inside sprite
     draw_circle(5, 5, 2, blue, 100, true)
 endsprite
+```
 
-# Variables for size
+Define Sprite (Multi-Cel Animation):
+```
+# Use sprite_cel() to define animation frames
+define_sprite(pacman, 12, 12)
+    sprite_cel(0)                          # First frame - closed mouth
+        draw_circle(6, 6, 5, yellow, 100, true)
+    
+    sprite_cel(1)                          # Second frame - open mouth
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+endsprite
+
+# Auto-indexing: omit index for sequential assignment
+define_sprite(blinker, 8, 8)
+    sprite_cel()                           # Auto-assigned cel 0
+        draw_circle(4, 4, 3, green, 100, true)
+    
+    sprite_cel()                           # Auto-assigned cel 1
+        draw_circle(4, 4, 3, red, 100, true)
+endsprite
+```
+
+Variables for sprite size:
+```
 v_width = 20
 v_height = 15
 define_sprite(sprite2, v_width, v_height)
     draw_rectangle(2, 2, 5, 5, green, 100, true)
 endsprite
-
-define_sprite(ellipse_sprite, 20, 20)
-    draw_ellipse(10, 10, 8, 4, green, 100, true, 45.5)  # burnout ignored
-endsprite
-show_sprite(ellipse_sprite, 20, 20)
+```
 
 Drawing Inside Sprites:
-    Available commands:
-    1. plot
-    2. draw_line
-    3. draw_rectangle
-    4. draw_circle
-    5. draw_text
-    6. draw_polygon
-    7. draw_ellipse
+-----------------------
+Available commands:
+1. plot
+2. draw_line
+3. draw_rectangle
+4. draw_circle
+5. draw_polygon
+6. draw_ellipse
+7. draw_arc
 
-    Note the burnout parmaeter doesn't apply when drawing in sprites
+Note: draw_text and burnout parameter are not supported inside sprites.
 
 Display Operations:
-# Show sprite at position
+-------------------
+```
+# Show sprite at position (uses cel 0 for new instances)
 show_sprite(sprite1, 10, 20)
 
-# Show sprite with instance ID
+# Show with instance ID
 show_sprite(sprite1, 10, 20, 1)
 
-# Hide sprite
+# Show with instance ID, z_index, and specific cel
+show_sprite(sprite1, 10, 20, 1, 0, 2)    # instance 1, z_index 0, cel 2
+
+# Hide sprite (preserves current cel state)
 hide_sprite(sprite1)
+hide_sprite(sprite1, 1)                   # Hide specific instance
 
-# Hide specific sprite instance
-hide_sprite(sprite1, 1)
-
-# Move sprite to new position
+# Move sprite - auto-advances to next cel
 move_sprite(sprite1, 30, 40)
+move_sprite(sprite1, 30, 40, 1)           # Move specific instance
 
-# Move specific sprite instance
-move_sprite(sprite1, 30, 40, 1)
+# Move sprite to specific cel (no auto-advance)
+move_sprite(sprite1, 30, 40, 0, 2)        # instance 0, jump to cel 2
 
 # With variables/expressions
 show_sprite(sprite1, v_x + 5, v_y * 2)
@@ -429,38 +456,82 @@ move_sprite(sprite1, v_x + cos(v_angle), v_y + sin(v_angle))
 # Dispose of a specific sprite instance
 dispose_sprite(sprite1, 1)
 
-# To dispose all defined sprites, used for cleanup:
+# Dispose all defined sprites (cleanup)
 dispose_all_sprites()
+```
 
-Sprite Indexing
-Sprites can be instantiated multiple times with different instance IDs:
-Copy# Create multiple instances of the same sprite
-show_sprite(invader, 10, 10, 1)   # First instance at position (10, 10)
-show_sprite(invader, 30, 10, 2)   # Second instance at position (30, 10)
-show_sprite(invader, 50, 10, 3)   # Third instance at position (50, 10)
+Cel Animation Behavior:
+-----------------------
+- **Auto-advance**: When move_sprite is called without a cel_idx, it automatically advances to the next cel (wraps from last cel back to 0)
+- **Explicit cel**: Provide cel_idx parameter to jump to a specific cel
+- **Cel preservation**: hide_sprite preserves the current cel; show_sprite on an existing instance preserves cel unless explicitly specified
+- **Independent tracking**: Each sprite instance tracks its own current cel independently
 
-# Move specific instances
-move_sprite(invader, 10, 20, 1)   # Move first instance to (10, 20)
+Animation Example:
+```
+# Define animated sprite with 4 frames
+define_sprite(walker, 8, 8)
+    sprite_cel(0)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+    sprite_cel(1)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(2, 4, 1, 7, cyan, 100)
+    sprite_cel(2)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+    sprite_cel(3)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(4, 4, 5, 7, cyan, 100)
+endsprite
 
-# Hide specific instances
-hide_sprite(invader, 2)           # Hide second instance
+# Animate across screen - each move auto-advances cel
+show_sprite(walker, 0, 28, 0, 0, 0)
+for v_x in (0, 55, 1)
+    move_sprite(walker, v_x, 28, 0)    # Auto-cycles through cels 0→1→2→3→0...
+    rest(0.08)
+endfor v_x
+```
 
-# Dispose of specific instances when no longer needed
-dispose_sprite(invader, 3)        # Remove third instance
+Sprite Instancing:
+------------------
+```
+# Create multiple instances of the same sprite at different cels
+show_sprite(traffic_light, 10, 10, 0, 0, 0)   # Instance 0 at cel 0 (red)
+show_sprite(traffic_light, 30, 10, 1, 0, 1)   # Instance 1 at cel 1 (yellow)
+show_sprite(traffic_light, 50, 10, 2, 0, 2)   # Instance 2 at cel 2 (green)
+
+# Each instance advances independently
+move_sprite(traffic_light, 10, 10, 0)   # Instance 0: cel 0→1
+move_sprite(traffic_light, 30, 10, 1)   # Instance 1: cel 1→2
+move_sprite(traffic_light, 50, 10, 2)   # Instance 2: cel 2→0 (wraps)
+```
+
+Command Reference:
+------------------
+| Command | Parameters | Description |
+|---------|------------|-------------|
+| define_sprite | (name, width, height) | Begin sprite definition |
+| sprite_cel | (cel_index?) | Start new animation cel (optional index, auto-assigns if omitted) |
+| endsprite | | End sprite definition |
+| show_sprite | (name, x, y, instance_id?, z_index?, cel_idx?) | Display sprite instance |
+| hide_sprite | (name, instance_id?) | Hide sprite instance (preserves cel) |
+| move_sprite | (name, x, y, instance_id?, cel_idx?) | Move sprite; auto-advances cel if cel_idx omitted |
+| dispose_sprite | (name, instance_id?) | Remove sprite instance |
+| dispose_all_sprites | | Remove all sprite instances and templates |
+
 Notes:
-
-Sprite coordinates are relative to sprite's top-left (0,0)
-All drawing must be between define_sprite and endsprite
-Sprite can be redrawn to update its appearance
-Same sprite can be shown multiple times at different positions with different instance IDs
-Variables can be used for positions and drawing inside sprites
-Sprites can be moved without redrawing
-Sprite names don't use quotes
-Instance IDs are optional - if not specified, instance 0 is used
-Instance IDs can be used to create multiple independent copies of the same sprite
-Sprites appear over top of all other drawing operations
-All other drawing operations are written to a background buffer and are maintained when sprites are moved or hidden
-
+------
+- Sprite coordinates are relative to sprite's top-left (0,0)
+- All drawing must be between define_sprite and endsprite
+- sprite_cel() commands must be inside define_sprite/endsprite block
+- Cel indices must be sequential starting from 0 (no gaps allowed)
+- Same sprite can be shown multiple times with different instance IDs
+- Variables can be used for positions and drawing inside sprites
+- Sprite names don't use quotes
+- Instance IDs are optional - defaults to 0
+- Sprites render above all background drawing operations
+- Background buffer is preserved when sprites move or hide
 
 Color Parameter Specification
 ---------------------------

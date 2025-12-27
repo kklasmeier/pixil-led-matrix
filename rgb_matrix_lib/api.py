@@ -7,12 +7,14 @@ import math
 from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager
 from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells
 from typing import Optional, List, Tuple, Union, Any
-from .debug import debug, Level, Component
-from .sprite import MatrixSprite, SpriteManager
+from .debug import debug, Level, Component, configure_debug
+from .sprite import MatrixSprite, SpriteManager, SpriteInstance
 import numpy as np
 from .text_effects import TextEffect, EffectModifier
 from .text_renderer import TextRenderer
 from .commands import CommandExecutor  # Added CommandExecutor import
+
+#configure_debug(level=Level.DEBUG)
 
 # Performance tuning flag
 USE_PIL_FOR_FRAME_MODE = True  # Set to True to use PIL Image approach
@@ -668,80 +670,131 @@ class RGB_Api:
             time.sleep(min(0.01, end_time - current_time))
 
     # Sprite Management Methods
-    def show_sprite(self, name: str, x: float, y: float, instance_id: int = 0):
-        """Show a sprite instance at specified position. Creates the instance if it doesn't exist."""
-        debug(f"Showing sprite '{name}' instance {instance_id} at ({x}, {y})", 
+    def show_sprite(self, name: str, x: float, y: float, instance_id: int = 0, 
+                    z_index: int = 0, cel_idx: int = None):
+        """
+        Show a sprite instance at specified position. Creates the instance if it doesn't exist.
+        
+        Args:
+            name: Sprite template name
+            x, y: Position on screen
+            instance_id: Instance identifier (default 0)
+            z_index: Z-order for layering (default 0)
+            cel_idx: Which animation cel to display. If None, preserves current cel for 
+                     existing instances or uses 0 for new instances.
+        """
+        debug(f"Showing sprite '{name}' instance {instance_id} at ({x}, {y})" + 
+              (f" cel {cel_idx}" if cel_idx is not None else ""), 
             Level.INFO, Component.SPRITE)
         
-        sprite = self.sprite_manager.get_sprite(name, instance_id)
+        # Get or create the instance
+        instance = self.sprite_manager.get_instance(name, instance_id)
+        is_new_instance = False
         
-        # If this instance doesn't exist yet, create it
-        if not sprite and instance_id > 0:
-            # Get the template sprite (instance 0)
-            template = self.sprite_manager.get_sprite(name, 0)
-            if template:
-                # Create new instance 
-                sprite = self.sprite_manager.create_sprite_instance(name, instance_id)
-            else:
+        if not instance:
+            # Create new instance from template - use cel_idx or default to 0
+            initial_cel = cel_idx if cel_idx is not None else 0
+            instance = self.sprite_manager.create_instance(name, instance_id, x, y, z_index, initial_cel)
+            if not instance:
                 debug(f"Cannot show sprite '{name}' instance {instance_id}: template doesn't exist", 
                     Level.ERROR, Component.SPRITE)
                 return
+            is_new_instance = True
         
-        if sprite:
-            if sprite.visible:
-                old_cells = get_grid_cells(int(sprite.x), int(sprite.y), sprite.width, sprite.height)
-                self._mark_cells_dirty(old_cells)
-            sprite.x = int(x)
-            sprite.y = int(y)
-            sprite.visible = True
-            new_cells = set(get_grid_cells(int(x), int(y), sprite.width, sprite.height))
-            sprite.occupied_cells = new_cells
-            if not self.frame_mode:
-                self._restore_dirty_cells()
-                self.copy_sprite_to_buffer(sprite, self.canvas)
-                self._maybe_swap_buffer()
-                self.refresh_display()
-            else:
-                self._restore_dirty_cells()  # Restore old position's background
-                self.copy_sprite_to_buffer(sprite, self.canvas)  # Draw new position
+        # If already visible, mark old position dirty
+        if instance.visible:
+            old_cells = get_grid_cells(int(instance.x), int(instance.y), instance.width, instance.height)
+            self._mark_cells_dirty(old_cells)
+        
+        # Update instance state
+        instance.x = int(x)
+        instance.y = int(y)
+        instance.visible = True
+        
+        # Only change cel if explicitly specified, or if this is a new instance
+        if cel_idx is not None:
+            instance.set_cel(cel_idx)
+        # If not specified and existing instance, preserve current cel (do nothing)
+        
+        new_cells = set(get_grid_cells(int(x), int(y), instance.width, instance.height))
+        instance.occupied_cells = new_cells
+        
+        if not self.frame_mode:
+            self._restore_dirty_cells()
+            self.copy_sprite_to_buffer(instance, self.canvas)
+            self._maybe_swap_buffer()
+            self.refresh_display()
+        else:
+            self._restore_dirty_cells()  # Restore old position's background
+            self.copy_sprite_to_buffer(instance, self.canvas)  # Draw new position
 
     def hide_sprite(self, name: str, instance_id: int = 0):
-        """Hide a specific sprite instance."""
+        """
+        Hide a specific sprite instance.
+        Note: Maintains current cel state (does NOT reset to cel 0).
+        """
         debug(f"Hiding sprite '{name}' instance {instance_id}", Level.INFO, Component.SPRITE)
         
-        sprite = self.sprite_manager.get_sprite(name, instance_id)
-        if sprite and sprite.visible:
-            cells = get_grid_cells(int(sprite.x), int(sprite.y), sprite.width, sprite.height)
+        instance = self.sprite_manager.get_instance(name, instance_id)
+        if instance and instance.visible:
+            cells = get_grid_cells(int(instance.x), int(instance.y), instance.width, instance.height)
             self._mark_cells_dirty(cells)
-            sprite.visible = False
-            sprite.occupied_cells.clear()
+            instance.visible = False
+            instance.occupied_cells.clear()
             if not self.frame_mode:
                 self._restore_dirty_cells()
                 self.refresh_display()
                 self._maybe_swap_buffer()
 
-    def move_sprite(self, name: str, x: float, y: float, instance_id: int = 0):
-        """Move a specific sprite instance to a new position."""
-        debug(f"Moving sprite '{name}' instance {instance_id} to ({x}, {y})", 
+    def move_sprite(self, name: str, x: float, y: float, instance_id: int = 0, cel_idx: Optional[int] = None):
+        """
+        Move a specific sprite instance to a new position.
+        
+        Args:
+            name: Sprite template name
+            x, y: New position on screen
+            instance_id: Instance identifier (default 0)
+            cel_idx: If specified, set to this cel. If None, auto-advance to next cel.
+        
+        Auto-Advance Behavior:
+            - Without cel_idx: Automatically advances to next cel (current_cel + 1)
+            - With cel_idx: Jumps to specified cel
+            - Wrapping: When reaching last cel, wraps to cel 0
+        """
+        debug(f"Moving sprite '{name}' instance {instance_id} to ({x}, {y})" + 
+              (f" cel {cel_idx}" if cel_idx is not None else " (auto-advance)"), 
             Level.INFO, Component.SPRITE)
         
-        sprite = self.sprite_manager.get_sprite(name, instance_id)
-        if sprite and sprite.visible:
-            old_cells = get_grid_cells(int(sprite.x), int(sprite.y), sprite.width, sprite.height)
+        instance = self.sprite_manager.get_instance(name, instance_id)
+        if instance and instance.visible:
+            # Mark old position dirty
+            old_cells = get_grid_cells(int(instance.x), int(instance.y), instance.width, instance.height)
             self._mark_cells_dirty(old_cells)
-            # Remove explicit clear to black
-            sprite.x = int(x)
-            sprite.y = int(y)
-            new_cells = set(get_grid_cells(int(x), int(y), sprite.width, sprite.height))
-            sprite.occupied_cells = new_cells
+            
+            # Update position
+            instance.x = int(x)
+            instance.y = int(y)
+            
+            # Handle cel animation
+            if cel_idx is not None:
+                # Explicit cel specified - jump to it
+                instance.set_cel(cel_idx)
+            else:
+                # Auto-advance to next cel (with wrap)
+                instance.advance_cel()
+            
+            # Update occupied cells
+            new_cells = set(get_grid_cells(int(x), int(y), instance.width, instance.height))
+            instance.occupied_cells = new_cells
+            
             if not self.frame_mode:
                 self._restore_dirty_cells()
-                self.copy_sprite_to_buffer(sprite, self.canvas)
+                self.copy_sprite_to_buffer(instance, self.canvas)
                 self._maybe_swap_buffer()
                 self.refresh_display()
             else:
                 self._restore_dirty_cells()  # Restore Background from drawing_buffer
-                self.copy_sprite_to_buffer(sprite, self.canvas)
+                self.copy_sprite_to_buffer(instance, self.canvas)
                 
     def dispose_sprite_instance(self, name: str, instance_id: int):
         """Remove a specific sprite instance."""
@@ -758,12 +811,16 @@ class RGB_Api:
     def refresh_display(self):
         """Refresh the display with all visible sprites in z-order."""
         for sprite_name, instance_id in self.sprite_manager.z_order:
-            sprite = self.sprite_manager.get_sprite(sprite_name, instance_id)
-            if sprite and sprite.visible:
-                self.copy_sprite_to_buffer(sprite, self.canvas)
+            instance = self.sprite_manager.get_instance(sprite_name, instance_id)
+            if instance and instance.visible:
+                self.copy_sprite_to_buffer(instance, self.canvas)
         self._maybe_swap_buffer()
 
-    def copy_sprite_to_buffer(self, sprite: MatrixSprite, dest_buffer):
+    def copy_sprite_to_buffer(self, sprite: Union[SpriteInstance, MatrixSprite], dest_buffer):
+        """
+        Copy sprite pixels to the destination buffer.
+        Works with both SpriteInstance (uses current_cel) and MatrixSprite (uses active_cel).
+        """
         x, y = round(sprite.x), round(sprite.y)
         start_x = max(0, x)
         start_y = max(0, y)
@@ -799,7 +856,7 @@ class RGB_Api:
         debug(f"Sprite copy complete: {pixels_copied} pixels copied, {pixels_skipped} skipped", 
             Level.TRACE, Component.SPRITE)
     
-    def clear_sprite_position(self, sprite: MatrixSprite, dest_buffer):
+    def clear_sprite_position(self, sprite: Union[SpriteInstance, MatrixSprite], dest_buffer):
         """Clear the sprite's current position with black."""
         x, y = round(sprite.x), round(sprite.y)
         start_x = max(0, x)
@@ -811,11 +868,16 @@ class RGB_Api:
                 dest_buffer.SetPixel(dx, dy, 0, 0, 0)
 
     def draw_to_sprite(self, name: str, command: str, *args):
-        """Execute a drawing command on a sprite."""
-        debug(f"(ktest) Drawing to sprite {name}: {command} {args}", Level.DEBUG, Component.SPRITE)
-        sprite = self.sprite_manager.get_sprite(name)
+        """Execute a drawing command on a sprite template being defined."""
+        debug(f"Drawing to sprite {name}: {command} {args}", Level.DEBUG, Component.SPRITE)
+        
+        # Get the sprite template - either currently being defined or already stored
+        sprite = self.sprite_manager.get_drawing_target()
+        if sprite is None or sprite.name != name:
+            sprite = self.sprite_manager.get_template(name)
+        
         if not sprite:
-            debug(f"Error: Sprite '{name}' not found", Level.ERROR, Component.SPRITE)
+            debug(f"Error: Sprite template '{name}' not found", Level.ERROR, Component.SPRITE)
             return
 
         try:

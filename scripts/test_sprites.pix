@@ -1,0 +1,54 @@
+# ============================================================
+# TEST 8: Hide/Show preserves cel state
+# ============================================================
+print("TEST 8: Hide/Show preserves cel state")
+
+define_sprite(state_test, 10, 10)
+    sprite_cel(0)
+        draw_rectangle(0, 0, 10, 10, red, 100, true)
+        # Cel 0 marker - small square in corner
+        draw_rectangle(1, 1, 3, 3, white, 100, true)
+    
+    sprite_cel(1)
+        draw_rectangle(0, 0, 10, 10, green, 100, true)
+        # Cel 1 marker - diagonal line
+        draw_line(1, 1, 8, 8, white, 100)
+    
+    sprite_cel(2)
+        draw_rectangle(0, 0, 10, 10, blue, 100, true)
+        # Cel 2 marker - X shape
+        draw_line(1, 1, 8, 8, white, 100)
+        draw_line(8, 1, 1, 8, white, 100)
+endsprite
+
+# Start at cel 0
+show_sprite(state_test, 27, 27, 0, 0, 0)
+sync_queue
+rest(1)
+
+# Advance to cel 1
+move_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(1)
+
+# Advance to cel 2
+move_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(1)
+
+# Hide sprite (should preserve cel 2)
+hide_sprite(state_test, 0)
+sync_queue
+rest(1)
+
+# Show again - should still be at cel 2 (blue with "2")
+print("Showing sprite again - should be at cel 2 (blue)")
+show_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(2)
+
+hide_sprite(state_test, 0)
+sync_queue
+rest(1)
+
+print("TEST 8 COMPLETE: Hide/Show cel preservation worked")

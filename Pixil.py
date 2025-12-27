@@ -1073,7 +1073,23 @@ def process_script(filename, execute_func=None):
         return True
 
     def process_sprite_command(line):
-        """Convert normal drawing commands to sprite drawing commands."""
+        """Convert normal drawing commands to sprite drawing commands, and handle sprite_cel()."""
+        # Check for sprite_cel command first
+        if line.startswith('sprite_cel'):
+            cel_match = re.match(r'sprite_cel\((\d+)?\)', line)
+            if cel_match:
+                cel_index = cel_match.group(1)
+                if cel_index is not None:
+                    cmd = f"sprite_cel({cel_index})"
+                else:
+                    cmd = "sprite_cel()"
+                debug_print(f"Sprite cel command: {cmd}", DEBUG_VERBOSE)
+                execute_command(cmd)
+                return
+            else:
+                debug_print(f"Warning: Invalid sprite_cel syntax: {line}", DEBUG_CONCISE)
+                return
+        
         command_match = COMMAND_PATTERN.match(line)
         if command_match:
             cmd_name = command_match.group(1)
@@ -1113,42 +1129,104 @@ def process_script(filename, execute_func=None):
         op = match.group(1)
         name = match.group(2)
 
-
         if op == 'hide' or op == 'dispose':
-            # Check if there's an instance_id parameter
+            # hide_sprite(name, instance_id?)
+            # dispose_sprite(name, instance_id?)
             instance_id = None
-            group_3 = match.group(3) if match else None   # ✅ Pylance-safe
+            group_3 = match.group(3) if match else None
             if group_3:
-                instance_id = parse_value(group_3, f'{op}_sprite', 1)  # instance_id is position 1
+                instance_id = parse_value(group_3, f'{op}_sprite', 1)
 
-            # Create command with or without instance_id
             if instance_id is not None:
                 cmd = f"{op}_sprite({name}, {instance_id})"
             else:
                 cmd = f"{op}_sprite({name})"
-        else:
-            # show or move with required x,y parameters
+                
+        elif op == 'show':
+            # show_sprite(name, x, y, instance_id?, z_index?, cel_idx?)
             x_group = match.group(3)
             y_group = match.group(4)
 
-            # Defensive: ensure both groups exist
             if x_group is None or y_group is None:
                 return False
 
-            x = parse_value(x_group, f'{op}_sprite', 1)  # x is position 1
-            y = parse_value(y_group, f'{op}_sprite', 2)  # y is position 2
+            x = parse_value(x_group, 'show_sprite', 1)
+            y = parse_value(y_group, 'show_sprite', 2)
             
-            # Check if there's an instance_id parameter
+            # Optional parameters
             instance_id = None
-            group_5 = match.group(5) if match else None   # ✅ Pylance-safe
+            z_index = None
+            cel_idx = None
+            
+            group_5 = match.group(5) if match else None
             if group_5:
-                instance_id = parse_value(group_5, f'{op}_sprite', 3)  # instance_id is position 3
+                instance_id = parse_value(group_5, 'show_sprite', 3)
                 
-            # Create command with or without instance_id
+            group_6 = match.group(6) if match else None
+            if group_6:
+                z_index = parse_value(group_6, 'show_sprite', 4)
+                
+            group_7 = match.group(7) if match else None
+            if group_7:
+                cel_idx = parse_value(group_7, 'show_sprite', 5)
+            
+            # Build command with available parameters
+            params = [name, x, y]
             if instance_id is not None:
-                cmd = f"{op}_sprite({name}, {x}, {y}, {instance_id})"
-            else:
-                cmd = f"{op}_sprite({name}, {x}, {y})"
+                params.append(str(instance_id))
+                if z_index is not None:
+                    params.append(str(z_index))
+                    if cel_idx is not None:
+                        params.append(str(cel_idx))
+                elif cel_idx is not None:
+                    params.append('0')  # default z_index
+                    params.append(str(cel_idx))
+            elif z_index is not None or cel_idx is not None:
+                params.append('0')  # default instance_id
+                if z_index is not None:
+                    params.append(str(z_index))
+                    if cel_idx is not None:
+                        params.append(str(cel_idx))
+                elif cel_idx is not None:
+                    params.append('0')  # default z_index
+                    params.append(str(cel_idx))
+                    
+            cmd = f"show_sprite({', '.join(str(p) for p in params)})"
+            
+        else:  # op == 'move'
+            # move_sprite(name, x, y, instance_id?, cel_idx?)
+            x_group = match.group(3)
+            y_group = match.group(4)
+
+            if x_group is None or y_group is None:
+                return False
+
+            x = parse_value(x_group, 'move_sprite', 1)
+            y = parse_value(y_group, 'move_sprite', 2)
+            
+            # Optional parameters
+            instance_id = None
+            cel_idx = None
+            
+            group_5 = match.group(5) if match else None
+            if group_5:
+                instance_id = parse_value(group_5, 'move_sprite', 3)
+                
+            group_6 = match.group(6) if match else None
+            if group_6:
+                cel_idx = parse_value(group_6, 'move_sprite', 4)
+            
+            # Build command with available parameters
+            params = [name, x, y]
+            if instance_id is not None:
+                params.append(str(instance_id))
+                if cel_idx is not None:
+                    params.append(str(cel_idx))
+            elif cel_idx is not None:
+                params.append('0')  # default instance_id
+                params.append(str(cel_idx))
+                    
+            cmd = f"move_sprite({', '.join(str(p) for p in params)})"
         
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Sprite operation: {cmd}", DEBUG_VERBOSE)
@@ -1260,6 +1338,7 @@ def process_script(filename, execute_func=None):
             # Handle sprite definition end
             if line == "endsprite" or line == "endsprite()":
                 debug_print(f"Ending sprite definition: {sprite_context.current_sprite}", DEBUG_VERBOSE)
+                execute_command("endsprite")  # Send endsprite to rgb_matrix_lib
                 sprite_context.in_sprite_definition = False
                 sprite_context.current_sprite = None
                 continue

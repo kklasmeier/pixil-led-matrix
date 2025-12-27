@@ -3,40 +3,93 @@
 import numpy as np
 from typing import List, Tuple, Dict, Optional, Union
 from .debug import debug, Level, Component
-from .utils import TRANSPARENT_COLOR, polygon_vertices, is_transparent, polygon_vertices
+from .utils import TRANSPARENT_COLOR, polygon_vertices, is_transparent
 
 
 class MatrixSprite:
+    """
+    Sprite template containing one or more animation cels.
+    This is the shared definition - instances reference this template.
+    """
     def __init__(self, width: int, height: int, name: str):
-        """Initialize a sprite with given dimensions."""
-        debug(f"Creating sprite '{name}' ({width}x{height})", Level.INFO, Component.SPRITE)
+        """Initialize a sprite template with given dimensions."""
+        debug(f"Creating sprite template '{name}' ({width}x{height})", Level.INFO, Component.SPRITE)
         
         self.width = width
         self.height = height
         self.name = name
-        self.buffer = np.zeros((height, width, 3), dtype=np.uint8)
-        self.intensity_buffer = np.full((height, width), 100, dtype=np.uint8)  # Default intensity remains 100
-        self.x = 0
-        self.y = 0
-        self.visible = False
-        self.z_index = 0
-        self.occupied_cells = set()
-
-        # Initialize with transparent color
-        self.clear()
         
-        debug(f"Sprite buffer created and initialized transparent", Level.DEBUG, Component.SPRITE)
+        # Cel storage - list of (buffer, intensity_buffer) tuples
+        # Initialized with one cel (cel 0) for backward compatibility
+        self._cels: List[Tuple[np.ndarray, np.ndarray]] = []
+        self._add_cel()  # Add default cel 0
+        
+        # Track which cel is currently being drawn to during definition
+        self._active_cel_index = 0
+        
+        debug(f"Sprite template created with initial cel 0", Level.DEBUG, Component.SPRITE)
+
+    def _add_cel(self) -> int:
+        """Add a new cel and return its index."""
+        buffer = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        intensity_buffer = np.full((self.height, self.width), 100, dtype=np.uint8)
+        # Initialize with transparent color
+        buffer[:, :] = TRANSPARENT_COLOR
+        self._cels.append((buffer, intensity_buffer))
+        return len(self._cels) - 1
+
+    @property
+    def cel_count(self) -> int:
+        """Return the number of cels in this sprite."""
+        return len(self._cels)
+
+    def get_cel_buffer(self, cel_index: int = 0) -> np.ndarray:
+        """Get the color buffer for a specific cel."""
+        if 0 <= cel_index < len(self._cels):
+            return self._cels[cel_index][0]
+        raise IndexError(f"Cel index {cel_index} out of range (0-{len(self._cels)-1})")
+
+    def get_cel_intensity(self, cel_index: int = 0) -> np.ndarray:
+        """Get the intensity buffer for a specific cel."""
+        if 0 <= cel_index < len(self._cels):
+            return self._cels[cel_index][1]
+        raise IndexError(f"Cel index {cel_index} out of range (0-{len(self._cels)-1})")
+
+    # Backward compatibility properties - access cel 0 as default
+    @property
+    def buffer(self) -> np.ndarray:
+        """Backward compatible access to cel 0's buffer."""
+        return self.get_cel_buffer(self._active_cel_index)
+
+    @property
+    def intensity_buffer(self) -> np.ndarray:
+        """Backward compatible access to cel 0's intensity buffer."""
+        return self.get_cel_intensity(self._active_cel_index)
+
+    def set_active_cel(self, cel_index: int):
+        """Set which cel drawing commands should target."""
+        if 0 <= cel_index < len(self._cels):
+            self._active_cel_index = cel_index
+            debug(f"Sprite '{self.name}' active cel set to {cel_index}", Level.DEBUG, Component.SPRITE)
+        else:
+            raise IndexError(f"Cel index {cel_index} out of range (0-{len(self._cels)-1})")
+
+    def ensure_cel_exists(self, cel_index: int):
+        """Ensure a cel exists at the given index, creating it if necessary."""
+        while len(self._cels) <= cel_index:
+            self._add_cel()
+            debug(f"Created cel {len(self._cels)-1} for sprite '{self.name}'", Level.DEBUG, Component.SPRITE)
 
     def plot(self, x: int, y: int, color: Union[str, int, Tuple[int, int, int]], intensity: int = 100):
-        """Plot a single pixel in the sprite buffer with intensity."""
-        debug(f"Plotting on sprite '{self.name}' at ({x},{y}) with color {color} at {intensity}%", 
+        """Plot a single pixel in the active cel buffer with intensity."""
+        debug(f"Plotting on sprite '{self.name}' cel {self._active_cel_index} at ({x},{y}) with color {color} at {intensity}%", 
               Level.TRACE, Component.SPRITE)
-        intensity = max(0, min(100, intensity))  # Changed from min(99, ...) to min(100, ...)
+        intensity = max(0, min(100, intensity))
         from .utils import get_color_rgb
         rgb_color = get_color_rgb(color, 100)  # Store full brightness (intensity applied later)
         if 0 <= x < self.width and 0 <= y < self.height:
             self.buffer[y, x] = rgb_color
-            self.intensity_buffer[y, x] = intensity  # Store intensity separately
+            self.intensity_buffer[y, x] = intensity
             debug(f"Plotted pixel at ({x},{y}) with RGB {rgb_color} and intensity {intensity}", 
                   Level.TRACE, Component.SPRITE)
         else:
@@ -45,10 +98,10 @@ class MatrixSprite:
 
     def draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int, Tuple[int, int, int]], 
                   intensity: int = 100):
-        """Draw a line in the sprite buffer with intensity."""
-        debug(f"Drawing line on sprite '{self.name}' from ({x0},{y0}) to ({x1},{y1}) with color {color} at {intensity}%", 
+        """Draw a line in the active cel buffer with intensity."""
+        debug(f"Drawing line on sprite '{self.name}' cel {self._active_cel_index} from ({x0},{y0}) to ({x1},{y1}) with color {color} at {intensity}%", 
               Level.DEBUG, Component.SPRITE)
-        intensity = max(0, min(100, intensity))  # Changed from min(99, ...) to min(100, ...)
+        intensity = max(0, min(100, intensity))
         from .utils import get_color_rgb
         rgb_color = get_color_rgb(color, 100)  # Full brightness
         dx = abs(x1 - x0)
@@ -78,11 +131,11 @@ class MatrixSprite:
 
     def draw_rectangle(self, x: int, y: int, width: int, height: int, color: Union[str, int, Tuple[int, int, int]], 
                        intensity: int = 100, fill: bool = False):
-        """Draw a rectangle in the sprite buffer with intensity."""
-        debug(f"Drawing {'filled' if fill else 'outline'} rectangle on sprite '{self.name}' at ({x},{y}) "
+        """Draw a rectangle in the active cel buffer with intensity."""
+        debug(f"Drawing {'filled' if fill else 'outline'} rectangle on sprite '{self.name}' cel {self._active_cel_index} at ({x},{y}) "
               f"size ({width}x{height}) with color {color} at {intensity}%", 
               Level.DEBUG, Component.SPRITE)
-        intensity = max(0, min(100, intensity))  # Changed from min(99, ...) to min(100, ...)
+        intensity = max(0, min(100, intensity))
         from .utils import get_color_rgb
         rgb_color = get_color_rgb(color, 100)  # Full brightness
         points_drawn = 0
@@ -120,11 +173,11 @@ class MatrixSprite:
 
     def draw_circle(self, x_center: int, y_center: int, radius: int, color: Union[str, int, Tuple[int, int, int]], 
                     intensity: int = 100, fill: bool = False):
-        """Draw a circle in the sprite buffer with intensity."""
-        debug(f"Drawing {'filled' if fill else 'outline'} circle on sprite '{self.name}' at ({x_center},{y_center}) "
+        """Draw a circle in the active cel buffer with intensity."""
+        debug(f"Drawing {'filled' if fill else 'outline'} circle on sprite '{self.name}' cel {self._active_cel_index} at ({x_center},{y_center}) "
               f"radius {radius} with color {color} at {intensity}%", 
               Level.DEBUG, Component.SPRITE)
-        intensity = max(0, min(100, intensity))  # Changed from min(99, ...) to min(100, ...)
+        intensity = max(0, min(100, intensity))
         from .utils import get_color_rgb
         rgb_color = get_color_rgb(color, 100)  # Full brightness
         points_drawn = 0
@@ -175,11 +228,11 @@ class MatrixSprite:
     def draw_polygon(self, x_center: int, y_center: int, radius: int, sides: int, 
                      color: Union[str, int, Tuple[int, int, int]], intensity: int = 100, rotation: float = 0, 
                      fill: bool = False):
-        """Draw a regular polygon in the sprite buffer with intensity."""
-        debug(f"Drawing {'filled' if fill else 'outline'} polygon on sprite '{self.name}' at ({x_center},{y_center}) "
+        """Draw a regular polygon in the active cel buffer with intensity."""
+        debug(f"Drawing {'filled' if fill else 'outline'} polygon on sprite '{self.name}' cel {self._active_cel_index} at ({x_center},{y_center}) "
               f"radius {radius}, sides {sides}, rotation {rotation} with color {color} at {intensity}%", 
               Level.DEBUG, Component.SPRITE)
-        intensity = max(0, min(100, intensity))  # Changed from min(99, ...) to min(100, ...)
+        intensity = max(0, min(100, intensity))
         from .utils import get_color_rgb
         rgb_color = get_color_rgb(color, 100)  # Full brightness
         points = polygon_vertices(x_center, y_center, radius, sides, rotation)
@@ -242,8 +295,8 @@ class MatrixSprite:
     def draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, 
                     color: Union[str, int, Tuple[int, int, int]], intensity: int = 100, 
                     fill: bool = False, rotation: float = 0):
-        """Draw an ellipse in the sprite buffer with intensity and optional rotation."""
-        debug(f"Drawing {'filled' if fill else 'outline'} ellipse on sprite '{self.name}' "
+        """Draw an ellipse in the active cel buffer with intensity and optional rotation."""
+        debug(f"Drawing {'filled' if fill else 'outline'} ellipse on sprite '{self.name}' cel {self._active_cel_index} "
             f"at ({x_center},{y_center}) radii ({x_radius},{y_radius}), rotation {rotation} "
             f"with color {color} at {intensity}%", 
             Level.DEBUG, Component.SPRITE)
@@ -350,11 +403,11 @@ class MatrixSprite:
                 dx += 2 * b_squared
                 
                 if d1 < 0:
-                    d1 += dx + b_squared
+                    d1 += b_squared + dx
                 else:
                     y -= 1
                     dy -= 2 * a_squared
-                    d1 += dx + b_squared - dy
+                    d1 += b_squared + dx - dy
                 
                 # Plot points in all four quadrants
                 rx, ry = rotate_point(x, y)
@@ -369,10 +422,8 @@ class MatrixSprite:
                 rx, ry = rotate_point(-x, -y)
                 plot_pixel(x_center + rx, y_center + ry)
             
-            # Decision parameter for region 2
-            d2 = (b_squared * (x + 0.5) * (x + 0.5) + 
-                a_squared * (y - 1) * (y - 1) - 
-                a_squared * b_squared)
+            # Region 2
+            d2 = (b_squared * ((x + 0.5) ** 2)) + (a_squared * ((y - 1) ** 2)) - (a_squared * b_squared)
             
             # Region 2
             while y >= 0:
@@ -405,7 +456,7 @@ class MatrixSprite:
     def draw_arc(self, x1: int, y1: int, x2: int, y2: int, arc_height: float, 
                     color: Union[str, int, Tuple[int, int, int]], intensity: int = 100, fill: bool = False):
             """
-            Draw an arc in the sprite buffer from (x1, y1) to (x2, y2) with specified arc height.
+            Draw an arc in the active cel buffer from (x1, y1) to (x2, y2) with specified arc height.
             
             Args:
                 x1, y1: Start point of the arc
@@ -420,7 +471,7 @@ class MatrixSprite:
             """
             import math
             
-            debug(f"Drawing arc on sprite '{self.name}' from ({x1},{y1}) to ({x2},{y2}) "
+            debug(f"Drawing arc on sprite '{self.name}' cel {self._active_cel_index} from ({x1},{y1}) to ({x2},{y2}) "
                 f"with height {arc_height} and color {color} at {intensity}%", 
                 Level.DEBUG, Component.SPRITE)
             
@@ -567,128 +618,281 @@ class MatrixSprite:
             debug(f"Arc complete on sprite '{self.name}', {points_drawn} points drawn", 
                 Level.TRACE, Component.SPRITE)
 
-    def clear(self):
-        """Clear sprite buffer with transparent color."""
-        self.buffer[:, :] = TRANSPARENT_COLOR
-        self.intensity_buffer[:, :] = 100  # Reset intensity to default
-        debug(f"Sprite '{self.name}' cleared with transparent color", Level.DEBUG, Component.SPRITE)
-                
+    def clear(self, cel_index: Optional[int] = None):
+        """Clear sprite buffer(s) with transparent color.
+        
+        Args:
+            cel_index: If specified, clear only that cel. If None, clear all cels.
+        """
+        if cel_index is not None:
+            if 0 <= cel_index < len(self._cels):
+                buffer, intensity = self._cels[cel_index]
+                buffer[:, :] = TRANSPARENT_COLOR
+                intensity[:, :] = 100
+                debug(f"Sprite '{self.name}' cel {cel_index} cleared", Level.DEBUG, Component.SPRITE)
+        else:
+            for i, (buffer, intensity) in enumerate(self._cels):
+                buffer[:, :] = TRANSPARENT_COLOR
+                intensity[:, :] = 100
+            debug(f"Sprite '{self.name}' all cels cleared", Level.DEBUG, Component.SPRITE)
+
+
+class SpriteInstance:
+    """
+    Lightweight instance of a sprite on screen.
+    References a shared MatrixSprite template and tracks instance-specific state.
+    """
+    def __init__(self, template: MatrixSprite, x: float = 0, y: float = 0, 
+                 z_index: int = 0, current_cel: int = 0):
+        self.template = template
+        self.x = x
+        self.y = y
+        self.current_cel = current_cel
+        self.visible = False
+        self.z_index = z_index
+        self.occupied_cells: set = set()
+    
+    @property
+    def width(self) -> int:
+        return self.template.width
+    
+    @property
+    def height(self) -> int:
+        return self.template.height
+    
+    @property
+    def name(self) -> str:
+        return self.template.name
+    
+    @property
+    def buffer(self) -> np.ndarray:
+        """Get the color buffer for the current cel."""
+        return self.template.get_cel_buffer(self.current_cel)
+    
+    @property
+    def intensity_buffer(self) -> np.ndarray:
+        """Get the intensity buffer for the current cel."""
+        return self.template.get_cel_intensity(self.current_cel)
+    
+    @property
+    def cel_count(self) -> int:
+        """Get the number of cels in the template."""
+        return self.template.cel_count
+    
+    def advance_cel(self) -> int:
+        """Advance to the next cel, wrapping around. Returns the new cel index."""
+        self.current_cel = (self.current_cel + 1) % self.template.cel_count
+        return self.current_cel
+    
+    def set_cel(self, cel_index: int):
+        """Set the current cel to a specific index."""
+        if 0 <= cel_index < self.template.cel_count:
+            self.current_cel = cel_index
+        else:
+            raise IndexError(f"Cel index {cel_index} out of range (0-{self.template.cel_count-1})")
+
+
 class SpriteManager:
+    """Manages sprite templates and instances."""
+    
     def __init__(self):
         """Initialize the sprite manager."""
         debug("Initializing SpriteManager", Level.INFO, Component.SPRITE)
-        # Change to nested dictionary: { sprite_name: { instance_id: MatrixSprite } }
-        self.sprites: Dict[str, Dict[int, MatrixSprite]] = {}
-        # Update z_order to track (name, instance_id) tuples
-        self.z_order: List[Tuple[str, int]] = []  # Track sprites in z-order
+        
+        # Sprite templates: { name: MatrixSprite }
+        self.templates: Dict[str, MatrixSprite] = {}
+        
+        # Sprite instances: { name: { instance_id: SpriteInstance } }
+        self.instances: Dict[str, Dict[int, SpriteInstance]] = {}
+        
+        # Z-order tracking: list of (name, instance_id) tuples
+        self.z_order: List[Tuple[str, int]] = []
+        
+        # Sprite definition state (for building sprites)
+        self._defining_sprite: Optional[MatrixSprite] = None
+        self._cel_indices_used: set = set()
+        self._next_auto_cel_index: int = 0
+        self._in_cel_block: bool = False
 
-    def dispose_all_sprites(self):
-        """
-        Dispose of all sprites and clear their resources.
-        """
-        debug("Disposing of all sprites", Level.INFO, Component.SPRITE)
-        
-        # Get list of all visible sprite instances for cleanup
-        visible_sprites = []
-        for sprite_name, instances in self.sprites.items():
-            for instance_id, sprite in instances.items():
-                if sprite.visible:
-                    visible_sprites.append(sprite)
-        
-        # Clear visible sprites from display
-        dirty_cells = set()
-        for sprite in visible_sprites:
-            dirty_cells.update(sprite.occupied_cells)
-            sprite.visible = False
-            sprite.occupied_cells.clear()
-        
-        # Clear sprite collections
-        self.sprites.clear()
-        self.z_order.clear()
-        
-        debug(f"Disposed of all sprites, {len(dirty_cells)} cells marked dirty", 
-            Level.DEBUG, Component.SPRITE)
-        
-        return list(dirty_cells)  # Return dirty cells for display cleanup
+    # ========== Sprite Definition Methods ==========
     
-    def create_sprite(self, name: str, width: int, height: int) -> MatrixSprite:
-        """Create a new sprite template (instance 0)."""
-        debug(f"Creating new sprite: {name} ({width}x{height})", Level.INFO, Component.SPRITE)
-        if name in self.sprites and 0 in self.sprites[name]:
-            debug(f"Sprite '{name}' already exists", Level.ERROR, Component.SPRITE)
-            raise ValueError(f"Sprite '{name}' already exists")
-            
-        # Create the sprite instance
+    def begin_sprite_definition(self, name: str, width: int, height: int) -> MatrixSprite:
+        """Begin defining a new sprite template."""
+        debug(f"Beginning sprite definition: {name} ({width}x{height})", Level.INFO, Component.SPRITE)
+        
+        if name in self.templates:
+            debug(f"Sprite template '{name}' already exists", Level.ERROR, Component.SPRITE)
+            raise ValueError(f"Sprite template '{name}' already exists")
+        
+        if self._defining_sprite is not None:
+            debug(f"Already defining sprite '{self._defining_sprite.name}'", Level.ERROR, Component.SPRITE)
+            raise RuntimeError(f"Already defining sprite '{self._defining_sprite.name}'")
+        
+        # Create new template
         sprite = MatrixSprite(width, height, name)
+        self._defining_sprite = sprite
+        self._cel_indices_used = {0}  # Cel 0 is created by default
+        self._next_auto_cel_index = 1  # Next auto-assigned index
+        self._in_cel_block = False
         
-        # Initialize the nested dictionary structure if needed
-        if name not in self.sprites:
-            self.sprites[name] = {}
-        
-        # Store as instance 0 (the template)
-        self.sprites[name][0] = sprite
-        self.z_order.append((name, 0))
-
         return sprite
     
-    def create_sprite_instance(self, name: str, instance_id: int) -> Optional[MatrixSprite]:
+    def start_cel(self, cel_index: Optional[int] = None) -> int:
+        """
+        Start defining a new cel within the current sprite definition.
+        
+        Args:
+            cel_index: Explicit cel index, or None for auto-assignment
+            
+        Returns:
+            The cel index being defined
+        """
+        if self._defining_sprite is None:
+            raise RuntimeError("Not currently defining a sprite")
+        
+        # Determine cel index
+        if cel_index is None:
+            # Auto-assignment: if this is the first sprite_cel() call and cel 0 
+            # exists but hasn't been explicitly used, start at 0
+            if self._next_auto_cel_index == 1 and 0 in self._cel_indices_used and not self._in_cel_block:
+                # First sprite_cel() call - reuse cel 0
+                cel_index = 0
+            else:
+                cel_index = self._next_auto_cel_index
+                self._next_auto_cel_index = cel_index + 1
+        else:
+            # Update auto index to be at least past this explicit index
+            self._next_auto_cel_index = max(self._next_auto_cel_index, cel_index + 1)
+        
+        # Check for duplicates (but allow redefining cel 0 on first sprite_cel call)
+        if cel_index in self._cel_indices_used and cel_index != 0:
+            raise ValueError(f"Duplicate cel index: {cel_index}")
+        if cel_index == 0 and self._in_cel_block:
+            # Already used cel 0 with an explicit sprite_cel() call
+            raise ValueError(f"Duplicate cel index: {cel_index}")
+        
+        # Ensure cel exists in template
+        self._defining_sprite.ensure_cel_exists(cel_index)
+        self._defining_sprite.set_active_cel(cel_index)
+        self._cel_indices_used.add(cel_index)
+        self._in_cel_block = True
+        
+        # If this was auto-assigned and was cel 0, update next auto to 1
+        if cel_index == 0:
+            self._next_auto_cel_index = max(self._next_auto_cel_index, 1)
+        
+        debug(f"Started cel {cel_index} for sprite '{self._defining_sprite.name}'", 
+              Level.DEBUG, Component.SPRITE)
+        
+        return cel_index
+    
+    def end_sprite_definition(self) -> MatrixSprite:
+        """
+        End the current sprite definition and validate cel indices.
+        
+        Returns:
+            The completed sprite template
+        """
+        if self._defining_sprite is None:
+            raise RuntimeError("Not currently defining a sprite")
+        
+        sprite = self._defining_sprite
+        
+        # Validate cel indices are sequential with no gaps
+        max_cel = max(self._cel_indices_used) if self._cel_indices_used else 0
+        expected_indices = set(range(max_cel + 1))
+        missing = expected_indices - self._cel_indices_used
+        
+        if missing:
+            raise ValueError(f"Gap in cel indices for sprite '{sprite.name}': missing {sorted(missing)}")
+        
+        # Store template
+        self.templates[sprite.name] = sprite
+        
+        # Reset definition state
+        self._defining_sprite = None
+        self._cel_indices_used = set()
+        self._next_auto_cel_index = 0
+        self._in_cel_block = False
+        
+        debug(f"Completed sprite definition '{sprite.name}' with {sprite.cel_count} cel(s)", 
+              Level.INFO, Component.SPRITE)
+        
+        return sprite
+    
+    def get_drawing_target(self) -> Optional[MatrixSprite]:
+        """Get the sprite currently being defined (for drawing commands)."""
+        return self._defining_sprite
+
+    # ========== Template and Instance Access ==========
+    
+    def get_template(self, name: str) -> Optional[MatrixSprite]:
+        """Get a sprite template by name."""
+        return self.templates.get(name)
+
+    def get_instance(self, name: str, instance_id: int = 0) -> Optional[SpriteInstance]:
+        """Get a specific sprite instance by name and instance ID."""
+        if name not in self.instances or instance_id not in self.instances[name]:
+            # This is DEBUG level because it's expected when showing a sprite for the first time
+            # (show_sprite will call create_instance after this returns None)
+            debug(f"Sprite instance '{name}[{instance_id}]' not found (will create if showing)", 
+                  Level.DEBUG, Component.SPRITE)
+            return None
+        
+        debug(f"Retrieved sprite instance '{name}[{instance_id}]'", Level.TRACE, Component.SPRITE)
+        return self.instances[name][instance_id]
+
+    # ========== Instance Management ==========
+    
+    def create_instance(self, name: str, instance_id: int, x: float = 0, y: float = 0,
+                       z_index: int = 0, cel_index: int = 0) -> Optional[SpriteInstance]:
         """Create a new instance of an existing sprite template."""
         debug(f"Creating instance {instance_id} of sprite '{name}'", Level.INFO, Component.SPRITE)
         
         # Check if template exists
-        if name not in self.sprites or 0 not in self.sprites[name]:
+        template = self.templates.get(name)
+        if template is None:
             debug(f"Sprite template '{name}' not found", Level.ERROR, Component.SPRITE)
             return None
         
+        # Validate cel index
+        if cel_index >= template.cel_count:
+            debug(f"Cel index {cel_index} out of range for sprite '{name}'", Level.ERROR, Component.SPRITE)
+            return None
+        
+        # Initialize instance dict if needed
+        if name not in self.instances:
+            self.instances[name] = {}
+        
         # Check if instance already exists
-        if instance_id in self.sprites[name]:
+        if instance_id in self.instances[name]:
             debug(f"Instance {instance_id} of sprite '{name}' already exists", Level.WARNING, Component.SPRITE)
-            return self.sprites[name][instance_id]
+            return self.instances[name][instance_id]
         
-        # Create a new sprite based on the template
-        template = self.sprites[name][0]
-        instance = MatrixSprite(template.width, template.height, template.name)
-        
-        # Copy the visual data from template to instance
-        instance.buffer = template.buffer.copy()
-        instance.intensity_buffer = template.intensity_buffer.copy()
-        
-        # Store the instance and update z-order
-        self.sprites[name][instance_id] = instance
+        # Create the instance
+        instance = SpriteInstance(template, x, y, z_index, cel_index)
+        self.instances[name][instance_id] = instance
         self.z_order.append((name, instance_id))
         
-        debug(f"Created instance {instance_id} of sprite '{name}'", Level.DEBUG, Component.SPRITE)
+        debug(f"Created instance {instance_id} of sprite '{name}' at cel {cel_index}", 
+              Level.DEBUG, Component.SPRITE)
         return instance
 
-    def get_overlapping_sprites(self, cells: List[Tuple[int, int]]) -> List[MatrixSprite]:
-        """Get all visible sprites that overlap given grid cells in z-order."""
+    def get_overlapping_sprites(self, cells: List[Tuple[int, int]]) -> List[SpriteInstance]:
+        """Get all visible sprite instances that overlap given grid cells in z-order."""
         overlapping = []
         cells_set = set(cells)
         
         for name, instance_id in self.z_order:
-            if name in self.sprites and instance_id in self.sprites[name]:
-                sprite = self.sprites[name][instance_id]
-                if sprite.visible and sprite.occupied_cells.intersection(cells_set):
-                    overlapping.append(sprite)
+            if name in self.instances and instance_id in self.instances[name]:
+                instance = self.instances[name][instance_id]
+                if instance.visible and instance.occupied_cells.intersection(cells_set):
+                    overlapping.append(instance)
                     debug(f"Found overlapping sprite: {name} instance {instance_id}", 
                           Level.DEBUG, Component.SPRITE)
         
         return overlapping
-        
-    def get_sprite(self, name: str, instance_id: int = 0) -> Optional[MatrixSprite]:
-        """Get a specific sprite instance by name and instance ID."""
-        if name not in self.sprites or instance_id not in self.sprites[name]:
-            # Only log warnings for template sprites (instance 0)
-            # For other instances, use TRACE level since they might be created on demand
-            if instance_id == 0:
-                debug(f"Sprite template '{name}' not found", Level.WARNING, Component.SPRITE)
-            else:
-                debug(f"Sprite '{name}' instance {instance_id} not found", Level.TRACE, Component.SPRITE)
-            return None
-        
-        debug(f"Retrieved sprite '{name}' instance {instance_id}", Level.TRACE, Component.SPRITE)
-        return self.sprites[name][instance_id]
-    
+
     def dispose_sprite_instance(self, name: str, instance_id: int) -> List[Tuple[int, int]]:
         """
         Dispose of a specific sprite instance.
@@ -696,31 +900,57 @@ class SpriteManager:
         """
         debug(f"Disposing sprite '{name}' instance {instance_id}", Level.INFO, Component.SPRITE)
         
-        if name not in self.sprites or instance_id not in self.sprites[name]:
+        if name not in self.instances or instance_id not in self.instances[name]:
             debug(f"Sprite '{name}' instance {instance_id} not found for disposal", 
                   Level.WARNING, Component.SPRITE)
             return []
         
-        sprite = self.sprites[name][instance_id]
+        instance = self.instances[name][instance_id]
         dirty_cells = []
         
         # If visible, mark cells as dirty
-        if sprite.visible:
-            dirty_cells = list(sprite.occupied_cells)
-            sprite.visible = False
-            sprite.occupied_cells.clear()
+        if instance.visible:
+            dirty_cells = list(instance.occupied_cells)
+            instance.visible = False
+            instance.occupied_cells.clear()
         
-        # Remove from z-order and sprites dictionary
+        # Remove from z-order and instances dictionary
         if (name, instance_id) in self.z_order:
             self.z_order.remove((name, instance_id))
         
-        del self.sprites[name][instance_id]
+        del self.instances[name][instance_id]
         
-        # If no instances left, clean up the sprite entry
-        if not self.sprites[name]:
-            del self.sprites[name]
+        # If no instances left, clean up the instance entry (but keep template)
+        if not self.instances[name]:
+            del self.instances[name]
         
         debug(f"Disposed sprite '{name}' instance {instance_id}, {len(dirty_cells)} cells marked dirty", 
               Level.DEBUG, Component.SPRITE)
         
         return dirty_cells
+
+    def dispose_all_sprites(self) -> List[Tuple[int, int]]:
+        """
+        Dispose of all sprite instances and templates.
+        Returns dirty cells for display cleanup.
+        """
+        debug("Disposing of all sprites", Level.INFO, Component.SPRITE)
+        
+        # Collect dirty cells from visible instances
+        dirty_cells = set()
+        for sprite_name, instances in self.instances.items():
+            for instance_id, instance in instances.items():
+                if instance.visible:
+                    dirty_cells.update(instance.occupied_cells)
+                    instance.visible = False
+                    instance.occupied_cells.clear()
+        
+        # Clear all collections
+        self.instances.clear()
+        self.templates.clear()
+        self.z_order.clear()
+        
+        debug(f"Disposed of all sprites, {len(dirty_cells)} cells marked dirty", 
+            Level.DEBUG, Component.SPRITE)
+        
+        return list(dirty_cells)

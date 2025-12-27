@@ -69,11 +69,16 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'width', 'type': 'int', 'position': 1},
         {'name': 'height', 'type': 'int', 'position': 2}
     ],
+    'sprite_cel': [
+        {'name': 'cel_index', 'type': 'int', 'position': 0, 'optional': True}
+    ],
     'show_sprite': [
         {'name': 'name', 'type': 'str', 'position': 0},
         {'name': 'x', 'type': 'int', 'position': 1},
         {'name': 'y', 'type': 'int', 'position': 2},
-        {'name': 'instance_id', 'type': 'int', 'position': 3, 'optional': True, 'default': '0'}
+        {'name': 'instance_id', 'type': 'int', 'position': 3, 'optional': True, 'default': '0'},
+        {'name': 'z_index', 'type': 'int', 'position': 4, 'optional': True, 'default': '0'},
+        {'name': 'cel_idx', 'type': 'int', 'position': 5, 'optional': True, 'default': '0'}
     ],
     'hide_sprite': [
         {'name': 'name', 'type': 'str', 'position': 0},
@@ -83,7 +88,8 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'name', 'type': 'str', 'position': 0},
         {'name': 'x', 'type': 'int', 'position': 1},
         {'name': 'y', 'type': 'int', 'position': 2},
-        {'name': 'instance_id', 'type': 'int', 'position': 3, 'optional': True, 'default': '0'}
+        {'name': 'instance_id', 'type': 'int', 'position': 3, 'optional': True, 'default': '0'},
+        {'name': 'cel_idx', 'type': 'int', 'position': 4, 'optional': True}
     ],
     'dispose_sprite': [
         {'name': 'name', 'type': 'str', 'position': 0},

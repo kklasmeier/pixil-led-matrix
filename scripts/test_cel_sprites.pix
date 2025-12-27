@@ -1,0 +1,362 @@
+# Cel Animation System Test Script
+# Run with: python Pixil.py test_cel_sprites.pixil
+
+# ============================================================
+# TEST 1: Single-cel sprite (backward compatibility)
+# ============================================================
+print("TEST 1: Single-cel sprite (backward compatibility)")
+
+define_sprite(simple_dot, 5, 5)
+    draw_circle(2, 2, 2, red, 100, true)
+endsprite
+
+show_sprite(simple_dot, 10, 10, 0)
+sync_queue
+rest(2)
+
+hide_sprite(simple_dot, 0)
+sync_queue
+rest(1)
+
+print("TEST 1 COMPLETE: Single-cel sprite worked")
+
+# ============================================================
+# TEST 2: Multi-cel sprite with explicit indices
+# ============================================================
+print("TEST 2: Multi-cel sprite with explicit indices")
+
+define_sprite(blinker, 8, 8)
+    sprite_cel(0)
+        draw_circle(4, 4, 3, green, 100, true)
+    
+    sprite_cel(1)
+        draw_circle(4, 4, 3, red, 100, true)
+endsprite
+
+# Show at cel 0 (green)
+show_sprite(blinker, 30, 10, 0, 0, 0)
+sync_queue
+rest(1.5)
+
+# Move with auto-advance to cel 1 (red)
+move_sprite(blinker, 30, 10, 0)
+sync_queue
+rest(1.5)
+
+# Move with auto-advance back to cel 0 (green) - wraps around
+move_sprite(blinker, 30, 10, 0)
+sync_queue
+rest(1.5)
+
+hide_sprite(blinker, 0)
+sync_queue
+rest(1)
+
+print("TEST 2 COMPLETE: Multi-cel explicit indices worked")
+
+# ============================================================
+# TEST 3: Multi-cel sprite with auto indices
+# ============================================================
+print("TEST 3: Multi-cel sprite with auto indices")
+
+define_sprite(traffic_light, 6, 16)
+    sprite_cel()
+        # Red light
+        draw_circle(3, 3, 2, red, 100, true)
+        draw_circle(3, 8, 2, dark_gray, 30, true)
+        draw_circle(3, 13, 2, dark_gray, 30, true)
+    
+    sprite_cel()
+        # Yellow light
+        draw_circle(3, 3, 2, dark_gray, 30, true)
+        draw_circle(3, 8, 2, yellow, 100, true)
+        draw_circle(3, 13, 2, dark_gray, 30, true)
+    
+    sprite_cel()
+        # Green light
+        draw_circle(3, 3, 2, dark_gray, 30, true)
+        draw_circle(3, 8, 2, dark_gray, 30, true)
+        draw_circle(3, 13, 2, green, 100, true)
+endsprite
+
+# Cycle through the traffic light
+show_sprite(traffic_light, 50, 5, 0, 0, 0)
+sync_queue
+rest(1.5)
+
+move_sprite(traffic_light, 50, 5, 0)
+sync_queue
+rest(1.5)
+
+move_sprite(traffic_light, 50, 5, 0)
+sync_queue
+rest(1.5)
+
+move_sprite(traffic_light, 50, 5, 0)
+sync_queue
+rest(1.5)
+
+hide_sprite(traffic_light, 0)
+sync_queue
+rest(1)
+
+print("TEST 3 COMPLETE: Auto indices worked")
+
+# ============================================================
+# TEST 4: Explicit cel jumping with move_sprite
+# ============================================================
+print("TEST 4: Explicit cel jumping")
+
+define_sprite(color_box, 10, 10)
+    sprite_cel(0)
+        draw_rectangle(0, 0, 10, 10, blue, 100, true)
+    
+    sprite_cel(1)
+        draw_rectangle(0, 0, 10, 10, green, 100, true)
+    
+    sprite_cel(2)
+        draw_rectangle(0, 0, 10, 10, red, 100, true)
+    
+    sprite_cel(3)
+        draw_rectangle(0, 0, 10, 10, yellow, 100, true)
+endsprite
+
+# Start at cel 0 (blue)
+show_sprite(color_box, 27, 27, 0, 0, 0)
+sync_queue
+rest(1)
+
+# Jump to cel 2 (red) - skipping cel 1
+move_sprite(color_box, 27, 27, 0, 2)
+sync_queue
+rest(1)
+
+# Jump to cel 3 (yellow)
+move_sprite(color_box, 27, 27, 0, 3)
+sync_queue
+rest(1)
+
+# Jump back to cel 0 (blue)
+move_sprite(color_box, 27, 27, 0, 0)
+sync_queue
+rest(1)
+
+# Auto-advance to cel 1 (green)
+move_sprite(color_box, 27, 27, 0)
+sync_queue
+rest(1)
+
+hide_sprite(color_box, 0)
+sync_queue
+rest(1)
+
+print("TEST 4 COMPLETE: Explicit cel jumping worked")
+
+# ============================================================
+# TEST 5: Multiple instances at different cels
+# ============================================================
+print("TEST 5: Multiple instances at different cels")
+
+define_sprite(multi_ball, 8, 8)
+    sprite_cel(0)
+        draw_circle(4, 4, 3, red, 100, true)
+    
+    sprite_cel(1)
+        draw_circle(4, 4, 3, green, 100, true)
+    
+    sprite_cel(2)
+        draw_circle(4, 4, 3, blue, 100, true)
+endsprite
+
+# Show 3 instances at different cels
+show_sprite(multi_ball, 10, 40, 0, 0, 0)
+show_sprite(multi_ball, 28, 40, 1, 0, 1)
+show_sprite(multi_ball, 46, 40, 2, 0, 2)
+sync_queue
+rest(2)
+
+# Move each - they should each advance to next cel independently
+move_sprite(multi_ball, 10, 40, 0)
+move_sprite(multi_ball, 28, 40, 1)
+move_sprite(multi_ball, 46, 40, 2)
+sync_queue
+rest(2)
+
+# Move again - continue cycling
+move_sprite(multi_ball, 10, 40, 0)
+move_sprite(multi_ball, 28, 40, 1)
+move_sprite(multi_ball, 46, 40, 2)
+sync_queue
+rest(2)
+
+hide_sprite(multi_ball, 0)
+hide_sprite(multi_ball, 1)
+hide_sprite(multi_ball, 2)
+sync_queue
+rest(1)
+
+print("TEST 5 COMPLETE: Multiple instances worked")
+
+# ============================================================
+# TEST 6: Animation loop with auto-advance
+# ============================================================
+print("TEST 6: Animation loop with movement")
+
+define_sprite(walker, 8, 8)
+    sprite_cel(0)
+        # Frame 1 - feet together
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+        draw_line(5, 4, 5, 7, cyan, 100)
+    
+    sprite_cel(1)
+        # Frame 2 - left foot forward
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(2, 4, 1, 7, cyan, 100)
+        draw_line(5, 4, 6, 7, cyan, 100)
+    
+    sprite_cel(2)
+        # Frame 3 - feet together
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+        draw_line(5, 4, 5, 7, cyan, 100)
+    
+    sprite_cel(3)
+        # Frame 4 - right foot forward
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 4, 7, cyan, 100)
+        draw_line(6, 4, 5, 7, cyan, 100)
+endsprite
+
+show_sprite(walker, 0, 28, 0, 0, 0)
+sync_queue
+
+# Walk across the screen
+for v_x in (0, 55, 1)
+    move_sprite(walker, v_x, 28, 0)
+    rest(0.08)
+endfor v_x
+
+sync_queue
+rest(1)
+
+hide_sprite(walker, 0)
+sync_queue
+rest(1)
+
+print("TEST 6 COMPLETE: Animation loop worked")
+
+# ============================================================
+# TEST 7: Pac-Man style chomping animation
+# ============================================================
+print("TEST 7: Pac-Man chomping animation")
+
+define_sprite(pacman, 12, 12)
+    sprite_cel(0)
+        # Closed mouth
+        draw_circle(6, 6, 5, yellow, 100, true)
+        plot(8, 4, black, 100)
+    
+    sprite_cel(1)
+        # Slightly open
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+    
+    sprite_cel(2)
+        # Wide open
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 5, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+    
+    sprite_cel(3)
+        # Slightly open (closing)
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+endsprite
+
+show_sprite(pacman, 0, 50, 0, 0, 0)
+sync_queue
+
+# Chomp across the screen
+for v_x in (0, 50, 1)
+    move_sprite(pacman, v_x, 50, 0)
+    rest(0.05)
+endfor v_x
+
+sync_queue
+rest(1)
+
+hide_sprite(pacman, 0)
+sync_queue
+rest(1)
+
+print("TEST 7 COMPLETE: Pac-Man animation worked")
+
+# ============================================================
+# TEST 8: Hide/Show preserves cel state
+# ============================================================
+print("TEST 8: Hide/Show preserves cel state")
+
+define_sprite(state_test, 10, 10)
+    sprite_cel(0)
+        draw_rectangle(0, 0, 10, 10, red, 100, true)
+        # Cel 0 marker - small square in corner
+        draw_rectangle(1, 1, 3, 3, white, 100, true)
+    
+    sprite_cel(1)
+        draw_rectangle(0, 0, 10, 10, green, 100, true)
+        # Cel 1 marker - diagonal line
+        draw_line(1, 1, 8, 8, white, 100)
+    
+    sprite_cel(2)
+        draw_rectangle(0, 0, 10, 10, blue, 100, true)
+        # Cel 2 marker - X shape
+        draw_line(1, 1, 8, 8, white, 100)
+        draw_line(8, 1, 1, 8, white, 100)
+endsprite
+
+# Start at cel 0
+show_sprite(state_test, 27, 27, 0, 0, 0)
+sync_queue
+rest(1)
+
+# Advance to cel 1
+move_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(1)
+
+# Advance to cel 2
+move_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(1)
+
+# Hide sprite (should preserve cel 2)
+hide_sprite(state_test, 0)
+sync_queue
+rest(1)
+
+# Show again - should still be at cel 2 (blue with "2")
+print("Showing sprite again - should be at cel 2 (blue)")
+show_sprite(state_test, 27, 27, 0)
+sync_queue
+rest(2)
+
+hide_sprite(state_test, 0)
+sync_queue
+rest(1)
+
+print("TEST 8 COMPLETE: Hide/Show cel preservation worked")
+
+# ============================================================
+# CLEANUP
+# ============================================================
+print("All tests complete! Cleaning up...")
+dispose_all_sprites()
+clear
+sync_queue
+
+print("============================================")
+print("CEL ANIMATION TEST SUITE COMPLETE")
+print("============================================")

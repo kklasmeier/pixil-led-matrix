@@ -22,11 +22,13 @@ class CommandExecutor:
             'draw_ellipse': self._handle_draw_ellipse,
             'draw_arc': self._handle_draw_arc,
             'define_sprite': self._handle_define_sprite,
+            'endsprite': self._handle_endsprite,
+            'sprite_cel': self._handle_sprite_cel,
             'sprite_draw': self._handle_sprite_draw,
             'show_sprite': self._handle_show_sprite,
             'hide_sprite': self._handle_hide_sprite,
             'move_sprite': self._handle_move_sprite,
-            'dispose_sprite': self._handle_dispose_sprite,  # New command
+            'dispose_sprite': self._handle_dispose_sprite,
             'clear': self._handle_clear,
             'rest': self._handle_rest,
             'begin_frame': self._handle_begin_frame,
@@ -51,7 +53,7 @@ class CommandExecutor:
         debug(f"Processing command: {command}", Level.DEBUG, Component.COMMAND)
 
         try:
-            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue']:
+            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite']:
                 debug(f"Executing simple command: {command}", Level.DEBUG, Component.COMMAND)
                 self.current_command = command
                 handler = self.command_handlers.get(command)
@@ -268,10 +270,26 @@ class CommandExecutor:
         self.api.draw_arc(x1, y1, x2, y2, bulge, color, intensity, fill, burnout)
         
     def _handle_define_sprite(self, name: str, width: int, height: int):
-        """Handle define_sprite command."""
+        """Handle define_sprite command - begins sprite template definition."""
         debug(f"Handling define_sprite command: '{name}' {width}x{height}", 
               Level.DEBUG, Component.COMMAND)
-        self.api.sprite_manager.create_sprite(name, width, height)
+        self.api.sprite_manager.begin_sprite_definition(name, width, height)
+
+    def _handle_endsprite(self):
+        """Handle endsprite command - ends sprite template definition."""
+        debug("Handling endsprite command", Level.DEBUG, Component.COMMAND)
+        self.api.sprite_manager.end_sprite_definition()
+
+    def _handle_sprite_cel(self, cel_index: Optional[int] = None):
+        """
+        Handle sprite_cel command - start a new animation cel.
+        
+        Args:
+            cel_index: Explicit cel index, or None for auto-assignment
+        """
+        debug(f"Handling sprite_cel command: index={cel_index if cel_index is not None else 'auto'}", 
+              Level.DEBUG, Component.COMMAND)
+        self.api.sprite_manager.start_cel(cel_index)
 
     def _handle_sprite_draw(self, name: str, cmd: str, *args):
         """Handle sprite_draw command."""
@@ -318,11 +336,22 @@ class CommandExecutor:
             debug(f"Unsupported sprite command: {cmd}", Level.ERROR, Component.COMMAND)
             raise ValueError(f"Unsupported sprite command: {cmd}")
 
-    def _handle_show_sprite(self, name: str, x: float, y: float, instance_id: int = 0):
-        """Handle show_sprite command with optional instance ID."""
-        debug(f"Handling show_sprite command: '{name}' instance {instance_id} at ({x}, {y})", 
+    def _handle_show_sprite(self, name: str, x: float, y: float, instance_id: int = 0,
+                            z_index: int = 0, cel_idx: Optional[int] = None):
+        """
+        Handle show_sprite command with optional instance ID, z_index, and cel index.
+        
+        Args:
+            name: Sprite template name
+            x, y: Position on screen
+            instance_id: Instance identifier (default 0)
+            z_index: Z-order for layering (default 0)
+            cel_idx: Which animation cel to display. None preserves current cel for existing instances.
+        """
+        debug(f"Handling show_sprite command: '{name}' instance {instance_id} at ({x}, {y}) z={z_index}" +
+              (f" cel={cel_idx}" if cel_idx is not None else " (preserve cel)"), 
             Level.DEBUG, Component.COMMAND)
-        self.api.show_sprite(name, x, y, instance_id)
+        self.api.show_sprite(name, x, y, instance_id, z_index, cel_idx)
 
     def _handle_hide_sprite(self, name: str, instance_id: int = 0):
         """Handle hide_sprite command with optional instance ID."""
@@ -330,11 +359,21 @@ class CommandExecutor:
             Level.DEBUG, Component.COMMAND)
         self.api.hide_sprite(name, instance_id)
 
-    def _handle_move_sprite(self, name: str, x: float, y: float, instance_id: int = 0):
-        """Handle move_sprite command with optional instance ID."""
-        debug(f"Handling move_sprite command: '{name}' instance {instance_id} to ({x}, {y})", 
+    def _handle_move_sprite(self, name: str, x: float, y: float, instance_id: int = 0,
+                            cel_idx: Optional[int] = None):
+        """
+        Handle move_sprite command with optional cel index.
+        
+        Args:
+            name: Sprite template name
+            x, y: New position on screen
+            instance_id: Instance identifier (default 0)
+            cel_idx: If specified, set to this cel. If None, auto-advance to next cel.
+        """
+        debug(f"Handling move_sprite command: '{name}' to ({x}, {y}) instance {instance_id}" +
+              (f" cel={cel_idx}" if cel_idx is not None else " (auto-advance)"), 
             Level.DEBUG, Component.COMMAND)
-        self.api.move_sprite(name, x, y, instance_id)
+        self.api.move_sprite(name, x, y, instance_id, cel_idx)
 
     def _handle_dispose_sprite(self, name: str, instance_id: int = 0):
         """Handle new dispose_sprite command to remove a specific instance."""
