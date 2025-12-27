@@ -1,0 +1,468 @@
+# Lava Lamp Animation
+# Multi-cel blob sprites that rise, fall, morph and merge
+
+throttle(0.3)
+
+# ============================================================
+# Background - lamp housing
+# ============================================================
+
+# Lamp base (metallic)
+draw_rectangle(20, 54, 24, 10, dark_gray, 100, true)
+draw_ellipse(32, 54, 14, 3, gray, 80, true, 0)
+
+# Lamp top cap
+draw_ellipse(32, 6, 12, 3, dark_gray, 100, true, 0)
+draw_rectangle(22, 4, 20, 4, dark_gray, 100, true)
+
+# Lamp glass body (dark tinted)
+draw_ellipse(32, 10, 11, 4, navy, 30, true, 0)
+draw_rectangle(21, 10, 22, 44, navy, 30, true)
+draw_ellipse(32, 54, 11, 4, navy, 30, true, 0)
+
+# Glass highlight (left edge)
+draw_line(22, 12, 22, 52, white, 15)
+draw_line(23, 14, 23, 50, white, 10)
+
+# ============================================================
+# BLOB TYPE 1 - Large blob (red/orange)
+# Cels for morphing: round, tall, wide, splitting top, splitting bottom
+# ============================================================
+define_sprite(blob1, 14, 16)
+    
+    # Cel 0: Round/relaxed
+    sprite_cel(0)
+        draw_ellipse(7, 8, 6, 6, red, 90, true, 0)
+        draw_ellipse(5, 6, 2, 2, orange, 60, true, 0)
+    
+    # Cel 1: Stretched tall (rising)
+    sprite_cel(1)
+        draw_ellipse(7, 8, 5, 7, red, 90, true, 0)
+        draw_ellipse(5, 5, 2, 2, orange, 60, true, 0)
+    
+    # Cel 2: Squished wide (settling)
+    sprite_cel(2)
+        draw_ellipse(7, 9, 6, 4, red, 90, true, 0)
+        draw_ellipse(5, 8, 2, 1, orange, 60, true, 0)
+    
+    # Cel 3: Bulge top (about to split)
+    sprite_cel(3)
+        draw_ellipse(7, 10, 5, 4, red, 90, true, 0)
+        draw_ellipse(7, 5, 4, 4, red, 90, true, 0)
+        draw_ellipse(5, 4, 2, 1, orange, 60, true, 0)
+    
+    # Cel 4: Bulge bottom (falling/merging)
+    sprite_cel(4)
+        draw_ellipse(7, 6, 4, 4, red, 90, true, 0)
+        draw_ellipse(7, 12, 5, 4, red, 90, true, 0)
+        draw_ellipse(5, 5, 2, 1, orange, 60, true, 0)
+    
+    # Cel 5: Teardrop up (rising fast)
+    sprite_cel(5)
+        draw_ellipse(7, 6, 4, 5, red, 90, true, 0)
+        draw_polygon(7, 14, 4, 3, red, 90, 180, true)
+        draw_ellipse(5, 4, 2, 2, orange, 60, true, 0)
+    
+    # Cel 6: Teardrop down (falling)
+    sprite_cel(6)
+        draw_polygon(7, 2, 4, 3, red, 90, 0, true)
+        draw_ellipse(7, 10, 4, 5, red, 90, true, 0)
+        draw_ellipse(5, 8, 2, 2, orange, 60, true, 0)
+
+endsprite
+
+# ============================================================
+# BLOB TYPE 2 - Medium blob (purple/magenta)
+# ============================================================
+define_sprite(blob2, 12, 14)
+    
+    # Cel 0: Round/relaxed
+    sprite_cel(0)
+        draw_ellipse(6, 7, 5, 5, magenta, 85, true, 0)
+        draw_ellipse(4, 5, 2, 2, pink, 50, true, 0)
+    
+    # Cel 1: Stretched tall
+    sprite_cel(1)
+        draw_ellipse(6, 7, 4, 6, magenta, 85, true, 0)
+        draw_ellipse(4, 4, 2, 2, pink, 50, true, 0)
+    
+    # Cel 2: Squished wide
+    sprite_cel(2)
+        draw_ellipse(6, 8, 5, 3, magenta, 85, true, 0)
+        draw_ellipse(4, 7, 2, 1, pink, 50, true, 0)
+    
+    # Cel 3: Bulge top
+    sprite_cel(3)
+        draw_ellipse(6, 9, 4, 3, magenta, 85, true, 0)
+        draw_ellipse(6, 4, 3, 3, magenta, 85, true, 0)
+        draw_ellipse(4, 3, 1, 1, pink, 50, true, 0)
+    
+    # Cel 4: Bulge bottom
+    sprite_cel(4)
+        draw_ellipse(6, 5, 3, 3, magenta, 85, true, 0)
+        draw_ellipse(6, 10, 4, 3, magenta, 85, true, 0)
+        draw_ellipse(4, 4, 1, 1, pink, 50, true, 0)
+    
+    # Cel 5: Teardrop up
+    sprite_cel(5)
+        draw_ellipse(6, 5, 3, 4, magenta, 85, true, 0)
+        draw_polygon(6, 12, 3, 3, magenta, 85, 180, true)
+        draw_ellipse(4, 3, 2, 2, pink, 50, true, 0)
+    
+    # Cel 6: Teardrop down
+    sprite_cel(6)
+        draw_polygon(6, 2, 3, 3, magenta, 85, 0, true)
+        draw_ellipse(6, 9, 3, 4, magenta, 85, true, 0)
+        draw_ellipse(4, 7, 2, 2, pink, 50, true, 0)
+
+endsprite
+
+# ============================================================
+# BLOB TYPE 3 - Small blob (yellow/gold)
+# ============================================================
+define_sprite(blob3, 10, 12)
+    
+    # Cel 0: Round
+    sprite_cel(0)
+        draw_ellipse(5, 6, 4, 4, gold, 90, true, 0)
+        draw_ellipse(3, 4, 1, 1, yellow, 60, true, 0)
+    
+    # Cel 1: Tall
+    sprite_cel(1)
+        draw_ellipse(5, 6, 3, 5, gold, 90, true, 0)
+        draw_ellipse(3, 3, 1, 1, yellow, 60, true, 0)
+    
+    # Cel 2: Wide
+    sprite_cel(2)
+        draw_ellipse(5, 7, 4, 3, gold, 90, true, 0)
+        draw_ellipse(3, 6, 1, 1, yellow, 60, true, 0)
+    
+    # Cel 3: Teardrop up
+    sprite_cel(3)
+        draw_ellipse(5, 5, 3, 4, gold, 90, true, 0)
+        draw_polygon(5, 11, 3, 3, gold, 90, 180, true)
+        draw_ellipse(3, 3, 1, 1, yellow, 60, true, 0)
+    
+    # Cel 4: Teardrop down
+    sprite_cel(4)
+        draw_polygon(5, 1, 3, 3, gold, 90, 0, true)
+        draw_ellipse(5, 7, 3, 4, gold, 90, true, 0)
+        draw_ellipse(3, 5, 1, 1, yellow, 60, true, 0)
+
+endsprite
+
+# ============================================================
+# BLOB TYPE 4 - Tiny blob (cyan/turquoise)
+# ============================================================
+define_sprite(blob4, 8, 10)
+    
+    # Cel 0: Round
+    sprite_cel(0)
+        draw_circle(4, 5, 3, cyan, 85, true)
+        draw_ellipse(3, 3, 1, 1, white, 40, true, 0)
+    
+    # Cel 1: Tall
+    sprite_cel(1)
+        draw_ellipse(4, 5, 2, 4, cyan, 85, true, 0)
+        draw_ellipse(3, 3, 1, 1, white, 40, true, 0)
+    
+    # Cel 2: Wide
+    sprite_cel(2)
+        draw_ellipse(4, 6, 3, 2, cyan, 85, true, 0)
+        draw_ellipse(3, 5, 1, 1, white, 40, true, 0)
+    
+    # Cel 3: Teardrop up
+    sprite_cel(3)
+        draw_ellipse(4, 4, 2, 3, cyan, 85, true, 0)
+        draw_polygon(4, 9, 2, 3, cyan, 85, 180, true)
+        draw_ellipse(3, 3, 1, 1, white, 40, true, 0)
+    
+    # Cel 4: Teardrop down
+    sprite_cel(4)
+        draw_polygon(4, 1, 2, 3, cyan, 85, 0, true)
+        draw_ellipse(4, 6, 2, 3, cyan, 85, true, 0)
+        draw_ellipse(3, 5, 1, 1, white, 40, true, 0)
+
+endsprite
+
+# ============================================================
+# Heat source glow at bottom
+# ============================================================
+define_sprite(glow, 20, 6)
+    
+    # Cel 0: Dim
+    sprite_cel(0)
+        draw_ellipse(10, 3, 9, 3, orange, 20, true, 0)
+        draw_ellipse(10, 3, 6, 2, yellow, 15, true, 0)
+    
+    # Cel 1: Medium
+    sprite_cel(1)
+        draw_ellipse(10, 3, 9, 3, orange, 30, true, 0)
+        draw_ellipse(10, 3, 6, 2, yellow, 25, true, 0)
+    
+    # Cel 2: Bright
+    sprite_cel(2)
+        draw_ellipse(10, 3, 9, 3, orange, 40, true, 0)
+        draw_ellipse(10, 3, 6, 2, yellow, 35, true, 0)
+
+endsprite
+
+# Show heat glow
+show_sprite(glow, 22, 48, 0, 0, 1)
+
+# ============================================================
+# Initialize blobs
+# ============================================================
+v_num_blobs = 6
+create_array(v_blob_x, v_num_blobs)
+create_array(v_blob_y, v_num_blobs)
+create_array(v_blob_vy, v_num_blobs)
+create_array(v_blob_type, v_num_blobs)
+create_array(v_blob_cel, v_num_blobs)
+create_array(v_blob_state, v_num_blobs)
+create_array(v_blob_timer, v_num_blobs)
+create_array(v_blob_target_y, v_num_blobs)
+
+# State: 0=resting bottom, 1=rising, 2=resting top, 3=falling
+# Blob types: 1=large red, 2=medium purple, 3=small gold, 4=tiny cyan
+
+# Initialize blobs at various positions
+for v_i in (0, v_num_blobs - 1, 1)
+    v_blob_type[v_i] = (v_i % 4) + 1
+    v_blob_cel[v_i] = 0
+    v_blob_timer[v_i] = random(0, 100, 0)
+    
+    # Stagger initial positions
+    if v_i < 2 then
+        # Start at bottom
+        v_blob_y[v_i] = random(38, 46, 0)
+        v_blob_state[v_i] = 0
+    elsif v_i < 4 then
+        # Start rising
+        v_blob_y[v_i] = random(25, 35, 0)
+        v_blob_state[v_i] = 1
+    else
+        # Start at top
+        v_blob_y[v_i] = random(12, 20, 0)
+        v_blob_state[v_i] = 2
+    endif
+    
+    # Random x within lamp (24-38 range, adjusted for blob size)
+    if v_blob_type[v_i] == 1 then
+        v_blob_x[v_i] = random(24, 32, 0)
+    elsif v_blob_type[v_i] == 2 then
+        v_blob_x[v_i] = random(25, 34, 0)
+    elsif v_blob_type[v_i] == 3 then
+        v_blob_x[v_i] = random(26, 36, 0)
+    else
+        v_blob_x[v_i] = random(27, 37, 0)
+    endif
+    
+    v_blob_vy[v_i] = 0
+    
+    # Show initial blob
+    if v_blob_type[v_i] == 1 then
+        show_sprite(blob1, v_blob_x[v_i], v_blob_y[v_i], v_i, 0, 0)
+    elsif v_blob_type[v_i] == 2 then
+        show_sprite(blob2, v_blob_x[v_i], v_blob_y[v_i], v_i, 0, 0)
+    elsif v_blob_type[v_i] == 3 then
+        show_sprite(blob3, v_blob_x[v_i], v_blob_y[v_i], v_i, 0, 0)
+    else
+        show_sprite(blob4, v_blob_x[v_i], v_blob_y[v_i], v_i, 0, 0)
+    endif
+endfor v_i
+
+# ============================================================
+# Main animation loop
+# ============================================================
+v_time = 0
+v_glow_timer = 0
+
+while 1 == 1 then
+    v_time = v_time + 1
+    v_glow_timer = v_glow_timer + 1
+    
+    begin_frame(true)
+    
+    # --------------------------------------------------------
+    # Animate heat glow
+    # --------------------------------------------------------
+    if v_glow_timer >= 8 then
+        v_glow_timer = 0
+        v_glow_cel = random(0, 2, 0)
+        move_sprite(glow, 22, 48, 0, v_glow_cel)
+    endif
+    
+    # --------------------------------------------------------
+    # Update each blob
+    # --------------------------------------------------------
+    for v_i in (0, v_num_blobs - 1, 1)
+        v_blob_timer[v_i] = v_blob_timer[v_i] + 1
+        
+        # Determine vertical bounds based on blob type (larger blobs need more margin)
+        if v_blob_type[v_i] == 1 then
+            v_top_limit = 10
+            v_bottom_limit = 38
+        elsif v_blob_type[v_i] == 2 then
+            v_top_limit = 11
+            v_bottom_limit = 40
+        elsif v_blob_type[v_i] == 3 then
+            v_top_limit = 12
+            v_bottom_limit = 42
+        else
+            v_top_limit = 13
+            v_bottom_limit = 44
+        endif
+        
+        # State machine for blob behavior
+        if v_blob_state[v_i] == 0 then
+            # Resting at bottom - squished shape, waiting to heat up
+            v_blob_cel[v_i] = 2
+            
+            # Random chance to start rising (heated up)
+            if v_blob_timer[v_i] > 60 then
+                v_chance = random(0, 100, 0)
+                if v_chance < 3 then
+                    v_blob_state[v_i] = 1
+                    v_blob_timer[v_i] = 0
+                    v_blob_vy[v_i] = 0
+                endif
+            endif
+            
+            # Gentle wobble while resting
+            v_wobble = sin(v_time * 0.1 + v_i * 2) * 0.3
+            v_blob_x[v_i] = v_blob_x[v_i] + v_wobble
+            
+            # Keep in horizontal bounds
+            if v_blob_x[v_i] < 24 then
+                v_blob_x[v_i] = 24
+            endif
+            if v_blob_x[v_i] > 36 then
+                v_blob_x[v_i] = 36
+            endif
+            
+        elsif v_blob_state[v_i] == 1 then
+            # Rising - teardrop up shape, accelerating upward
+            # blob1/blob2 use cel 5, blob3/blob4 use cel 3
+            if v_blob_type[v_i] < 3 then
+                v_blob_cel[v_i] = 5
+            else
+                v_blob_cel[v_i] = 3
+            endif
+            
+            # Accelerate upward (negative y)
+            v_blob_vy[v_i] = v_blob_vy[v_i] - 0.02
+            if v_blob_vy[v_i] < -0.5 then
+                v_blob_vy[v_i] = -0.5
+            endif
+            
+            v_blob_y[v_i] = v_blob_y[v_i] + v_blob_vy[v_i]
+            
+            # Slight horizontal drift
+            v_drift = sin(v_time * 0.08 + v_i) * 0.2
+            v_blob_x[v_i] = v_blob_x[v_i] + v_drift
+            
+            # Keep in horizontal bounds
+            if v_blob_x[v_i] < 24 then
+                v_blob_x[v_i] = 24
+            endif
+            if v_blob_x[v_i] > 36 then
+                v_blob_x[v_i] = 36
+            endif
+            
+            # Reached top?
+            if v_blob_y[v_i] <= v_top_limit then
+                v_blob_y[v_i] = v_top_limit
+                v_blob_state[v_i] = 2
+                v_blob_timer[v_i] = 0
+                v_blob_vy[v_i] = 0
+            endif
+            
+        elsif v_blob_state[v_i] == 2 then
+            # Resting at top - wide/squished, cooling down
+            v_blob_cel[v_i] = 2
+            
+            # Morph through shapes while cooling
+            if v_blob_timer[v_i] < 20 then
+                v_blob_cel[v_i] = 1
+            elsif v_blob_timer[v_i] < 40 then
+                v_blob_cel[v_i] = 0
+            else
+                v_blob_cel[v_i] = 2
+            endif
+            
+            # Random chance to start falling (cooled down)
+            if v_blob_timer[v_i] > 80 then
+                v_chance = random(0, 100, 0)
+                if v_chance < 4 then
+                    v_blob_state[v_i] = 3
+                    v_blob_timer[v_i] = 0
+                    v_blob_vy[v_i] = 0
+                endif
+            endif
+            
+            # Gentle wobble while resting
+            v_wobble = sin(v_time * 0.1 + v_i * 2) * 0.2
+            v_blob_x[v_i] = v_blob_x[v_i] + v_wobble
+            
+            # Keep in horizontal bounds
+            if v_blob_x[v_i] < 24 then
+                v_blob_x[v_i] = 24
+            endif
+            if v_blob_x[v_i] > 36 then
+                v_blob_x[v_i] = 36
+            endif
+            
+        else
+            # Falling (state 3) - teardrop down shape
+            # blob1/blob2 use cel 6, blob3/blob4 use cel 4
+            if v_blob_type[v_i] < 3 then
+                v_blob_cel[v_i] = 6
+            else
+                v_blob_cel[v_i] = 4
+            endif
+            
+            # Accelerate downward
+            v_blob_vy[v_i] = v_blob_vy[v_i] + 0.015
+            if v_blob_vy[v_i] > 0.4 then
+                v_blob_vy[v_i] = 0.4
+            endif
+            
+            v_blob_y[v_i] = v_blob_y[v_i] + v_blob_vy[v_i]
+            
+            # Slight horizontal drift
+            v_drift = sin(v_time * 0.08 + v_i) * 0.15
+            v_blob_x[v_i] = v_blob_x[v_i] + v_drift
+            
+            # Keep in horizontal bounds
+            if v_blob_x[v_i] < 24 then
+                v_blob_x[v_i] = 24
+            endif
+            if v_blob_x[v_i] > 36 then
+                v_blob_x[v_i] = 36
+            endif
+            
+            # Reached bottom?
+            if v_blob_y[v_i] >= v_bottom_limit then
+                v_blob_y[v_i] = v_bottom_limit
+                v_blob_state[v_i] = 0
+                v_blob_timer[v_i] = 0
+                v_blob_vy[v_i] = 0
+            endif
+        endif
+        
+        # Update sprite position and cel
+        if v_blob_type[v_i] == 1 then
+            move_sprite(blob1, v_blob_x[v_i], v_blob_y[v_i], v_i, v_blob_cel[v_i])
+        elsif v_blob_type[v_i] == 2 then
+            move_sprite(blob2, v_blob_x[v_i], v_blob_y[v_i], v_i, v_blob_cel[v_i])
+        elsif v_blob_type[v_i] == 3 then
+            move_sprite(blob3, v_blob_x[v_i], v_blob_y[v_i], v_i, v_blob_cel[v_i])
+        else
+            move_sprite(blob4, v_blob_x[v_i], v_blob_y[v_i], v_i, v_blob_cel[v_i])
+        endif
+        
+    endfor v_i
+    
+    end_frame
+endwhile

@@ -1,0 +1,805 @@
+# Smooth Blinking Eyes Animation v3
+# More expressive with normal, wide, and squinty eye positions
+# Added: Look around sequences with pupil movement
+
+throttle(0.1)
+
+# ============================================================
+# Eye sprite with cels:
+#   Cel 0:  Wide open (surprised) - center
+#   Cel 1:  Normal open (resting position) 
+#   Cel 2:  Slightly narrowed
+#   Cel 3:  More narrowed
+#   Cel 4:  Half closed
+#   Cel 5:  Mostly closed
+#   Cel 6:  Nearly shut
+#   Cel 7:  Fully closed
+#   Cel 8:  Nearly shut (opening)
+#   Cel 9:  Mostly closed (opening)
+#   Cel 10: Half closed (opening)
+#   Cel 11: More narrowed (opening)
+#   Cel 12: Slightly narrowed (opening)
+#   Cel 13: Normal open (return to rest)
+#   Cel 14: Wide open (for surprise)
+#   Cel 15: Normal open (return from wide)
+#
+#   Wide Open Look Around (cel 0 base):
+#   Cel 16: Wide open, looking up
+#   Cel 17: Wide open, looking up-right
+#   Cel 18: Wide open, looking right
+#   Cel 19: Wide open, looking down-right
+#   Cel 20: Wide open, looking down
+#   Cel 21: Wide open, looking down-left
+#   Cel 22: Wide open, looking left
+#   Cel 23: Wide open, looking up-left
+#
+#   Half Closed Look Left-Right (cel 4 base):
+#   Cel 24: Half closed, looking left
+#   Cel 25: Half closed, looking right
+# ============================================================
+
+define_sprite(eye, 16, 16)
+    
+    # Cel 0: Wide open (surprised) - center pupil
+    sprite_cel(0)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 5, white, 100)
+        plot(7, 5, white, 80)
+    
+    # Cel 1: Normal open (resting position)
+    sprite_cel(1)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+    
+    # Cel 2: Slightly narrowed (95% open)
+    sprite_cel(2)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 2, black, 100, true)
+    
+    # Cel 3: More narrowed (85% open)
+    sprite_cel(3)
+        draw_ellipse(8, 8, 7, 5, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 3, black, 100, true)
+    
+    # Cel 4: Half closed (70% open) - center pupil
+    sprite_cel(4)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(8, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(8, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+    
+    # Cel 5: Mostly closed (50% open)
+    sprite_cel(5)
+        draw_ellipse(8, 10, 7, 3, white, 100, true, 0)
+        draw_ellipse(8, 10, 4, 2, sky_blue, 100, true, 0)
+        draw_ellipse(8, 10, 2, 1, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 7, black, 100, true)
+    
+    # Cel 6: Nearly shut (30% open)
+    sprite_cel(6)
+        draw_ellipse(8, 10, 7, 2, white, 100, true, 0)
+        draw_ellipse(8, 10, 3, 1, sky_blue, 100, true, 0)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+    
+    # Cel 7: Fully closed
+    sprite_cel(7)
+        draw_line(1, 8, 15, 8, dark_gray, 100)
+        draw_line(2, 9, 14, 9, dark_gray, 60)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+        draw_rectangle(0, 10, 16, 6, black, 100, true)
+    
+    # Cel 8: Nearly shut (opening)
+    sprite_cel(8)
+        draw_ellipse(8, 10, 7, 2, white, 100, true, 0)
+        draw_ellipse(8, 10, 3, 1, sky_blue, 100, true, 0)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+    
+    # Cel 9: Mostly closed (opening)
+    sprite_cel(9)
+        draw_ellipse(8, 10, 7, 3, white, 100, true, 0)
+        draw_ellipse(8, 10, 4, 2, sky_blue, 100, true, 0)
+        draw_ellipse(8, 10, 2, 1, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 7, black, 100, true)
+    
+    # Cel 10: Half closed (opening)
+    sprite_cel(10)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(8, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(8, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+    
+    # Cel 11: More narrowed (opening)
+    sprite_cel(11)
+        draw_ellipse(8, 8, 7, 5, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 3, black, 100, true)
+    
+    # Cel 12: Slightly narrowed (opening)
+    sprite_cel(12)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 2, black, 100, true)
+    
+    # Cel 13: Normal open (return to rest)
+    sprite_cel(13)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+    
+    # Cel 14: Wide open (same as cel 0, for surprise sequence)
+    sprite_cel(14)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 5, white, 100)
+        plot(7, 5, white, 80)
+    
+    # Cel 15: Normal open (return from wide)
+    sprite_cel(15)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+
+    # ============================================================
+    # Wide Open Look Around Cels (16-23)
+    # Pupil moves within the wide open eye
+    # ============================================================
+    
+    # Cel 16: Wide open, looking UP
+    sprite_cel(16)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 5, 4, sky_blue, 100, true)
+        draw_circle(8, 5, 2, black, 100, true)
+        plot(6, 3, white, 100)
+        plot(7, 3, white, 80)
+    
+    # Cel 17: Wide open, looking UP-RIGHT
+    sprite_cel(17)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(10, 5, 4, sky_blue, 100, true)
+        draw_circle(10, 5, 2, black, 100, true)
+        plot(8, 3, white, 100)
+        plot(9, 3, white, 80)
+    
+    # Cel 18: Wide open, looking RIGHT
+    sprite_cel(18)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(11, 8, 4, sky_blue, 100, true)
+        draw_circle(11, 8, 2, black, 100, true)
+        plot(9, 5, white, 100)
+        plot(10, 5, white, 80)
+    
+    # Cel 19: Wide open, looking DOWN-RIGHT
+    sprite_cel(19)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(10, 11, 4, sky_blue, 100, true)
+        draw_circle(10, 11, 2, black, 100, true)
+        plot(8, 9, white, 100)
+        plot(9, 9, white, 80)
+    
+    # Cel 20: Wide open, looking DOWN
+    sprite_cel(20)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 11, 4, sky_blue, 100, true)
+        draw_circle(8, 11, 2, black, 100, true)
+        plot(6, 9, white, 100)
+        plot(7, 9, white, 80)
+    
+    # Cel 21: Wide open, looking DOWN-LEFT
+    sprite_cel(21)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(6, 11, 4, sky_blue, 100, true)
+        draw_circle(6, 11, 2, black, 100, true)
+        plot(4, 9, white, 100)
+        plot(5, 9, white, 80)
+    
+    # Cel 22: Wide open, looking LEFT
+    sprite_cel(22)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(5, 8, 4, sky_blue, 100, true)
+        draw_circle(5, 8, 2, black, 100, true)
+        plot(3, 5, white, 100)
+        plot(4, 5, white, 80)
+    
+    # Cel 23: Wide open, looking UP-LEFT
+    sprite_cel(23)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(6, 5, 4, sky_blue, 100, true)
+        draw_circle(6, 5, 2, black, 100, true)
+        plot(4, 3, white, 100)
+        plot(5, 3, white, 80)
+
+    # ============================================================
+    # Half Closed Look Left-Right Cels (24-25)
+    # Pupil moves within the half-closed eye
+    # ============================================================
+    
+    # Cel 24: Half closed, looking LEFT
+    sprite_cel(24)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(5, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(5, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+    
+    # Cel 25: Half closed, looking RIGHT
+    sprite_cel(25)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(11, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(11, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+
+endsprite
+
+# ============================================================
+# Look Around Sequence Arrays
+# Stores cel numbers for each look direction
+# ============================================================
+
+# Wide open look around: 8 directions in a circle
+# Pattern: center(0) -> up(16) -> up-right(17) -> right(18) -> down-right(19) -> down(20) -> down-left(21) -> left(22) -> up-left(23) -> center(0)
+create_array(v_look_cels, 9)
+v_look_cels[0] = 0
+v_look_cels[1] = 16
+v_look_cels[2] = 17
+v_look_cels[3] = 18
+v_look_cels[4] = 19
+v_look_cels[5] = 20
+v_look_cels[6] = 21
+v_look_cels[7] = 22
+v_look_cels[8] = 23
+
+# Squint look left-right: center -> left -> center -> right -> center
+create_array(v_squint_cels, 5)
+v_squint_cels[0] = 4
+v_squint_cels[1] = 24
+v_squint_cels[2] = 4
+v_squint_cels[3] = 25
+v_squint_cels[4] = 4
+
+# ============================================================
+# Default eye positions
+# ============================================================
+v_left_x = 16
+v_right_x = 34
+v_eye_y = 24
+
+# ============================================================
+# Position the eyes at normal resting position (cel 1)
+# ============================================================
+
+show_sprite(eye, v_left_x, v_eye_y, 0, 0, 1)
+show_sprite(eye, v_right_x, v_eye_y, 1, 0, 1)
+
+sync_queue
+rest(1)
+
+# ============================================================
+# Main animation loop - runs forever
+# ============================================================
+
+v_blink_speed = 0.001
+v_look_speed = 0.15
+
+while 1 == 1 then
+    
+    # Random wait between actions (2-4.5 seconds)
+    v_wait_time = 2.0 + random(0, 2.5, 2)
+    rest(v_wait_time)
+    
+    # Decide what to do (1-100)
+    v_action = random(1, 100, 0)
+    
+    if v_action <= 8 then
+        # ============================================================
+        # 8%: Fast wink - one random eye
+        # ============================================================
+        v_wink_eye = random(0, 1, 0)
+        
+        # Determine x position for the winking eye
+        if v_wink_eye == 0 then
+            v_wink_x = v_left_x
+        else
+            v_wink_x = v_right_x
+        endif
+        
+        # Quick close: 1 -> 3 -> 5 -> 7
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 3)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 5)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 7)
+        end_frame
+        rest(0.08)
+        
+        # Quick open: 7 -> 9 -> 11 -> 1
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 9)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 11)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_wink_x, v_eye_y, v_wink_eye, 1)
+        end_frame
+        
+    elsif v_action <= 16 then
+        # ============================================================
+        # 8%: Fast blink - both eyes, skip frames
+        # ============================================================
+        
+        # Quick close: 1 -> 3 -> 5 -> 7
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 5)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 5)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 7)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 7)
+        end_frame
+        rest(0.02)
+        
+        # Quick open: 7 -> 9 -> 11 -> 1
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 9)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 9)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 11)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 11)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    elsif v_action <= 24 then
+        # ============================================================
+        # 8%: Surprised! Wide eyes then return to normal
+        # ============================================================
+        
+        # Open wide
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 0)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 0)
+        end_frame
+        rest(0.4 + random(0, 0.3, 2))
+        
+        # Return to normal
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    elsif v_action <= 32 then
+        # ============================================================
+        # 8%: Wide eyes then blink
+        # ============================================================
+        
+        # Open wide
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 0)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 0)
+        end_frame
+        rest(0.3)
+        
+        # Blink from wide: 0 -> 2 -> 4 -> 6 -> 7 -> 8 -> 10 -> 12 -> 1
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 2)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 2)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 4)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 4)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 6)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 6)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 7)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 7)
+        end_frame
+        rest(0.03)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 8)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 8)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 10)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 10)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 12)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 12)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    elsif v_action <= 40 then
+        # ============================================================
+        # 8%: Slow drowsy close (sleepy)
+        # ============================================================
+        
+        # Slow close: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 2)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 2)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 4)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 4)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 5)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 5)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 6)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 6)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 7)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 7)
+        end_frame
+        
+        # Stay closed
+        rest(1.0 + random(0, 1.0, 2))
+        
+        # Slow open: 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 1
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 8)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 8)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 9)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 9)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 10)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 10)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 11)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 11)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 12)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 12)
+        end_frame
+        rest(0.1)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    elsif v_action <= 50 then
+        # ============================================================
+        # 10%: Wide Open Look Around Sequence
+        # Eyes wide open, pupils look around in a circle
+        # Randomly forward or backward direction
+        # ============================================================
+        
+        # First, open eyes wide (cel 0 - center)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 0)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 0)
+        end_frame
+        rest(0.2)
+        
+        # Randomly choose direction: 0 = forward, 1 = backward
+        v_direction = random(0, 1, 0)
+        
+        if v_direction == 0 then
+            # Forward: up -> up-right -> right -> down-right -> down -> down-left -> left -> up-left
+            for v_i in (1, 8, 1)
+                v_cel = v_look_cels[v_i]
+                begin_frame
+                    move_sprite(eye, v_left_x, v_eye_y, 0, v_cel)
+                    move_sprite(eye, v_right_x, v_eye_y, 1, v_cel)
+                end_frame
+                rest(v_look_speed)
+            endfor v_i
+        else
+            # Backward: up-left -> left -> down-left -> down -> down-right -> right -> up-right -> up
+            for v_i in (8, 1, -1)
+                v_cel = v_look_cels[v_i]
+                begin_frame
+                    move_sprite(eye, v_left_x, v_eye_y, 0, v_cel)
+                    move_sprite(eye, v_right_x, v_eye_y, 1, v_cel)
+                end_frame
+                rest(v_look_speed)
+            endfor v_i
+        endif
+        
+        # Return to center (cel 0)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 0)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 0)
+        end_frame
+        rest(0.2)
+        
+        # Return to normal resting position (cel 1)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    elsif v_action <= 60 then
+        # ============================================================
+        # 10%: Squinty Look Left-Right Sequence
+        # Eyes half closed, pupils look left then right (or reverse)
+        # Randomly forward or backward direction
+        # ============================================================
+        
+        # First, narrow the eyes to half-closed (cel 4 - center)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 2)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 2)
+        end_frame
+        rest(0.05)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+        end_frame
+        rest(0.05)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 4)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 4)
+        end_frame
+        rest(0.2)
+        
+        # Randomly choose direction: 0 = forward (left first), 1 = backward (right first)
+        v_direction = random(0, 1, 0)
+        
+        if v_direction == 0 then
+            # Forward: center -> left -> center -> right -> center
+            for v_i in (1, 4, 1)
+                v_cel = v_squint_cels[v_i]
+                begin_frame
+                    move_sprite(eye, v_left_x, v_eye_y, 0, v_cel)
+                    move_sprite(eye, v_right_x, v_eye_y, 1, v_cel)
+                end_frame
+                rest(v_look_speed + 0.1)
+            endfor v_i
+        else
+            # Backward: center -> right -> center -> left -> center
+            for v_i in (4, 1, -1)
+                v_cel = v_squint_cels[v_i]
+                begin_frame
+                    move_sprite(eye, v_left_x, v_eye_y, 0, v_cel)
+                    move_sprite(eye, v_right_x, v_eye_y, 1, v_cel)
+                end_frame
+                rest(v_look_speed + 0.1)
+            endfor v_i
+        endif
+        
+        # Make sure we're at center (cel 4)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 4)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 4)
+        end_frame
+        rest(0.15)
+        
+        # Open eyes back to normal (cel 4 -> 3 -> 2 -> 1)
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+        end_frame
+        rest(0.05)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 2)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 2)
+        end_frame
+        rest(0.05)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+    else
+        # ============================================================
+        # 40%: Normal smooth blink from resting position
+        # ============================================================
+        
+        # Close: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 2)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 2)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 4)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 4)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 5)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 5)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 6)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 6)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 7)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 7)
+        end_frame
+        rest(0.02)
+        
+        # Open: 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 1
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 8)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 8)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 9)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 9)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 10)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 10)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 11)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 11)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 12)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 12)
+        end_frame
+        rest(v_blink_speed)
+        
+        begin_frame
+            move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+            move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+        end_frame
+        
+        # Occasional double-blink (15% chance)
+        v_double = random(1, 100, 0)
+        if v_double <= 15 then
+            rest(0.1)
+            
+            # Quick second blink
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 3)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 3)
+            end_frame
+            rest(v_blink_speed)
+            
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 5)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 5)
+            end_frame
+            rest(v_blink_speed)
+            
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 7)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 7)
+            end_frame
+            rest(0.02)
+            
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 9)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 9)
+            end_frame
+            rest(v_blink_speed)
+            
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 11)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 11)
+            end_frame
+            rest(v_blink_speed)
+            
+            begin_frame
+                move_sprite(eye, v_left_x, v_eye_y, 0, 1)
+                move_sprite(eye, v_right_x, v_eye_y, 1, 1)
+            end_frame
+        endif
+        
+    endif
+    
+endwhile

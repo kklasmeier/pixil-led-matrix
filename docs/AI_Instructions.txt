@@ -456,7 +456,7 @@ move_sprite(sprite1, v_x + cos(v_angle), v_y + sin(v_angle))
 # Dispose of a specific sprite instance
 dispose_sprite(sprite1, 1)
 
-# Dispose all defined sprites (cleanup)
+    # Dispose all defined sprites (cleanup)
 dispose_all_sprites()
 ```
 
@@ -1178,4 +1178,4 @@ My current list of scripts are:
 119. Rotating Cube - Wireframe Cube that rotates
 120. Jellyfish - Swimming Jellyfish
 121. Cloth simulation - A large sheet blowing in the Windows
-            
+122. Watching eyes - Cartoon animated eyes looking around and blinking        
