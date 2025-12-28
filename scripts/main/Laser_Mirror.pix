@@ -1,0 +1,736 @@
+# ============================================================================
+# LASER MIRROR FIELD
+# ============================================================================
+# A top-down laser simulation with reflective mirrors
+# The laser rotates 360 degrees and bounces off randomly placed mirrors
+# ============================================================================
+
+throttle(0.8)
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+v_mirror_min = 5
+v_mirror_max = 10
+v_mirror_size_min = 4
+v_mirror_size_max = 16
+v_laser_length = 128
+v_rotation_speed_min = 1
+v_rotation_speed_max = 4
+v_rotations_per_cycle = 2
+v_max_bounces = 12
+v_burnout_duration = 200
+
+# Multi-laser settings
+v_max_lasers = 3
+
+# Display boundaries
+v_min_x = 0
+v_max_x = 63
+v_min_y = 0
+v_max_y = 63
+
+# ============================================================================
+# RUNTIME VARIABLES
+# ============================================================================
+v_laser_x = 0
+v_laser_y = 0
+v_angle = 0
+v_has_walls = 0
+v_use_burnout = 0
+v_uniform_color = 0
+v_cycle_color = 0
+v_mirror_count = 0
+v_rotation_speed = 2
+
+# Multi-laser variables
+v_laser_count = 1
+create_array(v_laser_xs, 3, numeric)
+create_array(v_laser_ys, 3, numeric)
+create_array(v_laser_angles, 3, numeric)
+create_array(v_laser_speeds, 3, numeric)
+create_array(v_laser_colors, 3, string)
+v_laser_colors[0] = "red"
+v_laser_colors[1] = "green"
+v_laser_colors[2] = "cyan"
+v_current_laser = 0
+v_current_color = "red"
+v_primary_angle = 0
+v_prev_angle = 0
+v_rotations_done = 0
+v_rest_time = 0.03
+
+# Arrays for mirror edges (each mirror edge is a line segment)
+# We'll store up to 50 edges (enough for 10 polygons with 5 sides each)
+create_array(v_edge_x1, 50, numeric)
+create_array(v_edge_y1, 50, numeric)
+create_array(v_edge_x2, 50, numeric)
+create_array(v_edge_y2, 50, numeric)
+# Cached edge vectors + normals for faster intersection/reflection
+create_array(v_edge_dx, 50, numeric)
+create_array(v_edge_dy, 50, numeric)
+create_array(v_edge_nx, 50, numeric)
+create_array(v_edge_ny, 50, numeric)
+v_edge_count = 0
+
+# Arrays for mirror colors (one per edge for drawing)
+create_array(v_edge_color, 50, string)
+
+# Color palette for mirrors
+create_array(v_colors, 10, string)
+v_colors[0] = "cyan"
+v_colors[1] = "magenta"
+v_colors[2] = "yellow"
+v_colors[3] = "green"
+v_colors[4] = "orange"
+v_colors[5] = "purple"
+v_colors[6] = "white"
+v_colors[7] = "pink"
+v_colors[8] = "lime"
+v_colors[9] = "sky_blue"
+
+# Trig lookup tables (integer degrees 0-359)
+create_array(v_cos_lut, 360, numeric)
+create_array(v_sin_lut, 360, numeric)
+for v_d in (0, 359, 1)
+    v_cos_lut[v_d] = cos(radians(v_d))
+    v_sin_lut[v_d] = sin(radians(v_d))
+endfor v_d
+
+# Temporary variables for ray tracing
+v_ray_x = 0
+v_ray_y = 0
+v_ray_dx = 0
+v_ray_dy = 0
+v_hit_x = 0
+v_hit_y = 0
+v_hit_dist = 0
+v_hit_edge = -1
+v_best_dist = 9999
+v_best_edge = -1
+v_best_wall_axis = 0
+v_best_x = 0
+v_best_y = 0
+v_color_pick = "white"
+
+# Variables for intersection calculation
+v_t = 0
+v_u = 0
+v_denom = 0
+v_ix = 0
+v_iy = 0
+
+# Variables for reflection calculation
+v_nx = 0
+v_ny = 0
+v_dot = 0
+v_len = 0
+
+# Drawing variables
+v_draw_x = 0
+v_draw_y = 0
+v_prev_x = 0
+v_prev_y = 0
+v_intensity = 100
+v_pixels_drawn = 0
+v_bounce_count = 0
+v_futility = 0
+v_keep_tracing = 1
+
+# Loop counters
+v_i = 0
+v_j = 0
+v_k = 0
+v_rot = 0
+v_cycle = 0
+
+# Temporary calculation variables
+v_temp = 0
+v_temp2 = 0
+v_cx = 0
+v_cy = 0
+v_radius = 0
+v_sides = 0
+v_angle_step = 0
+v_px = 0
+v_py = 0
+v_px2 = 0
+v_py2 = 0
+v_edge_start = 0
+
+# Mirror generation variables
+v_new_cx = 0
+v_new_cy = 0
+v_new_radius = 0
+v_new_sides = 0
+v_overlap = 0
+v_attempt = 0
+v_max_attempts = 50
+v_laser_valid = 0
+
+# Wall edge indices (stored at end of edge array if walls enabled)
+v_wall_start = 0
+
+# ============================================================================
+# PROCEDURE: Check if point is within valid bounds
+# Sets v_temp to 1 if valid, 0 if not
+# ============================================================================
+def check_bounds {
+    v_temp = 1
+    if v_new_cx - v_new_radius < 2 then
+        v_temp = 0
+    endif
+    if v_new_cx + v_new_radius > 61 then
+        v_temp = 0
+    endif
+    if v_new_cy - v_new_radius < 2 then
+        v_temp = 0
+    endif
+    if v_new_cy + v_new_radius > 61 then
+        v_temp = 0
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Check overlap with existing mirrors
+# Sets v_overlap to 1 if overlapping, 0 if clear
+# Uses bounding circle check for simplicity
+# ============================================================================
+def check_overlap {
+    v_overlap = 0
+    v_j = 0
+    while v_j < v_edge_count and v_overlap == 0 then
+        v_temp = abs(v_new_cx - (v_edge_x1[v_j] + v_edge_x2[v_j]) / 2)
+        v_temp2 = abs(v_new_cy - (v_edge_y1[v_j] + v_edge_y2[v_j]) / 2)
+        v_temp = sqrt(v_temp * v_temp + v_temp2 * v_temp2)
+        if v_temp < v_new_radius + v_mirror_size_max then
+            v_overlap = 1
+        endif
+        v_j = v_j + 1
+    endwhile
+}
+
+# ============================================================================
+# PROCEDURE: Add a line segment mirror
+# ============================================================================
+def add_line_mirror {
+    v_attempt = 0
+    v_overlap = 1
+    while v_overlap == 1 and v_attempt < v_max_attempts then
+        v_new_cx = random(10, 53, 0)
+        v_new_cy = random(10, 53, 0)
+        v_new_radius = random(v_mirror_size_min, v_mirror_size_max, 0)
+        v_temp = random(0, 359, 0)
+        v_px = v_new_cx + v_cos_lut[v_temp] * v_new_radius / 2
+        v_py = v_new_cy + v_sin_lut[v_temp] * v_new_radius / 2
+        v_px2 = v_new_cx - v_cos_lut[v_temp] * v_new_radius / 2
+        v_py2 = v_new_cy - v_sin_lut[v_temp] * v_new_radius / 2
+        call check_bounds
+        if v_temp == 1 then
+            call check_overlap
+        else
+            v_overlap = 1
+        endif
+        v_attempt = v_attempt + 1
+    endwhile
+    if v_overlap == 0 then
+        v_edge_x1[v_edge_count] = v_px
+        v_edge_y1[v_edge_count] = v_py
+        v_edge_x2[v_edge_count] = v_px2
+        v_edge_y2[v_edge_count] = v_py2
+        # Cache edge vector + normal (used by intersection + reflection)
+        v_edge_dx[v_edge_count] = v_px2 - v_px
+        v_edge_dy[v_edge_count] = v_py2 - v_py
+        v_len = sqrt(v_edge_dx[v_edge_count] * v_edge_dx[v_edge_count] + v_edge_dy[v_edge_count] * v_edge_dy[v_edge_count])
+        if v_len > 0.0001 then
+            v_edge_nx[v_edge_count] = 0 - v_edge_dy[v_edge_count] / v_len
+            v_edge_ny[v_edge_count] = v_edge_dx[v_edge_count] / v_len
+        else
+            v_edge_nx[v_edge_count] = 0
+            v_edge_ny[v_edge_count] = 0
+        endif
+        if v_uniform_color == 1 then
+            v_color_pick = v_colors[v_cycle_color]
+        else
+            v_temp = random(0, 9, 0)
+            v_color_pick = v_colors[v_temp]
+        endif
+        v_edge_color[v_edge_count] = v_color_pick
+        v_edge_count = v_edge_count + 1
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Add a polygon mirror (3-5 sides)
+# ============================================================================
+def add_polygon_mirror {
+    v_attempt = 0
+    v_overlap = 1
+    while v_overlap == 1 and v_attempt < v_max_attempts then
+        v_new_cx = random(12, 51, 0)
+        v_new_cy = random(12, 51, 0)
+        v_new_radius = random(v_mirror_size_min, v_mirror_size_max, 0) / 2
+        v_new_sides = random(3, 5, 0)
+        call check_bounds
+        if v_temp == 1 then
+            call check_overlap
+        else
+            v_overlap = 1
+        endif
+        v_attempt = v_attempt + 1
+    endwhile
+    if v_overlap == 0 then
+        v_angle_step = 360 / v_new_sides
+        v_temp = random(0, 359, 0)
+        v_edge_start = v_edge_count
+        for v_k in (0, v_new_sides - 1, 1)
+            v_px = v_new_cx + cos(radians(v_temp + v_k * v_angle_step)) * v_new_radius
+            v_py = v_new_cy + sin(radians(v_temp + v_k * v_angle_step)) * v_new_radius
+            v_px2 = v_new_cx + cos(radians(v_temp + (v_k + 1) * v_angle_step)) * v_new_radius
+            v_py2 = v_new_cy + sin(radians(v_temp + (v_k + 1) * v_angle_step)) * v_new_radius
+            v_edge_x1[v_edge_count] = v_px
+            v_edge_y1[v_edge_count] = v_py
+            v_edge_x2[v_edge_count] = v_px2
+            v_edge_y2[v_edge_count] = v_py2
+            # Cache edge vector + normal (used by intersection + reflection)
+            v_edge_dx[v_edge_count] = v_px2 - v_px
+            v_edge_dy[v_edge_count] = v_py2 - v_py
+            v_len = sqrt(v_edge_dx[v_edge_count] * v_edge_dx[v_edge_count] + v_edge_dy[v_edge_count] * v_edge_dy[v_edge_count])
+            if v_len > 0.0001 then
+                v_edge_nx[v_edge_count] = 0 - v_edge_dy[v_edge_count] / v_len
+                v_edge_ny[v_edge_count] = v_edge_dx[v_edge_count] / v_len
+            else
+                v_edge_nx[v_edge_count] = 0
+                v_edge_ny[v_edge_count] = 0
+            endif
+            if v_uniform_color == 1 then
+                v_color_pick = v_colors[v_cycle_color]
+            else
+                v_temp2 = random(0, 9, 0)
+                v_color_pick = v_colors[v_temp2]
+            endif
+            v_edge_color[v_edge_count] = v_color_pick
+            v_edge_count = v_edge_count + 1
+        endfor v_k
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Add wall edges if enabled
+# ============================================================================
+def add_walls {
+    # Walls are handled analytically for intersections (faster than treating as 4 extra edges)
+    v_has_walls = 1
+    v_wall_start = v_edge_count   # mirror edges end here
+}
+
+# ============================================================================
+# PROCEDURE: Check if laser position is clear of mirrors
+# Uses point-to-segment distance check
+# Sets v_laser_valid to 1 if clear, 0 if too close to a mirror
+# ============================================================================
+def check_laser_position {
+    v_laser_valid = 1
+    v_j = 0
+    while v_j < v_edge_count and v_laser_valid == 1 then
+        v_temp = v_edge_x2[v_j] - v_edge_x1[v_j]
+        v_temp2 = v_edge_y2[v_j] - v_edge_y1[v_j]
+        v_len = v_temp * v_temp + v_temp2 * v_temp2
+        if v_len > 0 then
+            v_t = ((v_laser_x - v_edge_x1[v_j]) * v_temp + (v_laser_y - v_edge_y1[v_j]) * v_temp2) / v_len
+            if v_t < 0 then
+                v_t = 0
+            endif
+            if v_t > 1 then
+                v_t = 1
+            endif
+            v_px = v_edge_x1[v_j] + v_t * v_temp
+            v_py = v_edge_y1[v_j] + v_t * v_temp2
+            v_temp = v_laser_x - v_px
+            v_temp2 = v_laser_y - v_py
+            v_len = sqrt(v_temp * v_temp + v_temp2 * v_temp2)
+            if v_len < 3 then
+                v_laser_valid = 0
+            endif
+        endif
+        v_j = v_j + 1
+    endwhile
+}
+
+# ============================================================================
+# PROCEDURE: Generate mirror field
+# ============================================================================
+def generate_field {
+    v_edge_count = 0
+    v_temp = random(1, 4, 0)
+    if v_temp == 1 then
+        v_laser_count = random(2, 3, 0)
+    else
+        v_laser_count = 1
+    endif
+    if v_laser_count > 1 then
+        v_mirror_count = random(v_mirror_min, v_mirror_max - 2, 0)
+    else
+        v_mirror_count = random(v_mirror_min, v_mirror_max, 0)
+    endif
+    v_has_walls = random(0, 1, 0)
+    v_rotation_speed = random(v_rotation_speed_min, v_rotation_speed_max, 0)
+    v_use_burnout = random(1, 4, 0)
+    if v_use_burnout == 1 then
+        v_use_burnout = 1
+    else
+        v_use_burnout = 0
+    endif
+    v_temp = random(1, 5, 0)
+    if v_temp == 1 then
+        v_uniform_color = 0
+    else
+        v_uniform_color = 1
+        v_cycle_color = random(0, 9, 0)
+    endif
+    for v_i in (0, v_mirror_count - 1, 1)
+        v_temp = random(0, 2, 0)
+        if v_temp == 0 then
+            call add_line_mirror
+        else
+            call add_polygon_mirror
+        endif
+    endfor v_i
+    if v_has_walls == 1 then
+        call add_walls
+    endif
+    for v_i in (0, v_laser_count - 1, 1)
+        v_laser_valid = 0
+        v_attempt = 0
+        while v_laser_valid == 0 and v_attempt < v_max_attempts then
+            v_laser_x = random(10, 53, 0)
+            v_laser_y = random(10, 53, 0)
+            call check_laser_position
+            v_attempt = v_attempt + 1
+        endwhile
+        if v_laser_valid == 0 then
+            v_laser_x = 20 + v_i * 12
+            v_laser_y = 32
+        endif
+        v_laser_xs[v_i] = v_laser_x
+        v_laser_ys[v_i] = v_laser_y
+        v_laser_angles[v_i] = random(0, 359, 0)
+        v_laser_speeds[v_i] = random(v_rotation_speed_min, v_rotation_speed_max, 0)
+    endfor v_i
+    v_laser_speeds[0] = v_rotation_speed
+}
+
+# ============================================================================
+# PROCEDURE: Draw all mirrors
+# ============================================================================
+def draw_mirrors {
+    # Mirrors
+    for v_i in (0, v_edge_count - 1, 1)
+        draw_line(v_edge_x1[v_i], v_edge_y1[v_i], v_edge_x2[v_i], v_edge_y2[v_i], v_edge_color[v_i], 80)
+    endfor v_i
+
+    # Outer border (walls) - keep crisp on top in burnout mode
+    if v_has_walls == 1 then
+        # Outline rectangle: (x1,y1) to (x2,y2)
+        draw_rectangle(v_min_x, v_min_y, 64, 64, "white", 60, false)
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Ray-segment intersection test
+# Input: v_ray_x, v_ray_y (ray origin), v_ray_dx, v_ray_dy (ray direction)
+#        v_i (edge index to test)
+# Output: v_hit_dist (distance to hit, 9999 if no hit), v_hit_x, v_hit_y
+# ============================================================================
+def ray_segment_intersect {
+    v_hit_dist = 9999
+    v_temp = v_edge_dx[v_i]
+    v_temp2 = v_edge_dy[v_i]
+    v_denom = v_ray_dx * v_temp2 - v_ray_dy * v_temp
+    if abs(v_denom) > 0.0001 then
+        v_t = ((v_edge_x1[v_i] - v_ray_x) * v_temp2 - (v_edge_y1[v_i] - v_ray_y) * v_temp) / v_denom
+        v_u = ((v_edge_x1[v_i] - v_ray_x) * v_ray_dy - (v_edge_y1[v_i] - v_ray_y) * v_ray_dx) / v_denom
+        if v_t > 0.01 and v_u >= 0 and v_u <= 1 then
+            v_hit_dist = v_t
+            v_hit_x = v_ray_x + v_ray_dx * v_t
+            v_hit_y = v_ray_y + v_ray_dy * v_t
+        endif
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Find closest wall hit analytically (no per-edge loop)
+# Outputs:
+#   v_wall_hit = 1/0
+#   v_wall_t   = distance along ray
+#   v_wall_x, v_wall_y = hit point
+#   v_wall_axis = 0 for vertical wall (reflect dx), 1 for horizontal wall (reflect dy)
+# ============================================================================
+def wall_hit {
+    v_wall_hit = 0
+    v_wall_t = 9999
+    v_wall_axis = -1
+
+    # Vertical walls (x = v_min_x or x = v_max_x)
+    if abs(v_ray_dx) > 0.0001 then
+        if v_ray_dx > 0 then
+            v_t = (v_max_x - v_ray_x) / v_ray_dx
+            if v_t > 0.01 and v_t < v_wall_t then
+                v_wall_t = v_t
+                v_wall_axis = 0
+                v_wall_hit = 1
+            endif
+        else
+            v_t = (v_min_x - v_ray_x) / v_ray_dx
+            if v_t > 0.01 and v_t < v_wall_t then
+                v_wall_t = v_t
+                v_wall_axis = 0
+                v_wall_hit = 1
+            endif
+        endif
+    endif
+
+    # Horizontal walls (y = v_min_y or y = v_max_y)
+    if abs(v_ray_dy) > 0.0001 then
+        if v_ray_dy > 0 then
+            v_t = (v_max_y - v_ray_y) / v_ray_dy
+            if v_t > 0.01 and v_t < v_wall_t then
+                v_wall_t = v_t
+                v_wall_axis = 1
+                v_wall_hit = 1
+            endif
+        else
+            v_t = (v_min_y - v_ray_y) / v_ray_dy
+            if v_t > 0.01 and v_t < v_wall_t then
+                v_wall_t = v_t
+                v_wall_axis = 1
+                v_wall_hit = 1
+            endif
+        endif
+    endif
+
+    if v_wall_hit == 1 then
+        v_wall_x = v_ray_x + v_ray_dx * v_wall_t
+        v_wall_y = v_ray_y + v_ray_dy * v_wall_t
+    endif
+}
+
+
+
+# ============================================================================
+# PROCEDURE: Find closest intersection
+# Input: v_ray_x, v_ray_y (ray origin), v_ray_dx, v_ray_dy (ray direction)
+# Output: v_best_dist, v_best_x, v_best_y, v_best_edge
+# ============================================================================
+def find_closest_hit {
+    v_best_dist = 9999
+    v_best_edge = -1
+
+    # Scan mirror edges only (walls handled analytically)
+    for v_i in (0, v_edge_count - 1, 1)
+        call ray_segment_intersect
+        if v_hit_dist < v_best_dist then
+            v_best_dist = v_hit_dist
+            v_best_x = v_hit_x
+            v_best_y = v_hit_y
+            v_best_edge = v_i
+        endif
+    endfor v_i
+
+    # Compare with analytic wall hit (if enabled)
+    if v_has_walls == 1 then
+        call wall_hit
+        if v_wall_hit == 1 and v_wall_t < v_best_dist then
+            v_best_dist = v_wall_t
+            v_best_x = v_wall_x
+            v_best_y = v_wall_y
+            v_best_edge = -2      # sentinel for wall
+            v_best_wall_axis = v_wall_axis
+        endif
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Calculate reflection vector
+# Input: v_ray_dx, v_ray_dy (incoming direction), v_best_edge (hit edge)
+# Output: v_ray_dx, v_ray_dy (reflected direction)
+# ============================================================================
+def calculate_reflection {
+    # Wall hit: reflect by flipping axis (cheaper than dot/normal math)
+    if v_best_edge == -2 then
+        if v_best_wall_axis == 0 then
+            v_ray_dx = 0 - v_ray_dx
+        else
+            v_ray_dy = 0 - v_ray_dy
+        endif
+    else
+        # Mirror hit: use cached edge normal
+        v_nx = v_edge_nx[v_best_edge]
+        v_ny = v_edge_ny[v_best_edge]
+        v_dot = v_ray_dx * v_nx + v_ray_dy * v_ny
+        v_ray_dx = v_ray_dx - 2 * v_dot * v_nx
+        v_ray_dy = v_ray_dy - 2 * v_dot * v_ny
+    endif
+}
+
+# ============================================================================
+# PROCEDURE: Draw laser beam with fading
+# Traces ray and draws with bounces
+# ============================================================================
+def draw_laser {
+    v_ray_x = v_laser_x
+    v_ray_y = v_laser_y
+    v_ray_dx = v_cos_lut[v_angle]
+    v_ray_dy = v_sin_lut[v_angle]
+    v_pixels_drawn = 0
+    v_bounce_count = 0
+    v_prev_x = v_ray_x
+    v_prev_y = v_ray_y
+    v_futility = v_laser_length * 0.9
+    v_keep_tracing = 1
+    while v_keep_tracing == 1 then
+        call find_closest_hit
+        if v_best_edge != -1 then
+            v_temp = v_best_dist
+            if v_pixels_drawn + v_temp > v_laser_length then
+                v_temp = v_laser_length - v_pixels_drawn
+                v_best_x = v_ray_x + v_ray_dx * v_temp
+                v_best_y = v_ray_y + v_ray_dy * v_temp
+                v_keep_tracing = 0
+            endif
+            v_intensity = 100 - (v_pixels_drawn * 80 / v_laser_length)
+            if v_intensity < 20 then
+                v_intensity = 20
+            endif
+            if v_use_burnout == 1 then
+                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
+            else
+                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity)
+            endif
+            v_pixels_drawn = v_pixels_drawn + v_best_dist
+            if v_keep_tracing == 1 then
+                if v_pixels_drawn > v_futility then
+                    v_keep_tracing = 0
+                elseif v_bounce_count >= v_max_bounces then
+                    v_keep_tracing = 0
+                else
+                    v_ray_x = v_best_x
+                    v_ray_y = v_best_y
+                    v_prev_x = v_best_x
+                    v_prev_y = v_best_y
+                    call calculate_reflection
+                    v_bounce_count = v_bounce_count + 1
+                endif
+            endif
+        else
+            v_temp = v_laser_length - v_pixels_drawn
+            v_best_x = v_ray_x + v_ray_dx * v_temp
+            v_best_y = v_ray_y + v_ray_dy * v_temp
+            v_intensity = 100 - (v_pixels_drawn * 80 / v_laser_length)
+            if v_intensity < 20 then
+                v_intensity = 20
+            endif
+            if v_use_burnout == 1 then
+                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
+            else
+                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity)
+            endif
+            v_keep_tracing = 0
+        endif
+    endwhile
+}
+
+# ============================================================================
+# PROCEDURE: Draw all laser emitters
+# ============================================================================
+def draw_all_emitters {
+    for v_i in (0, v_laser_count - 1, 1)
+        plot(v_laser_xs[v_i], v_laser_ys[v_i], white, 100)
+    endfor v_i
+}
+
+# ============================================================================
+# PROCEDURE: Draw all lasers
+# ============================================================================
+def draw_all_lasers {
+    for v_current_laser in (0, v_laser_count - 1, 1)
+        v_laser_x = v_laser_xs[v_current_laser]
+        v_laser_y = v_laser_ys[v_current_laser]
+        v_angle = v_laser_angles[v_current_laser]
+        v_current_color = v_laser_colors[v_current_laser]
+        call draw_laser
+    endfor v_current_laser
+}
+
+# ============================================================================
+# PROCEDURE: Update all laser angles
+# ============================================================================
+def update_laser_angles {
+    for v_i in (0, v_laser_count - 1, 1)
+        v_temp = v_laser_angles[v_i] + v_laser_speeds[v_i]
+        if v_temp >= 360 then
+            v_temp = v_temp - 360
+        endif
+        v_laser_angles[v_i] = v_temp
+    endfor v_i
+}
+
+# ============================================================================
+# PROCEDURE: Run one rotation cycle
+# Based on primary laser (index 0) completing rotations
+# ============================================================================
+def run_rotation {
+    v_primary_angle = v_laser_angles[0]
+    v_rotations_done = 0
+    v_prev_angle = v_primary_angle
+    if v_laser_count > 1 then
+        v_rest_time = 0.02
+    else
+        v_rest_time = 0.03
+    endif
+    while v_rotations_done < v_rotations_per_cycle then
+        if v_use_burnout == 0 then
+            begin_frame
+                call draw_mirrors
+                call draw_all_lasers
+                call draw_all_emitters
+            end_frame
+        else
+            begin_frame(true)
+                call draw_mirrors
+            end_frame
+            call draw_all_lasers
+            begin_frame(true)
+                call draw_all_emitters
+            end_frame
+        endif
+        call update_laser_angles
+        v_primary_angle = v_laser_angles[0]
+        if v_primary_angle < v_prev_angle then
+            v_rotations_done = v_rotations_done + 1
+        endif
+        v_prev_angle = v_primary_angle
+        rest(v_rest_time)
+    endwhile
+}
+
+# ============================================================================
+# MAIN LOOP
+# ============================================================================
+print("Laser Mirror Field - Starting")
+
+v_cycle = 0
+while 1 == 1 then
+    print(f"Cycle {v_cycle}: Generating new field...")
+    call generate_field
+    print(f"  Mirrors: {v_mirror_count}, Edges: {v_edge_count}, Walls: {v_has_walls}, Burnout: {v_use_burnout}, Lasers: {v_laser_count}")
+    clear()
+    begin_frame
+        call draw_mirrors
+        call draw_all_emitters
+    end_frame
+    rest(0.5)
+    call run_rotation
+    rest(0.5)
+    v_cycle = v_cycle + 1
+endwhile
