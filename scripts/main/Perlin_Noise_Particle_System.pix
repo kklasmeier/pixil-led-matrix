@@ -1,0 +1,680 @@
+# ============================================================================
+# FLOW FIELD - Perlin Noise Particle System
+# ============================================================================
+# Particles follow invisible vector currents creating organic, smoke-like
+# patterns. Uses burnout system for efficient trail rendering.
+# ============================================================================
+
+throttle(0.2)
+
+# ----------------------------------------------------------------------------
+# CONFIGURATION
+# ----------------------------------------------------------------------------
+
+# Number of particles to simulate
+# Range: 1-80 (lower = faster/sparse, higher = denser/slower)
+# Array max is 80, so this is the upper limit
+v_num_particles = 45
+
+# Base particle movement speed (scaled by sequence)
+# Range: 60-150 (lower = gentle drift, higher = fast streams)
+v_particle_speed = 150
+
+# How long particles live before respawning
+# Range: 100-300 (lower = frequent respawn, higher = longer paths)
+v_max_age = 200
+
+# Burnout time in milliseconds - how long pixel trails persist
+# Range: 500-3000 (lower = short tails, higher = long ghostly trails)
+v_burnout = 1800
+
+# Duration of each sequence in frames before switching
+# Range: 300-1200 (at full speed, roughly 10-40 seconds per sequence)
+v_sequence_duration = 600
+
+# Total number of sequences available
+v_total_sequences = 10
+
+# Spawn mode: 0 = edges (default), 1 = center, 2 = random anywhere
+# Set per-sequence in setup_sequence
+v_spawn_mode = 0
+
+# ----------------------------------------------------------------------------
+# DEBUG OVERRIDE
+# ----------------------------------------------------------------------------
+# Set to -1 for normal randomized operation
+# Set to 0-9 to force a specific sequence for testing
+# Sequences:
+#   0 = Turbulent Ocean      5 = Diagonal Rain
+#   1 = Spiral Fire          6 = Converge Center
+#   2 = Dual Vortex Aurora   7 = Wave Motion
+#   3 = Horizontal Forest    8 = Chaos Field
+#   4 = Radial Burst         9 = Serpentine
+v_debug_sequence = -1
+
+# ----------------------------------------------------------------------------
+# ARRAYS
+# ----------------------------------------------------------------------------
+
+# Particle position arrays (stored as position * 100 for sub-pixel precision)
+create_array(v_px, 80)
+create_array(v_py, 80)
+create_array(v_age, 80)
+
+# Precomputed 8x8 vector field (64 angle values)
+create_array(v_field_angle, 64)
+
+# Color palette (8 colors per sequence)
+create_array(v_pal, 8, string)
+
+# Sequence order array (for randomized playback)
+create_array(v_seq_order, 10)
+
+# Tracking
+v_sequence_idx = 0
+v_current_seq = 0
+v_frame = 0
+
+# ----------------------------------------------------------------------------
+# PALETTES
+# ----------------------------------------------------------------------------
+def palette_ocean {
+    v_pal[0] = "navy"
+    v_pal[1] = "royal_blue"
+    v_pal[2] = "blue"
+    v_pal[3] = "ocean_blue"
+    v_pal[4] = "sky_blue"
+    v_pal[5] = "cyan"
+    v_pal[6] = "turquoise"
+    v_pal[7] = "teal"
+}
+
+def palette_fire {
+    v_pal[0] = "maroon"
+    v_pal[1] = "crimson"
+    v_pal[2] = "red"
+    v_pal[3] = "coral"
+    v_pal[4] = "orange"
+    v_pal[5] = "gold"
+    v_pal[6] = "yellow"
+    v_pal[7] = "white"
+}
+
+def palette_aurora {
+    v_pal[0] = "indigo"
+    v_pal[1] = "purple"
+    v_pal[2] = "violet"
+    v_pal[3] = "magenta"
+    v_pal[4] = "cyan"
+    v_pal[5] = "teal"
+    v_pal[6] = "spring_green"
+    v_pal[7] = "mint"
+}
+
+def palette_forest {
+    v_pal[0] = "forest_green"
+    v_pal[1] = "olive"
+    v_pal[2] = "green"
+    v_pal[3] = "spring_green"
+    v_pal[4] = "lime"
+    v_pal[5] = "mint"
+    v_pal[6] = "teal"
+    v_pal[7] = "cyan"
+}
+
+def palette_sunset {
+    v_pal[0] = "indigo"
+    v_pal[1] = "purple"
+    v_pal[2] = "magenta"
+    v_pal[3] = "crimson"
+    v_pal[4] = "red"
+    v_pal[5] = "orange"
+    v_pal[6] = "gold"
+    v_pal[7] = "yellow"
+}
+
+def palette_ice {
+    v_pal[0] = "navy"
+    v_pal[1] = "royal_blue"
+    v_pal[2] = "sky_blue"
+    v_pal[3] = "cyan"
+    v_pal[4] = "white"
+    v_pal[5] = "lavender"
+    v_pal[6] = "silver"
+    v_pal[7] = "white"
+}
+
+def palette_toxic {
+    v_pal[0] = "black"
+    v_pal[1] = "forest_green"
+    v_pal[2] = "green"
+    v_pal[3] = "lime"
+    v_pal[4] = "yellow"
+    v_pal[5] = "lime"
+    v_pal[6] = "green"
+    v_pal[7] = "white"
+}
+
+def palette_lava {
+    v_pal[0] = "black"
+    v_pal[1] = "maroon"
+    v_pal[2] = "red"
+    v_pal[3] = "orange"
+    v_pal[4] = "yellow"
+    v_pal[5] = "white"
+    v_pal[6] = "orange"
+    v_pal[7] = "red"
+}
+
+# ----------------------------------------------------------------------------
+# FIELD GENERATORS (8x8 grid = 64 vectors)
+# ----------------------------------------------------------------------------
+
+# Sequence 0: Turbulent - multi-layered sine noise
+def field_turbulent {
+    v_t = v_sequence_idx * 0.5
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_nx = v_i * 0.5 + v_t
+            v_ny = v_j * 0.5 + v_t * 0.7
+            v_a = sin(v_nx) * cos(v_ny) * 3.14 + sin(v_nx * 1.7 + v_ny) * 1.2
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 1: Spiral - outward rotating flow
+def field_spiral {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_dx = v_i - 3.5
+            v_dy = v_j - 3.5
+            v_dist = sqrt(v_dx * v_dx + v_dy * v_dy) + 0.1
+            # Point outward with spiral rotation
+            v_a = atan2(v_dy, v_dx) + 0.5
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 2: Dual Vortex - two counter-rotating centers
+def field_vortex {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            
+            # Left vortex at (2, 4) - clockwise
+            v_dx1 = v_i - 2
+            v_dy1 = v_j - 4
+            v_d1 = sqrt(v_dx1 * v_dx1 + v_dy1 * v_dy1) + 0.5
+            v_a1 = atan2(v_dy1, v_dx1) - 1.57
+            v_str1 = 1.0 / (v_d1 * v_d1)
+            
+            # Right vortex at (5, 4) - counterclockwise
+            v_dx2 = v_i - 5
+            v_dy2 = v_j - 4
+            v_d2 = sqrt(v_dx2 * v_dx2 + v_dy2 * v_dy2) + 0.5
+            v_a2 = atan2(v_dy2, v_dx2) + 1.57
+            v_str2 = 1.0 / (v_d2 * v_d2)
+            
+            # Weighted blend based on inverse square distance
+            v_total = v_str1 + v_str2
+            v_ax = cos(v_a1) * v_str1 + cos(v_a2) * v_str2
+            v_ay = sin(v_a1) * v_str1 + sin(v_a2) * v_str2
+            v_a = atan2(v_ay, v_ax)
+            
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 3: Horizontal - gentle side-to-side waves
+def field_horizontal {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_a = sin(v_j * 0.8) * 0.5
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 4: Radial Burst - spiraling outward from center
+def field_radial {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_dx = v_i - 3.5
+            v_dy = v_j - 3.5
+            # Point outward with slight clockwise spin to prevent edge sticking
+            v_a = atan2(v_dy, v_dx) + 0.3
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 5: Diagonal Rain - falling at 45 degrees with ripples
+def field_diagonal {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_a = 0.785 + sin(v_i * 0.5 + v_j * 0.3) * 0.3
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 6: Converge - all particles flow to center
+def field_converge {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_dx = 3.5 - v_i
+            v_dy = 3.5 - v_j
+            v_a = atan2(v_dy, v_dx)
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 7: Wave - vertical sinusoidal motion
+def field_wave {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_a = 1.57 + sin(v_i * 1.2) * 0.8
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 8: Chaos - high frequency turbulence with drift
+def field_chaos {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            # Strong downward-right drift (1.0 rad ≈ 57 degrees)
+            v_base = 1.0
+            # Lighter turbulent noise so drift dominates
+            v_turb = sin(v_i * 2.3 + v_j * 0.7) * 0.4
+            v_turb = v_turb + cos(v_i * 1.5 + v_j * 1.2) * 0.3
+            v_a = v_base + v_turb
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# Sequence 9: Serpentine - S-curve flowing pattern
+def field_serpentine {
+    for v_j in (0, 7, 1)
+        for v_i in (0, 7, 1)
+            v_idx = v_j * 8 + v_i
+            v_wave = sin(v_j * 0.9) * 1.5
+            v_a = v_wave + cos(v_i * 0.4) * 0.3
+            v_field_angle[v_idx] = v_a
+        endfor v_i
+    endfor v_j
+}
+
+# ----------------------------------------------------------------------------
+# PARTICLE INIT
+# ----------------------------------------------------------------------------
+def init_particles {
+    v_last_particle = v_num_particles - 1
+    for v_i in (0, v_last_particle, 1)
+        v_px[v_i] = random(100, 6200, 0)
+        v_py[v_i] = random(100, 6200, 0)
+        v_age[v_i] = random(0, 100, 0)
+    endfor v_i
+}
+
+# ----------------------------------------------------------------------------
+# SHUFFLE SEQUENCE ORDER (Fisher-Yates)
+# ----------------------------------------------------------------------------
+def shuffle_sequences {
+    # Initialize in order
+    for v_i in (0, 9, 1)
+        v_seq_order[v_i] = v_i
+    endfor v_i
+    
+    # Shuffle
+    for v_i in (9, 1, -1)
+        v_j = random(0, v_i, 0)
+        v_temp = v_seq_order[v_i]
+        v_seq_order[v_i] = v_seq_order[v_j]
+        v_seq_order[v_j] = v_temp
+    endfor v_i
+    
+    print("Sequence order shuffled:")
+    for v_i in (0, 9, 1)
+        print(f"  Position {v_i}: Sequence {v_seq_order[v_i]}")
+    endfor v_i
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE SETUP - applies field and palette for current sequence
+# ----------------------------------------------------------------------------
+def setup_sequence {
+    # Get actual sequence number (debug override or from shuffled order)
+    if v_debug_sequence >= 0 then
+        v_current_seq = v_debug_sequence
+        print(f"DEBUG MODE: Forcing sequence {v_current_seq}")
+    else
+        v_current_seq = v_seq_order[v_sequence_idx]
+    endif
+    
+    # Reset max_age and spawn_mode to defaults (some sequences override)
+    v_max_age = 200
+    v_spawn_mode = 0
+    
+    print(f"=== SEQUENCE {v_current_seq} (index {v_sequence_idx} of 9) ===")
+    
+    # Sequence 0: Turbulent Ocean
+    if v_current_seq == 0 then
+        call field_turbulent
+        call palette_ocean
+        v_particle_speed = 100
+        print("Field: Turbulent - multi-layered sine noise")
+        print("Palette: Ocean")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 1: Spiral Fire
+    if v_current_seq == 1 then
+        call field_spiral
+        call palette_fire
+        v_particle_speed = 90
+        v_spawn_mode = 1
+        v_max_age = 120
+        print("Field: Spiral - outward rotating flow")
+        print("Palette: Fire")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 2: Dual Vortex Aurora
+    if v_current_seq == 2 then
+        call field_vortex
+        call palette_aurora
+        v_particle_speed = 90
+        print("Field: Dual Vortex - two counter-rotating centers")
+        print("Palette: Aurora")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 3: Horizontal Forest
+    if v_current_seq == 3 then
+        call field_horizontal
+        call palette_forest
+        v_particle_speed = 120
+        print("Field: Horizontal - gentle side-to-side waves")
+        print("Palette: Forest")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 4: Radial Burst Sunset
+    if v_current_seq == 4 then
+        call field_radial
+        call palette_sunset
+        v_particle_speed = 110
+        v_spawn_mode = 1
+        v_max_age = 100
+        print("Field: Radial Burst - spiraling outward from center")
+        print("Palette: Sunset")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 5: Diagonal Rain Ice
+    if v_current_seq == 5 then
+        call field_diagonal
+        call palette_ice
+        v_particle_speed = 130
+        v_spawn_mode = 3
+        print("Field: Diagonal Rain - 45 degree fall with ripples")
+        print("Palette: Ice")
+        print("Palette: Ice")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 6: Converge Center Toxic
+    if v_current_seq == 6 then
+        call field_converge
+        call palette_toxic
+        v_particle_speed = 70
+        v_spawn_mode = 4
+        v_max_age = 150
+        print("Field: Converge - all particles flow to center")
+        print("Palette: Toxic")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 7: Wave Motion Ocean
+    if v_current_seq == 7 then
+        call field_wave
+        call palette_ocean
+        v_particle_speed = 90
+        print("Field: Wave - vertical sinusoidal motion")
+        print("Palette: Ocean")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 8: Chaos Field Lava
+    if v_current_seq == 8 then
+        call field_chaos
+        call palette_lava
+        v_particle_speed = 100
+        v_max_age = 120
+        v_spawn_mode = 2
+        print("Field: Chaos - turbulent flow with drift")
+        print("Palette: Lava")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    # Sequence 9: Serpentine Aurora
+    if v_current_seq == 9 then
+        call field_serpentine
+        call palette_aurora
+        v_particle_speed = 100
+        print("Field: Serpentine - S-curve flowing pattern")
+        print("Palette: Aurora")
+        print(f"Speed: {v_particle_speed}")
+    endif
+    
+    print(f"Particles: {v_num_particles}")
+    print(f"Burnout: {v_burnout}ms")
+    print("")
+    
+    call init_particles
+}
+
+# ----------------------------------------------------------------------------
+# MAIN
+# ----------------------------------------------------------------------------
+
+# Initialize
+v_sequence_idx = 0
+v_frame = 0
+call shuffle_sequences
+call setup_sequence
+clear()
+
+# Main loop
+while 1 == 1 then
+    
+    # Calculate loop bound once per frame
+    v_last_p = v_num_particles - 1
+    
+    # Update and render each particle
+    for v_p in (0, v_last_p, 1)
+        # Get display position
+        v_x = v_px[v_p] / 100
+        v_y = v_py[v_p] / 100
+        
+        # Get field cell (8x8 grid, so divide by 8)
+        v_cx = int(v_x / 8)
+        v_cy = int(v_y / 8)
+        if v_cx > 7 then
+            v_cx = 7
+        endif
+        if v_cy > 7 then
+            v_cy = 7
+        endif
+        if v_cx < 0 then
+            v_cx = 0
+        endif
+        if v_cy < 0 then
+            v_cy = 0
+        endif
+        
+        # Get angle and move
+        v_fidx = v_cy * 8 + v_cx
+        v_ang = v_field_angle[v_fidx]
+        v_px[v_p] = v_px[v_p] + cos(v_ang) * v_particle_speed
+        v_py[v_p] = v_py[v_p] + sin(v_ang) * v_particle_speed
+        v_age[v_p] = v_age[v_p] + 1
+        
+        # Check bounds and respawn (use tighter bounds to prevent edge sticking)
+        v_respawn = 0
+        if v_px[v_p] < 100 or v_px[v_p] > 6300 then
+            v_respawn = 1
+        endif
+        if v_py[v_p] < 100 or v_py[v_p] > 6300 then
+            v_respawn = 1
+        endif
+        if v_age[v_p] > v_max_age then
+            v_respawn = 1
+        endif
+        # For converge mode, respawn when particle reaches center
+        if v_spawn_mode == 4 then
+            v_cdx = v_px[v_p] - 3200
+            v_cdy = v_py[v_p] - 3200
+            v_cdist = v_cdx * v_cdx + v_cdy * v_cdy
+            if v_cdist < 250000 then
+                v_respawn = 1
+            endif
+        endif
+        
+        if v_respawn == 1 then
+            # Spawn mode 0: edges (default for most sequences)
+            if v_spawn_mode == 0 then
+                v_edge = random(0, 3, 0)
+                if v_edge == 0 then
+                    v_px[v_p] = 150
+                    v_py[v_p] = random(500, 5900, 0)
+                endif
+                if v_edge == 1 then
+                    v_px[v_p] = 6250
+                    v_py[v_p] = random(500, 5900, 0)
+                endif
+                if v_edge == 2 then
+                    v_px[v_p] = random(500, 5900, 0)
+                    v_py[v_p] = 150
+                endif
+                if v_edge == 3 then
+                    v_px[v_p] = random(500, 5900, 0)
+                    v_py[v_p] = 6250
+                endif
+            endif
+            # Spawn mode 1: center (for radial burst)
+            if v_spawn_mode == 1 then
+                v_px[v_p] = random(2500, 3900, 0)
+                v_py[v_p] = random(2500, 3900, 0)
+            endif
+            # Spawn mode 2: random anywhere (for chaos/turbulent)
+            if v_spawn_mode == 2 then
+                v_px[v_p] = random(500, 5900, 0)
+                v_py[v_p] = random(500, 5900, 0)
+            endif
+            # Spawn mode 3: top-left edge (for diagonal rain)
+            if v_spawn_mode == 3 then
+                v_edge = random(0, 1, 0)
+                if v_edge == 0 then
+                    v_px[v_p] = random(100, 6300, 0)
+                    v_py[v_p] = 150
+                endif
+                if v_edge == 1 then
+                    v_px[v_p] = 150
+                    v_py[v_p] = random(100, 6300, 0)
+                endif
+            endif
+            # Spawn mode 4: edges (for converge - same as mode 0)
+            if v_spawn_mode == 4 then
+                v_edge = random(0, 3, 0)
+                if v_edge == 0 then
+                    v_px[v_p] = 150
+                    v_py[v_p] = random(500, 5900, 0)
+                endif
+                if v_edge == 1 then
+                    v_px[v_p] = 6250
+                    v_py[v_p] = random(500, 5900, 0)
+                endif
+                if v_edge == 2 then
+                    v_px[v_p] = random(500, 5900, 0)
+                    v_py[v_p] = 150
+                endif
+                if v_edge == 3 then
+                    v_px[v_p] = random(500, 5900, 0)
+                    v_py[v_p] = 6250
+                endif
+            endif
+            v_age[v_p] = 0
+        endif
+        
+        # Render with burnout for trail effect
+        v_x = v_px[v_p] / 100
+        v_y = v_py[v_p] / 100
+        if v_x >= 0 and v_x < 64 and v_y >= 0 and v_y < 64 then
+            # Color based on distance from center for radial burst, age for others
+            if v_spawn_mode == 1 then
+                v_dx = v_x - 32
+                v_dy = v_y - 32
+                v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                v_cidx = v_dist / 5.7
+            elseif v_spawn_mode == 3 then
+                # Color based on diagonal position (x + y) for rain effect
+                v_diag = v_x + v_y
+                v_cidx = v_diag / 16
+            elseif v_spawn_mode == 4 then
+                # Inverted distance - bright at edges, intense at center
+                v_dx = v_x - 32
+                v_dy = v_y - 32
+                v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+                v_cidx = 7 - v_dist / 5.7
+            else
+                v_color_scale = v_max_age / 8
+                v_cidx = v_age[v_p] / v_color_scale
+            endif
+            if v_cidx > 7 then
+                v_cidx = 7
+            endif
+            if v_cidx < 0 then
+                v_cidx = 0
+            endif
+            v_col = v_pal[v_cidx]
+            v_bright = 100 - v_age[v_p] * 50 / v_max_age
+            if v_bright < 30 then
+                v_bright = 30
+            endif
+            mplot(v_x, v_y, v_col, v_bright, v_burnout)
+        endif
+    endfor v_p
+    
+    mflush()
+    
+    # Sequence change
+    v_frame = v_frame + 1
+    if v_frame > v_sequence_duration then
+        v_frame = 0
+        v_sequence_idx = v_sequence_idx + 1
+        
+        # Reshuffle after all 10 sequences played
+        if v_sequence_idx >= v_total_sequences then
+            v_sequence_idx = 0
+            call shuffle_sequences
+        endif
+        
+        call setup_sequence
+    endif
+    
+endwhile

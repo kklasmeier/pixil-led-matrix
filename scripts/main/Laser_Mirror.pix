@@ -689,7 +689,7 @@ def run_rotation {
         v_rest_time = 0.03
     endif
     while v_rotations_done < v_rotations_per_cycle then
-        if v_use_burnout == 0 then
+        if v_use_burnout == 1then
             begin_frame
                 call draw_mirrors
                 call draw_all_lasers
@@ -697,11 +697,9 @@ def run_rotation {
             end_frame
         else
             begin_frame(true)
-                call draw_mirrors
-            end_frame
+            call draw_mirrors
             call draw_all_lasers
-            begin_frame(true)
-                call draw_all_emitters
+            call draw_all_emitters
             end_frame
         endif
         call update_laser_angles
@@ -725,10 +723,8 @@ while 1 == 1 then
     call generate_field
     print(f"  Mirrors: {v_mirror_count}, Edges: {v_edge_count}, Walls: {v_has_walls}, Burnout: {v_use_burnout}, Lasers: {v_laser_count}")
     clear()
-    begin_frame
-        call draw_mirrors
-        call draw_all_emitters
-    end_frame
+    call draw_mirrors
+    call draw_all_emitters
     rest(0.5)
     call run_rotation
     rest(0.5)
