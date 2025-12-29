@@ -1640,8 +1640,16 @@ def process_script(filename, execute_func=None):
                             if len(args) > 4 and args[4]:
                                 burnout = int(float(parse_value(args[4], 'mplot', 4)))
                             
+                            # NEW: Handle burnout_mode parameter
+                            burnout_mode = None  # Default to 'instant' in pack_mplot
+                            if len(args) > 5 and args[5]:
+                                burnout_mode = parse_value(args[5], 'mplot', 5)
+                                # Remove quotes if present
+                                if isinstance(burnout_mode, str):
+                                    burnout_mode = burnout_mode.strip('"').strip("'")
+                            
                             # Pack into buffer (coordinates are already validated)
-                            record = pack_mplot(x, y, final_color, intensity, burnout)
+                            record = pack_mplot(x, y, final_color, intensity, burnout, burnout_mode)
                             mplot_buffer.extend(record)
                             mplot_count += 1
 

@@ -26,7 +26,7 @@ v_max_age = 200
 
 # Burnout time in milliseconds - how long pixel trails persist
 # Range: 500-3000 (lower = short tails, higher = long ghostly trails)
-v_burnout = 1800
+v_burnout = 2500
 
 # Duration of each sequence in frames before switching
 # Range: 300-1200 (at full speed, roughly 10-40 seconds per sequence)
@@ -50,7 +50,7 @@ v_spawn_mode = 0
 #   2 = Dual Vortex Aurora   7 = Wave Motion
 #   3 = Horizontal Forest    8 = Chaos Field
 #   4 = Radial Burst         9 = Serpentine
-v_debug_sequence = -1
+v_debug_sequence = 0
 
 # ----------------------------------------------------------------------------
 # ARRAYS
@@ -656,7 +656,7 @@ while 1 == 1 then
             if v_bright < 30 then
                 v_bright = 30
             endif
-            mplot(v_x, v_y, v_col, v_bright, v_burnout)
+            mplot(v_x, v_y, v_col, v_bright, v_burnout, fade)
         endif
     endfor v_p
     

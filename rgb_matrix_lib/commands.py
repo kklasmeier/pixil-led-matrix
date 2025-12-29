@@ -209,65 +209,66 @@ class CommandExecutor:
             raise
 
     # Command Handlers
-    def _handle_plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, burnout: Optional[int] = None):
+    def _handle_plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, 
+                     burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle plot command."""
         rgb_color = get_color_rgb(color, intensity)
-        # Changed: No default burnout - if None is specified, it stays None (never burns out)
-        debug(f"Handling plot command: ({x}, {y}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'} -> RGB {rgb_color}", 
+        debug(f"Handling plot command: ({x}, {y}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode} -> RGB {rgb_color}", 
             Level.DEBUG, Component.COMMAND)
-        self.api.plot(x, y, color, intensity, burnout)
+        self.api.plot(x, y, color, intensity, burnout, burnout_mode)
 
     def _handle_draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int], 
-                        intensity: int = 100, burnout: Optional[int] = None):
+                        intensity: int = 100, burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle draw_line command."""
         rgb_color = get_color_rgb(color, intensity)
-        # Changed: No default burnout - if None is specified, it stays None (never burns out)
-        debug(f"Handling draw_line command: ({x0}, {y0}) to ({x1}, {y1}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}", 
+        debug(f"Handling draw_line command: ({x0}, {y0}) to ({x1}, {y1}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
-        self.api.draw_line(x0, y0, x1, y1, color, intensity, burnout)
+        self.api.draw_line(x0, y0, x1, y1, color, intensity, burnout, burnout_mode)
 
     def _handle_draw_rectangle(self, x: int, y: int, width: int, height: int, color: Union[str, int], 
-                            intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
+                            intensity: int = 100, fill: bool = False, burnout: Optional[int] = None,
+                            burnout_mode: str = "instant"):
         """Handle draw_rectangle command."""
-        debug(f"Handling draw_rectangle command: ({x}, {y}) {width}x{height} in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}", 
+        debug(f"Handling draw_rectangle command: ({x}, {y}) {width}x{height} in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
-        self.api.draw_rectangle(x, y, width, height, color, intensity, fill, burnout)
+        self.api.draw_rectangle(x, y, width, height, color, intensity, fill, burnout, burnout_mode)
 
     def _handle_draw_circle(self, x: int, y: int, radius: int, color: Union[str, int], 
-                            intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
+                            intensity: int = 100, fill: bool = False, burnout: Optional[int] = None,
+                            burnout_mode: str = "instant"):
         """Handle draw_circle command."""
-        debug(f"Handling draw_circle command: center({x}, {y}) radius={radius} in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}", 
+        debug(f"Handling draw_circle command: center({x}, {y}) radius={radius} in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
-        self.api.draw_circle(x, y, radius, color, intensity, fill, burnout)
+        self.api.draw_circle(x, y, radius, color, intensity, fill, burnout, burnout_mode)
 
     def _handle_draw_polygon(self, x_center: int, y_center: int, radius: int, sides: int, 
                             color: Union[str, int], intensity: int = 100, rotation: float = 0, 
-                            fill: bool = False, burnout: Optional[int] = None):
+                            fill: bool = False, burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle draw_polygon command."""
-        debug(f"Handling draw_polygon command: center({x_center}, {y_center}), r={radius}, sides={sides}, rot={rotation}°, in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}", 
+        debug(f"Handling draw_polygon command: center({x_center}, {y_center}), r={radius}, sides={sides}, rot={rotation}°, in {color} at {intensity}%, fill={fill}, burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
-        self.api.draw_polygon(x_center, y_center, radius, sides, color, intensity, rotation, fill, burnout)
+        self.api.draw_polygon(x_center, y_center, radius, sides, color, intensity, rotation, fill, burnout, burnout_mode)
 
     def _handle_draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, 
                         color: Union[str, int], intensity: int = 100, fill: bool = False, 
-                        rotation: float = 0, burnout: Optional[int] = None):
+                        rotation: float = 0, burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle draw_ellipse command."""
         debug(f"Handling draw_ellipse command: center({x_center}, {y_center}), radii=({x_radius}, {y_radius}), "
             f"rotation={rotation}° in {color} at {intensity}%, fill={fill}, "
-            f"burnout {burnout if burnout is not None else 'None (permanent)'}", 
+            f"burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
         self.api.draw_ellipse(x_center, y_center, x_radius, y_radius, color, 
-                            intensity, fill, rotation, burnout)
+                            intensity, fill, rotation, burnout, burnout_mode)
 
     def _handle_draw_arc(self, x1: int, y1: int, x2: int, y2: int, bulge: float,
                          color: Union[str, int], intensity: int = 100, fill: bool = False,
-                         burnout: Optional[int] = None):
+                         burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle draw_arc command."""
         debug(f"Handling draw_arc command: ({x1}, {y1}) to ({x2}, {y2}), bulge={bulge}, "
               f"in {color} at {intensity}%, fill={fill}, "
-              f"burnout {burnout if burnout is not None else 'None (permanent)'}", 
+              f"burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
               Level.DEBUG, Component.COMMAND)
-        self.api.draw_arc(x1, y1, x2, y2, bulge, color, intensity, fill, burnout)
+        self.api.draw_arc(x1, y1, x2, y2, bulge, color, intensity, fill, burnout, burnout_mode)
         
     def _handle_define_sprite(self, name: str, width: int, height: int):
         """Handle define_sprite command - begins sprite template definition."""

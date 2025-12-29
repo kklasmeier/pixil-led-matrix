@@ -1,0 +1,177 @@
+# Burnout Mode Performance Comparison Test
+# ==========================================
+# This script compares instant vs fade burnout modes
+# to help identify any performance differences.
+#
+# Test methodology:
+# - Each test draws the same number of pixels with mplot
+# - Uses rest() to allow burnout processing
+# - Run multiple iterations to observe smoothness
+#
+# Watch for:
+# - Stuttering or frame drops during fade mode
+# - Smooth vs choppy fade animations
+# - Any visible lag compared to instant mode
+
+# Configuration
+v_pixels_per_batch = 200
+v_burnout_time = 1500
+v_iterations = 5
+
+# ============================================
+# TEST 1: Instant Burnout Baseline
+# ============================================
+# This establishes baseline - pixels appear then vanish instantly
+
+draw_text(2, 2, "TEST 1: INSTANT", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+for v_iter in (0, v_iterations, 1)
+    # Draw random scatter of pixels
+    for v_i in (0, v_pixels_per_batch, 1)
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 99, 0)
+        mplot(v_x, v_y, v_color, 100, v_burnout_time, instant)
+    endfor v_i
+    mflush()
+#   rest(0.05)
+endfor v_iter
+
+sync_queue
+# Wait for all burnouts to complete
+rest(2)
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 2: Fade Burnout
+# ============================================
+# Same pattern but with fade - watch for performance differences
+
+draw_text(2, 2, "TEST 2: FADE", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+for v_iter in (0, v_iterations, 1)
+    # Draw random scatter of pixels
+    for v_i in (0, v_pixels_per_batch, 1)
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 99, 0)
+        mplot(v_x, v_y, v_color, 100, v_burnout_time, fade)
+    endfor v_i
+    mflush()
+#   rest(0.05)
+endfor v_iter
+
+sync_queue
+
+# Wait for all fades to complete
+rest(2)
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 3: Side-by-Side Comparison
+# ============================================
+# Left half = instant, Right half = fade
+# Easier to spot differences when simultaneous
+
+draw_text(2, 2, "TEST 3: SIDE BY SIDE", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+# Draw dividing line
+for v_y in (0, 64, 1)
+    plot(32, v_y, white, 50, -1)
+endfor v_y
+
+for v_iter in (0, v_iterations, 1)
+    # Left side - instant (x: 0-30)
+    for v_i in (0, 100, 1)
+        v_x = random(0, 30, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 50, 0)
+        mplot(v_x, v_y, v_color, 100, v_burnout_time, instant)
+    endfor v_i
+    
+    # Right side - fade (x: 33-63)
+    for v_i in (0, 100, 1)
+        v_x = random(33, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(50, 99, 0)
+        mplot(v_x, v_y, v_color, 100, v_burnout_time, fade)
+    endfor v_i
+    
+    mflush()
+#   rest(0.05)
+endfor v_iter
+
+sync_queue
+
+rest(2)
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 4: High Load Fade Stress Test
+# ============================================
+# Push the fade system harder with more concurrent fades
+
+draw_text(2, 2, "TEST 4: STRESS", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+v_heavy_pixels = 500
+v_heavy_iterations = 8
+
+for v_iter in (0, v_heavy_iterations, 1)
+    for v_i in (0, v_heavy_pixels, 1)
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 99, 0)
+        mplot(v_x, v_y, v_color, 100, 2000, fade)
+    endfor v_i
+    mflush()
+#   rest(0.03)
+endfor v_iter
+
+sync_queue
+
+rest(3)
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 5: Continuous Stream
+# ============================================
+# Continuous drawing to test sustained performance
+
+draw_text(2, 2, "TEST 5: STREAM", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+# 10 seconds of continuous fade activity
+for v_frame in (0, 200, 1)
+    for v_i in (0, 50, 1)
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 99, 0)
+        mplot(v_x, v_y, v_color, 100, 800, fade)
+    endfor v_i
+    mflush()
+#   rest(0.05)
+endfor v_frame
+sync_queue
+
+rest(1)
+clear()
+
+# ============================================
+# DONE
+# ============================================
+draw_text(10, 28, "COMPLETE", "piboto-regular", 10, green, 100)
+rest(2)
+clear()

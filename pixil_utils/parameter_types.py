@@ -11,15 +11,17 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'x', 'type': 'int', 'position': 0},
         {'name': 'y', 'type': 'int', 'position': 1},
         {'name': 'color', 'type': 'color', 'position': 2},
-        {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},  # Added
-        {'name': 'duration', 'type': 'float', 'position': 4, 'optional': True}
+        {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},
+        {'name': 'duration', 'type': 'float', 'position': 4, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 5, 'optional': True, 'default': 'instant'}
     ],
     'mplot': [
         {'name': 'x', 'type': 'int', 'position': 0},
         {'name': 'y', 'type': 'int', 'position': 1},
         {'name': 'color', 'type': 'color', 'position': 2},
         {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},
-        {'name': 'burnout', 'type': 'float', 'position': 4, 'optional': True}
+        {'name': 'burnout', 'type': 'float', 'position': 4, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 5, 'optional': True, 'default': 'instant'}
     ],
     'mflush': [],
     'draw_line': [
@@ -28,8 +30,9 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'x2', 'type': 'int', 'position': 2},
         {'name': 'y2', 'type': 'int', 'position': 3},
         {'name': 'color', 'type': 'color', 'position': 4},
-        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},  # Added
-        {'name': 'duration', 'type': 'float', 'position': 6, 'optional': True}
+        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},
+        {'name': 'duration', 'type': 'float', 'position': 6, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 7, 'optional': True, 'default': 'instant'}
     ],
     'draw_rectangle': [
         {'name': 'x', 'type': 'int', 'position': 0},
@@ -37,18 +40,20 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'width', 'type': 'int', 'position': 2},
         {'name': 'height', 'type': 'int', 'position': 3},
         {'name': 'color', 'type': 'color', 'position': 4},
-        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},  # Added
+        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},
         {'name': 'filled', 'type': 'bool', 'position': 6, 'optional': True, 'default': 'false'},
-        {'name': 'duration', 'type': 'float', 'position': 7, 'optional': True}
+        {'name': 'duration', 'type': 'float', 'position': 7, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 8, 'optional': True, 'default': 'instant'}
     ],
     'draw_circle': [
         {'name': 'x', 'type': 'int', 'position': 0},
         {'name': 'y', 'type': 'int', 'position': 1},
         {'name': 'radius', 'type': 'int', 'position': 2},
         {'name': 'color', 'type': 'color', 'position': 3},
-        {'name': 'intensity', 'type': 'int', 'position': 4, 'optional': True},  # Added
+        {'name': 'intensity', 'type': 'int', 'position': 4, 'optional': True},
         {'name': 'filled', 'type': 'bool', 'position': 5},
-        {'name': 'duration', 'type': 'float', 'position': 6, 'optional': True}
+        {'name': 'duration', 'type': 'float', 'position': 6, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 7, 'optional': True, 'default': 'instant'}
     ],
     'draw_arc': [
         {'name': 'x1', 'type': 'int', 'position': 0},
@@ -59,7 +64,8 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'color', 'type': 'color', 'position': 5},
         {'name': 'intensity', 'type': 'int', 'position': 6, 'optional': True, 'default': '100'},
         {'name': 'filled', 'type': 'bool', 'position': 7, 'optional': True, 'default': 'false'},
-        {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True}
+        {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 9, 'optional': True, 'default': 'instant'}
     ],
     'rest': [
         {'name': 'duration', 'type': 'float', 'position': 0}
@@ -107,10 +113,11 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'radius', 'type': 'int', 'position': 2},
         {'name': 'sides', 'type': 'int', 'position': 3},
         {'name': 'color', 'type': 'color', 'position': 4},
-        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},  # Added
+        {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True},
         {'name': 'rotation', 'type': 'float', 'position': 6, 'optional': True, 'default': '0'},
         {'name': 'filled', 'type': 'bool', 'position': 7, 'optional': True, 'default': 'false'},
-        {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True}
+        {'name': 'duration', 'type': 'float', 'position': 8, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 9, 'optional': True, 'default': 'instant'}
     ],
     'draw_ellipse': [
         {'name': 'x_center', 'type': 'int', 'position': 0},
@@ -121,7 +128,8 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'intensity', 'type': 'int', 'position': 5, 'optional': True, 'default': '100'},
         {'name': 'fill', 'type': 'bool', 'position': 6, 'optional': True, 'default': 'false'},
         {'name': 'rotation', 'type': 'float', 'position': 7, 'optional': True, 'default': '0'},
-        {'name': 'burnout', 'type': 'float', 'position': 8, 'optional': True}
+        {'name': 'burnout', 'type': 'float', 'position': 8, 'optional': True},
+        {'name': 'burnout_mode', 'type': 'str', 'position': 9, 'optional': True, 'default': 'instant'}
     ],
     'draw_text': [
         {'name': 'x', 'type': 'int', 'position': 0},

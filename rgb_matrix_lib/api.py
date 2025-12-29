@@ -4,7 +4,7 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from PIL import Image, ImageDraw, ImageFont
 import time
 import math
-from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager
+from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager, BurnoutMode
 from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells
 from typing import Optional, List, Tuple, Union, Any
 from .debug import debug, Level, Component, configure_debug
@@ -169,8 +169,17 @@ class RGB_Api:
             self.current_command_pixels.clear()
 
     # Basic Drawing Methods
-    def plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, burnout: Optional[int] = None):
-        """Plot a single pixel."""
+    def plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, 
+             burnout: Optional[int] = None, burnout_mode: str = "instant"):
+        """Plot a single pixel.
+        
+        Args:
+            x, y: Pixel coordinates
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
         debug(f"Plotting point at ({x}, {y}) with color {color} at {intensity}% -> RGB {rgb_color}", 
               Level.TRACE, Component.DRAWING)
@@ -179,20 +188,34 @@ class RGB_Api:
             self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
             self._maybe_swap_buffer()
 
-            if burnout is not None:
+            if burnout is not None and burnout >= 0:
+                mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+                pixel_colors = [rgb_color] if mode == BurnoutMode.FADE else None
                 self.burnout_manager.add_object(
-                    ShapeType.POINT, (x, y), [(x, y)], burnout
+                    ShapeType.POINT, (x, y), [(x, y)], burnout, mode, pixel_colors
                 )
         else:
             debug(f"Plot point ({x}, {y}) outside matrix bounds", Level.TRACE, Component.DRAWING)
 
     def plot_batch(self, plots):
-        """Execute multiple plots atomically with single buffer swap."""
+        """Execute multiple plots atomically with single buffer swap.
+        
+        Args:
+            plots: List of tuples (x, y, color, intensity, burnout, burnout_mode)
+                   burnout_mode is optional and defaults to 'instant'
+        """
         pixels_plotted = 0
         burnout_objects = []  # Only used if we find burnouts
         has_burnouts = False
         
-        for x, y, color, intensity, burnout in plots:
+        for plot_data in plots:
+            # Handle both old format (5 elements) and new format (6 elements)
+            if len(plot_data) == 5:
+                x, y, color, intensity, burnout = plot_data
+                burnout_mode = "instant"
+            else:
+                x, y, color, intensity, burnout, burnout_mode = plot_data
+            
             # Skip invalid coordinates immediately
             if not (0 <= x < self.matrix.width and 0 <= y < self.matrix.height):
                 continue
@@ -206,12 +229,11 @@ class RGB_Api:
             if not self.frame_mode or self.preserve_frame_changes:
                 self.current_command_pixels.append((x, y, rgb_color[0], rgb_color[1], rgb_color[2]))
             
-            # Only collect burnout data if burnout is specified
-            if burnout is not None:
+            # Only collect burnout data if burnout is specified and >= 0
+            if burnout is not None and burnout >= 0:
                 if not has_burnouts:
                     has_burnouts = True
-                    # Initialize burnout collection on first burnout found
-                burnout_objects.append(((x, y), burnout))
+                burnout_objects.append(((x, y), burnout, burnout_mode, rgb_color))
             
             pixels_plotted += 1
         
@@ -220,9 +242,11 @@ class RGB_Api:
         
         # Only process burnouts if any were found
         if has_burnouts:
-            for (x, y), burnout_time in burnout_objects:
+            for (x, y), burnout_time, b_mode, rgb_color in burnout_objects:
+                mode = BurnoutMode.FADE if b_mode.lower() == "fade" else BurnoutMode.INSTANT
+                pixel_colors = [rgb_color] if mode == BurnoutMode.FADE else None
                 self.burnout_manager.add_object(
-                    ShapeType.POINT, (x, y), [(x, y)], burnout_time
+                    ShapeType.POINT, (x, y), [(x, y)], burnout_time, mode, pixel_colors
                 )
             debug(f"Batch plotted {pixels_plotted} pixels ({len(burnout_objects)} with burnouts) atomically", 
                 Level.DEBUG, Component.COMMAND)
@@ -231,8 +255,17 @@ class RGB_Api:
                 Level.DEBUG, Component.COMMAND)
         
     def draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int], 
-                  intensity: int = 100, burnout: Optional[int] = None):
-        """Draw a line between two points."""
+                  intensity: int = 100, burnout: Optional[int] = None, burnout_mode: str = "instant"):
+        """Draw a line between two points.
+        
+        Args:
+            x0, y0: Start point coordinates
+            x1, y1: End point coordinates
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
         points = []
         
@@ -258,13 +291,27 @@ class RGB_Api:
 
         self._maybe_swap_buffer()
 
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            pixel_colors = [rgb_color] * len(points) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
-                ShapeType.LINE, (x0, y0, x1, y1), points, burnout
+                ShapeType.LINE, (x0, y0, x1, y1), points, burnout, mode, pixel_colors
             )
 
     def draw_rectangle(self, x: int, y: int, width: int, height: int, color: Union[str, int], 
-                    intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
+                    intensity: int = 100, fill: bool = False, burnout: Optional[int] = None,
+                    burnout_mode: str = "instant"):
+        """Draw a rectangle.
+        
+        Args:
+            x, y: Top-left corner coordinates
+            width, height: Rectangle dimensions
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            fill: If True, fill the rectangle (default False)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
 
         points = []
@@ -292,14 +339,27 @@ class RGB_Api:
 
         self._maybe_swap_buffer()
 
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            pixel_colors = [rgb_color] * len(points) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
-                ShapeType.RECTANGLE, (x, y, width, height), points, burnout
+                ShapeType.RECTANGLE, (x, y, width, height), points, burnout, mode, pixel_colors
             )
 
     def draw_circle(self, x_center: int, y_center: int, radius: int, color: Union[str, int], 
-                    intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
-        """Draw a circle."""
+                    intensity: int = 100, fill: bool = False, burnout: Optional[int] = None,
+                    burnout_mode: str = "instant"):
+        """Draw a circle.
+        
+        Args:
+            x_center, y_center: Center coordinates
+            radius: Circle radius
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            fill: If True, fill the circle (default False)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
         points = set()
 
@@ -337,19 +397,35 @@ class RGB_Api:
 
         self._maybe_swap_buffer()
 
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            points_list = list(points)
+            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
-                ShapeType.CIRCLE, (x_center, y_center, radius), list(points), burnout
+                ShapeType.CIRCLE, (x_center, y_center, radius), points_list, burnout, mode, pixel_colors
             )
 
     def draw_polygon(self, x_center: int, y_center: int, radius: int, sides: int, color: Union[str, int], 
-                     intensity: int = 100, rotation: float = 0, fill: bool = False, burnout: Optional[int] = None):
-        """Draw a regular polygon."""
+                     intensity: int = 100, rotation: float = 0, fill: bool = False, burnout: Optional[int] = None,
+                     burnout_mode: str = "instant"):
+        """Draw a regular polygon.
+        
+        Args:
+            x_center, y_center: Center coordinates
+            radius: Distance from center to vertices
+            sides: Number of sides
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            rotation: Rotation in degrees (default 0)
+            fill: If True, fill the polygon (default False)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
         debug(f"Drawing polygon: center({x_center}, {y_center}), radius={radius}, sides={sides}", 
               Level.DEBUG, Component.DRAWING)
         vertices = polygon_vertices(x_center, y_center, radius, sides, rotation)
-        burnout_points = set() if burnout is not None else None
+        burnout_points = set() if burnout is not None and burnout >= 0 else None
         
         for i in range(len(vertices)):
             x0, y0 = vertices[i]
@@ -401,15 +477,30 @@ class RGB_Api:
 
         self._maybe_swap_buffer()
 
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            points_list = list(burnout_points) if burnout_points else []
+            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
                 ShapeType.POLYGON, (x_center, y_center, radius), 
-                list(burnout_points) if burnout_points else [], burnout
+                points_list, burnout, mode, pixel_colors
             )
 
     def draw_ellipse(self, x_center: int, y_center: int, x_radius: int, y_radius: int, color: Union[str, int], 
-                    intensity: int = 100, fill: bool = False, rotation: float = 0, burnout: Optional[int] = None):
-        """Draw an ellipse with optional rotation."""
+                    intensity: int = 100, fill: bool = False, rotation: float = 0, burnout: Optional[int] = None,
+                    burnout_mode: str = "instant"):
+        """Draw an ellipse with optional rotation.
+        
+        Args:
+            x_center, y_center: Center coordinates
+            x_radius, y_radius: Horizontal and vertical radii
+            color: Color name, spectral number (0-99), or RGB tuple
+            intensity: Brightness 0-100 (default 100)
+            fill: If True, fill the ellipse (default False)
+            rotation: Rotation in degrees (default 0)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
+        """
         rgb_color = self._get_color(color, intensity)
         points = set()
         
@@ -448,10 +539,13 @@ class RGB_Api:
             
             self._maybe_swap_buffer()
             
-            if burnout is not None:
+            if burnout is not None and burnout >= 0:
+                mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+                points_list = list(points)
+                pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
                 self.burnout_manager.add_object(
                     ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
-                    list(points), burnout
+                    points_list, burnout, mode, pixel_colors
                 )
             return
         
@@ -565,14 +659,18 @@ class RGB_Api:
         
         self._maybe_swap_buffer()
         
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            points_list = list(points)
+            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
                 ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
-                list(points), burnout
+                points_list, burnout, mode, pixel_colors
             )
 
     def draw_arc(self, x1: int, y1: int, x2: int, y2: int, bulge: float, color: Union[str, int],
-                 intensity: int = 100, fill: bool = False, burnout: Optional[int] = None):
+                 intensity: int = 100, fill: bool = False, burnout: Optional[int] = None,
+                 burnout_mode: str = "instant"):
         """
         Draw an arc defined by two endpoints and a bulge value.
         
@@ -590,7 +688,8 @@ class RGB_Api:
             color: Color name, spectral number (0-99), or RGB tuple
             intensity: Brightness 0-100 (default 100)
             fill: If True, fills the chord area between arc and straight line (default False)
-            burnout: Duration in milliseconds before the arc fades (None for permanent)
+            burnout: Duration in milliseconds before removal. -1 means no burnout.
+            burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
         """
         rgb_color = self._get_color(color, intensity)
         
@@ -612,9 +711,11 @@ class RGB_Api:
         self._maybe_swap_buffer()
         
         # Register with burnout manager if duration specified
-        if burnout is not None:
+        if burnout is not None and burnout >= 0:
+            mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
+            pixel_colors = [rgb_color] * len(drawn_points) if mode == BurnoutMode.FADE else None
             self.burnout_manager.add_object(
-                ShapeType.ARC, (x1, y1, x2, y2, bulge), drawn_points, burnout
+                ShapeType.ARC, (x1, y1, x2, y2, bulge), drawn_points, burnout, mode, pixel_colors
             )
         
         debug(f"Arc drawn with {len(drawn_points)} pixels", Level.TRACE, Component.DRAWING)
@@ -652,16 +753,17 @@ class RGB_Api:
         debug(f"Resting for {duration} seconds", Level.DEBUG, Component.COMMAND)
         end_time = time.time() + duration
         last_refresh_time = time.time()
-        refresh_interval = 0.05  # Refresh display every 100ms
+        refresh_interval = 0.05  # Refresh display every 50ms
         
         while time.time() < end_time:
             current_time = time.time()
             
             # Check if it's time for a display refresh
             if current_time - last_refresh_time >= refresh_interval:
-                # Only refresh if not in frame mode AND burnouts have made changes
-                if not self.frame_mode and self.burnout_manager.check_and_reset_changes():
-                    debug("Refreshing display due to burnout changes", Level.TRACE, Component.SYSTEM)
+                # Refresh if not in frame mode AND (burnouts have made changes OR active fades exist)
+                if not self.frame_mode and (self.burnout_manager.check_and_reset_changes() or 
+                                            self.burnout_manager.has_active_fades()):
+                    debug("Refreshing display due to burnout/fade changes", Level.TRACE, Component.SYSTEM)
                     self._maybe_swap_buffer()
                     self.refresh_display()
                 last_refresh_time = current_time

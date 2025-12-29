@@ -13,7 +13,8 @@ BINARY FORMAT (20 bytes per plot):
 │ color_id    │ 2            │ signed        │ -32768-32767  │ None            │ Color ID    │
 │ intensity   │ 1            │ unsigned      │ 0-100         │ 255=default(100)│ Brightness  │
 │ burnout     │ 4            │ unsigned      │ 0-4294967294  │ 0xFFFFFFFF=None │ Burnout ms  │
-│ padding     │ 9            │ reserved      │ 0             │ None            │ Future use  │
+│ burnout_mode│ 1            │ unsigned      │ 0-1           │ 0=instant,1=fade│ Burnout mode│
+│ padding     │ 8            │ reserved      │ 0             │ None            │ Future use  │
 └─────────────┴──────────────┴───────────────┴───────────────┴─────────────────┴─────────────┘
 
 COLOR ID MAPPING:
@@ -21,25 +22,30 @@ COLOR ID MAPPING:
 - Named colors: -1, -2, -3, ... (negative values)
 - Example: red=-1, blue=-2, green=-3, etc.
 
-STRUCT FORMAT: '<HHhBI9x'
+BURNOUT MODE:
+- 0 = instant (default) - pixel clears to black instantly at expiration
+- 1 = fade - pixel gradually fades from full intensity to black over duration
+
+STRUCT FORMAT: '<HHhBIB8x'
 - < = little-endian
 - H = unsigned short (2 bytes) for x, y
 - h = signed short (2 bytes) for color_id  
 - B = unsigned char (1 byte) for intensity
 - I = unsigned int (4 bytes) for burnout
-- 9x = 9 padding bytes (zeros)
+- B = unsigned char (1 byte) for burnout_mode
+- 8x = 8 padding bytes (zeros)
 
 USAGE:
     # Packing (Pixil.py side)
     buffer = bytearray()
-    buffer.extend(pack_mplot(10, 20, "red", 100, 1000))
-    buffer.extend(pack_mplot(15, 25, "blue"))  # defaults
+    buffer.extend(pack_mplot(10, 20, "red", 100, 1000, "instant"))
+    buffer.extend(pack_mplot(15, 25, "blue", burnout_mode="fade"))
     encoded = encode_buffer(buffer)
     
     # Unpacking (RGB_matrix_lib side)  
     binary_data = decode_buffer(encoded)
-    for x, y, color, intensity, burnout in unpack_mplot_batch(binary_data):
-        api.plot(x, y, color, intensity, burnout)
+    for x, y, color, intensity, burnout, burnout_mode in unpack_mplot_batch(binary_data):
+        api.plot(x, y, color, intensity, burnout, burnout_mode)
 """
 
 import struct
@@ -48,11 +54,27 @@ from typing import Union, Optional, Iterator, Tuple, Any
 
 # Binary format constants
 MPLOT_RECORD_SIZE = 20
-STRUCT_FORMAT = '<HHhBI9x'  # little-endian: ushort, ushort, short, uchar, uint, 9 padding
+STRUCT_FORMAT = '<HHhBIB8x'  # little-endian: ushort, ushort, short, uchar, uint, uchar, 8 padding
 
 # Special values for optional parameters
 INTENSITY_DEFAULT = 255      # Indicates "use default intensity (100)"
 BURNOUT_NONE = 0xFFFFFFFF   # Indicates "no burnout"
+
+# Burnout mode constants
+BURNOUT_MODE_INSTANT = 0
+BURNOUT_MODE_FADE = 1
+
+# Burnout mode string to int mapping
+BURNOUT_MODE_TO_INT = {
+    'instant': BURNOUT_MODE_INSTANT,
+    'fade': BURNOUT_MODE_FADE,
+}
+
+# Burnout mode int to string mapping
+INT_TO_BURNOUT_MODE = {
+    BURNOUT_MODE_INSTANT: 'instant',
+    BURNOUT_MODE_FADE: 'fade',
+}
 
 # Color ID mapping: named colors to negative IDs
 # Future expansion: add more colors with sequential negative IDs
@@ -156,11 +178,58 @@ def get_color_from_id(color_id: int) -> Union[str, int]:
         else:
             raise ValueError(f"Unknown named color ID: {color_id}")
 
+def get_burnout_mode_int(mode: Optional[str]) -> int:
+    """
+    Convert burnout mode string to integer.
+    
+    Args:
+        mode: 'instant', 'fade', or None (defaults to 'instant')
+        
+    Returns:
+        int: 0 for instant, 1 for fade
+    """
+    if mode is None:
+        return BURNOUT_MODE_INSTANT
+    
+    mode_lower = mode.lower()
+    if mode_lower in BURNOUT_MODE_TO_INT:
+        return BURNOUT_MODE_TO_INT[mode_lower]
+    else:
+        raise ValueError(f"Unknown burnout mode: {mode}. Must be 'instant' or 'fade'")
+
+def get_burnout_mode_str(mode_int: int) -> str:
+    """
+    Convert burnout mode integer back to string.
+    
+    Args:
+        mode_int: 0 for instant, 1 for fade
+        
+    Returns:
+        str: 'instant' or 'fade'
+    """
+    if mode_int in INT_TO_BURNOUT_MODE:
+        return INT_TO_BURNOUT_MODE[mode_int]
+    else:
+        # Default to instant for unknown values
+        return 'instant'
+
 def pack_mplot(x: int, y: int, color: Union[str, int], 
                intensity: Optional[int] = None, 
-               burnout: Optional[int] = None) -> bytes:
+               burnout: Optional[int] = None,
+               burnout_mode: Optional[str] = None) -> bytes:
     """
     Pack a single mplot command into 20-byte binary format.
+    
+    Args:
+        x: X coordinate (0-65535)
+        y: Y coordinate (0-65535)
+        color: Color name (str) or spectral number (0-99)
+        intensity: Brightness 0-100, or None for default (100)
+        burnout: Burnout time in ms, or None for no burnout
+        burnout_mode: 'instant' or 'fade', or None for default ('instant')
+        
+    Returns:
+        bytes: 20-byte packed record
     """
     # Validate coordinates
     if not (0 <= x <= 65535):
@@ -187,10 +256,13 @@ def pack_mplot(x: int, y: int, color: Union[str, int],
             raise ValueError(f"Burnout must be 0-4294967294, got {burnout}")
         burnout_value = burnout
     
+    # Handle burnout mode
+    burnout_mode_value = get_burnout_mode_int(burnout_mode)
+    
     # Pack into binary format
-    return struct.pack(STRUCT_FORMAT, x, y, color_id, intensity_value, burnout_value)
+    return struct.pack(STRUCT_FORMAT, x, y, color_id, intensity_value, burnout_value, burnout_mode_value)
 
-def unpack_mplot_batch(binary_data: bytes) -> Iterator[Tuple[int, int, Union[str, int], Optional[int], Optional[int]]]:
+def unpack_mplot_batch(binary_data: bytes) -> Iterator[Tuple[int, int, Union[str, int], Optional[int], Optional[int], str]]:
     """
     Unpack binary data into individual mplot commands.
     
@@ -198,8 +270,8 @@ def unpack_mplot_batch(binary_data: bytes) -> Iterator[Tuple[int, int, Union[str
         binary_data: Binary data containing packed mplot records
         
     Yields:
-        Tuple[int, int, Union[str, int], Optional[int], Optional[int]]: 
-            (x, y, color, intensity, burnout) for each plot
+        Tuple[int, int, Union[str, int], Optional[int], Optional[int], str]: 
+            (x, y, color, intensity, burnout, burnout_mode) for each plot
             
     Raises:
         ValueError: If binary data is malformed
@@ -212,7 +284,7 @@ def unpack_mplot_batch(binary_data: bytes) -> Iterator[Tuple[int, int, Union[str
         record = binary_data[offset:offset + MPLOT_RECORD_SIZE]
         
         # Unpack binary record
-        x, y, color_id, intensity_value, burnout_value = struct.unpack(STRUCT_FORMAT, record)
+        x, y, color_id, intensity_value, burnout_value, burnout_mode_value = struct.unpack(STRUCT_FORMAT, record)
         
         # Convert color ID back to color
         color = get_color_from_id(color_id)
@@ -221,7 +293,10 @@ def unpack_mplot_batch(binary_data: bytes) -> Iterator[Tuple[int, int, Union[str
         intensity = None if intensity_value == INTENSITY_DEFAULT else intensity_value
         burnout = None if burnout_value == BURNOUT_NONE else burnout_value
         
-        yield (x, y, color, intensity, burnout)
+        # Convert burnout mode back to string
+        burnout_mode = get_burnout_mode_str(burnout_mode_value)
+        
+        yield (x, y, color, intensity, burnout, burnout_mode)
 
 def encode_buffer(buffer: bytes) -> str:
     """
@@ -265,6 +340,7 @@ def get_protocol_info() -> dict:
         'struct_format': STRUCT_FORMAT,
         'intensity_default': INTENSITY_DEFAULT,
         'burnout_none': BURNOUT_NONE,
+        'burnout_modes': list(BURNOUT_MODE_TO_INT.keys()),
         'named_color_count': len(NAMED_COLOR_TO_ID),
         'spectral_color_range': '0-99 (current), 100-999 (future)',
         'max_burnout_ms': 4294967294,
@@ -279,9 +355,10 @@ if __name__ == "__main__":
     
     # Test packing
     buffer = bytearray()
-    buffer.extend(pack_mplot(10, 20, "red", 100, 1000))
-    buffer.extend(pack_mplot(15, 25, "blue"))  # Test defaults
-    buffer.extend(pack_mplot(30, 40, 50, 75, 2000))  # Test spectral
+    buffer.extend(pack_mplot(10, 20, "red", 100, 1000, "instant"))
+    buffer.extend(pack_mplot(15, 25, "blue", burnout_mode="fade"))  # Test defaults with fade
+    buffer.extend(pack_mplot(30, 40, 50, 75, 2000))  # Test spectral (default instant)
+    buffer.extend(pack_mplot(35, 45, "green", 80, 3000, "fade"))  # Test fade mode
     
     print(f"Buffer size: {len(buffer)} bytes ({len(buffer)//MPLOT_RECORD_SIZE} records)")
     
@@ -294,8 +371,8 @@ if __name__ == "__main__":
     
     # Test unpacking
     print("\nUnpacked records:")
-    for i, (x, y, color, intensity, burnout) in enumerate(unpack_mplot_batch(decoded)):
-        print(f"  {i+1}: plot({x}, {y}, {color}, {intensity}, {burnout})")
+    for i, (x, y, color, intensity, burnout, burnout_mode) in enumerate(unpack_mplot_batch(decoded)):
+        print(f"  {i+1}: plot({x}, {y}, {color}, {intensity}, {burnout}, {burnout_mode})")
     
     # Protocol info
     print(f"\nProtocol info: {get_protocol_info()}")
