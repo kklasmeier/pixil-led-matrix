@@ -57,6 +57,10 @@ if TYPE_CHECKING:
 
 class ThreadedBurnoutManager:
     BURNOUT_WAKE_INTERVAL = 0.01  # 10ms
+    
+    # Optimization #5: Gamma correction for perceptual fade
+    # 2.2 is standard sRGB gamma - makes fade appear more linear to human eyes
+    FADE_GAMMA = 2.2
 
     def __init__(self, api: "RGB_Api"):
         self.api = api
@@ -82,14 +86,18 @@ class ThreadedBurnoutManager:
                 # Process active fades
                 self._update_active_fades(current_time)
                 
-                # Process expirations
-                if not self.burnout_queue.empty():
+                # Process ALL expired objects (not just one per cycle)
+                while not self.burnout_queue.empty():
                     obj = self.burnout_queue.queue[0]
                     if obj.is_expired(current_time):
                         self.burnout_queue.get_nowait()
                         self._clear_object(obj)
                         # Remove from active_fades if present
-                        self.active_fades.discard(obj)
+                        with self.index_lock:
+                            self.active_fades.discard(obj)
+                    else:
+                        # Queue is sorted by removal_time, so if first isn't expired, none are
+                        break
                 
                 time.sleep(self.BURNOUT_WAKE_INTERVAL)
             except Exception as e:
@@ -98,36 +106,52 @@ class ThreadedBurnoutManager:
                 time.sleep(self.BURNOUT_WAKE_INTERVAL)
 
     def _update_active_fades(self, current_time: float):
-        """Update intensity for all actively fading objects."""
+        """
+        Update intensity for all actively fading objects.
+        
+        Optimization #4: Reduced lock scope - only lock for data structure access,
+        not during pixel writes.
+        """
+        # Optimization #4: Quick check without lock first
         if not self.active_fades:
             return
         
+        # Optimization #4: Copy fades list while holding lock briefly
+        with self.index_lock:
+            fades_to_process = list(self.active_fades)
+        
         pixels_updated = False
         
-        with self.index_lock:
-            for obj in list(self.active_fades):
-                # Skip if expired (will be handled by _clear_object)
-                if obj.is_expired(current_time):
-                    continue
+        for obj in fades_to_process:
+            # Skip if expired (will be handled by _clear_object)
+            if obj.is_expired(current_time):
+                continue
+            
+            # Calculate fade progress
+            duration = obj.removal_time - obj.start_time
+            if duration <= 0:
+                continue
                 
-                # Calculate fade progress
-                duration = obj.removal_time - obj.start_time
-                if duration <= 0:
-                    continue
-                    
-                elapsed = current_time - obj.start_time
-                progress = elapsed / duration  # 0.0 → 1.0
-                intensity = max(0.0, 1.0 - progress)  # 1.0 → 0.0
+            elapsed = current_time - obj.start_time
+            progress = elapsed / duration  # 0.0 → 1.0
+            
+            # Optimization #5: Apply gamma curve for perceptual fade
+            linear_intensity = max(0.0, 1.0 - progress)
+            intensity = pow(linear_intensity, self.FADE_GAMMA)
+            
+            # Update each pixel if this object owns it
+            for i, (x, y) in enumerate(obj.points):
+                # Optimization #4: Lock only for ownership check
+                with self.index_lock:
+                    is_owner = self._is_pixel_owner(x, y, obj)
                 
-                # Update each pixel if this object owns it
-                for i, (x, y) in enumerate(obj.points):
-                    if self._is_pixel_owner(x, y, obj):
-                        r, g, b = obj.pixel_colors[i]
-                        faded_r = int(r * intensity)
-                        faded_g = int(g * intensity)
-                        faded_b = int(b * intensity)
-                        self.api._draw_to_buffers(x, y, faded_r, faded_g, faded_b)
-                        pixels_updated = True
+                if is_owner:
+                    r, g, b = obj.pixel_colors[i]
+                    faded_r = int(r * intensity)
+                    faded_g = int(g * intensity)
+                    faded_b = int(b * intensity)
+                    self.api._draw_to_buffers(x, y, faded_r, faded_g, faded_b)
+                    pixels_updated = True
         
         if pixels_updated:
             self.changes_made = True

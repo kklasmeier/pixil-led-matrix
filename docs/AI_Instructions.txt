@@ -7,23 +7,23 @@ reference:
 4. Variables can be used in any command parameter position and in conditions
 
 
-Drawing Commands
+Drawing Commands - Brackets indicate optional
 ----------------
-* draw_line(x1, y1, x2, y2, color, [intensity], [duration]) - Draws a line that may or may not burn out after duration milliseconds
-* plot(x, y, color, [intensity], [duration]) - Plots a single point that may or may not burn out after duration milliseconds
-* draw_rectangle(x, y, width, height, color, [intensity], [filled], [duration]) - Draws a rectangle that may or may not burn out after duration milliseconds
-* draw_circle(x, y, radius, color, [intensity], [filled], [duration]) - Draws a circle that may or may not burn out after duration milliseconds
+* draw_line(x1, y1, x2, y2, color, [color intensity], [burnout duration in ms], [burnout mode]) - Draws a line that may or may not burn out after duration milliseconds
+* plot(x, y, color, [color intensity], [burnout duration in ms], [burnout mode]) - Plots a single point that may or may not burn out after duration milliseconds
+* draw_rectangle(x, y, width, height, color, [color intensity], [filled], [burnout duration in ms], [burnout mode]) - Draws a rectangle that may or may not burn out after duration milliseconds
+* draw_circle(x, y, radius, color, [color intensity], [filled], [burnout duration in ms], [burnout mode]) - Draws a circle that may or may not burn out after duration milliseconds
 * clear() - Clears the display
-* draw_polygon(x, y, radius, sides, color, [intensity], [rotation], [filled], [duration]) - Draws a polygon with a defined number of sides that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated.
-* draw_ellipse(x_center, y_center, x_radius, y_radius, color, [intensity], [fill], [rotation], [burnout]) - Draws an ellipse that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated
-* draw_arc(x1, y1, x2, y2, bulge, color, [intensity], [filled], [duration])
+* draw_polygon(x, y, radius, sides, color, [color intensity], [rotation], [filled], [burnout duration in ms], [burnout mode]) - Draws a polygon with a defined number of sides that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated.
+* draw_ellipse(x_center, y_center, x_radius, y_radius, color, [color intensity], [fill], [rotation], [burnout]) - Draws an ellipse that may or may not burn out after duration milliseconds. Rotation means how many degrees clockwise should the shape be rotated
+* draw_arc(x1, y1, x2, y2, bulge, color, [color intensity], [filled], [burnout duration in ms], [burnout mode])
     Understanding Bulge parameter: The bulge value represents the perpendicular distance from the chord (straight line between endpoints) to the arc's peak:
         Positive bulge: Arc curves to the port side (left when traveling from start to end)
         Negative bulge: Arc curves to the starboard side (right when traveling from start to end)
         Zero bulge: Draws a straight line
         Larger absolute values: More pronounced curve
 
-Note: When the burnout is not specified, then the shape will stay displayed until the matrix is cleared
+Note: When the burnout is not specified, then the shape will stay displayed until the matrix is cleared. the burnout mode can be "instant" (default) or "fade". Instant will turn off after the stated milliseconds. Fade will fade to black over the milliseconds duration.
 
 Control Commands - Variables and Expressions
 --------------------------------------------
@@ -92,6 +92,96 @@ draw_arc(0, 32, 63, 32, 5, green)
 
 # Dramatic curve (large bulge)
 draw_arc(0, 32, 63, 32, 25, orange)
+
+Burnout concepts
+================
+Syntax
+Drawing commands support two optional parameters at the end:
+
+burnout - Duration in milliseconds before the shape is removed (-1 for permanent)
+burnout_mode - Either instant (default) or fade
+
+Basic Examples
+pixil# Permanent pixel (no burnout)
+plot(32, 32, red, 100)
+
+# Pixel that disappears after 2 seconds (instant)
+plot(32, 32, red, 100, 2000)
+
+# Pixel that fades out over 2 seconds
+plot(32, 32, red, 100, 2000, fade)
+
+# Explicit instant mode (same as default)
+plot(32, 32, red, 100, 2000, instant)
+
+# Permanent drawing objects can use a -1 burnout value. This is useful in scripts among all drawing objects that set the burnout on and off programatically in a single command:
+plot(32, 32, red, 100, -1)
+
+Shape Examples
+pixil# Circle that fades out over 3 seconds
+draw_circle(32, 32, 10, blue, 100, true, 3000, fade)
+
+# Rectangle that disappears instantly after 1.5 seconds
+draw_rectangle(10, 10, 20, 15, green, 100, true, 1500, instant)
+
+# Line that fades over 2 seconds
+draw_line(0, 0, 63, 63, yellow, 100, 2000, fade)
+
+# Polygon that fades over 4 seconds
+draw_polygon(32, 32, 15, 6, purple, 100, 0, true, 4000, fade)
+
+# Ellipse that fades over 2.5 seconds
+draw_ellipse(32, 32, 20, 10, cyan, 100, false, 0, 2500, fade)
+
+# Arc that fades over 1 second
+draw_arc(10, 32, 54, 32, 15, orange, 100, false, 1000, fade)
+Batched Plots (mplot)
+pixil# Batch multiple fading pixels
+mplot(10, 10, red, 100, 2000, fade)
+mplot(11, 10, red, 100, 2000, fade)
+mplot(12, 10, red, 100, 2000, fade)
+mflush()
+
+# Mix of instant and fade in same batch
+mplot(20, 20, blue, 100, 1500, instant)
+mplot(21, 20, green, 100, 1500, fade)
+mflush()
+Practical Examples
+pixil# Trailing effect - particles that fade behind a moving object
+for v_i in (0, 50, 1)
+    v_x = 10 + v_i
+    plot(v_x, 32, orange, 100, 500, fade)
+    rest(0.05)
+endfor v_i
+
+# Explosion effect - expanding ring that fades
+for v_radius in (1, 20, 1)
+    draw_circle(32, 32, v_radius, red, 100, false, 800, fade)
+    rest(0.03)
+endfor v_radius
+
+# Sparkle effect - random pixels that fade
+for v_i in (0, 100, 1)
+    v_x = random(0, 63, 0)
+    v_y = random(0, 63, 0)
+    v_color = random(0, 99, 0)
+    plot(v_x, v_y, v_color, 100, 1000, fade)
+    rest(0.02)
+endfor v_i
+
+# Comet trail
+for v_frame in (0, 60, 1)
+    v_x = v_frame
+    v_y = 32
+    # Head (bright, instant burnout)
+    plot(v_x, v_y, white, 100, 100, instant)
+    # Trail (dimmer, fades)
+    plot(v_x - 1, v_y, yellow, 80, 400, fade)
+    plot(v_x - 2, v_y, orange, 60, 400, fade)
+    plot(v_x - 3, v_y, red, 40, 400, fade)
+    rest(0.05)
+endfor v_frame
+
 
 Arrays
 ------
@@ -811,7 +901,7 @@ end_frame   # Only these new elements appear
 Batch Plotting Commands
 ------------------------
 
-* mplot(x, y, color, [intensity], [burnout]) - Queues a pixel plot into buffer without displaying. Same parameters as plot(). Invalid coordinates silently skipped.
+* mplot(x, y, color, [color intensity], [burnout]) - Queues a pixel plot into buffer without displaying. Same parameters as plot(). Invalid coordinates silently skipped.
 * mflush() - Sends all buffered mplot commands to display as single optimized batch, then clears buffer.
 
 Use mplot/mflush for drawing many individual pixels efficiently:

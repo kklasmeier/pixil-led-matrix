@@ -73,7 +73,7 @@ while true then
     # Update rocket
     if v_rocket_active == 1 then
         # Draw rocket trail
-        plot(v_rocket_x, v_rocket_y, white, 90, v_rocket_trail_duration)  # Updated: separated color and intensity
+        plot(v_rocket_x, v_rocket_y, white, 90, v_rocket_trail_duration, fade)  # Updated: separated color and intensity
         
         # Update position
         v_rocket_y = v_rocket_y + v_rocket_dy
@@ -127,11 +127,11 @@ while true then
                 
                 # Draw different colored sparks with random duration
                 if v_i % 3 == 0 then
-                    mplot(v_x[v_i], v_y[v_i], red, v_r, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], red, v_r, random(300, 1300, 0), fade)  # Updated: separated color and intensity
                 elseif v_i % 3 == 1 then
-                    mplot(v_x[v_i], v_y[v_i], violet, v_g, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], violet, v_g, random(300, 1300, 0), fade)  # Updated: separated color and intensity
                 else
-                    mplot(v_x[v_i], v_y[v_i], blue, v_b, random(300, 1300, 0))  # Updated: separated color and intensity
+                    mplot(v_x[v_i], v_y[v_i], blue, v_b, random(300, 1300, 0), fade)  # Updated: separated color and intensity
                 endif
             endif
         endif

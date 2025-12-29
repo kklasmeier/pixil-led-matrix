@@ -1,0 +1,31 @@
+# Configuration
+v_pixels_per_batch = 200
+v_burnout_time = 1500
+v_iterations = 5
+
+# ============================================
+# TEST 1: Instant Burnout Baseline
+# ============================================
+# This establishes baseline - pixels appear then vanish instantly
+
+draw_text(2, 2, "TEST 1: INSTANT", "piboto-regular", 8, white, 100)
+rest(1)
+clear()
+
+for v_iter in (0, v_iterations, 1)
+    # Draw random scatter of pixels
+    for v_i in (0, v_pixels_per_batch, 1)
+        v_x = random(0, 63, 0)
+        v_y = random(0, 63, 0)
+        v_color = random(0, 99, 0)
+        mplot(v_x, v_y, v_color, 100, v_burnout_time, instant)
+    endfor v_i
+    mflush()
+    rest(0.05)
+endfor v_iter
+
+sync_queue
+# Wait for all burnouts to complete
+rest(20)
+clear()
+rest(0.5)

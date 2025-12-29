@@ -41,7 +41,7 @@ endfor v_iter
 
 sync_queue
 # Wait for all burnouts to complete
-rest(2)
+rest(20)
 clear()
 rest(0.5)
 
