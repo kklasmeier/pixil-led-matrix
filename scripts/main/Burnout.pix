@@ -1,0 +1,786 @@
+# ============================================
+# DYNAMIC PIXEL SPRAY
+# A forever-running animation with multiple
+# visual variations that shuffle and repeat
+# ============================================
+
+# ============================================
+# CONFIGURATION
+# ============================================
+v_sequence_duration = 6    # Approximate seconds per sequence
+v_test_sequence = 16         # 0 = shuffle, 1-16 = pin specific, -1 = sequential debug mode
+v_num_sequences = 16        # Total number of sequences
+
+# ============================================
+# SEQUENCE 1: Random Spray
+# Pure chaos - random positions, random colors
+# Self-varies: density, burnout, and burst rate
+# ============================================
+def seq_random_spray {
+    print("Playing: Random Spray")
+    v_base_density = random(30, 80, 0)
+    v_base_burnout = random(400, 1200, 0)
+    v_base_rest = random(3, 8, 0)
+    v_base_rest = v_base_rest / 100
+    print(f"  density={v_base_density} burnout={v_base_burnout} rest={v_base_rest}")
+    v_frames = v_sequence_duration / v_base_rest
+    v_frames = int(v_frames)
+    for v_frame in (0, v_frames, 1)
+        v_density = v_base_density + random(-15, 15, 0)
+        v_density = max(10, v_density)
+        for v_i in (0, v_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            v_color = random(0, 99, 0)
+            v_burnout = v_base_burnout + random(-200, 3500, 0)
+            plot(v_x, v_y, v_color, 100, v_burnout, fade)
+        endfor v_i
+        mflush()
+        rest(v_base_rest)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 2: Center Bloom
+# Pixels spawn near center, radius expands
+# Self-varies: expansion speed, density per ring
+# ============================================
+def seq_center_bloom {
+    print("Playing: Center Bloom")
+    v_cycles = v_sequence_duration / 5
+    v_cycles = int(v_cycles)
+    for v_cycle in (0, v_cycles, 1)
+        v_density = random(20, 50, 0)
+        v_step = random(1, 3, 0)
+        v_burnout = random(800, 1800, 0)
+        print(f"  cycle {v_cycle}: density={v_density} step={v_step} burnout={v_burnout}")
+        for v_radius in (2, 35, v_step)
+            v_ring_density = v_density + v_radius / 2
+            v_ring_density = int(v_ring_density)
+            for v_i in (0, v_ring_density, 1)
+                v_angle = random(0, 628, 0)
+                v_angle = v_angle / 100
+                v_dist = random(0, v_radius, 0)
+                v_x = 32 + cos(v_angle) * v_dist
+                v_y = 32 + sin(v_angle) * v_dist
+                v_x = int(v_x)
+                v_y = int(v_y)
+                v_color = random(0, 99, 0)
+                mplot(v_x, v_y, v_color, 100, v_burnout, fade)
+            endfor v_i
+            mflush()
+            rest(0.04)
+        endfor v_radius
+        rest(0.3)
+    endfor v_cycle
+}
+
+# ============================================
+# SEQUENCE 3: Warm Embers
+# Reds, oranges, yellows - slow fade, sparse
+# Self-varies: color bias, burnout length
+# ============================================
+def seq_warm_embers {
+    print("Playing: Warm Embers")
+    v_burnout = random(1500, 3000, 0)
+    v_density = random(15, 35, 0)
+    v_rest = random(8, 15, 0)
+    v_rest = v_rest / 100
+    print(f"  density={v_density} burnout={v_burnout} rest={v_rest}")
+    v_frames = v_sequence_duration / v_rest
+    v_frames = int(v_frames)
+    for v_frame in (0, v_frames, 1)
+        v_frame_density = v_density + random(-8, 8, 0)
+        v_frame_density = max(5, v_frame_density)
+        for v_i in (0, v_frame_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            v_color_pick = random(1, 8, 0)
+            if v_color_pick == 1 then
+                v_color = "red"
+            endif
+            if v_color_pick == 2 then
+                v_color = "orange"
+            endif
+            if v_color_pick == 3 then
+                v_color = "yellow"
+            endif
+            if v_color_pick == 4 then
+                v_color = "coral"
+            endif
+            if v_color_pick == 5 then
+                v_color = "gold"
+            endif
+            if v_color_pick == 6 then
+                v_color = "crimson"
+            endif
+            if v_color_pick == 7 then
+                v_color = "salmon"
+            endif
+            if v_color_pick == 8 then
+                v_color = "peach"
+            endif
+            v_intensity = random(50, 100, 0)
+            v_this_burnout = v_burnout + random(-400, 400, 0)
+            plot(v_x, v_y, v_color, v_intensity, v_this_burnout, fade)
+        endfor v_i
+        mflush()
+        rest(v_rest)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 4: Cool Mist
+# Blues, cyans - fast fade, very dense
+# Self-varies: density waves
+# ============================================
+def seq_cool_mist {
+    print("Playing: Cool Mist")
+    v_base_density = random(80, 150, 0)
+    v_burnout = random(250, 500, 0)
+    print(f"  density={v_base_density} burnout={v_burnout}")
+    v_frames = v_sequence_duration * 30
+    for v_frame in (0, v_frames, 1)
+        v_wave = sin(v_frame / 10) * 40
+        v_density = v_base_density + v_wave
+        v_density = int(v_density)
+        v_density = max(40, v_density)
+        for v_i in (0, v_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            v_color_pick = random(1, 7, 0)
+            if v_color_pick == 1 then
+                v_color = "blue"
+            endif
+            if v_color_pick == 2 then
+                v_color = "cyan"
+            endif
+            if v_color_pick == 3 then
+                v_color = "teal"
+            endif
+            if v_color_pick == 4 then
+                v_color = "sky_blue"
+            endif
+            if v_color_pick == 5 then
+                v_color = "azure"
+            endif
+            if v_color_pick == 6 then
+                v_color = "turquoise"
+            endif
+            if v_color_pick == 7 then
+                v_color = "mint"
+            endif
+            v_intensity = random(40, 100, 0)
+            plot(v_x, v_y, v_color, v_intensity, v_burnout, fade)
+        endfor v_i
+        mflush()
+        rest(0.033)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 5: Sweeping Band
+# Vertical band of activity sweeps across
+# Self-varies: band width, direction, speed
+# ============================================
+def seq_sweeping_band {
+    print("Playing: Sweeping Band")
+    v_sweeps = v_sequence_duration / 3
+    v_sweeps = int(v_sweeps)
+    for v_sweep in (0, v_sweeps, 1)
+        v_direction = random(0, 1, 0)
+        v_band_width = random(6, 16, 0)
+        v_density = random(30, 70, 0)
+        v_burnout = random(400, 900, 0)
+        v_speed = random(4, 8, 0)
+        v_speed = v_speed / 100
+        print(f"  sweep {v_sweep}: width={v_band_width} dir={v_direction} density={v_density}")
+        for v_band_pos in (0, 63, 1)
+            if v_direction == 1 then
+                v_x_center = 63 - v_band_pos
+            else
+                v_x_center = v_band_pos
+            endif
+            for v_i in (0, v_density, 1)
+                v_half_width = v_band_width / 2
+                v_x_offset = random(0 - v_half_width, v_half_width, 0)
+                v_x = v_x_center + v_x_offset
+                v_x = max(0, v_x)
+                v_x = min(63, v_x)
+                v_y = random(0, 63, 0)
+                v_color = random(0, 99, 0)
+                mplot(v_x, v_y, v_color, 100, v_burnout, fade)
+            endfor v_i
+            mflush()
+            rest(v_speed)
+        endfor v_band_pos
+    endfor v_sweep
+}
+
+# ============================================
+# SEQUENCE 6: Sparkle Burst
+# Quick fades, high density bursts with pauses
+# Self-varies: burst size, pause length
+# ============================================
+def seq_sparkle_burst {
+    print("Playing: Sparkle Burst")
+    v_elapsed = 0
+    while v_elapsed < v_sequence_duration then
+        v_burst_size = random(30, 600, 0)
+        v_burnout = random(150, 2000, 0)
+        for v_i in (0, v_burst_size, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            v_color = random(0, 99, 0)
+            v_intensity = random(70, 100, 0)
+            mplot(v_x, v_y, v_color, v_intensity, v_burnout, fade)
+        endfor v_i
+        mflush()
+        v_pause = random(3, 12, 0)
+        v_pause = v_pause / 10
+        rest((v_burnout / 1000) - v_pause)
+        v_elapsed = v_elapsed + v_pause + 0.1
+    endwhile
+}
+
+# ============================================
+# SEQUENCE 7: Corner Wanderer
+# Activity focuses on corners, rotating
+# Self-varies: dwell time, spread, corner order
+# ============================================
+def seq_corner_wanderer {
+    print("Playing: Corner Wanderer")
+    v_time_per_corner = v_sequence_duration / 5
+    v_start_corner = random(0, 3, 0)
+    for v_c in (0, 4, 1)
+        v_corner = v_start_corner + v_c
+        if v_corner > 3 then
+            v_corner = v_corner - 4
+        endif
+        if v_corner == 0 then
+            v_cx = 10
+            v_cy = 10
+        endif
+        if v_corner == 1 then
+            v_cx = 53
+            v_cy = 10
+        endif
+        if v_corner == 2 then
+            v_cx = 53
+            v_cy = 53
+        endif
+        if v_corner == 3 then
+            v_cx = 10
+            v_cy = 53
+        endif
+        v_spread = random(10, 18, 0)
+        v_density = random(30, 60, 0)
+        v_burnout = random(500, 4000, 0)
+        print(f"  corner {v_corner}: spread={v_spread} density={v_density}")
+        v_frames = v_time_per_corner / 0.05
+        v_frames = int(v_frames)
+        for v_frame in (0, v_frames, 1)
+            v_frame_density = v_density + random(-10, 10, 0)
+            for v_i in (0, v_frame_density, 1)
+                v_x = v_cx + random(0 - v_spread, v_spread, 0)
+                v_y = v_cy + random(0 - v_spread, v_spread, 0)
+                v_x = max(0, v_x)
+                v_x = min(63, v_x)
+                v_y = max(0, v_y)
+                v_y = min(63, v_y)
+                v_color = random(0, 99, 0)
+                plot(v_x, v_y, v_color, 100, v_burnout, fade)
+            endfor v_i
+            mflush()
+            rest(0.02)
+        endfor v_frame
+    endfor v_c
+}
+
+# ============================================
+# SEQUENCE 8: Density Pulse
+# Sine wave controls pixel density
+# Self-varies: frequency, min/max density
+# ============================================
+def seq_density_pulse {
+    print("Playing: Density Pulse")
+    v_min_density = random(5, 20, 0)
+    v_max_density = random(80, 140, 0)
+    v_frequency = random(3, 8, 0)
+    v_burnout = random(400, 800, 0)
+    print(f"  min={v_min_density} max={v_max_density} freq={v_frequency} burnout={v_burnout}")
+    v_frames = v_sequence_duration * 10
+    for v_frame in (0, v_frames, 1)
+        v_wave = sin(v_frame / v_frequency)
+        v_wave = v_wave + 1
+        v_wave = v_wave / 2
+        v_range = v_max_density - v_min_density
+        v_density = (v_min_density + v_wave * v_range) * random(.1, 1.5, 1)
+        v_density = int(v_density)
+        for v_i in (0, v_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            v_color = random(0, 99, 0)
+            mplot(v_x, v_y, v_color, 100, v_burnout, fade)
+        endfor v_i
+        mflush()
+        rest(0.1)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 9: Rainfall
+# Streams fall from top to bottom
+# Self-varies: drop density, speed, color theme
+# ============================================
+def seq_rainfall {
+    print("Playing: Rainfall")
+    v_color_mode = random(1, 3, 0)
+    v_drop_density = random(20, 50, 0)
+    v_base_speed = random(2, 5, 0)
+    v_burnout = random(300, 1000, 0)
+    print(f"  color_mode={v_color_mode} drops={v_drop_density} speed={v_base_speed}")
+    v_frames = v_sequence_duration * 15
+    for v_frame in (0, v_frames, 1)
+        for v_i in (0, v_drop_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 50, 0)
+            v_length = random(3, 10, 0)
+            for v_d in (0, v_length, 1)
+                v_dy = v_y + v_d * 3
+                if v_dy < 64 then
+                    if v_color_mode == 1 then
+                        v_color = "cyan"
+                    endif
+                    if v_color_mode == 2 then
+                        v_color = "lime"
+                    endif
+                    if v_color_mode == 3 then
+                        v_color = random(0, 99, 0)
+                    endif
+                    v_intensity = 100 - v_d * 10
+                    v_intensity = max(30, v_intensity)
+                    plot(v_x, v_dy, v_color, v_intensity, v_burnout, fade)
+                endif
+            endfor v_d
+        endfor v_i
+        mflush()
+        v_rest = 10 - v_base_speed
+        v_rest = v_rest / 100
+        rest(v_rest)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 10: Galaxy Spiral
+# Pixels follow spiral arms from center
+# Self-varies: arm count, rotation speed, tightness
+# ============================================
+def seq_galaxy_spiral {
+    print("Playing: Galaxy Spiral")
+    v_arms = random(2, 5, 0)
+    v_tightness = random(8, 15, 0)
+    v_rot_speed = random(2, 6, 0)
+    v_burnout = random(1200, 2300, 0)
+    print(f"  arms={v_arms} tight={v_tightness} rot={v_rot_speed} burnout={v_burnout}")
+    v_frames = v_sequence_duration * 12
+    v_start_color = random(0, 9, 0) * 10
+    print(f'v_start_color = {v_start_color}')
+    for v_frame in (0, v_frames, 1)
+        v_rotation = v_frame / v_rot_speed
+        for v_arm in (0, v_arms - 1, 1)
+            v_arm_offset = v_arm * 6.28 / v_arms
+            for v_i in (0, 35, 1)
+                v_dist = random(2, 30, 0)
+                v_angle = v_rotation + v_arm_offset + v_dist / v_tightness
+                v_x = 32 + cos(v_angle) * v_dist
+                v_y = 32 + sin(v_angle) * v_dist
+                v_x = int(v_x)
+                v_y = int(v_y)
+                if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+                    v_color = random(v_start_color, v_start_color + 9, 0)
+                    v_intensity = 100 - v_dist
+                    v_intensity = max(40, v_intensity)
+                    mplot(v_x, v_y, v_color, v_intensity, v_burnout, fade)
+                endif
+            endfor v_i
+        endfor v_arm
+        mflush()
+        rest(0.08)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 11: Breathing
+# Whole screen pulses intensity in and out
+# Self-varies: breath rate, color theme
+# ============================================
+def seq_breathing {
+    print("Playing: Breathing")
+    v_color_mode = random(1, 4, 0)
+    v_breath_rate = random(15, 30, 0)
+    v_density = random(100, 180, 0)
+    print(f"  color_mode={v_color_mode} rate={v_breath_rate} density={v_density}")
+    v_frames = v_sequence_duration * 10
+    for v_frame in (0, v_frames, 1)
+        v_breath = sin(v_frame / v_breath_rate)
+        v_breath = v_breath + 1
+        v_breath = v_breath / 2
+        v_intensity = 20 + v_breath * 80
+        v_intensity = int(v_intensity)
+        v_burnout = 150 + v_breath * 200
+        v_burnout = int(v_burnout)
+        for v_i in (0, v_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            if v_color_mode == 1 then
+                v_color = "white"
+            endif
+            if v_color_mode == 2 then
+                v_color = "magenta"
+            endif
+            if v_color_mode == 3 then
+                v_color = "purple"
+            endif
+            if v_color_mode == 4 then
+                v_color = random(0, 99, 0)
+            endif
+            mplot(v_x, v_y, v_color, v_intensity, v_burnout, fade)
+        endfor v_i
+        mflush()
+        rest(0.1)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 12: Popcorn
+# Sparse, sudden pops with long gaps
+# Self-varies: pop frequency, cluster size
+# ============================================
+def seq_popcorn {
+    print("Playing: Popcorn")
+    v_elapsed = 0
+    v_pop_count = 0
+    while v_elapsed < v_sequence_duration then
+        v_wait = random(2, 8, 0)
+        v_wait = v_wait / 10
+        rest(v_wait)
+        v_elapsed = v_elapsed + v_wait
+        v_cluster_size = random(30, 80, 0)
+        v_cx = random(5, 58, 0)
+        v_cy = random(5, 58, 0)
+        v_spread = random(3, 10, 0)
+        v_burnout = random(800, 2000, 0)
+        for v_i in (0, v_cluster_size, 1)
+            v_x = v_cx + random(0 - v_spread, v_spread, 0)
+            v_y = v_cy + random(0 - v_spread, v_spread, 0)
+            v_x = max(0, v_x)
+            v_x = min(63, v_x)
+            v_y = max(0, v_y)
+            v_y = min(63, v_y)
+            v_color = random(0, 99, 0)
+            plot(v_x, v_y, v_color, 100, v_burnout, fade)
+        endfor v_i
+        mflush()
+        v_pop_count = v_pop_count + 1
+    endwhile
+    print(f"  total pops: {v_pop_count}")
+}
+
+# ============================================
+# SEQUENCE 13: Wave Front
+# Diagonal wave sweeps across matrix
+# Self-varies: direction, thickness, speed
+# ============================================
+def seq_wave_front {
+    print("Playing: Wave Front")
+    v_sweeps = v_sequence_duration / 4
+    v_sweeps = int(v_sweeps)
+    for v_sweep in (0, v_sweeps, 1)
+        v_direction = random(0, 3, 0)
+        v_thickness = random(8, 20, 0)
+        v_density = random(40, 80, 0)
+        v_burnout = random(400, 900, 0)
+        v_speed = random(3, 7, 0)
+        v_speed = v_speed / 100
+        print(f"  sweep {v_sweep}: dir={v_direction} thick={v_thickness}")
+        for v_pos in (0, 126, 1)
+            for v_i in (0, v_density, 1)
+                v_offset = random(0, v_thickness, 0)
+                v_diag = v_pos + v_offset
+                if v_direction == 0 then
+                    v_x = random(0, 63, 0)
+                    v_y = v_diag - v_x
+                endif
+                if v_direction == 1 then
+                    v_x = random(0, 63, 0)
+                    v_y = v_x - v_diag + 63
+                endif
+                if v_direction == 2 then
+                    v_y = random(0, 63, 0)
+                    v_x = v_diag - v_y
+                endif
+                if v_direction == 3 then
+                    v_y = random(0, 63, 0)
+                    v_x = v_y - v_diag + 63
+                endif
+                if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+                    v_color = random(0, 99, 0)
+                    mplot(v_x, v_y, v_color, 100, v_burnout, fade)
+                endif
+            endfor v_i
+            mflush()
+            rest(v_speed)
+        endfor v_pos
+    endfor v_sweep
+}
+
+# ============================================
+# SEQUENCE 14: Fireflies
+# Very sparse, long burn, wandering clusters
+# Self-varies: cluster count, wander speed
+# ============================================
+def seq_fireflies {
+    print("Playing: Fireflies")
+    v_num_flies = random(4, 10, 0)
+    v_burnout = random(1500, 3000, 0)
+    print(f"  flies={v_num_flies} burnout={v_burnout}")
+    create_array(v_fly_x, v_num_flies)
+    create_array(v_fly_y, v_num_flies)
+    for v_i in (0, v_num_flies - 1, 1)
+        v_fly_x[v_i] = random(10, 53, 0)
+        v_fly_y[v_i] = random(10, 53, 0)
+    endfor v_i
+    v_frames = v_sequence_duration * 8
+    for v_frame in (0, v_frames, 1)
+        for v_i in (0, v_num_flies - 1, 1)
+            v_dx = random(-3, 3, 0)
+            v_dy = random(-3, 3, 0)
+            v_fly_x[v_i] = v_fly_x[v_i] + v_dx
+            v_fly_y[v_i] = v_fly_y[v_i] + v_dy
+            v_fly_x[v_i] = max(2, v_fly_x[v_i])
+            v_fly_x[v_i] = min(61, v_fly_x[v_i])
+            v_fly_y[v_i] = max(2, v_fly_y[v_i])
+            v_fly_y[v_i] = min(61, v_fly_y[v_i])
+            v_glow = random(1, 4, 0)
+            for v_g in (0, v_glow, 1)
+                v_gx = v_fly_x[v_i] + random(-1, 1, 0)
+                v_gy = v_fly_y[v_i] + random(-1, 1, 0)
+                v_color_pick = random(1, 3, 0)
+                if v_color_pick == 1 then
+                    v_color = "yellow"
+                endif
+                if v_color_pick == 2 then
+                    v_color = "lime"
+                endif
+                if v_color_pick == 3 then
+                    v_color = "gold"
+                endif
+                v_intensity = random(60, 100, 0)
+                mplot(v_gx, v_gy, v_color, v_intensity, v_burnout, fade)
+            endfor v_g
+        endfor v_i
+        mflush()
+        rest(0.12)
+    endfor v_frame
+}
+
+# ============================================
+# SEQUENCE 15: Static Burst
+# TV static - ultra dense, ultra short burn
+# Self-varies: intensity waves, color/mono
+# ============================================
+def seq_static_burst {
+    print("Playing: Static Burst")
+    v_color_mode = random(1, 2, 0)
+    v_base_density = random(200, 400, 0)
+    v_burnout = random(80, 150, 0)
+    print(f"  mode={v_color_mode} density={v_base_density} burnout={v_burnout}")
+    v_frames = v_sequence_duration * 10
+    v_color = random(5, 99, 0)
+    for v_frame in (0, v_frames, 1)
+        v_wave = sin(v_frame / 8)
+        v_density = v_base_density + v_wave * 100
+        v_density = int(v_density)
+        v_density = max(100, v_density)
+        for v_i in (0, v_density, 1)
+            v_x = random(0, 63, 0)
+            v_y = random(0, 63, 0)
+            if v_color_mode == 1 then
+                v_gray = random(40, 100, 0)
+                mplot(v_x, v_y, white, v_gray, v_burnout * 100, fade)
+            else
+                plot(v_x, v_y, v_color, 100, v_burnout * 100, fade)
+            endif
+        endfor v_i
+        mflush()
+        rest(0.05)
+    endfor v_frame
+    rest(v_burnout * 50)
+}
+
+# ============================================
+# SEQUENCE 16: Edges Only
+# Activity hugs the perimeter
+# Self-varies: edge thickness, rotation direction
+# ============================================
+def seq_edges_only {
+    print("Playing: Edges Only")
+    v_thickness = random(4, 12, 0)
+    v_density = random(40, 80, 0)
+    v_burnout = random(500, 1000, 0)
+    v_clockwise = random(0, 1, 0)
+    print(f"  thickness={v_thickness} density={v_density} clockwise={v_clockwise}")
+    v_cycles = v_sequence_duration / 6
+    v_cycles = int(v_cycles)
+    for v_cycle in (0, v_cycles, 1)
+        for v_side in (0, 3, 1)
+            v_actual_side = v_side
+            if v_clockwise == 0 then
+                v_actual_side = 3 - v_side
+            endif
+            v_side_frames = 40
+            for v_frame in (0, v_side_frames, 1)
+                for v_i in (0, v_density, 1)
+                    if v_actual_side == 0 then
+                        v_x = random(0, 63, 0)
+                        v_y = random(0, v_thickness, 0)
+                    endif
+                    if v_actual_side == 1 then
+                        v_x = random(63 - v_thickness, 63, 0)
+                        v_y = random(0, 63, 0)
+                    endif
+                    if v_actual_side == 2 then
+                        v_x = random(0, 63, 0)
+                        v_y = random(63 - v_thickness, 63, 0)
+                    endif
+                    if v_actual_side == 3 then
+                        v_x = random(0, v_thickness, 0)
+                        v_y = random(0, 63, 0)
+                    endif
+                    v_color = random(0, 99, 0)
+                    mplot(v_x, v_y, v_color, 100, v_burnout, fade)
+                endfor v_i
+                mflush()
+                rest(0.04)
+            endfor v_frame
+        endfor v_side
+    endfor v_cycle
+}
+
+# ============================================
+# MAIN LOOP
+# ============================================
+print("Starting Dynamic Pixel Spray")
+print(f"Sequence duration: {v_sequence_duration} seconds")
+print(f"Total sequences: {v_num_sequences}")
+if v_test_sequence > 0 then
+    print(f"TEST MODE: Pinned to sequence {v_test_sequence}")
+endif
+if v_test_sequence == -1 then
+    print("DEBUG MODE: Sequential playthrough")
+endif
+
+# Shuffle tracking array - 0 = not played, 1 = played
+create_array(v_played, v_num_sequences)
+v_played_count = 0
+v_debug_index = 1
+
+v_running = 1
+while v_running == 1 then
+    
+    # Reset shuffle when all sequences have played
+    if v_played_count >= v_num_sequences then
+        print("All sequences played - reshuffling")
+        for v_i in (0, v_num_sequences - 1, 1)
+            v_played[v_i] = 0
+        endfor v_i
+        v_played_count = 0
+    endif
+    
+    # Select sequence based on mode
+    if v_test_sequence > 0 then
+        # Pin mode - always play the same sequence
+        v_current = v_test_sequence
+    elseif v_test_sequence == -1 then
+        # Debug mode - sequential playthrough
+        v_current = v_debug_index
+        v_debug_index = v_debug_index + 1
+        if v_debug_index > v_num_sequences then
+            v_debug_index = 1
+        endif
+        v_played_count = v_played_count + 1
+    else
+        # Normal shuffle mode
+        v_found = 0
+        while v_found == 0 then
+            v_pick = random(1, v_num_sequences, 0)
+            v_idx = v_pick - 1
+            if v_played[v_idx] == 0 then
+                v_current = v_pick
+                v_played[v_idx] = 1
+                v_played_count = v_played_count + 1
+                v_found = 1
+            endif
+        endwhile
+    endif
+    
+    print(f"=== Playing sequence {v_current} of {v_num_sequences} ===")
+    
+    # Call the selected sequence procedure
+    if v_current == 1 then
+        call seq_random_spray
+    endif
+    if v_current == 2 then
+        call seq_center_bloom
+    endif
+    if v_current == 3 then
+        call seq_warm_embers
+    endif
+    if v_current == 4 then
+        call seq_cool_mist
+    endif
+    if v_current == 5 then
+        call seq_sweeping_band
+    endif
+    if v_current == 6 then
+        call seq_sparkle_burst
+    endif
+    if v_current == 7 then
+        call seq_corner_wanderer
+    endif
+    if v_current == 8 then
+        call seq_density_pulse
+    endif
+    if v_current == 9 then
+        call seq_rainfall
+    endif
+    if v_current == 10 then
+        call seq_galaxy_spiral
+    endif
+    if v_current == 11 then
+        call seq_breathing
+    endif
+    if v_current == 12 then
+        call seq_popcorn
+    endif
+    if v_current == 13 then
+        call seq_wave_front
+    endif
+    if v_current == 14 then
+        call seq_fireflies
+    endif
+    if v_current == 15 then
+        call seq_static_burst
+    endif
+    if v_current == 16 then
+        call seq_edges_only
+    endif
+    
+    # Cleanup between sequences
+    sync_queue
+    rest(1.5)
+    clear()
+    rest(0.5)
+    
+endwhile

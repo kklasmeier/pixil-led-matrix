@@ -1,0 +1,160 @@
+# Sparkler
+# Hand-held sparkler effect with bright sparks that arc and fade like real sparks cooling
+# Uses fade burnout for sparks, begin_frame(true) to preserve them while redrawing stick
+
+# Sparkler position - waves gently like someone holding it
+v_base_x = 32
+v_base_y = 50
+v_time = 0
+
+# Previous tip position (for erasing)
+v_prev_tip_x = v_base_x
+v_prev_tip_y = v_base_y
+v_prev_handle_x = v_base_x
+v_prev_handle_y = v_base_y + 15
+
+v_running = 1
+
+while v_running == 1 then
+    
+    # Calculate new sparkler tip position (gentle figure-8 wave)
+    v_sway_x = sin(v_time * 1.5) * 10
+    v_sway_y = sin(v_time * 3.0) * 4
+    v_tip_x = v_base_x + v_sway_x
+    v_tip_y = v_base_y + v_sway_y
+    
+    # Handle position (moves less than tip)
+    v_handle_x = v_base_x + (v_sway_x * 0.2)
+    v_handle_y = v_base_y + 15
+    
+    # Use preserve mode - sparks stay, we redraw stick
+    begin_frame(true)
+        
+        # Erase previous stick position by drawing over it in black
+        draw_line(v_prev_handle_x, v_prev_handle_y, v_prev_tip_x, v_prev_tip_y, black, 100)
+        draw_circle(v_prev_tip_x, v_prev_tip_y, 4, black, 100, true)
+        
+        # Draw the sparkler stick
+        draw_line(v_handle_x, v_handle_y, v_tip_x, v_tip_y, gray, 70)
+        
+        # Draw the glowing hot tip
+        v_core_flicker = random(85, 100, 0)
+        draw_circle(v_tip_x, v_tip_y, 2, white, v_core_flicker, true)
+        
+        # Flickering glow rings around tip
+        v_glow1 = random(60, 90, 0)
+        v_glow2 = random(40, 70, 0)
+        v_glow3 = random(20, 50, 0)
+        draw_circle(v_tip_x, v_tip_y, 3, yellow, v_glow1, false)
+        draw_circle(v_tip_x, v_tip_y, 4, orange, v_glow2, false)
+        
+        # Occasional larger flicker burst
+        v_burst = random(0, 100, 0)
+        if v_burst > 85 then
+            draw_circle(v_tip_x, v_tip_y, 5, yellow, v_glow3, false)
+        endif
+        
+    end_frame
+    
+    # Store current position for next frame erase
+    v_prev_tip_x = v_tip_x
+    v_prev_tip_y = v_tip_y
+    v_prev_handle_x = v_handle_x
+    v_prev_handle_y = v_handle_y
+    
+    # Spew sparks - these persist due to fade burnout
+    v_num_sparks = random(5, 12, 0)
+    for v_s in (0, v_num_sparks, 1)
+        
+        # Random angle for spark ejection (full 360)
+        v_angle = random(0, 628, 0)
+        v_angle_rad = v_angle / 100
+        
+        # Random speed and distance
+        v_speed = random(3, 12, 1)
+        v_dist = random(2, 8, 0)
+        
+        # Calculate spark position (near the tip)
+        v_spark_x = v_tip_x + cos(v_angle_rad) * v_dist
+        v_spark_y = v_tip_y + sin(v_angle_rad) * v_dist
+        
+        # Spark color and intensity based on "temperature"
+        v_temp = random(0, 100, 0)
+        v_intensity = random(70, 100, 0)
+        
+        # Fade time varies - hotter sparks last longer
+        v_fade = random(300, 800, 0)
+        
+        if v_temp < 25 then
+            # White hot
+            plot(v_spark_x, v_spark_y, white, v_intensity, v_fade, fade)
+        elseif v_temp < 50 then
+            # Yellow
+            plot(v_spark_x, v_spark_y, yellow, v_intensity, v_fade, fade)
+        elseif v_temp < 75 then
+            # Orange
+            plot(v_spark_x, v_spark_y, orange, v_intensity * 0.9, v_fade, fade)
+        else
+            # Red (cooler)
+            plot(v_spark_x, v_spark_y, red, v_intensity * 0.8, v_fade, fade)
+        endif
+    endfor v_s
+    
+    # Flying sparks that arc outward with trails
+    v_num_flyers = random(1, 4, 0)
+    for v_f in (0, v_num_flyers, 1)
+        v_fly_angle = random(0, 628, 0)
+        v_fly_rad = v_fly_angle / 100
+        v_fly_speed = random(8, 20, 1)
+        
+        # Draw a short trail of points for the flying spark
+        for v_t in (0, 5, 1)
+            v_trail_dist = v_t * v_fly_speed * 0.15
+            v_gravity_drop = v_t * v_t * 0.08
+            
+            v_fx = v_tip_x + cos(v_fly_rad) * v_trail_dist
+            v_fy = v_tip_y + sin(v_fly_rad) * v_trail_dist + v_gravity_drop
+            
+            # Trail cools as it gets further from tip
+            v_trail_intensity = 90 - (v_t * 15)
+            v_trail_fade = 3000 - (v_t * 60)
+            if v_trail_fade < 1150 then
+                v_trail_fade = 1150
+            endif
+            
+            if v_t < 2 then
+                plot(v_fx, v_fy, white, v_trail_intensity, v_trail_fade, fade)
+            elseif v_t < 4 then
+                plot(v_fx, v_fy, yellow, v_trail_intensity, v_trail_fade, fade)
+            else
+                plot(v_fx, v_fy, orange, v_trail_intensity * 0.7, v_trail_fade, fade)
+            endif
+        endfor v_t
+    endfor v_f
+    
+    # Occasional bright burst of sparks
+    v_burst_chance = random(0, 100, 0)
+    if v_burst_chance > 93 then
+        for v_b in (0, 20, 1)
+            v_b_angle = random(0, 628, 0)
+            v_b_rad = v_b_angle / 100
+            v_b_dist = random(4, 15, 0)
+            v_bx = v_tip_x + cos(v_b_rad) * v_b_dist
+            v_by = v_tip_y + sin(v_b_rad) * v_b_dist
+            v_b_int = random(80, 100, 0)
+            plot(v_bx, v_by, white, v_b_int, 400, fade)
+        endfor v_b
+    endif
+    
+    # Tiny embers that drift up
+    v_ember_count = random(0, 3, 0)
+    for v_e in (0, v_ember_count, 1)
+        v_ember_x = v_tip_x + random(-5, 5, 0)
+        v_ember_y = v_tip_y - random(5, 15, 0)
+        v_ember_int = random(30, 60, 0)
+        plot(v_ember_x, v_ember_y, orange, v_ember_int, 900, fade)
+    endfor v_e
+    
+    v_time = v_time + 0.1
+    rest(0.04)
+endwhile
