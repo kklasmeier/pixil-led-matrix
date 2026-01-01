@@ -1,0 +1,30 @@
+# Burnout Flicker Test
+# This script demonstrates a flicker bug when burnout overlaps with active drawing
+
+clear()
+
+v_x = 32
+v_y = 32
+v_direction = 1
+
+while true then
+    # Move ball back and forth
+    v_x = v_x + v_direction
+    if v_x >= 50 then
+        v_direction = -1
+    endif
+    if v_x <= 14 then
+        v_direction = 1
+    endif
+    
+    # Every other frame, plot a burnout pixel at the ball's position
+    if v_x % 2 == 0 then
+        plot(v_x, v_y, red, 100, 2000, fade)
+    endif
+    
+    # Draw the ball every frame
+    begin_frame
+        draw_circle(v_x, v_y, 5, blue, 100, true)
+    end_frame
+    
+endwhile

@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+LOG_FILE="pixil.log"
+PIXIL_MATCH='python(3)? .*Pixil\.py'
+
+usage() {
+  cat <<'EOF'
+run - Pixil runner and controller
+
+USAGE:
+  ./run                          Show this help
+  ./run <command> [--] [args]    Run a command
+  ./run [--] [pixil args...]     (No command) => RUN INTERACTIVE in foreground
+
+COMMANDS:
+  interactive   Run Pixil in the FOREGROUND (stays attached to terminal).
+  start         Run Pixil in the BACKGROUND (sudo + nohup + &), logs to pixil.log.
+  bg            Alias for start.
+  status        Show running Pixil processes (PID + command).
+  stop          Stop Pixil processes (TERM first, then KILL if needed).
+  killpython    Big hammer: kill Pixil python processes, then optionally ALL python.
+  help          Show this help.
+
+DEFAULT PIXIL ARGS (when omitted for interactive/start):
+  main/* -t 60:00
+
+EXAMPLES (foreground):
+  ./run interactive -- main/* -t 5:00 -q
+  ./run main/* -t 5:00 -q
+
+EXAMPLES (background):
+  ./run start -- main/* -t 5:00 -q
+  ./run bg main/* -t 5:00 -q
+
+STATUS / STOP:
+  ./run status
+  ./run stop
+
+IMPORTANT:
+  Do NOT type:  main *  (a bare '*' expands to every file in the folder)
+  Use:          main/*  (matches scripts in main/)
+EOF
+}
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 0
+fi
+
+show_pixil_procs() {
+  if pgrep -af "$PIXIL_MATCH" >/dev/null 2>&1; then
+    echo "Pixil processes:"
+    pgrep -af "$PIXIL_MATCH" | sed 's/^/  /'
+    return 0
+  else
+    echo "No Pixil processes running."
+    return 1
+  fi
+}
+
+pixil_is_running() {
+  pgrep -af "$PIXIL_MATCH" >/dev/null 2>&1
+}
+
+stop_pixil() {
+  local wait_seconds="${1:-3}"
+
+  echo "Stopping Pixil (TERM)..."
+  pkill -f "$PIXIL_MATCH" || true
+  sleep "$wait_seconds"
+
+  if pixil_is_running; then
+    echo "Pixil still running; forcing stop (KILL)..."
+    pkill -9 -f "$PIXIL_MATCH" || true
+    sleep 1
+  fi
+
+  if pixil_is_running; then
+    echo "WARNING: Pixil still appears to be running:"
+    pgrep -af "$PIXIL_MATCH" | sed 's/^/  /'
+    return 1
+  fi
+
+  echo "Pixil stopped."
+}
+
+killpython_big_hammer() {
+  echo "============================================================"
+  echo "WARNING: killpython is dangerous."
+  echo "Recommended: use './run stop' first."
+  echo "============================================================"
+  echo
+
+  echo "Python processes (for visibility):"
+  ps aux | grep python | grep -v grep || true
+  echo
+
+  echo "Killing Pixil python processes..."
+  pkill -9 -f "$PIXIL_MATCH" || true
+  echo
+
+  echo "Kill ALL python processes? (y/N)"
+  read -r ANSWER
+  case "${ANSWER,,}" in
+    y|yes)
+      echo "Killing ALL python processes..."
+      pkill -9 python || true
+      ;;
+    *)
+      echo "Skipping global python kill."
+      ;;
+  esac
+}
+
+# Guardrail: if the user accidentally passed a bare '*', explain and exit.
+guard_against_bare_star() {
+  local a
+  for a in "$@"; do
+    if [[ "$a" == "*" ]]; then
+      echo "ERROR: You passed a bare '*' which expands to every file in this directory."
+      echo
+      echo "Use one of these instead:"
+      echo "  ./run interactive -- main/* -t 5:00 -q"
+      echo "  ./run start -- main/* -t 5:00 -q"
+      echo
+      echo "Or if you truly meant 'all scripts in main', use main/* (no spaces)."
+      exit 2
+    fi
+  done
+}
+
+# ------------------------------------------------------------
+# Command detection:
+# If first arg is a known command, use it.
+# Otherwise treat everything as Pixil args and run interactive.
+# ------------------------------------------------------------
+COMMAND=""
+case "${1:-}" in
+  help|status|stop|killpython|interactive|start|bg)
+    COMMAND="$1"
+    shift
+    ;;
+  *)
+    COMMAND="interactive"
+    ;;
+esac
+
+# Optional -- boundary
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
+
+PASS_ARGS=( "$@" )
+
+# Apply guardrail to the Pixil args we are about to pass along
+guard_against_bare_star "${PASS_ARGS[@]}"
+
+# Default args if none provided for interactive/start/bg
+if [[ ${#PASS_ARGS[@]} -eq 0 && ( "$COMMAND" == "start" || "$COMMAND" == "bg" || "$COMMAND" == "interactive" ) ]]; then
+  PASS_ARGS=( main/* -t 60:00 )
+fi
+
+case "$COMMAND" in
+  help)
+    usage
+    ;;
+
+  status)
+    show_pixil_procs || true
+    ;;
+
+  stop)
+    [[ "$EUID" -ne 0 ]] && exec sudo "$0" stop
+    show_pixil_procs || true
+    echo
+    stop_pixil 3
+    ;;
+
+  killpython)
+    [[ "$EUID" -ne 0 ]] && exec sudo "$0" killpython
+    killpython_big_hammer
+    ;;
+
+  interactive)
+    echo "Starting Pixil interactively (foreground)..."
+    echo "Command: sudo python3 Pixil.py ${PASS_ARGS[*]}"
+    echo
+    exec sudo python3 Pixil.py "${PASS_ARGS[@]}"
+    ;;
+
+  start|bg)
+    echo "Starting Pixil in background..."
+    echo "Command: sudo nohup python3 Pixil.py ${PASS_ARGS[*]} > $LOG_FILE 2>&1 &"
+    sudo nohup python3 Pixil.py "${PASS_ARGS[@]}" > "$LOG_FILE" 2>&1 &
+    sleep 1
+    show_pixil_procs || true
+    echo "Log: $LOG_FILE"
+    ;;
+
+  *)
+    echo "Unknown command: $COMMAND"
+    echo
+    usage
+    exit 2
+    ;;
+esac
+

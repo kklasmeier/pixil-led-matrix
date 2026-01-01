@@ -773,7 +773,7 @@ class RGB_Api:
 
     # Sprite Management Methods
     def show_sprite(self, name: str, x: float, y: float, instance_id: int = 0, 
-                    z_index: int = 0, cel_idx: int = None):
+                    z_index: int = 0, cel_idx: Optional[int] = None):
         """
         Show a sprite instance at specified position. Creates the instance if it doesn't exist.
         
@@ -923,7 +923,11 @@ class RGB_Api:
         Copy sprite pixels to the destination buffer.
         Works with both SpriteInstance (uses current_cel) and MatrixSprite (uses active_cel).
         """
-        x, y = round(sprite.x), round(sprite.y)
+        if isinstance(sprite, SpriteInstance):
+            x, y = int(sprite.x), int(sprite.y)
+        else:
+            # MatrixSprite doesn't have x/y attributes; draw at origin
+            x, y = 0, 0
         start_x = max(0, x)
         start_y = max(0, y)
         end_x = min(self.matrix.width, x + sprite.width)
@@ -960,7 +964,11 @@ class RGB_Api:
     
     def clear_sprite_position(self, sprite: Union[SpriteInstance, MatrixSprite], dest_buffer):
         """Clear the sprite's current position with black."""
-        x, y = round(sprite.x), round(sprite.y)
+        if isinstance(sprite, SpriteInstance):
+            x, y = round(sprite.x), round(sprite.y)
+        else:
+            # MatrixSprite doesn't have x/y attributes; clear at origin
+            x, y = 0, 0
         start_x = max(0, x)
         start_y = max(0, y)
         end_x = min(self.matrix.width, x + sprite.width)

@@ -12,6 +12,8 @@
 # 4. Styles with burnout rest after last nest so the
 #    display can fully fade before switching styles
 # 5. v_force_style lets you lock to a specific style index
+# 6. Random burnout mode (instant/fade) for non-erratic styles
+# 7. Randomized style order - all styles play before repeating
 # ============================================
 
 clear()
@@ -22,7 +24,7 @@ throttle(0.6)
 # --------------------------------------------
 
 # Force a specific style:
-#   -1 = automatic cycling through all styles
+#   -1 = automatic cycling through all styles (randomized)
 #    0..10 = lock to that style index for testing
 v_force_style = -1
 
@@ -117,6 +119,10 @@ v_tight_angle_jitter[2] = 30
 # --------------------------------------------
 
 v_style_count = 11
+
+# Shuffled style order array
+create_array(v_style_order, v_style_count)
+v_shuffle_index = 0
 
 create_array(v_style_burnout,    v_style_count)
 create_array(v_style_tightness,  v_style_count)
@@ -226,6 +232,7 @@ v_style_index = 0
 v_style_counter = 0
 
 v_current_burnout = 0
+v_current_burnout_mode = "instant"
 v_min_radius_step = 0
 v_max_radius_step = 0
 v_angle_jitter    = 0
@@ -241,9 +248,50 @@ v_mono_color = "white"
 v_last_style_index = -1
 
 # --------------------------------------------
+# HELPER: Shuffle style order array
+# Fisher-Yates shuffle algorithm
+# --------------------------------------------
+def shuffle_styles {
+    # Initialize array with sequential indices
+    for v_i in (0, v_style_count - 1, 1)
+        v_style_order[v_i] = v_i
+    endfor v_i
+
+    # Fisher-Yates shuffle
+    v_i = v_style_count - 1
+    while v_i > 0 then
+        v_j = int(random(0, v_i, 0))
+        
+        # Swap v_style_order[v_i] and v_style_order[v_j]
+        v_temp = v_style_order[v_i]
+        v_style_order[v_i] = v_style_order[v_j]
+        v_style_order[v_j] = v_temp
+        
+        v_i = v_i - 1
+    endwhile
+    
+    v_shuffle_index = 0
+    print("[SHUFFLE] New random style order generated")
+}
+
+# --------------------------------------------
+# HELPER: Get next style from shuffled order
+# --------------------------------------------
+def get_next_style {
+    v_style_index = v_style_order[v_shuffle_index]
+    v_shuffle_index = v_shuffle_index + 1
+    
+    # If we've played all styles, reshuffle
+    if v_shuffle_index >= v_style_count then
+        call shuffle_styles
+    endif
+}
+
+# --------------------------------------------
 # HELPER: Apply style parameters
 # - Clears screen when style actually changes
 # - Prints style info once per change
+# - Randomly selects burnout mode for non-erratic styles
 # --------------------------------------------
 def apply_style {
 
@@ -264,6 +312,20 @@ def apply_style {
     endif
 
     v_current_burnout = v_style_burnout[v_style_index]
+
+    # Randomly choose burnout mode for non-erratic styles with burnout
+    # Erratic styles (burnout <= 10) always use instant
+    if v_current_burnout > 10 then
+        v_mode_roll = random(0, 1, 0)
+        if v_mode_roll == 0 then
+            v_current_burnout_mode = "instant"
+        else
+            v_current_burnout_mode = "fade"
+            v_current_burnout = v_current_burnout * 2
+        endif
+    else
+        v_current_burnout_mode = "instant"
+    endif
 
     # Resolve tightness profile
     v_tight_index = v_style_tightness[v_style_index]
@@ -294,7 +356,7 @@ def apply_style {
         v_mono_color = v_colors[v_mono_color_index]
     endif
 
-    print(f"[STYLE] {v_style_index}: {v_style_name[v_style_index]} (burnout={v_current_burnout})")
+    print(f"[STYLE] {v_style_index}: {v_style_name[v_style_index]} (burnout={v_current_burnout}, mode={v_current_burnout_mode})")
 }
 
 # --------------------------------------------
@@ -353,7 +415,7 @@ def pick_pen_color {
 }
 
 # --------------------------------------------
-# HELPER: Safe plot with current burnout & color
+# HELPER: Safe plot with current burnout, mode & color
 # Uses v_px, v_py as coordinates
 # --------------------------------------------
 v_px = 0
@@ -361,7 +423,11 @@ v_py = 0
 
 def safe_plot {
     if v_current_burnout > 0 then
-        plot(v_px, v_py, v_pen_color, 100, v_current_burnout)
+        if v_current_burnout_mode == "fade" then
+            plot(v_px, v_py, v_pen_color, 100, v_current_burnout, fade)
+        else
+            plot(v_px, v_py, v_pen_color, 100, v_current_burnout, instant)
+        endif
     else
         plot(v_px, v_py, v_pen_color, 100)
     endif
@@ -425,7 +491,7 @@ def run_pen_nest {
 
     call pick_pen_color
 
-    # Choose radius step within style’s min/max
+    # Choose radius step within style's min/max
     v_radius_step_raw = random(v_min_radius_step, v_max_radius_step, 0)
     v_radius_step = v_radius_step_raw / 100
 
@@ -526,7 +592,8 @@ def run_pen_nest {
 if v_force_style >= 0 then
     v_style_index = v_force_style
 else
-    v_style_index = 0
+    call shuffle_styles
+    call get_next_style
 endif
 v_style_counter = 0
 
@@ -570,11 +637,7 @@ while 1 == 1 then
                 rest(v_wait)
             endif
 
-            v_style_index = v_style_index + 1
-            if v_style_index >= v_style_count then
-                v_style_index = 0
-            endif
-
+            call get_next_style
             call apply_style
         endif
     endif

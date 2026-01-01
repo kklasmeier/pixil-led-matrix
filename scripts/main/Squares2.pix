@@ -22,6 +22,11 @@ def get_burnout_time {
     else
         v_current_burnout = v_burnout
     endif
+    
+    # Apply 40% increase for fade mode (since fade starts immediately)
+    if v_use_fade == 1 then
+        v_current_burnout = v_current_burnout * 1.4
+    endif
 }
 
 while true then
@@ -40,6 +45,9 @@ while true then
     
     # Gradient mode (50/50)
     v_gradient_mode = random(0, 1, 1)
+    
+    # Fade mode (50/50) - entire spiral uses same mode
+    v_use_fade = random(0, 1, 1)
     
     # Initial color and gradient settings
     v_color = random(1, 99, 1)
@@ -62,7 +70,11 @@ while true then
         
         while v_x >= v_offset then
             call get_burnout_time
-            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_use_fade == 1 then
+                plot(v_x, v_y, v_color, 80, v_current_burnout, fade)
+            else
+                plot(v_x, v_y, v_color, 80, v_current_burnout, instant)
+            endif
             if v_gradient_mode == 1 then
                 call check_color_shift
             endif
@@ -75,7 +87,11 @@ while true then
         v_y = v_offset
         while v_y <= 63 - v_offset then
             call get_burnout_time
-            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_use_fade == 1 then
+                plot(v_x, v_y, v_color, 80, v_current_burnout, fade)
+            else
+                plot(v_x, v_y, v_color, 80, v_current_burnout, instant)
+            endif
             if v_gradient_mode == 1 then
                 call check_color_shift
             endif
@@ -88,7 +104,11 @@ while true then
         v_y = 63 - v_offset
         while v_x <= 63 - v_offset then
             call get_burnout_time
-            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_use_fade == 1 then
+                plot(v_x, v_y, v_color, 80, v_current_burnout, fade)
+            else
+                plot(v_x, v_y, v_color, 80, v_current_burnout, instant)
+            endif
             if v_gradient_mode == 1 then
                 call check_color_shift
             endif
@@ -101,7 +121,11 @@ while true then
         v_y = 63 - v_offset
         while v_y >= v_offset + 3 then
             call get_burnout_time
-            plot(v_x, v_y, v_color, 80, v_current_burnout)
+            if v_use_fade == 1 then
+                plot(v_x, v_y, v_color, 80, v_current_burnout, fade)
+            else
+                plot(v_x, v_y, v_color, 80, v_current_burnout, instant)
+            endif
             if v_gradient_mode == 1 then
                 call check_color_shift
             endif

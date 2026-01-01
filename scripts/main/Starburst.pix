@@ -16,6 +16,7 @@ v_effect_max_time = 2   # Change effect every 3 iterations
 v_burnout_enabled = 0
 v_burnout_min = 100
 v_burnout_max = 500
+v_use_fade = 0
 
 # Starburst specific variables
 v_wave_amp = 10        # Wave amplitude for ray length variation
@@ -45,6 +46,16 @@ while 1 then
         if random(0, 100, 0) > 70 then
             v_burnout_enabled = 1
             v_rest_time = 0.01
+            # 50/50 chance for fade vs instant burnout mode
+            v_use_fade = random(0, 1, 1)
+            if v_use_fade == 1 then
+                # Increase burnout by 40% for fade mode
+                v_burnout_min = 140
+                v_burnout_max = 700
+            else
+                v_burnout_min = 100
+                v_burnout_max = 500
+            endif
         else
             v_burnout_enabled = 0
             v_rest_time = 0.05
@@ -75,7 +86,12 @@ while 1 then
             v_intensity = v_fade_start * (1 - v_d / v_r)
             
             if v_burnout_enabled == 1 then
-                plot(v_x, v_y, v_color_base, v_intensity, random(v_burnout_min, v_burnout_max, 0))
+                v_current_burnout = random(v_burnout_min, v_burnout_max, 0)
+                if v_use_fade == 1 then
+                    plot(v_x, v_y, v_color_base, v_intensity, v_current_burnout, fade)
+                else
+                    plot(v_x, v_y, v_color_base, v_intensity, v_current_burnout, instant)
+                endif
             else
                 plot(v_x, v_y, v_color_base, v_intensity)
             endif

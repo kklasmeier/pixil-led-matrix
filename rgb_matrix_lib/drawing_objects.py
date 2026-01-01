@@ -139,6 +139,9 @@ class ThreadedBurnoutManager:
             linear_intensity = max(0.0, 1.0 - progress)
             intensity = pow(linear_intensity, self.FADE_GAMMA)
             
+            # Track pixels to remove from future updates
+            pixels_to_remove = []
+            
             # Update each pixel if this object owns it
             for i, (x, y) in enumerate(obj.points):
                 # Optimization #4: Lock only for ownership check
@@ -150,8 +153,30 @@ class ThreadedBurnoutManager:
                     faded_r = int(r * intensity)
                     faded_g = int(g * intensity)
                     faded_b = int(b * intensity)
+                    
+                    # Check if pixel was overwritten by something brighter
+                    current = self.api.drawing_buffer[y, x]
+                    if current[0] > faded_r or current[1] > faded_g or current[2] > faded_b:
+                        # Something brighter is here - pixel was overwritten
+                        # Remove from future fade updates
+                        pixels_to_remove.append((x, y))
+                        continue
+                    
                     self.api._draw_to_buffers(x, y, faded_r, faded_g, faded_b)
                     pixels_updated = True
+            
+            # Remove overwritten pixels from this object's points
+            # (Optimization: skip these pixels in future fade cycles)
+            if pixels_to_remove:
+                with self.index_lock:
+                    for x, y in pixels_to_remove:
+                        # Remove from pixel_index
+                        if (x, y) in self.pixel_index:
+                            self.pixel_index[(x, y)] = [
+                                (o, t) for o, t in self.pixel_index[(x, y)] if o != obj
+                            ]
+                            if not self.pixel_index[(x, y)]:
+                                del self.pixel_index[(x, y)]
         
         if pixels_updated:
             self.changes_made = True
