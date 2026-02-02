@@ -615,5 +615,5 @@ while 1 == 1 then
     endfor v_i
     
     end_frame
-    # rest(0.01)
+    rest(0.06)
 endwhile

@@ -726,15 +726,15 @@ while v_running == 1 then
             call draw_background
             call draw_pillars
             if v_bridge_type == 1 then
-                draw_text(8, 5, "PRATT TRUSS", piboto-regular, 8, white, 90)
+                draw_text(8, 5, "PRATT TRUSS", tiny64_font, 8, white, 90)
             elseif v_bridge_type == 2 then
-                draw_text(6, 5, "WARREN TRUSS", piboto-regular, 8, white, 90)
+                draw_text(6, 5, "WARREN TRUSS", tiny64_font, 8, white, 90)
             elseif v_bridge_type == 3 then
-                draw_text(10, 5, "HOWE TRUSS", piboto-regular, 8, white, 90)
+                draw_text(10, 5, "HOWE TRUSS", tiny64_font, 8, white, 90)
             elseif v_bridge_type == 4 then
-                draw_text(8, 5, "ARCH BRIDGE", piboto-regular, 8, white, 90)
+                draw_text(8, 5, "ARCH BRIDGE", tiny64_font, 8, white, 90)
             elseif v_bridge_type == 5 then
-                draw_text(14, 5, "K-TRUSS", piboto-regular, 8, white, 90)
+                draw_text(14, 5, "K-TRUSS", tiny64_font, 8, white, 90)
             endif
         end_frame
         rest(1.5)

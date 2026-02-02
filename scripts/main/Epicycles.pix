@@ -1,0 +1,219 @@
+# Epicycles - Fourier Series Drawing (Optimized)
+# Demonstrates how rotating circles can trace complex patterns
+# Uses sprites for efficient trail rendering
+
+# Display center
+v_cx = 32
+v_cy = 32
+
+# Animation settings
+v_speed = 0.02
+v_trail_length = 250
+v_frame_delay = 0.001
+
+# Trail buffer tracking (no arrays needed!)
+v_head = 0
+v_count = 0
+
+# Define the trail dot sprite once
+define_sprite(dot, 1, 1)
+plot(0, 0, red, 100)
+endsprite
+
+# Epicycle parameters: radius and frequency multiplier
+v_r1 = 16
+v_f1 = 1
+v_r2 = 8
+v_f2 = 2
+v_r3 = 4
+v_f3 = 3
+v_r4 = 2
+v_f4 = 5
+
+# Colors for each circle
+v_c1 = "blue"
+v_c2 = "cyan"
+v_c3 = "green"
+v_c4 = "yellow"
+
+# Main animation angle
+v_angle = 0
+
+# Procedure to draw epicycle mechanism and update trail
+def draw_frame {
+    # Calculate position of each epicycle center
+    v_x1 = v_cx + v_r1 * cos(v_angle * v_f1)
+    v_y1 = v_cy + v_r1 * sin(v_angle * v_f1)
+    
+    v_x2 = v_x1 + v_r2 * cos(v_angle * v_f2)
+    v_y2 = v_y1 + v_r2 * sin(v_angle * v_f2)
+    
+    v_x3 = v_x2 + v_r3 * cos(v_angle * v_f3)
+    v_y3 = v_y2 + v_r3 * sin(v_angle * v_f3)
+    
+    v_x4 = v_x3 + v_r4 * cos(v_angle * v_f4)
+    v_y4 = v_y3 + v_r4 * sin(v_angle * v_f4)
+    
+    begin_frame
+    
+    # Draw the rotating circles (faint)
+    draw_circle(v_cx, v_cy, v_r1, v_c1, 30, false)
+    draw_circle(v_x1, v_y1, v_r2, v_c2, 30, false)
+    draw_circle(v_x2, v_y2, v_r3, v_c3, 30, false)
+    draw_circle(v_x3, v_y3, v_r4, v_c4, 30, false)
+    
+    # Draw arms connecting circle centers
+    draw_line(v_cx, v_cy, v_x1, v_y1, v_c1, 50)
+    draw_line(v_x1, v_y1, v_x2, v_y2, v_c2, 50)
+    draw_line(v_x2, v_y2, v_x3, v_y3, v_c3, 50)
+    draw_line(v_x3, v_y3, v_x4, v_y4, v_c4, 50)
+    
+    # Bright dot at the drawing point
+    plot(v_x4, v_y4, white, 100)
+    
+    # Manage trail sprite - hide oldest if buffer full
+    if v_count >= v_trail_length then
+        hide_sprite(dot, v_head)
+    else
+        v_count = v_count + 1
+    endif
+    
+    # Show new trail point
+    show_sprite(dot, v_x4, v_y4, v_head)
+    
+    # Advance head with wraparound
+    v_head = v_head + 1
+    if v_head >= v_trail_length then
+        v_head = 0
+    endif
+    
+    end_frame
+}
+
+print("Epicycles - Fourier Series Drawing")
+print("Watch as rotating circles trace a complex pattern")
+print("")
+
+# Main animation loop - Pattern 1
+v_max_angle = tau * 8
+throttle(0.3)
+
+while v_angle < v_max_angle then
+    call draw_frame
+    v_angle = v_angle + v_speed
+    rest(v_frame_delay)
+endwhile
+
+rest(2)
+
+# Pattern 2: Square-ish pattern (odd harmonics)
+print("Pattern 2: Odd harmonics create angular shapes")
+
+clear()
+v_angle = 0
+v_head = 0
+v_count = 0
+
+v_r1 = 14
+v_f1 = 1
+v_r2 = 5
+v_f2 = 3
+v_r3 = 3
+v_f3 = 5
+v_r4 = 2
+v_f4 = 7
+
+v_max_angle = tau * 4
+
+while v_angle < v_max_angle then
+    call draw_frame
+    v_angle = v_angle + v_speed
+    rest(v_frame_delay)
+endwhile
+
+rest(2)
+
+# Pattern 3: Spirograph-like (mixed positive/negative frequencies)
+print("Pattern 3: Mixed positive/negative frequencies")
+
+clear()
+v_angle = 0
+v_head = 0
+v_count = 0
+
+v_r1 = 12
+v_f1 = 1
+v_r2 = 10
+v_f2 = -3
+v_r3 = 4
+v_f3 = 5
+v_r4 = 2
+v_f4 = -7
+
+v_max_angle = tau * 6
+
+while v_angle < v_max_angle then
+    call draw_frame
+    v_angle = v_angle + v_speed
+    rest(v_frame_delay)
+endwhile
+
+rest(2)
+
+# Pattern 4: Star pattern
+print("Pattern 4: Star-like pattern")
+
+clear()
+v_angle = 0
+v_head = 0
+v_count = 0
+
+v_r1 = 15
+v_f1 = 1
+v_r2 = 8
+v_f2 = -2
+v_r3 = 4
+v_f3 = 3
+v_r4 = 2
+v_f4 = -4
+
+v_max_angle = tau * 5
+
+while v_angle < v_max_angle then
+    call draw_frame
+    v_angle = v_angle + v_speed
+    rest(v_frame_delay)
+endwhile
+
+rest(2)
+
+# Pattern 5: Flower pattern
+print("Pattern 5: Flower petals")
+
+clear()
+v_angle = 0
+v_head = 0
+v_count = 0
+
+v_r1 = 10
+v_f1 = 1
+v_r2 = 10
+v_f2 = 6
+v_r3 = 3
+v_f3 = -11
+v_r4 = 2
+v_f4 = 16
+
+v_max_angle = tau * 3
+
+while v_angle < v_max_angle then
+    call draw_frame
+    v_angle = v_angle + v_speed
+    rest(v_frame_delay)
+endwhile
+
+rest(3)
+
+print("")
+print("Epicycles demonstration complete!")
+clear()

@@ -1,0 +1,167 @@
+# Fade Burnout Layering Test
+# ============================
+# This script validates that fade burnout works correctly with layering:
+# 1. Fade continues in background when covered by another object
+# 2. Fade is revealed when the covering object moves away
+# 3. Expired fades don't clear pixels that have active objects on top
+
+clear()
+
+# ============================================
+# TEST 1: Ball moving over fading trail
+# ============================================
+# Expected: Trail should be visible behind the ball when it moves away
+# The trail should be dimmer (further into fade) than when first drawn
+
+draw_text(2, 2, "TEST 1: TRAIL", "piboto-regular", 8, white, 100)
+rest(1.5)
+clear()
+
+v_x = 32
+v_y = 32
+v_direction = 1
+
+for v_frame in (0, 60, 1)
+    # Move ball back and forth
+    v_x = v_x + v_direction
+    if v_x >= 45 then
+        v_direction = -1
+    endif
+    if v_x <= 20 then
+        v_direction = 1
+    endif
+    
+    # Plot trail at current position BEFORE drawing ball
+    # Trail has long fade so we can see it dim over time
+    plot(v_x, v_y, red, 100, 2000, fade)
+    
+    # Draw the ball on top
+    begin_frame
+        draw_circle(v_x, v_y, 4, blue, 100, true)
+    end_frame
+    
+    rest(0.08)
+endfor v_frame
+
+rest(2)
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 2: Stationary fade covered temporarily
+# ============================================
+# Expected: Place a fading pixel, cover it with a shape,
+# move shape away, pixel should still be fading
+
+draw_text(2, 2, "TEST 2: COVER", "piboto-regular", 8, white, 100)
+rest(1.5)
+clear()
+
+# Place a fading pixel at center
+plot(32, 32, green, 100, 4000, fade)
+rest(0.5)
+
+# Cover it with a white rectangle for 1 second
+draw_text(25, 28, "COVERED", "piboto-regular", 8, white, 100)
+rest(1)
+
+# Clear the text - the green fade should reappear, dimmer than before
+clear_text(25, 28)
+rest(0.5)
+
+# Add label showing fade should be visible
+draw_text(20, 45, "FADE HERE?", "piboto-regular", 8, yellow, 100)
+rest(2)
+
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 3: Multiple fades with moving object
+# ============================================
+# Expected: Multiple trail pixels at different fade stages
+
+draw_text(2, 2, "TEST 3: MULTI", "piboto-regular", 8, white, 100)
+rest(1.5)
+clear()
+
+# Draw a horizontal line of fading pixels
+for v_i in (10, 54, 4)
+    plot(v_i, 32, orange, 100, 3000, fade)
+endfor v_i
+rest(0.3)
+
+# Move a rectangle across them
+for v_x in (5, 58, 1)
+    begin_frame
+        draw_rectangle(v_x, 28, 8, 9, cyan, 100, true)
+    end_frame
+    rest(0.04)
+endfor v_x
+
+# Fades should still be visible (dimmer now)
+draw_text(15, 50, "FADES VISIBLE?", "piboto-regular", 8, yellow, 100)
+rest(2)
+
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 4: Fade expiration under object
+# ============================================
+# Expected: When fade expires while covered, it should NOT
+# clear the covering object to black
+
+draw_text(2, 2, "TEST 4: EXPIRE", "piboto-regular", 8, white, 100)
+rest(1.5)
+clear()
+
+# Place a short-lived fade
+plot(32, 32, red, 100, 1000, fade)
+
+# Immediately cover with a permanent circle
+draw_circle(32, 32, 8, magenta, 100, true)
+
+# Wait for fade to expire
+draw_text(10, 50, "CIRCLE STAYS?", "piboto-regular", 8, yellow, 100)
+rest(2)
+
+# Circle should still be there (not cleared to black)
+rest(1)
+
+clear()
+rest(0.5)
+
+# ============================================
+# TEST 5: Rapid trail effect
+# ============================================
+# Expected: Smooth comet-like trail behind moving object
+
+draw_text(2, 2, "TEST 5: COMET", "piboto-regular", 8, white, 100)
+rest(1.5)
+clear()
+
+for v_x in (5, 58, 1)
+    # Fading trail
+    plot(v_x, 32, yellow, 100, 400, fade)
+    plot(v_x, 31, orange, 80, 300, fade)
+    plot(v_x, 33, orange, 80, 300, fade)
+    
+    # Bright head
+    begin_frame
+        draw_circle(v_x + 2, 32, 2, white, 100, true)
+    end_frame
+    
+    rest(0.03)
+endfor v_x
+
+rest(1)
+clear()
+rest(0.5)
+
+# ============================================
+# DONE
+# ============================================
+draw_text(8, 25, "TESTS COMPLETE", "piboto-regular", 10, green, 100)
+rest(2)
+clear()

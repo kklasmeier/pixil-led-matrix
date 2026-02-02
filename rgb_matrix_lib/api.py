@@ -127,16 +127,21 @@ class RGB_Api:
             self.canvas.Fill(0, 0, 0) # Clears the current canvas if not preserving
 
     def end_frame(self):
-        """End frame mode and display the accumulated drawing."""
         if self.frame_mode:
+            # FIRST: Draw all visible sprites to the current canvas (before swap)
+            for sprite_name, instance_id in self.sprite_manager.z_order:
+                instance = self.sprite_manager.get_instance(sprite_name, instance_id)
+                if instance and instance.visible:
+                    self.copy_sprite_to_buffer(instance, self.canvas)
+            
+            # NOW swap - front buffer has background + sprites
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             
+            # Prepare back buffer for next frame
             if USE_PIL_FOR_FRAME_MODE:
-                # PIL Image approach (faster in benchmarks, needs production testing)
                 pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
                 self.canvas.SetImage(pil_image)
             else:
-                # Original approach (stable, proven)
                 for y in range(self.matrix.height):
                     for x in range(self.matrix.width):
                         r, g, b = self.drawing_buffer[y, x]
@@ -145,13 +150,39 @@ class RGB_Api:
             if self.preserve_frame_changes:
                 for x, y, r, g, b in self.current_command_pixels:
                     self.canvas.SetPixel(x, y, r, g, b)
-                self.current_command_pixels.clear()
             else:
-                self.canvas.Fill(0, 0, 0)
+                self.canvas.Fill(0, 0, 0)  # Keep this - prepares back buffer
             
-            self.refresh_display()
+            self.current_command_pixels.clear()
             self.frame_mode = False
             self.preserve_frame_changes = False
+
+#    def end_frame(self):
+#        """End frame mode and display the accumulated drawing."""
+#        if self.frame_mode:
+#            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+#            
+#            if USE_PIL_FOR_FRAME_MODE:
+#                # PIL Image approach (faster in benchmarks, needs production testing)
+#                pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
+#                self.canvas.SetImage(pil_image)
+#            else:
+#                # Original approach (stable, proven)
+#                for y in range(self.matrix.height):
+#                    for x in range(self.matrix.width):
+#                        r, g, b = self.drawing_buffer[y, x]
+#                        self.canvas.SetPixel(x, y, int(r), int(g), int(b))
+#            
+#            if self.preserve_frame_changes:
+#                for x, y, r, g, b in self.current_command_pixels:
+#                    self.canvas.SetPixel(x, y, r, g, b)
+#                self.current_command_pixels.clear()
+#            else:
+#                self.canvas.Fill(0, 0, 0)
+#            
+#            self.refresh_display()
+#            self.frame_mode = False
+#            self.preserve_frame_changes = False
 
     def _draw_to_buffers(self, x: int, y: int, r: int, g: int, b: int):
         if 0 <= x < self.matrix.width and 0 <= y < self.matrix.height:
@@ -826,9 +857,9 @@ class RGB_Api:
             self.copy_sprite_to_buffer(instance, self.canvas)
             self._maybe_swap_buffer()
             self.refresh_display()
-        else:
-            self._restore_dirty_cells()  # Restore old position's background
-            self.copy_sprite_to_buffer(instance, self.canvas)  # Draw new position
+        #else:
+        #    self._restore_dirty_cells()  # Restore old position's background
+        #    self.copy_sprite_to_buffer(instance, self.canvas)  # Draw new position
 
     def hide_sprite(self, name: str, instance_id: int = 0):
         """
@@ -894,9 +925,9 @@ class RGB_Api:
                 self.copy_sprite_to_buffer(instance, self.canvas)
                 self._maybe_swap_buffer()
                 self.refresh_display()
-            else:
-                self._restore_dirty_cells()  # Restore Background from drawing_buffer
-                self.copy_sprite_to_buffer(instance, self.canvas)
+            #else:
+            #    self._restore_dirty_cells()  # Restore Background from drawing_buffer
+            #    self.copy_sprite_to_buffer(instance, self.canvas)
                 
     def dispose_sprite_instance(self, name: str, instance_id: int):
         """Remove a specific sprite instance."""

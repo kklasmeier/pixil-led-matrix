@@ -1273,5 +1273,5 @@ My current list of scripts are:
 124. Wave Grid - Undulating coordinate mesh animation
 125. Watching Eyes - Cartoon animated eyes looking around and blinking
 126. Wormhole - Space-time tunnel visualization
-127. Burnout - Different sequence patterns of pixels that fad out
+127. Burnout - Different sequence patterns of pixels that fade out
 

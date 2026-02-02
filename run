@@ -28,16 +28,16 @@ DEFAULT PIXIL ARGS (when omitted for interactive/start):
   main/* -t 60:00
 
 EXAMPLES (foreground):
-  ./run interactive -- main/* -t 5:00 -q
-  ./run main/* -t 5:00 -q
+./run interactive -- main/* -t 5:00 -q
+./run main/* -t 5:00 -q
 
 EXAMPLES (background):
-  ./run start -- main/* -t 5:00 -q
-  ./run bg main/* -t 5:00 -q
+./run start -- main/* -t 60:00
+./run bg main/* -t 60:00 
 
 STATUS / STOP:
-  ./run status
-  ./run stop
+./run status
+./run stop
 
 IMPORTANT:
   Do NOT type:  main *  (a bare '*' expands to every file in the folder)
