@@ -1,0 +1,969 @@
+# Morse Code Transmitter
+# A signal lamp blinks morse code while a ticker tape scrolls horizontally
+# showing dots and dashes
+
+# ============================================================
+# MESSAGE LIST - Pre-encoded messages
+# ============================================================
+# Each letter is encoded as a number:
+# A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
+# K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19
+# U=20, V=21, W=22, X=23, Y=24, Z=25
+# SPACE=26, END=-1
+#
+# To add a new message:
+# 1. Create array: create_array(v_msgX, length, numeric)
+# 2. Encode each letter using the chart above
+# 3. End with -1
+# 4. Add to message list section below
+# 5. Update v_msg_count
+# 6. Add retrieval logic in main loop
+# ============================================================
+
+# Message 0: "SOS"
+create_array(v_msg0, 4, numeric)
+v_msg0[0] = 18
+v_msg0[1] = 14
+v_msg0[2] = 18
+v_msg0[3] = -1
+
+# Message 1: "WHAT HATH GOD WROUGHT"
+create_array(v_msg1, 22, numeric)
+v_msg1[0] = 22
+v_msg1[1] = 7
+v_msg1[2] = 0
+v_msg1[3] = 19
+v_msg1[4] = 26
+v_msg1[5] = 7
+v_msg1[6] = 0
+v_msg1[7] = 19
+v_msg1[8] = 7
+v_msg1[9] = 26
+v_msg1[10] = 6
+v_msg1[11] = 14
+v_msg1[12] = 3
+v_msg1[13] = 26
+v_msg1[14] = 22
+v_msg1[15] = 17
+v_msg1[16] = 14
+v_msg1[17] = 20
+v_msg1[18] = 6
+v_msg1[19] = 7
+v_msg1[20] = 19
+v_msg1[21] = -1
+
+# Message 2: "USA"
+create_array(v_msg2, 4, numeric)
+v_msg2[0] = 20
+v_msg2[1] = 18
+v_msg2[2] = 0
+v_msg2[3] = -1
+
+# Message 3: "PRESIDENT TRUMP"
+create_array(v_msg3, 16, numeric)
+v_msg3[0] = 15
+v_msg3[1] = 17
+v_msg3[2] = 4
+v_msg3[3] = 18
+v_msg3[4] = 8
+v_msg3[5] = 3
+v_msg3[6] = 4
+v_msg3[7] = 13
+v_msg3[8] = 19
+v_msg3[9] = 26
+v_msg3[10] = 19
+v_msg3[11] = 17
+v_msg3[12] = 20
+v_msg3[13] = 12
+v_msg3[14] = 15
+v_msg3[15] = -1
+
+# Message 4: "COME HERE WATSON"
+create_array(v_msg4, 17, numeric)
+v_msg4[0] = 2
+v_msg4[1] = 14
+v_msg4[2] = 12
+v_msg4[3] = 4
+v_msg4[4] = 26
+v_msg4[5] = 7
+v_msg4[6] = 4
+v_msg4[7] = 17
+v_msg4[8] = 4
+v_msg4[9] = 26
+v_msg4[10] = 22
+v_msg4[11] = 0
+v_msg4[12] = 19
+v_msg4[13] = 18
+v_msg4[14] = 14
+v_msg4[15] = 13
+v_msg4[16] = -1
+
+# Message 5: "HAIL MARY FULL OF GRACE THE LORD IS WITH THEE"
+create_array(v_msg5, 47, numeric)
+v_msg5[0] = 7
+v_msg5[1] = 0
+v_msg5[2] = 8
+v_msg5[3] = 11
+v_msg5[4] = 26
+v_msg5[5] = 12
+v_msg5[6] = 0
+v_msg5[7] = 17
+v_msg5[8] = 24
+v_msg5[9] = 26
+v_msg5[10] = 5
+v_msg5[11] = 20
+v_msg5[12] = 11
+v_msg5[13] = 11
+v_msg5[14] = 26
+v_msg5[15] = 14
+v_msg5[16] = 5
+v_msg5[17] = 26
+v_msg5[18] = 6
+v_msg5[19] = 17
+v_msg5[20] = 0
+v_msg5[21] = 2
+v_msg5[22] = 4
+v_msg5[23] = 26
+v_msg5[24] = 19
+v_msg5[25] = 7
+v_msg5[26] = 4
+v_msg5[27] = 26
+v_msg5[28] = 11
+v_msg5[29] = 14
+v_msg5[30] = 17
+v_msg5[31] = 3
+v_msg5[32] = 26
+v_msg5[33] = 8
+v_msg5[34] = 18
+v_msg5[35] = 26
+v_msg5[36] = 22
+v_msg5[37] = 8
+v_msg5[38] = 19
+v_msg5[39] = 7
+v_msg5[40] = 26
+v_msg5[41] = 19
+v_msg5[42] = 7
+v_msg5[43] = 4
+v_msg5[44] = 4
+v_msg5[45] = -1
+
+# Message 6: "THE LORD BE WITH YOU"
+create_array(v_msg6, 21, numeric)
+v_msg6[0] = 19
+v_msg6[1] = 7
+v_msg6[2] = 4
+v_msg6[3] = 26
+v_msg6[4] = 11
+v_msg6[5] = 14
+v_msg6[6] = 17
+v_msg6[7] = 3
+v_msg6[8] = 26
+v_msg6[9] = 1
+v_msg6[10] = 4
+v_msg6[11] = 26
+v_msg6[12] = 22
+v_msg6[13] = 8
+v_msg6[14] = 19
+v_msg6[15] = 7
+v_msg6[16] = 26
+v_msg6[17] = 24
+v_msg6[18] = 14
+v_msg6[19] = 20
+v_msg6[20] = -1
+
+# Message 7: "GLORY TO GOD IN THE HIGHEST"
+create_array(v_msg7, 28, numeric)
+v_msg7[0] = 6
+v_msg7[1] = 11
+v_msg7[2] = 14
+v_msg7[3] = 17
+v_msg7[4] = 24
+v_msg7[5] = 26
+v_msg7[6] = 19
+v_msg7[7] = 14
+v_msg7[8] = 26
+v_msg7[9] = 6
+v_msg7[10] = 14
+v_msg7[11] = 3
+v_msg7[12] = 26
+v_msg7[13] = 8
+v_msg7[14] = 13
+v_msg7[15] = 26
+v_msg7[16] = 19
+v_msg7[17] = 7
+v_msg7[18] = 4
+v_msg7[19] = 26
+v_msg7[20] = 7
+v_msg7[21] = 8
+v_msg7[22] = 6
+v_msg7[23] = 7
+v_msg7[24] = 4
+v_msg7[25] = 18
+v_msg7[26] = 19
+v_msg7[27] = -1
+
+# Message 8: "LAMB OF GOD"
+create_array(v_msg8, 12, numeric)
+v_msg8[0] = 11
+v_msg8[1] = 0
+v_msg8[2] = 12
+v_msg8[3] = 1
+v_msg8[4] = 26
+v_msg8[5] = 14
+v_msg8[6] = 5
+v_msg8[7] = 26
+v_msg8[8] = 6
+v_msg8[9] = 14
+v_msg8[10] = 3
+v_msg8[11] = -1
+
+# Message 9: "GOD BLESS AMERICA"
+create_array(v_msg9, 18, numeric)
+v_msg9[0] = 6
+v_msg9[1] = 14
+v_msg9[2] = 3
+v_msg9[3] = 26
+v_msg9[4] = 1
+v_msg9[5] = 11
+v_msg9[6] = 4
+v_msg9[7] = 18
+v_msg9[8] = 18
+v_msg9[9] = 26
+v_msg9[10] = 0
+v_msg9[11] = 12
+v_msg9[12] = 4
+v_msg9[13] = 17
+v_msg9[14] = 8
+v_msg9[15] = 2
+v_msg9[16] = 0
+v_msg9[17] = -1
+
+# Message 10: "E PLURIBUS UNUM"
+create_array(v_msg10, 16, numeric)
+v_msg10[0] = 4
+v_msg10[1] = 26
+v_msg10[2] = 15
+v_msg10[3] = 11
+v_msg10[4] = 20
+v_msg10[5] = 17
+v_msg10[6] = 8
+v_msg10[7] = 1
+v_msg10[8] = 20
+v_msg10[9] = 18
+v_msg10[10] = 26
+v_msg10[11] = 20
+v_msg10[12] = 13
+v_msg10[13] = 20
+v_msg10[14] = 12
+v_msg10[15] = -1
+
+# Message 11: "NEVER GIVE UP"
+create_array(v_msg11, 14, numeric)
+v_msg11[0] = 13
+v_msg11[1] = 4
+v_msg11[2] = 21
+v_msg11[3] = 4
+v_msg11[4] = 17
+v_msg11[5] = 26
+v_msg11[6] = 6
+v_msg11[7] = 8
+v_msg11[8] = 21
+v_msg11[9] = 4
+v_msg11[10] = 26
+v_msg11[11] = 20
+v_msg11[12] = 15
+v_msg11[13] = -1
+
+# Message 12: "YOU CAN DO HARD THINGS"
+create_array(v_msg12, 23, numeric)
+v_msg12[0] = 24
+v_msg12[1] = 14
+v_msg12[2] = 20
+v_msg12[3] = 26
+v_msg12[4] = 2
+v_msg12[5] = 0
+v_msg12[6] = 13
+v_msg12[7] = 26
+v_msg12[8] = 3
+v_msg12[9] = 14
+v_msg12[10] = 26
+v_msg12[11] = 7
+v_msg12[12] = 0
+v_msg12[13] = 17
+v_msg12[14] = 3
+v_msg12[15] = 26
+v_msg12[16] = 19
+v_msg12[17] = 7
+v_msg12[18] = 8
+v_msg12[19] = 13
+v_msg12[20] = 6
+v_msg12[21] = 18
+v_msg12[22] = -1
+
+# Number of messages
+v_msg_count = 13
+
+# Randomized playback order
+create_array(v_play_order, 13, numeric)
+
+# ============================================================
+# MORSE CODE PATTERNS
+# ============================================================
+# Each pattern is a sequence: 1=dot, 2=dash
+# Stored as arrays for each letter
+# Pattern length stored separately
+
+create_array(v_morse_len, 27, numeric)
+create_array(v_morse_p1, 27, numeric)
+create_array(v_morse_p2, 27, numeric)
+create_array(v_morse_p3, 27, numeric)
+create_array(v_morse_p4, 27, numeric)
+
+# A: .-
+v_morse_len[0] = 2
+v_morse_p1[0] = 1
+v_morse_p2[0] = 2
+
+# B: -...
+v_morse_len[1] = 4
+v_morse_p1[1] = 2
+v_morse_p2[1] = 1
+v_morse_p3[1] = 1
+v_morse_p4[1] = 1
+
+# C: -.-.
+v_morse_len[2] = 4
+v_morse_p1[2] = 2
+v_morse_p2[2] = 1
+v_morse_p3[2] = 2
+v_morse_p4[2] = 1
+
+# D: -..
+v_morse_len[3] = 3
+v_morse_p1[3] = 2
+v_morse_p2[3] = 1
+v_morse_p3[3] = 1
+
+# E: .
+v_morse_len[4] = 1
+v_morse_p1[4] = 1
+
+# F: ..-.
+v_morse_len[5] = 4
+v_morse_p1[5] = 1
+v_morse_p2[5] = 1
+v_morse_p3[5] = 2
+v_morse_p4[5] = 1
+
+# G: --.
+v_morse_len[6] = 3
+v_morse_p1[6] = 2
+v_morse_p2[6] = 2
+v_morse_p3[6] = 1
+
+# H: ....
+v_morse_len[7] = 4
+v_morse_p1[7] = 1
+v_morse_p2[7] = 1
+v_morse_p3[7] = 1
+v_morse_p4[7] = 1
+
+# I: ..
+v_morse_len[8] = 2
+v_morse_p1[8] = 1
+v_morse_p2[8] = 1
+
+# J: .---
+v_morse_len[9] = 4
+v_morse_p1[9] = 1
+v_morse_p2[9] = 2
+v_morse_p3[9] = 2
+v_morse_p4[9] = 2
+
+# K: -.-
+v_morse_len[10] = 3
+v_morse_p1[10] = 2
+v_morse_p2[10] = 1
+v_morse_p3[10] = 2
+
+# L: .-..
+v_morse_len[11] = 4
+v_morse_p1[11] = 1
+v_morse_p2[11] = 2
+v_morse_p3[11] = 1
+v_morse_p4[11] = 1
+
+# M: --
+v_morse_len[12] = 2
+v_morse_p1[12] = 2
+v_morse_p2[12] = 2
+
+# N: -.
+v_morse_len[13] = 2
+v_morse_p1[13] = 2
+v_morse_p2[13] = 1
+
+# O: ---
+v_morse_len[14] = 3
+v_morse_p1[14] = 2
+v_morse_p2[14] = 2
+v_morse_p3[14] = 2
+
+# P: .--.
+v_morse_len[15] = 4
+v_morse_p1[15] = 1
+v_morse_p2[15] = 2
+v_morse_p3[15] = 2
+v_morse_p4[15] = 1
+
+# Q: --.-
+v_morse_len[16] = 4
+v_morse_p1[16] = 2
+v_morse_p2[16] = 2
+v_morse_p3[16] = 1
+v_morse_p4[16] = 2
+
+# R: .-.
+v_morse_len[17] = 3
+v_morse_p1[17] = 1
+v_morse_p2[17] = 2
+v_morse_p3[17] = 1
+
+# S: ...
+v_morse_len[18] = 3
+v_morse_p1[18] = 1
+v_morse_p2[18] = 1
+v_morse_p3[18] = 1
+
+# T: -
+v_morse_len[19] = 1
+v_morse_p1[19] = 2
+
+# U: ..-
+v_morse_len[20] = 3
+v_morse_p1[20] = 1
+v_morse_p2[20] = 1
+v_morse_p3[20] = 2
+
+# V: ...-
+v_morse_len[21] = 4
+v_morse_p1[21] = 1
+v_morse_p2[21] = 1
+v_morse_p3[21] = 1
+v_morse_p4[21] = 2
+
+# W: .--
+v_morse_len[22] = 3
+v_morse_p1[22] = 1
+v_morse_p2[22] = 2
+v_morse_p3[22] = 2
+
+# X: -..-
+v_morse_len[23] = 4
+v_morse_p1[23] = 2
+v_morse_p2[23] = 1
+v_morse_p3[23] = 1
+v_morse_p4[23] = 2
+
+# Y: -.--
+v_morse_len[24] = 4
+v_morse_p1[24] = 2
+v_morse_p2[24] = 1
+v_morse_p3[24] = 2
+v_morse_p4[24] = 2
+
+# Z: --..
+v_morse_len[25] = 4
+v_morse_p1[25] = 2
+v_morse_p2[25] = 2
+v_morse_p3[25] = 1
+v_morse_p4[25] = 1
+
+# Space (26) - handled specially, no pattern needed
+v_morse_len[26] = 0
+
+# ============================================================
+# DISPLAY SETTINGS
+# ============================================================
+
+# Lamp settings
+v_lamp_x = 32
+v_lamp_y = 15
+v_lamp_radius = 8
+v_lamp_fade_time = 150
+
+# Tape settings
+v_tape_y = 32
+v_tape_height = 10
+v_mark_y = v_tape_y + 2
+
+# Letter display settings
+v_letter_x = 56
+v_word_x = 2
+
+# Three lines for word display (y positions)
+v_line0_y = 44
+v_line1_y = 51
+v_line2_y = 58
+
+# Word storage for each line
+create_array(v_lines, 3, string)
+v_lines[0] = ""
+v_lines[1] = ""
+v_lines[2] = ""
+
+# Current word being built
+v_current_word = ""
+
+# Temp variable for array shuffling
+v_temp_word = ""
+v_temp_swap = 0
+v_temp_swap2 = 0
+
+# Word count in current message
+v_word_count = 0
+
+# Letter lookup for display (A-Z)
+create_array(v_letters, 27, string)
+v_letters[0] = "A"
+v_letters[1] = "B"
+v_letters[2] = "C"
+v_letters[3] = "D"
+v_letters[4] = "E"
+v_letters[5] = "F"
+v_letters[6] = "G"
+v_letters[7] = "H"
+v_letters[8] = "I"
+v_letters[9] = "J"
+v_letters[10] = "K"
+v_letters[11] = "L"
+v_letters[12] = "M"
+v_letters[13] = "N"
+v_letters[14] = "O"
+v_letters[15] = "P"
+v_letters[16] = "Q"
+v_letters[17] = "R"
+v_letters[18] = "S"
+v_letters[19] = "T"
+v_letters[20] = "U"
+v_letters[21] = "V"
+v_letters[22] = "W"
+v_letters[23] = "X"
+v_letters[24] = "Y"
+v_letters[25] = "Z"
+v_letters[26] = " "
+
+# Timing (in seconds)
+v_dot_time = 0.12
+v_dash_time = 0.36
+v_symbol_gap = 0.12
+v_letter_gap = 0.25
+v_word_gap = 0.5
+
+# Tape scroll tracking
+# 0 = empty, 1 = dot center, 2 = dash
+create_array(v_tape, 64, numeric)
+
+# Symbol sizes on tape (in pixels)
+v_dot_width = 2
+v_dash_width = 6
+v_symbol_space = 2
+v_letter_space = 5
+v_word_space = 10
+
+# ============================================================
+# PROCEDURES
+# ============================================================
+
+# Redraw all word lines based on current word count
+def redraw_word_lines {
+    # Clear word area (all 3 lines)
+    draw_rectangle(v_word_x - 1, v_line0_y - 2, 50, 24, black, 100, true)
+    
+    if v_word_count == 1 then
+        # One word - only line 2
+        draw_text(v_word_x, v_line2_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+    
+    if v_word_count == 2 then
+        # Two words - lines 1 and 2
+        draw_text(v_word_x, v_line1_y, v_lines[1], tiny64_font, 10, yellow, 100)
+        draw_text(v_word_x, v_line2_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+    
+    if v_word_count >= 3 then
+        # Three or more words - all lines
+        draw_text(v_word_x, v_line0_y, v_lines[0], tiny64_font, 10, yellow, 100)
+        draw_text(v_word_x, v_line1_y, v_lines[1], tiny64_font, 10, yellow, 100)
+        draw_text(v_word_x, v_line2_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+}
+
+# Add completed word to the line display (stores word, doesn't redraw)
+def add_word_to_lines {
+    v_word_count = v_word_count + 1
+    
+    if v_word_count == 1 then
+        # First word goes to line 2
+        v_lines[2] = v_current_word
+    endif
+    
+    if v_word_count == 2 then
+        # Second word: first word moves to line 1, new word to line 2
+        v_temp_word = v_lines[2]
+        v_lines[1] = v_temp_word
+        v_lines[2] = v_current_word
+    endif
+    
+    if v_word_count >= 3 then
+        # Third+ word: scroll up, new word to line 2
+        v_temp_word = v_lines[1]
+        v_lines[0] = v_temp_word
+        v_temp_word = v_lines[2]
+        v_lines[1] = v_temp_word
+        v_lines[2] = v_current_word
+    endif
+}
+
+# Scroll lines up and redraw to prepare for next word
+def scroll_lines_up {
+    # Clear word area and redraw based on word count
+    draw_rectangle(v_word_x - 1, v_line0_y - 2, 50, 24, black, 100, true)
+    
+    if v_word_count == 1 then
+        # One word moves to line 1
+        draw_text(v_word_x, v_line1_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+    
+    if v_word_count == 2 then
+        # Two words move to lines 0 and 1
+        draw_text(v_word_x, v_line0_y, v_lines[1], tiny64_font, 10, yellow, 100)
+        draw_text(v_word_x, v_line1_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+    
+    if v_word_count >= 3 then
+        # Three words - all lines shift up
+        draw_text(v_word_x, v_line0_y, v_lines[1], tiny64_font, 10, yellow, 100)
+        draw_text(v_word_x, v_line1_y, v_lines[2], tiny64_font, 10, yellow, 100)
+    endif
+}
+
+# Shuffle the play order array using Fisher-Yates algorithm
+def shuffle_play_order {
+    # Initialize array with sequential values
+    for v_i in (0, v_msg_count - 1, 1)
+        v_play_order[v_i] = v_i
+    endfor v_i
+    
+    # Fisher-Yates shuffle
+    v_i = v_msg_count - 1
+    while v_i > 0 then
+        # Pick random index from 0 to v_i
+        v_j = random(0, v_i, 0)
+        
+        # Swap v_play_order[v_i] and v_play_order[v_j]
+        v_temp_swap = v_play_order[v_i]
+        v_temp_swap2 = v_play_order[v_j]
+        v_play_order[v_i] = v_temp_swap2
+        v_play_order[v_j] = v_temp_swap
+        
+        v_i = v_i - 1
+    endwhile
+}
+
+# Redraw the entire tape
+def redraw_tape {
+    begin_frame(true)
+        # Draw tape background - light color for better contrast
+        draw_rectangle(0, v_tape_y, 64, v_tape_height, peach, 90, true)
+        
+        # Draw marks
+        for v_i in (0, 63, 1)
+            if v_tape[v_i] == 1 then
+                # Dot - small filled circle
+                draw_circle(v_i, v_mark_y + 2, 1, black, 100, true)
+            endif
+            if v_tape[v_i] == 2 then
+                # Dash - rectangle
+                draw_rectangle(v_i, v_mark_y, 1, v_tape_height - 4, black, 100, true)
+            endif
+            if v_tape[v_i] == 3 then
+                # Letter separator - dots at top and bottom
+                plot(v_i, v_tape_y + 1, gray, 80)
+                plot(v_i, v_tape_y + v_tape_height - 2, gray, 80)
+            endif
+        endfor v_i
+    end_frame
+}
+
+# Scroll tape left by v_scroll_amount pixels, adding marks or spaces
+# v_add_mark: 0 = space, 1 = dot, 2 = dash
+def scroll_tape_pixels {
+    for v_sp in (0, v_scroll_amount - 1, 1)
+        # Shift all values left
+        for v_i in (0, 62, 1)
+            v_tape[v_i] = v_tape[v_i + 1]
+        endfor v_i
+        v_tape[63] = v_mark_type
+    endfor v_sp
+    call redraw_tape
+}
+
+# Blink lamp and add dot to tape
+def transmit_dot {
+    # Flash lamp with fade
+    draw_circle(v_lamp_x, v_lamp_y, v_lamp_radius, yellow, 100, true, v_lamp_fade_time, fade)
+    
+    # Add dot to tape (type 1)
+    v_scroll_amount = v_dot_width
+    v_mark_type = 1
+    call scroll_tape_pixels
+    
+    rest(v_dot_time)
+}
+
+# Blink lamp and add dash to tape
+def transmit_dash {
+    # Flash lamp multiple times for dash duration
+    draw_circle(v_lamp_x, v_lamp_y, v_lamp_radius, yellow, 100, true, v_lamp_fade_time, fade)
+    rest(0.1)
+    draw_circle(v_lamp_x, v_lamp_y, v_lamp_radius, yellow, 100, true, v_lamp_fade_time, fade)
+    rest(0.1)
+    draw_circle(v_lamp_x, v_lamp_y, v_lamp_radius, yellow, 100, true, v_lamp_fade_time, fade)
+    
+    # Add dash to tape (type 2)
+    v_scroll_amount = v_dash_width
+    v_mark_type = 2
+    call scroll_tape_pixels
+    
+    rest(v_dash_time)
+}
+
+# Add symbol gap (space between dots/dashes in same letter)
+def add_symbol_gap {
+    v_scroll_amount = v_symbol_space
+    v_mark_type = 0
+    call scroll_tape_pixels
+    rest(v_symbol_gap)
+}
+
+# Add letter gap (space between letters)
+def add_letter_gap {
+    # First half of gap - empty
+    v_scroll_amount = 2
+    v_mark_type = 0
+    call scroll_tape_pixels
+    
+    # Middle - separator dot
+    v_scroll_amount = 1
+    v_mark_type = 3
+    call scroll_tape_pixels
+    
+    # Second half of gap - empty
+    v_scroll_amount = 2
+    v_mark_type = 0
+    call scroll_tape_pixels
+    
+    rest(v_letter_gap)
+}
+
+# Add word gap (space between words)
+def add_word_gap {
+    v_scroll_amount = v_word_space
+    v_mark_type = 0
+    call scroll_tape_pixels
+    rest(v_word_gap)
+}
+
+# Transmit a single symbol (1=dot, 2=dash)
+def transmit_symbol {
+    if v_symbol == 1 then
+        call transmit_dot
+    endif
+    if v_symbol == 2 then
+        call transmit_dash
+    endif
+}
+
+# Transmit a letter (v_letter_code = 0-25 for A-Z, 26 for space)
+def transmit_letter {
+    # Get the character to display
+    v_display_char = v_letters[v_letter_code]
+    
+    if v_letter_code == 26 then
+        # Word space - add current word to lines and reset
+        call add_word_to_lines
+        v_current_word = ""
+        
+        # Clear the current letter display
+        draw_rectangle(v_letter_x - 4, v_line2_y - 2, 12, 14, black, 100, true)
+        
+        # Scroll word lines up BEFORE tape scrolling starts
+        call scroll_lines_up
+        
+        # Now add gap on tape (uninterrupted)
+        call add_word_gap
+    else
+        # Clear letter area on right and display current letter
+        draw_rectangle(v_letter_x - 4, v_line2_y - 2, 12, 14, black, 100, true)
+        draw_text(v_letter_x, v_line2_y, v_display_char, tiny64_font, 10, white, 100)
+        
+        # Get pattern length
+        v_pattern_len = v_morse_len[v_letter_code]
+        
+        # Transmit each symbol in the pattern
+        if v_pattern_len >= 1 then
+            v_symbol = v_morse_p1[v_letter_code]
+            call transmit_symbol
+        endif
+        
+        if v_pattern_len >= 2 then
+            call add_symbol_gap
+            v_symbol = v_morse_p2[v_letter_code]
+            call transmit_symbol
+        endif
+        
+        if v_pattern_len >= 3 then
+            call add_symbol_gap
+            v_symbol = v_morse_p3[v_letter_code]
+            call transmit_symbol
+        endif
+        
+        if v_pattern_len >= 4 then
+            call add_symbol_gap
+            v_symbol = v_morse_p4[v_letter_code]
+            call transmit_symbol
+        endif
+        
+        # After letter is done, add it to the current word and display
+        v_current_word = v_current_word & v_display_char
+        
+        # Show current word being built on line 2
+        draw_rectangle(v_word_x - 1, v_line2_y - 2, 50, 14, black, 100, true)
+        draw_text(v_word_x, v_line2_y, v_current_word, tiny64_font, 10, yellow, 100)
+        
+        # Add letter gap after each letter
+        call add_letter_gap
+    endif
+}
+
+# ============================================================
+# MAIN PROGRAM
+# ============================================================
+
+# Initialize display
+clear()
+
+# Initialize tape array to empty
+for v_i in (0, 63, 1)
+    v_tape[v_i] = 0
+endfor v_i
+
+# Draw initial tape background
+call redraw_tape
+
+# Draw lamp housing (decorative ring)
+draw_circle(v_lamp_x, v_lamp_y, v_lamp_radius + 2, gray, 50, false)
+
+# Shuffle messages at startup
+call shuffle_play_order
+
+# Current position in play order
+v_play_index = 0
+
+# Main loop - cycle through messages forever
+while 1 == 1 then
+    
+    # Get the actual message index from shuffled order
+    v_current_msg = v_play_order[v_play_index]
+    
+    # Reset word display for new message
+    v_current_word = ""
+    v_word_count = 0
+    v_lines[0] = ""
+    v_lines[1] = ""
+    v_lines[2] = ""
+    draw_rectangle(0, v_line0_y - 2, 64, 26, black, 100, true)
+    
+    # Process current message based on index
+    v_char_index = 0
+    v_done = 0
+    
+    while v_done == 0 then
+        
+        # Get letter code from current message
+        # We need to check which message we're on and get from that array
+        
+        if v_current_msg == 0 then
+            v_letter_code = v_msg0[v_char_index]
+        endif
+        if v_current_msg == 1 then
+            v_letter_code = v_msg1[v_char_index]
+        endif
+        if v_current_msg == 2 then
+            v_letter_code = v_msg2[v_char_index]
+        endif
+        if v_current_msg == 3 then
+            v_letter_code = v_msg3[v_char_index]
+        endif
+        if v_current_msg == 4 then
+            v_letter_code = v_msg4[v_char_index]
+        endif
+        if v_current_msg == 5 then
+            v_letter_code = v_msg5[v_char_index]
+        endif
+        if v_current_msg == 6 then
+            v_letter_code = v_msg6[v_char_index]
+        endif
+        if v_current_msg == 7 then
+            v_letter_code = v_msg7[v_char_index]
+        endif
+        if v_current_msg == 8 then
+            v_letter_code = v_msg8[v_char_index]
+        endif
+        if v_current_msg == 9 then
+            v_letter_code = v_msg9[v_char_index]
+        endif
+        if v_current_msg == 10 then
+            v_letter_code = v_msg10[v_char_index]
+        endif
+        if v_current_msg == 11 then
+            v_letter_code = v_msg11[v_char_index]
+        endif
+        if v_current_msg == 12 then
+            v_letter_code = v_msg12[v_char_index]
+        endif
+        
+        # Check for end of message
+        if v_letter_code == -1 then
+            v_done = 1
+        else
+            # Transmit this letter
+            call transmit_letter
+            v_char_index = v_char_index + 1
+        endif
+        
+    endwhile
+    
+    # Add the last word of the message (no trailing space)
+    if v_current_word != "" then
+        call add_word_to_lines
+        v_current_word = ""
+    endif
+    
+    # Pause to show complete message
+    rest(1.5)
+    
+    # Add extra space between messages
+    call add_word_gap
+    call add_word_gap
+    
+    # Move to next message in shuffled order
+    v_play_index = v_play_index + 1
+    if v_play_index >= v_msg_count then
+        # Reshuffle and start over
+        call shuffle_play_order
+        v_play_index = 0
+    endif
+
+endwhile

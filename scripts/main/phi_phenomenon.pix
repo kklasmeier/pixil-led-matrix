@@ -1,0 +1,760 @@
+# ============================================================================
+# PHI PHENOMENON - Apparent Motion Demonstration
+# ============================================================================
+# The phi phenomenon is the optical illusion of perceiving continuous motion 
+# between separate objects viewed rapidly in succession. This is the 
+# foundation of all cinema, animation, and motion graphics.
+#
+# This script demonstrates 16 different sequences showcasing apparent motion.
+# ============================================================================
+
+throttle(0.5)
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 1: Classic Two-Dot
+# The fundamental phi effect - a dot alternates between two positions
+# ----------------------------------------------------------------------------
+def sequence_classic_two_dot {
+    print("sequence_classic_two_dot")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 20
+    v_interval = 0.12
+    
+    while v_cycles < v_max_cycles then
+        # Position A - Left
+        clear()
+        draw_circle(20, 32, 6, cyan, 100, true)
+        rest(v_interval)
+        
+        # Position B - Right
+        clear()
+        draw_circle(44, 32, 6, cyan, 100, true)
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 2: Rotating Quartet
+# Four positions around a circle create apparent rotation
+# ----------------------------------------------------------------------------
+def sequence_rotating_quartet {
+    print("sequence_rotating_quartet")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 24
+    v_interval = 0.10
+    v_radius = 16
+    v_cx = 32
+    v_cy = 32
+    
+    while v_cycles < v_max_cycles then
+        # Position 0 - Right
+        clear()
+        v_x = v_cx + v_radius
+        v_y = v_cy
+        draw_circle(v_x, v_y, 5, magenta, 100, true)
+        rest(v_interval)
+        
+        # Position 1 - Bottom
+        clear()
+        v_x = v_cx
+        v_y = v_cy + v_radius
+        draw_circle(v_x, v_y, 5, magenta, 100, true)
+        rest(v_interval)
+        
+        # Position 2 - Left
+        clear()
+        v_x = v_cx - v_radius
+        v_y = v_cy
+        draw_circle(v_x, v_y, 5, magenta, 100, true)
+        rest(v_interval)
+        
+        # Position 3 - Top
+        clear()
+        v_x = v_cx
+        v_y = v_cy - v_radius
+        draw_circle(v_x, v_y, 5, magenta, 100, true)
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 3: Wave Propagation
+# Motion travels across a horizontal line like a wave
+# ----------------------------------------------------------------------------
+def sequence_wave_propagation {
+    print("sequence_wave_propagation")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 12
+    v_interval = 0.06
+    v_cols = 8
+    
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, v_cols - 1, 1)
+            clear()
+            v_spacing = 7
+            v_x = 8 + v_phase * v_spacing
+            v_wave_offset = sin(v_phase * 0.6) * 8
+            v_y = 32 + v_wave_offset
+            draw_circle(v_x, v_y, 4, orange, 100, true)
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 4: Spiral Descent
+# Apparent inward spiral motion
+# ----------------------------------------------------------------------------
+def sequence_spiral_descent {
+    print("sequence_spiral_descent")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 8
+    v_interval = 0.05
+    v_steps = 16
+    v_cx = 32
+    v_cy = 32
+    
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, v_steps - 1, 1)
+            clear()
+            v_angle = v_phase * 0.393
+            v_shrink = 1 - v_phase * 0.05
+            v_radius = 22 * v_shrink
+            v_x = v_cx + cos(v_angle) * v_radius
+            v_y = v_cy + sin(v_angle) * v_radius
+            v_size = 3 + v_phase * 0.3
+            draw_circle(v_x, v_y, v_size, lime, 100, true)
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 5: Bouncing Line
+# Vertical oscillation creates bouncing motion
+# ----------------------------------------------------------------------------
+def sequence_bouncing_line {
+    print("sequence_bouncing_line")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 12
+    v_interval = 0.08
+    v_steps = 10
+    
+    while v_cycles < v_max_cycles then
+        # Down motion
+        for v_pos in (0, v_steps - 1, 1)
+            begin_frame
+            v_y = 12 + v_pos * 4
+            draw_line(16, v_y, 48, v_y, cyan, 100)
+            draw_line(16, v_y + 1, 48, v_y + 1, cyan, 80)
+            end_frame
+            rest(v_interval)
+        endfor v_pos
+        
+        # Up motion
+        for v_pos in (v_steps - 1, 0, -1)
+            begin_frame
+            v_y = 12 + v_pos * 4
+            draw_line(16, v_y, 48, v_y, cyan, 100)
+            draw_line(16, v_y + 1, 48, v_y + 1, cyan, 80)
+            end_frame
+            rest(v_interval)
+        endfor v_pos
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 6: Pulsing Grid
+# Ripple effect through a grid - apparent propagation
+# ----------------------------------------------------------------------------
+def sequence_pulsing_grid {
+    print("sequence_pulsing_grid")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 6
+    v_interval = 0.07
+    v_grid_size = 5
+    v_spacing = 10
+    v_offset_x = 12
+    v_offset_y = 12
+    
+    while v_cycles < v_max_cycles then
+        for v_active in (0, 24, 1)
+            begin_frame
+            for v_row in (0, v_grid_size - 1, 1)
+                for v_col in (0, v_grid_size - 1, 1)
+                    v_idx = v_row * v_grid_size + v_col
+                    v_x = v_offset_x + v_col * v_spacing
+                    v_y = v_offset_y + v_row * v_spacing
+                    
+                    v_dist = abs(v_idx - v_active)
+                    
+                    if v_dist == 0 then
+                        draw_circle(v_x, v_y, 4, magenta, 100, true)
+                    elseif v_dist < 3 then
+                        draw_circle(v_x, v_y, 2, magenta, 60, true)
+                    else
+                        plot(v_x, v_y, magenta, 30)
+                    endif
+                endfor v_col
+            endfor v_row
+            end_frame
+            rest(v_interval)
+        endfor v_active
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 7: Shape Morph
+# Apparent transformation between geometric shapes
+# ----------------------------------------------------------------------------
+def sequence_shape_morph {
+    print("sequence_shape_morph")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 12
+    v_interval = 0.18
+    v_cx = 32
+    v_cy = 32
+    v_size = 12
+    
+    while v_cycles < v_max_cycles then
+        # Circle
+        clear()
+        draw_circle(v_cx, v_cy, v_size, orange, 100, true)
+        rest(v_interval)
+        
+        # Square
+        clear()
+        v_half = v_size
+        draw_rectangle(v_cx - v_half, v_cy - v_half, v_half * 2, v_half * 2, orange, 100, true)
+        rest(v_interval)
+        
+        # Triangle
+        clear()
+        draw_polygon(v_cx, v_cy, v_size + 2, 3, orange, 100, 0, true)
+        rest(v_interval)
+        
+        # Diamond (rotated square)
+        clear()
+        draw_polygon(v_cx, v_cy, v_size + 2, 4, orange, 100, 45, true)
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 8: Orbital Rings
+# Multiple orbiting dots at different speeds create depth
+# ----------------------------------------------------------------------------
+def sequence_orbital_rings {
+    print("sequence_orbital_rings")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 10
+    v_interval = 0.04
+    v_steps = 24
+    v_cx = 32
+    v_cy = 32
+    
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, v_steps - 1, 1)
+            begin_frame
+            
+            # Draw faint orbit rings
+            draw_circle(v_cx, v_cy, 10, lime, 15, false)
+            draw_circle(v_cx, v_cy, 18, lime, 15, false)
+            draw_circle(v_cx, v_cy, 26, lime, 15, false)
+            
+            # Inner orbit - fastest
+            v_angle1 = v_phase * 0.523
+            v_x1 = v_cx + cos(v_angle1) * 10
+            v_y1 = v_cy + sin(v_angle1) * 10
+            draw_circle(v_x1, v_y1, 2, lime, 100, true)
+            
+            # Middle orbit - medium speed
+            v_angle2 = v_phase * 0.349
+            v_x2 = v_cx + cos(v_angle2) * 18
+            v_y2 = v_cy + sin(v_angle2) * 18
+            draw_circle(v_x2, v_y2, 3, lime, 100, true)
+            
+            # Outer orbit - slowest
+            v_angle3 = v_phase * 0.262
+            v_x3 = v_cx + cos(v_angle3) * 26
+            v_y3 = v_cy + sin(v_angle3) * 26
+            draw_circle(v_x3, v_y3, 4, lime, 100, true)
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 9: Stroboscopic Wheel
+# Dots around a wheel create apparent rotation (wagon wheel effect)
+# ----------------------------------------------------------------------------
+def sequence_stroboscopic_wheel {
+    print("sequence_stroboscopic_wheel")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 60
+    v_interval = 0.08
+    v_spokes = 8
+    v_cx = 32
+    v_cy = 32
+    v_radius = 20
+    
+    while v_cycles < v_max_cycles then
+        for v_offset in (0, v_spokes - 1, 1)
+            begin_frame
+            
+            # Draw center hub
+            draw_circle(v_cx, v_cy, 4, white, 40, true)
+            
+            # Draw spoke dots at current rotation
+            for v_spoke in (0, v_spokes - 1, 1)
+                v_angle = (v_spoke + v_offset * 0.12) * 0.785
+                v_x = v_cx + cos(v_angle) * v_radius
+                v_y = v_cy + sin(v_angle) * v_radius
+                draw_circle(v_x, v_y, 3, yellow, 100, true)
+                
+                # Draw spoke line
+                v_x2 = v_cx + cos(v_angle) * 6
+                v_y2 = v_cy + sin(v_angle) * 6
+                draw_line(v_x2, v_y2, v_x, v_y, yellow, 40)
+            endfor v_spoke
+            
+            end_frame
+            rest(v_interval)
+        endfor v_offset
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 10: Apparent Expansion
+# Concentric rings appear to expand outward
+# ----------------------------------------------------------------------------
+def sequence_apparent_expansion {
+    print("sequence_apparent_expansion")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 20
+    v_interval = 0.10
+    v_cx = 32
+    v_cy = 32
+    
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, 5, 1)
+            begin_frame
+            
+            # Draw multiple rings offset by phase
+            for v_ring in (0, 3, 1)
+                v_r = v_phase * 4 + v_ring * 8
+                if v_r < 32 then
+                    v_bright = 100 - v_r * 2
+                    if v_bright > 20 then
+                        draw_circle(v_cx, v_cy, v_r, red, v_bright, false)
+                    endif
+                endif
+            endfor v_ring
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 11: Chasing Dots
+# Multiple dots chasing each other around a path
+# ----------------------------------------------------------------------------
+def sequence_chasing_dots {
+    print("sequence_chasing_dots")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 10
+    v_interval = 0.05
+    v_steps = 24
+    v_cx = 32
+    v_cy = 32
+    v_radius = 18
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, v_steps - 1, 1)
+            begin_frame
+            # Draw faint path
+            draw_circle(v_cx, v_cy, v_radius, blue, 15, false)
+            
+            # Draw 4 chasing dots with spacing
+            for v_dot in (0, 3, 1)
+                v_offset = v_dot * 6
+                v_angle = (v_phase + v_offset) * 0.262
+                v_x = v_cx + cos(v_angle) * v_radius
+                v_y = v_cy + sin(v_angle) * v_radius
+                
+                # Lead dot is brightest
+                v_bright = 100 - v_dot * 20
+                v_size = 4 - v_dot
+                if v_size < 2 then
+                    v_size = 2
+                endif
+                draw_circle(v_x, v_y, v_size, blue, v_bright, true)
+            endfor v_dot
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 12: Pendulum Swing
+# Classic pendulum apparent motion
+# ----------------------------------------------------------------------------
+def sequence_pendulum_swing {
+    print("sequence_pendulum_swing")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 8
+    v_interval = 0.06
+    v_steps = 16
+    v_pivot_x = 32
+    v_pivot_y = 8
+    v_length = 48
+    
+    while v_cycles < v_max_cycles then
+        # Swing right
+        for v_phase in (0, v_steps - 1, 1)
+            begin_frame
+            
+            # Calculate pendulum angle (-45 to +45 degrees)
+            v_progress = v_phase / v_steps
+            v_angle = -0.785 + v_progress * 1.57
+            
+            v_bob_x = v_pivot_x + sin(v_angle) * v_length
+            v_bob_y = v_pivot_y + cos(v_angle) * v_length
+            
+            # Draw pivot
+            draw_circle(v_pivot_x, v_pivot_y, 2, white, 60, true)
+            
+            # Draw string
+            draw_line(v_pivot_x, v_pivot_y, v_bob_x, v_bob_y, white, 40)
+            
+            # Draw bob
+            draw_circle(v_bob_x, v_bob_y, 5, purple, 100, true)
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        
+        # Swing left
+        for v_phase in (v_steps - 1, 0, -1)
+            begin_frame
+            
+            v_progress = v_phase / v_steps
+            v_angle = -0.785 + v_progress * 1.57
+            
+            v_bob_x = v_pivot_x + sin(v_angle) * v_length
+            v_bob_y = v_pivot_y + cos(v_angle) * v_length
+            
+            draw_circle(v_pivot_x, v_pivot_y, 2, white, 60, true)
+            draw_line(v_pivot_x, v_pivot_y, v_bob_x, v_bob_y, white, 40)
+            draw_circle(v_bob_x, v_bob_y, 5, purple, 100, true)
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 13: Zoetrope Gallop
+# Classic horse gallop frames (simplified) - homage to Muybridge
+# ----------------------------------------------------------------------------
+def sequence_zoetrope_gallop {
+    print("sequence_zoetrope_gallop")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 40
+    v_interval = 0.10
+    v_y_base = 40
+    v_x_base = 20
+    
+    while v_cycles < v_max_cycles then
+        # Frame 1: Legs gathered
+        begin_frame
+        draw_circle(v_x_base + 20, v_y_base - 12, 6, white, 100, true)
+        draw_ellipse(v_x_base + 12, v_y_base - 6, 12, 5, white, 80, true, 0)
+        draw_line(v_x_base + 8, v_y_base, v_x_base + 10, v_y_base + 8, white, 100)
+        draw_line(v_x_base + 16, v_y_base, v_x_base + 14, v_y_base + 8, white, 100)
+        end_frame
+        rest(v_interval)
+        
+        # Frame 2: Front legs forward
+        begin_frame
+        draw_circle(v_x_base + 20, v_y_base - 14, 6, white, 100, true)
+        draw_ellipse(v_x_base + 12, v_y_base - 8, 12, 5, white, 80, true, -10)
+        draw_line(v_x_base + 4, v_y_base - 4, v_x_base + 2, v_y_base + 6, white, 100)
+        draw_line(v_x_base + 18, v_y_base - 2, v_x_base + 24, v_y_base + 4, white, 100)
+        end_frame
+        rest(v_interval)
+        
+        # Frame 3: Full extension
+        begin_frame
+        draw_circle(v_x_base + 20, v_y_base - 12, 6, white, 100, true)
+        draw_ellipse(v_x_base + 12, v_y_base - 6, 12, 5, white, 80, true, 0)
+        draw_line(v_x_base + 2, v_y_base - 2, v_x_base - 2, v_y_base + 8, white, 100)
+        draw_line(v_x_base + 20, v_y_base, v_x_base + 26, v_y_base + 6, white, 100)
+        end_frame
+        rest(v_interval)
+        
+        # Frame 4: Back legs push
+        begin_frame
+        draw_circle(v_x_base + 20, v_y_base - 10, 6, white, 100, true)
+        draw_ellipse(v_x_base + 12, v_y_base - 4, 12, 5, white, 80, true, 10)
+        draw_line(v_x_base + 6, v_y_base + 2, v_x_base + 4, v_y_base + 10, white, 100)
+        draw_line(v_x_base + 18, v_y_base + 2, v_x_base + 22, v_y_base + 10, white, 100)
+        end_frame
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 14: Beta Movement
+# Two shapes alternating create apparent motion (classic beta movement)
+# ----------------------------------------------------------------------------
+def sequence_beta_movement {
+    print("sequence_beta_movement")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 24
+    v_interval = 0.14
+    
+    while v_cycles < v_max_cycles then
+        # Position A with shape A
+        clear()
+        draw_rectangle(12, 24, 16, 16, teal, 100, true)
+        rest(v_interval)
+        
+        # Position B with shape B
+        clear()
+        draw_rectangle(36, 24, 16, 16, teal, 100, true)
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 15: Apparent Rotation Cube
+# Dots suggest a rotating 3D cube face
+# ----------------------------------------------------------------------------
+def sequence_apparent_rotation_cube {
+    print("sequence_apparent_rotation_cube")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 40
+    v_interval = 0.08
+    v_steps = 16
+    v_cx = 32
+    v_cy = 32
+    v_size = 14
+    
+    while v_cycles < v_max_cycles then
+        for v_phase in (0, v_steps - 1, 1)
+            begin_frame
+            
+            # Calculate rotation angle
+            v_angle = v_phase * 0.393
+            v_cos_a = cos(v_angle)
+            
+            # 4 corners of a square, projected with rotation
+            v_x1 = v_cx + (-v_size * v_cos_a)
+            v_y1 = v_cy - v_size
+            
+            v_x2 = v_cx + (v_size * v_cos_a)
+            v_y2 = v_cy - v_size
+            
+            v_x3 = v_cx + (v_size * v_cos_a)
+            v_y3 = v_cy + v_size
+            
+            v_x4 = v_cx + (-v_size * v_cos_a)
+            v_y4 = v_cy + v_size
+            
+            # Draw edges
+            draw_line(v_x1, v_y1, v_x2, v_y2, pink, 60)
+            draw_line(v_x2, v_y2, v_x3, v_y3, pink, 60)
+            draw_line(v_x3, v_y3, v_x4, v_y4, pink, 60)
+            draw_line(v_x4, v_y4, v_x1, v_y1, pink, 60)
+            
+            # Draw corner dots
+            draw_circle(v_x1, v_y1, 3, pink, 100, true)
+            draw_circle(v_x2, v_y2, 3, pink, 100, true)
+            draw_circle(v_x3, v_y3, 3, pink, 100, true)
+            draw_circle(v_x4, v_y4, 3, pink, 100, true)
+            
+            end_frame
+            rest(v_interval)
+        endfor v_phase
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ----------------------------------------------------------------------------
+# SEQUENCE 16: Ternus Illusion
+# Three dots - element vs group motion perception
+# ----------------------------------------------------------------------------
+def sequence_ternus_illusion {
+    print("sequence_ternus_illusion")
+    sync_queue
+    v_cycles = 0
+    v_max_cycles = 8
+    v_interval = 0.12
+    v_y = 32
+    
+    while v_cycles < v_max_cycles then
+        # Frame A: dots at positions 1, 2, 3
+        begin_frame
+        draw_circle(20, v_y, 5, gold, 100, true)
+        draw_circle(32, v_y, 5, gold, 100, true)
+        draw_circle(44, v_y, 5, gold, 100, true)
+        end_frame
+        rest(v_interval)
+        
+        # Frame B: dots at positions 2, 3, 4 (shifted right)
+        begin_frame
+        draw_circle(32, v_y, 5, gold, 100, true)
+        draw_circle(44, v_y, 5, gold, 100, true)
+        draw_circle(56, v_y, 5, gold, 100, true)
+        end_frame
+        rest(v_interval)
+        
+        # Frame C: back to positions 1, 2, 3
+        begin_frame
+        draw_circle(20, v_y, 5, gold, 100, true)
+        draw_circle(32, v_y, 5, gold, 100, true)
+        draw_circle(44, v_y, 5, gold, 100, true)
+        end_frame
+        rest(v_interval)
+        
+        # Frame D: shifted left to 0, 1, 2
+        begin_frame
+        draw_circle(8, v_y, 5, gold, 100, true)
+        draw_circle(20, v_y, 5, gold, 100, true)
+        draw_circle(32, v_y, 5, gold, 100, true)
+        end_frame
+        rest(v_interval)
+        
+        v_cycles = v_cycles + 1
+    endwhile
+}
+
+# ============================================================================
+# MAIN LOOP - Run Forever
+# ============================================================================
+v_running = 1
+
+while v_running == 1 then
+    # Sequence 1: Classic Two-Dot
+    clear()
+    call sequence_classic_two_dot()
+    rest(0.5)
+    
+    # Sequence 2: Rotating Quartet
+    clear()
+    call sequence_rotating_quartet()
+    rest(0.5)
+    
+    # Sequence 3: Wave Propagation
+    clear()
+    call sequence_wave_propagation()
+    rest(0.5)
+    
+    # Sequence 4: Spiral Descent
+    clear()
+    call sequence_spiral_descent()
+    rest(0.5)
+    
+    # Sequence 5: Bouncing Line
+    clear()
+    call sequence_bouncing_line()
+    rest(0.5)
+    
+    # Sequence 6: Pulsing Grid
+    clear()
+    call sequence_pulsing_grid()
+    rest(0.5)
+    
+    # Sequence 7: Shape Morph
+    clear()
+    call sequence_shape_morph()
+    rest(0.5)
+    
+    # Sequence 8: Orbital Rings
+    clear()
+    call sequence_orbital_rings()
+    rest(0.5)
+    
+    # Sequence 9: Stroboscopic Wheel
+    clear()
+    call sequence_stroboscopic_wheel()
+    rest(0.5)
+    
+    # Sequence 10: Apparent Expansion
+    clear()
+    call sequence_apparent_expansion()
+    rest(0.5)
+    
+    # Sequence 11: Chasing Dots
+    clear()
+    call sequence_chasing_dots()
+    rest(0.5)
+    
+    # Sequence 12: Pendulum Swing
+    clear()
+    call sequence_pendulum_swing()
+    rest(0.5)
+    
+    # Sequence 13: Zoetrope Gallop
+    clear()
+    call sequence_zoetrope_gallop()
+    rest(0.5)
+    
+    # Sequence 14: Beta Movement
+    clear()
+    call sequence_beta_movement()
+    rest(0.5)
+    
+    # Sequence 15: Apparent Rotation Cube
+    clear()
+    call sequence_apparent_rotation_cube()
+    rest(0.5)
+    
+    # Sequence 16: Ternus Illusion
+    clear()
+    call sequence_ternus_illusion()
+    rest(0.5)
+endwhile

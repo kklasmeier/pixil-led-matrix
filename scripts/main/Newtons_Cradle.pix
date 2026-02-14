@@ -1,0 +1,376 @@
+# Newton's Cradle - Classic momentum transfer demonstration
+# Cycles through multiple modes forever
+
+throttle(0)
+
+# ============================================
+# CONFIGURATION
+# ============================================
+v_num_balls = 5
+v_ball_radius = 4
+v_string_length = 42
+v_anchor_y = 4
+v_center_x = 32
+v_spacing = 9
+v_gravity = 0.8
+v_damping = 0.995
+v_transfer_efficiency = 0.97
+
+# Lift animation settings
+v_lift_speed = 1.5
+
+# Ball position arrays (angles in degrees, converted for display)
+create_array(v_angle, v_num_balls)
+create_array(v_angular_vel, v_num_balls)
+create_array(v_ball_x, v_num_balls)
+create_array(v_ball_y, v_num_balls)
+create_array(v_anchor_x, v_num_balls)
+
+# Target angles for lift animation
+create_array(v_target_angle, v_num_balls)
+
+# Ball colors for visual variety
+create_array(v_ball_color, v_num_balls, string)
+v_ball_color[0] = "gold"
+v_ball_color[1] = "silver"
+v_ball_color[2] = "gold"
+v_ball_color[3] = "silver"
+v_ball_color[4] = "gold"
+
+# Mode tracking
+v_mode = 0
+v_num_modes = 8
+v_mode_timer = 0
+v_mode_duration = 350
+
+# State: 0 = lifting, 1 = running physics
+v_state = 0
+
+# Mode names for display
+create_array(v_mode_names, v_num_modes, string)
+v_mode_names[0] = "Single Ball"
+v_mode_names[1] = "Double Ball"
+v_mode_names[2] = "Triple Ball"
+v_mode_names[3] = "Alternating"
+v_mode_names[4] = "Both Sides"
+v_mode_names[5] = "Chaos"
+v_mode_names[6] = "Wave"
+v_mode_names[7] = "Big Swing"
+
+# Min/max angles for each mode (will randomize between these)
+create_array(v_min_angle, v_num_modes)
+create_array(v_max_angle, v_num_modes)
+v_min_angle[0] = 45
+v_max_angle[0] = 75
+v_min_angle[1] = 50
+v_max_angle[1] = 70
+v_min_angle[2] = 35
+v_max_angle[2] = 65
+v_min_angle[3] = 55
+v_max_angle[3] = 75
+v_min_angle[4] = 50
+v_max_angle[4] = 70
+v_min_angle[5] = 45
+v_max_angle[5] = 75
+v_min_angle[6] = 55
+v_max_angle[6] = 75
+v_min_angle[7] = 70
+v_max_angle[7] = 90
+
+# ============================================
+# INITIALIZE ANCHOR POSITIONS
+# ============================================
+v_start_x = v_center_x - ((v_num_balls - 1) * v_spacing) / 2
+for v_i in (0, v_num_balls - 1, 1)
+    v_anchor_x[v_i] = v_start_x + v_i * v_spacing
+    v_angle[v_i] = 0
+    v_angular_vel[v_i] = 0
+    v_target_angle[v_i] = 0
+endfor v_i
+
+# ============================================
+# PROCEDURES
+# ============================================
+
+# Calculate ball positions from angles
+def calc_positions {
+    for v_i in (0, v_num_balls - 1, 1)
+        v_rad = radians(v_angle[v_i])
+        v_ball_x[v_i] = v_anchor_x[v_i] + sin(v_rad) * v_string_length
+        v_ball_y[v_i] = v_anchor_y + cos(v_rad) * v_string_length
+    endfor v_i
+}
+
+# Draw the frame/support structure
+def draw_frame {
+    # Top bar
+    v_bar_left = v_anchor_x[0] - 8
+    v_bar_right = v_anchor_x[v_num_balls - 1] + 8
+    draw_rectangle(v_bar_left, v_anchor_y - 3, v_bar_right - v_bar_left, 4, dark_gray, 90, true)
+    draw_line(v_bar_left, v_anchor_y - 3, v_bar_right, v_anchor_y - 3, silver, 60)
+    
+    # Support legs
+    draw_line(v_bar_left + 2, v_anchor_y + 1, v_bar_left - 3, 62, dark_gray, 70)
+    draw_line(v_bar_left + 3, v_anchor_y + 1, v_bar_left - 4, 62, dark_gray, 70)
+    draw_line(v_bar_right - 4, v_anchor_y + 1, v_bar_right + 3, 62, dark_gray, 70)
+    draw_line(v_bar_right - 3, v_anchor_y + 1, v_bar_right + 2, 62, dark_gray, 70)   
+    # Base
+    draw_line(v_bar_left - 6, 62, v_bar_right + 6, 62, dark_gray, 80)
+}
+
+# Draw strings and balls
+def draw_cradle {
+    for v_i in (0, v_num_balls - 1, 1)
+        # Draw string
+        draw_line(v_anchor_x[v_i], v_anchor_y, v_ball_x[v_i], v_ball_y[v_i] - v_ball_radius, gray, 50)
+        
+        # Draw ball with highlight for 3D effect
+        v_bx = int(v_ball_x[v_i])
+        v_by = int(v_ball_y[v_i])
+        draw_circle(v_bx, v_by, v_ball_radius, v_ball_color[v_i], 90, true)
+        draw_circle(v_bx - 1, v_by - 1, v_ball_radius - 3, white, 40, true)
+    endfor v_i
+}
+
+# Physics update
+def update_physics {
+    # Apply gravity and damping to each ball
+    for v_i in (0, v_num_balls - 1, 1)
+        # Pendulum physics: angular acceleration = -g/L * sin(angle)
+        v_rad = radians(v_angle[v_i])
+        v_accel = -v_gravity / v_string_length * sin(v_rad) * 57.3
+        v_angular_vel[v_i] = v_angular_vel[v_i] + v_accel
+        v_angular_vel[v_i] = v_angular_vel[v_i] * v_damping
+        v_angle[v_i] = v_angle[v_i] + v_angular_vel[v_i]
+    endfor v_i
+    
+    # Collision detection and momentum transfer
+    for v_i in (0, v_num_balls - 2, 1)
+        v_j = v_i + 1
+        
+        # Calculate positions
+        v_rad_i = radians(v_angle[v_i])
+        v_rad_j = radians(v_angle[v_j])
+        v_x_i = v_anchor_x[v_i] + sin(v_rad_i) * v_string_length
+        v_x_j = v_anchor_x[v_j] + sin(v_rad_j) * v_string_length
+        
+        # Check for collision
+        v_dist = v_x_j - v_x_i
+        v_min_dist = v_ball_radius * 2 + 1
+        
+        if v_dist < v_min_dist then
+            if v_angular_vel[v_i] > v_angular_vel[v_j] then
+                v_temp = v_angular_vel[v_i]
+                v_angular_vel[v_i] = v_angular_vel[v_j] * v_transfer_efficiency
+                v_angular_vel[v_j] = v_temp * v_transfer_efficiency
+                
+                v_overlap = v_min_dist - v_dist
+                v_angle[v_i] = v_angle[v_i] - v_overlap * 0.3
+                v_angle[v_j] = v_angle[v_j] + v_overlap * 0.3
+            endif
+        endif
+    endfor v_i
+}
+
+# Animate lifting balls to target positions
+# Returns 1 when all balls have reached their targets
+def update_lift {
+    v_all_reached = 1
+    
+    for v_i in (0, v_num_balls - 1, 1)
+        v_diff = v_target_angle[v_i] - v_angle[v_i]
+        
+        # Check if we need to move
+        if abs(v_diff) > 0.5 then
+            v_all_reached = 0
+            
+            # Move toward target
+            if v_diff > 0 then
+                v_angle[v_i] = v_angle[v_i] + v_lift_speed
+                if v_angle[v_i] > v_target_angle[v_i] then
+                    v_angle[v_i] = v_target_angle[v_i]
+                endif
+            else
+                v_angle[v_i] = v_angle[v_i] - v_lift_speed
+                if v_angle[v_i] < v_target_angle[v_i] then
+                    v_angle[v_i] = v_target_angle[v_i]
+                endif
+            endif
+        endif
+    endfor v_i
+    
+    # If all reached, switch to physics state
+    if v_all_reached == 1 then
+        v_state = 1
+    endif
+}
+
+# Reset all balls to rest position
+def reset_balls {
+    for v_i in (0, v_num_balls - 1, 1)
+        v_angle[v_i] = 0
+        v_angular_vel[v_i] = 0
+        v_target_angle[v_i] = 0
+    endfor v_i
+}
+
+# Get random angle for current mode
+def get_random_angle {
+    v_min = v_min_angle[v_mode]
+    v_max = v_max_angle[v_mode]
+    v_rand_angle = random(v_min, v_max, 0)
+}
+
+# Mode 0: Single ball from left
+def setup_mode_single {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+}
+
+# Mode 1: Double ball from left
+def setup_mode_double {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[1] = -v_rand_angle
+}
+
+# Mode 2: Triple ball from left
+def setup_mode_triple {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[1] = -v_rand_angle
+    v_target_angle[2] = -v_rand_angle
+}
+
+# Mode 3: Alternating - one from each side
+def setup_mode_alternating {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[4] = v_rand_angle
+}
+
+# Mode 4: Both sides simultaneously
+def setup_mode_both {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[4] = v_rand_angle
+}
+
+# Mode 5: Chaos - random starting positions
+def setup_mode_chaos {
+    call reset_balls
+    for v_i in (0, v_num_balls - 1, 1)
+        v_rand_ch = random(-40, 40, 0)
+        v_target_angle[v_i] = v_rand_ch
+    endfor v_i
+}
+
+# Mode 6: Wave - staggered release
+def setup_mode_wave {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[1] = -v_rand_angle * 0.75
+    v_target_angle[2] = -v_rand_angle * 0.5
+    v_target_angle[3] = -v_rand_angle * 0.25
+    v_target_angle[4] = 0
+}
+
+# Mode 7: Big swing - high energy
+def setup_mode_big {
+    call reset_balls
+    call get_random_angle
+    v_target_angle[0] = -v_rand_angle
+    v_target_angle[4] = v_rand_angle
+}
+
+# Setup the current mode (sets targets, starts lift)
+def setup_current_mode {
+    v_state = 0
+    
+    if v_mode == 0 then
+        call setup_mode_single
+    endif
+    if v_mode == 1 then
+        call setup_mode_double
+    endif
+    if v_mode == 2 then
+        call setup_mode_triple
+    endif
+    if v_mode == 3 then
+        call setup_mode_alternating
+    endif
+    if v_mode == 4 then
+        call setup_mode_both
+    endif
+    if v_mode == 5 then
+        call setup_mode_chaos
+    endif
+    if v_mode == 6 then
+        call setup_mode_wave
+    endif
+    if v_mode == 7 then
+        call setup_mode_big
+    endif
+}
+
+# ============================================
+# MAIN LOOP
+# ============================================
+
+# Initial mode setup
+call setup_current_mode
+
+v_running = 1
+while v_running == 1 then
+    
+    begin_frame
+        # Background
+        draw_rectangle(0, 0, 64, 64, navy, 20, true)
+        
+        # Draw the frame structure
+        call draw_frame
+        
+        # Update based on state
+        if v_state == 0 then
+            # Lifting phase
+            call update_lift
+        else
+            # Physics phase
+            call update_physics
+        endif
+        
+        # Calculate display positions
+        call calc_positions
+        
+        # Draw the cradle
+        call draw_cradle
+        
+        # Display mode name at bottom
+        draw_text(2, 56, v_mode_names[v_mode], tiny64_font, 8, cyan, 60)
+        
+    end_frame
+    
+    # Only count timer during physics phase
+    if v_state == 1 then
+        v_mode_timer = v_mode_timer + 1
+    endif
+    
+    # Check for mode change
+    if v_mode_timer >= v_mode_duration then
+        v_mode_timer = 0
+        v_mode = v_mode + 1
+        if v_mode >= v_num_modes then
+            v_mode = 0
+        endif
+        
+        # Setup new mode (starts lift animation)
+        call setup_current_mode
+    endif
+    
+endwhile

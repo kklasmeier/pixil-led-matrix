@@ -1,0 +1,1478 @@
+# Frost Forming - Dynamic Ice Crystal Simulation
+# A forever-running frost effect with millions of unique combinations
+# Formation modes, crystal styles, colors, shimmer, thaw effects all randomized
+
+# ============================================================================
+# CONFIGURATION ARRAYS AND VARIABLES
+# ============================================================================
+
+# Display dimensions
+v_width = 64
+v_height = 64
+
+# Frost state tracking (0 = unfrozen, 1+ = frozen with age)
+create_array(v_frost, 4096, numeric)
+create_array(v_frost_age, 4096, numeric)
+
+# Growth frontier tracking (pixels that can grow)
+create_array(v_frontier_x, 500, numeric)
+create_array(v_frontier_y, 500, numeric)
+v_frontier_count = 0
+
+# Nucleation/origin points (for multi-seed modes)
+create_array(v_origin_x, 8, numeric)
+create_array(v_origin_y, 8, numeric)
+v_origin_count = 0
+
+# Current cycle parameters (randomized each cycle)
+v_formation_mode = 0
+v_crystal_style = 0
+v_growth_speed = 0
+v_branch_density = 0
+v_color_palette = 0
+v_shimmer_level = 0
+v_edge_glow = 0
+v_thaw_mode = 0
+v_thaw_speed = 0
+v_pause_duration = 0
+v_connection_flash = 0
+
+# Growth control
+v_growth_delay = 0.05
+v_grow_chance = 70
+v_branch_chance = 40
+v_frozen_count = 0
+v_max_frozen = 4096
+v_target_coverage = 85
+
+# Color variables
+v_base_r = 255
+v_base_g = 255
+v_base_b = 255
+v_edge_r = 255
+v_edge_g = 255
+v_edge_b = 255
+
+# Shimmer control
+v_shimmer_active = 0
+v_shimmer_count = 0
+
+# Breath circle (for breath mode)
+v_breath_x = 32
+v_breath_y = 32
+v_breath_radius = 12
+
+# Timing
+v_cycle_count = 0
+
+# ============================================================================
+# UTILITY PROCEDURES
+# ============================================================================
+
+# Convert x,y to array index
+# Uses global v_tx, v_ty -> sets v_tidx
+def calc_index {
+    v_tidx = v_ty * 64 + v_tx
+}
+
+# Check if coordinates are valid
+# Uses global v_tx, v_ty -> sets v_tvalid
+def check_bounds {
+    v_tvalid = 1
+    if v_tx < 0 then
+        v_tvalid = 0
+    endif
+    if v_tx > 63 then
+        v_tvalid = 0
+    endif
+    if v_ty < 0 then
+        v_tvalid = 0
+    endif
+    if v_ty > 63 then
+        v_tvalid = 0
+    endif
+}
+
+# Clear frost arrays
+def clear_frost_arrays {
+    for v_i in (0, 4095, 1)
+        v_frost[v_i] = 0
+        v_frost_age[v_i] = 0
+    endfor v_i
+    v_frontier_count = 0
+    v_frozen_count = 0
+}
+
+# Add pixel to frontier
+def add_to_frontier {
+    if v_frontier_count < 499 then
+        v_frontier_x[v_frontier_count] = v_tx
+        v_frontier_y[v_frontier_count] = v_ty
+        v_frontier_count = v_frontier_count + 1
+    endif
+}
+
+# ============================================================================
+# COLOR PROCEDURES
+# ============================================================================
+
+# Set colors based on palette (v_color_palette)
+# 0 = Pure White, 1 = Ice Blue, 2 = Winter Mix, 3 = Frozen Steel
+def setup_colors {
+    if v_color_palette == 0 then
+        # Pure White
+        v_base_r = 255
+        v_base_g = 255
+        v_base_b = 255
+        v_edge_r = 255
+        v_edge_g = 255
+        v_edge_b = 255
+    endif
+    if v_color_palette == 1 then
+        # Ice Blue
+        v_base_r = 220
+        v_base_g = 240
+        v_base_b = 255
+        v_edge_r = 180
+        v_edge_g = 220
+        v_edge_b = 255
+    endif
+    if v_color_palette == 2 then
+        # Winter Mix
+        v_base_r = 230
+        v_base_g = 235
+        v_base_b = 250
+        v_edge_r = 200
+        v_edge_g = 210
+        v_edge_b = 255
+    endif
+    if v_color_palette == 3 then
+        # Frozen Steel
+        v_base_r = 200
+        v_base_g = 210
+        v_base_b = 220
+        v_edge_r = 170
+        v_edge_g = 185
+        v_edge_b = 210
+    endif
+}
+
+# Color selection inlined in try_grow_from_pixel for performance
+
+# ============================================================================
+# RANDOMIZE CYCLE PARAMETERS
+# ============================================================================
+
+def randomize_parameters {
+    # Formation mode (0-7)
+    v_formation_mode = random(0, 7, 0)
+    
+    # Crystal style (0-2): dendritic, feathered, geometric
+    v_crystal_style = random(0, 2, 0)
+    
+    # Growth speed (0-3): flash, quick, medium, slow
+    v_growth_speed = random(0, 3, 0)
+    
+    # Branch density (0-2): sparse, medium, dense
+    v_branch_density = random(0, 2, 0)
+    
+    # Color palette (0-3)
+    v_color_palette = random(0, 3, 0)
+    
+    # Shimmer level (0-3): none, subtle, moderate, active
+    v_shimmer_level = random(0, 3, 0)
+    
+    # Edge glow (0-2): off, subtle, bright
+    v_edge_glow = random(0, 2, 0)
+    
+    # Thaw mode (0-4): fade, melt down, reverse, warm glow, sparkle burst
+    v_thaw_mode = random(0, 4, 0)
+    
+    # Thaw speed (0-2): quick, medium, slow
+    v_thaw_speed = random(0, 2, 0)
+    
+    # Pause duration (0-2): brief, medium, long
+    v_pause_duration = random(0, 2, 0)
+    
+    # Connection flash (0-1)
+    v_connection_flash = random(0, 1, 0)
+    
+    # Set growth delay based on speed (optimized for Pi performance)
+    if v_growth_speed == 0 then
+        v_growth_delay = 0.001
+        v_grow_chance = 98
+    endif
+    if v_growth_speed == 1 then
+        v_growth_delay = 0.005
+        v_grow_chance = 95
+    endif
+    if v_growth_speed == 2 then
+        v_growth_delay = 0.015
+        v_grow_chance = 90
+    endif
+    if v_growth_speed == 3 then
+        v_growth_delay = 0.035
+        v_grow_chance = 80
+    endif
+    
+    # Set branch chance based on density
+    if v_branch_density == 0 then
+        v_branch_chance = 25
+    endif
+    if v_branch_density == 1 then
+        v_branch_chance = 45
+    endif
+    if v_branch_density == 2 then
+        v_branch_chance = 70
+    endif
+    
+    # Randomize target coverage independently (frost doesn't always cover everything)
+    # Halved for more realistic partial coverage
+    v_coverage_roll = random(0, 100, 0)
+    if v_coverage_roll < 20 then
+        # Light frost - just patches
+        v_target_coverage = random(12, 20, 0)
+    elseif v_coverage_roll < 50 then
+        # Moderate frost
+        v_target_coverage = random(22, 32, 0)
+    elseif v_coverage_roll < 80 then
+        # Heavy frost
+        v_target_coverage = random(35, 42, 0)
+    else
+        # Full freeze
+        v_target_coverage = random(44, 48, 0)
+    endif
+    
+    # Setup colors for this cycle
+    call setup_colors
+    
+    # Print cycle info with human-readable names
+    v_cycle_count = v_cycle_count + 1
+    print(f"")
+    print(f"=== Frost Cycle {v_cycle_count} ===")
+    
+    # Formation mode name
+    if v_formation_mode == 0 then
+        print(f"Formation: Single Corner (0)")
+    endif
+    if v_formation_mode == 1 then
+        print(f"Formation: Multi-Corner (1)")
+    endif
+    if v_formation_mode == 2 then
+        print(f"Formation: Single Edge (2)")
+    endif
+    if v_formation_mode == 3 then
+        print(f"Formation: Multi-Edge (3)")
+    endif
+    if v_formation_mode == 4 then
+        print(f"Formation: Nucleation Seeds (4)")
+    endif
+    if v_formation_mode == 5 then
+        print(f"Formation: Center Outward (5)")
+    endif
+    if v_formation_mode == 6 then
+        print(f"Formation: Frame Inward (6)")
+    endif
+    if v_formation_mode == 7 then
+        print(f"Formation: Breath Circle (7)")
+    endif
+    
+    # Crystal style name
+    if v_crystal_style == 0 then
+        print(f"Crystal: Dendritic (0)")
+    endif
+    if v_crystal_style == 1 then
+        print(f"Crystal: Feathered (1)")
+    endif
+    if v_crystal_style == 2 then
+        print(f"Crystal: Geometric (2)")
+    endif
+    
+    # Growth speed name
+    if v_growth_speed == 0 then
+        print(f"Speed: Flash Freeze (0)")
+    endif
+    if v_growth_speed == 1 then
+        print(f"Speed: Quick (1)")
+    endif
+    if v_growth_speed == 2 then
+        print(f"Speed: Medium (2)")
+    endif
+    if v_growth_speed == 3 then
+        print(f"Speed: Slow Creep (3)")
+    endif
+    
+    # Branch density name
+    if v_branch_density == 0 then
+        print(f"Density: Sparse (0)")
+    endif
+    if v_branch_density == 1 then
+        print(f"Density: Medium (1)")
+    endif
+    if v_branch_density == 2 then
+        print(f"Density: Dense (2)")
+    endif
+    
+    # Color palette name
+    if v_color_palette == 0 then
+        print(f"Palette: Pure White (0)")
+    endif
+    if v_color_palette == 1 then
+        print(f"Palette: Ice Blue (1)")
+    endif
+    if v_color_palette == 2 then
+        print(f"Palette: Winter Mix (2)")
+    endif
+    if v_color_palette == 3 then
+        print(f"Palette: Frozen Steel (3)")
+    endif
+    
+    # Shimmer level name
+    if v_shimmer_level == 0 then
+        print(f"Shimmer: None (0)")
+    endif
+    if v_shimmer_level == 1 then
+        print(f"Shimmer: Subtle (1)")
+    endif
+    if v_shimmer_level == 2 then
+        print(f"Shimmer: Moderate (2)")
+    endif
+    if v_shimmer_level == 3 then
+        print(f"Shimmer: Active (3)")
+    endif
+    
+    # Thaw mode name
+    if v_thaw_mode == 0 then
+        print(f"Thaw: Fade Out (0)")
+    endif
+    if v_thaw_mode == 1 then
+        print(f"Thaw: Melt Down (1)")
+    endif
+    if v_thaw_mode == 2 then
+        print(f"Thaw: Reverse Growth (2)")
+    endif
+    if v_thaw_mode == 3 then
+        print(f"Thaw: Warm Glow (3)")
+    endif
+    if v_thaw_mode == 4 then
+        print(f"Thaw: Sparkle Burst (4)")
+    endif
+    
+    # Coverage
+    print(f"Target Coverage: {v_target_coverage}%")
+    
+    # Connection flash
+    if v_connection_flash == 0 then
+        print(f"Connection Flash: Off (0)")
+    else
+        print(f"Connection Flash: On (1)")
+    endif
+}
+
+# ============================================================================
+# FORMATION MODE SETUP PROCEDURES
+# ============================================================================
+
+# Mode 0: Single corner
+def setup_corner_single {
+    v_corner = random(0, 3, 0)
+    v_origin_count = 1
+    if v_corner == 0 then
+        v_origin_x[0] = 0
+        v_origin_y[0] = 0
+    endif
+    if v_corner == 1 then
+        v_origin_x[0] = 63
+        v_origin_y[0] = 0
+    endif
+    if v_corner == 2 then
+        v_origin_x[0] = 0
+        v_origin_y[0] = 63
+    endif
+    if v_corner == 3 then
+        v_origin_x[0] = 63
+        v_origin_y[0] = 63
+    endif
+    
+    # Seed initial frontier around corner
+    v_tx = v_origin_x[0]
+    v_ty = v_origin_y[0]
+    call calc_index
+    v_frost[v_tidx] = 1
+    v_frost_age[v_tidx] = 0
+    v_frozen_count = 1
+    call add_to_frontier
+}
+
+# Mode 1: Multi-corner (2-4 corners)
+def setup_corner_multi {
+    v_num_corners = random(2, 4, 0)
+    v_origin_count = 0
+    
+    # Randomly select corners
+    create_array(v_corner_used, 4, numeric)
+    v_corner_used[0] = 0
+    v_corner_used[1] = 0
+    v_corner_used[2] = 0
+    v_corner_used[3] = 0
+    
+    while v_origin_count < v_num_corners then
+        v_try_corner = random(0, 3, 0)
+        if v_corner_used[v_try_corner] == 0 then
+            v_corner_used[v_try_corner] = 1
+            if v_try_corner == 0 then
+                v_origin_x[v_origin_count] = 0
+                v_origin_y[v_origin_count] = 0
+            endif
+            if v_try_corner == 1 then
+                v_origin_x[v_origin_count] = 63
+                v_origin_y[v_origin_count] = 0
+            endif
+            if v_try_corner == 2 then
+                v_origin_x[v_origin_count] = 0
+                v_origin_y[v_origin_count] = 63
+            endif
+            if v_try_corner == 3 then
+                v_origin_x[v_origin_count] = 63
+                v_origin_y[v_origin_count] = 63
+            endif
+            
+            v_tx = v_origin_x[v_origin_count]
+            v_ty = v_origin_y[v_origin_count]
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+            
+            v_origin_count = v_origin_count + 1
+        endif
+    endwhile
+}
+
+# Mode 2: Single edge
+def setup_edge_single {
+    v_edge = random(0, 3, 0)
+    v_origin_count = 1
+    
+    # Seed along the edge
+    if v_edge == 0 then
+        # Top edge
+        for v_ex in (0, 63, 4)
+            v_tx = v_ex
+            v_ty = 0
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+        endfor v_ex
+    endif
+    if v_edge == 1 then
+        # Bottom edge
+        for v_ex in (0, 63, 4)
+            v_tx = v_ex
+            v_ty = 63
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+        endfor v_ex
+    endif
+    if v_edge == 2 then
+        # Left edge
+        for v_ey in (0, 63, 4)
+            v_tx = 0
+            v_ty = v_ey
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+        endfor v_ey
+    endif
+    if v_edge == 3 then
+        # Right edge
+        for v_ey in (0, 63, 4)
+            v_tx = 63
+            v_ty = v_ey
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+        endfor v_ey
+    endif
+}
+
+# Mode 3: Multi-edge (2-4 edges)
+def setup_edge_multi {
+    v_num_edges = random(2, 4, 0)
+    create_array(v_edge_used, 4, numeric)
+    v_edge_used[0] = 0
+    v_edge_used[1] = 0
+    v_edge_used[2] = 0
+    v_edge_used[3] = 0
+    
+    v_edges_placed = 0
+    while v_edges_placed < v_num_edges then
+        v_try_edge = random(0, 3, 0)
+        if v_edge_used[v_try_edge] == 0 then
+            v_edge_used[v_try_edge] = 1
+            
+            if v_try_edge == 0 then
+                for v_ex in (0, 63, 4)
+                    v_tx = v_ex
+                    v_ty = 0
+                    call calc_index
+                    if v_frost[v_tidx] == 0 then
+                        v_frost[v_tidx] = 1
+                        v_frost_age[v_tidx] = 0
+                        v_frozen_count = v_frozen_count + 1
+                        call add_to_frontier
+                    endif
+                endfor v_ex
+            endif
+            if v_try_edge == 1 then
+                for v_ex in (0, 63, 4)
+                    v_tx = v_ex
+                    v_ty = 63
+                    call calc_index
+                    if v_frost[v_tidx] == 0 then
+                        v_frost[v_tidx] = 1
+                        v_frost_age[v_tidx] = 0
+                        v_frozen_count = v_frozen_count + 1
+                        call add_to_frontier
+                    endif
+                endfor v_ex
+            endif
+            if v_try_edge == 2 then
+                for v_ey in (0, 63, 4)
+                    v_tx = 0
+                    v_ty = v_ey
+                    call calc_index
+                    if v_frost[v_tidx] == 0 then
+                        v_frost[v_tidx] = 1
+                        v_frost_age[v_tidx] = 0
+                        v_frozen_count = v_frozen_count + 1
+                        call add_to_frontier
+                    endif
+                endfor v_ey
+            endif
+            if v_try_edge == 3 then
+                for v_ey in (0, 63, 4)
+                    v_tx = 63
+                    v_ty = v_ey
+                    call calc_index
+                    if v_frost[v_tidx] == 0 then
+                        v_frost[v_tidx] = 1
+                        v_frost_age[v_tidx] = 0
+                        v_frozen_count = v_frozen_count + 1
+                        call add_to_frontier
+                    endif
+                endfor v_ey
+            endif
+            
+            v_edges_placed = v_edges_placed + 1
+        endif
+    endwhile
+}
+
+# Mode 4: Multi-nucleation (3-8 random seeds)
+def setup_nucleation {
+    v_num_seeds = random(3, 8, 0)
+    v_origin_count = v_num_seeds
+    
+    for v_si in (0, v_num_seeds - 1, 1)
+        v_origin_x[v_si] = random(8, 55, 0)
+        v_origin_y[v_si] = random(8, 55, 0)
+        
+        v_tx = v_origin_x[v_si]
+        v_ty = v_origin_y[v_si]
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+    endfor v_si
+}
+
+# Mode 5: Center outward
+def setup_center {
+    v_origin_count = 1
+    v_origin_x[0] = 32
+    v_origin_y[0] = 32
+    
+    # Seed a small cluster at center
+    for v_cy in (30, 34, 1)
+        for v_cx in (30, 34, 1)
+            v_tx = v_cx
+            v_ty = v_cy
+            call calc_index
+            v_frost[v_tidx] = 1
+            v_frost_age[v_tidx] = 0
+            v_frozen_count = v_frozen_count + 1
+            call add_to_frontier
+        endfor v_cx
+    endfor v_cy
+}
+
+# Mode 6: Frame Inward (all four edges, no warm spot)
+def setup_frame_inward {
+    v_origin_count = 4
+    v_origin_x[0] = 32
+    v_origin_y[0] = 0
+    v_origin_x[1] = 32
+    v_origin_y[1] = 63
+    v_origin_x[2] = 0
+    v_origin_y[2] = 32
+    v_origin_x[3] = 63
+    v_origin_y[3] = 32
+    
+    # Seed all four edges
+    for v_ex in (0, 63, 3)
+        v_tx = v_ex
+        v_ty = 0
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+        
+        v_ty = 63
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+    endfor v_ex
+    
+    for v_ey in (1, 62, 3)
+        v_tx = 0
+        v_ty = v_ey
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+        
+        v_tx = 63
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+    endfor v_ey
+}
+
+# Mode 7: Breath circle (warm spot resists)
+def setup_breath {
+    # Position breath circle
+    v_breath_offset = random(0, 2, 0)
+    if v_breath_offset == 0 then
+        v_breath_x = 32
+        v_breath_y = 32
+    endif
+    if v_breath_offset == 1 then
+        v_breath_x = random(20, 44, 0)
+        v_breath_y = 32
+    endif
+    if v_breath_offset == 2 then
+        v_breath_x = 32
+        v_breath_y = random(20, 44, 0)
+    endif
+    
+    v_breath_size = random(0, 2, 0)
+    if v_breath_size == 0 then
+        v_breath_radius = 8
+    endif
+    if v_breath_size == 1 then
+        v_breath_radius = 12
+    endif
+    if v_breath_size == 2 then
+        v_breath_radius = 16
+    endif
+    
+    # Seed all four edges
+    for v_ex in (0, 63, 3)
+        v_tx = v_ex
+        v_ty = 0
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+        
+        v_ty = 63
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+    endfor v_ex
+    
+    for v_ey in (1, 62, 3)
+        v_tx = 0
+        v_ty = v_ey
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+        
+        v_tx = 63
+        call calc_index
+        v_frost[v_tidx] = 1
+        v_frost_age[v_tidx] = 0
+        v_frozen_count = v_frozen_count + 1
+        call add_to_frontier
+    endfor v_ey
+}
+
+# Main setup dispatcher
+def setup_formation {
+    if v_formation_mode == 0 then
+        call setup_corner_single
+    endif
+    if v_formation_mode == 1 then
+        call setup_corner_multi
+    endif
+    if v_formation_mode == 2 then
+        call setup_edge_single
+    endif
+    if v_formation_mode == 3 then
+        call setup_edge_multi
+    endif
+    if v_formation_mode == 4 then
+        call setup_nucleation
+    endif
+    if v_formation_mode == 5 then
+        call setup_center
+    endif
+    if v_formation_mode == 6 then
+        call setup_frame_inward
+    endif
+    if v_formation_mode == 7 then
+        call setup_breath
+    endif
+}
+
+# ============================================================================
+# CRYSTAL GROWTH PROCEDURES
+# ============================================================================
+
+# Breath zone check is now inlined in try_grow_from_pixel for performance
+
+# Color selection is now inlined in try_grow_from_pixel for performance
+
+# Try to grow frost from a frontier pixel
+# v_fx, v_fy = frontier pixel coords
+def try_grow_from_pixel {
+    # Direction offsets (inline for speed)
+    # 0=N, 1=NE, 2=E, 3=SE, 4=S, 5=SW, 6=W, 7=NW
+    
+    # Pick 2-4 random directions to try (not all 8)
+    v_num_tries = random(2, 4, 0)
+    v_try = 0
+    
+    while v_try < v_num_tries then
+        v_dir = random(0, 7, 0)
+        
+        # Get direction offset inline
+        v_odx = 0
+        v_ody = 0
+        if v_dir == 0 then
+            v_ody = -1
+        endif
+        if v_dir == 1 then
+            v_odx = 1
+            v_ody = -1
+        endif
+        if v_dir == 2 then
+            v_odx = 1
+        endif
+        if v_dir == 3 then
+            v_odx = 1
+            v_ody = 1
+        endif
+        if v_dir == 4 then
+            v_ody = 1
+        endif
+        if v_dir == 5 then
+            v_odx = -1
+            v_ody = 1
+        endif
+        if v_dir == 6 then
+            v_odx = -1
+        endif
+        if v_dir == 7 then
+            v_odx = -1
+            v_ody = -1
+        endif
+        
+        v_nx = v_fx + v_odx
+        v_ny = v_fy + v_ody
+        
+        # Inline bounds check
+        if v_nx >= 0 and v_nx <= 63 and v_ny >= 0 and v_ny <= 63 then
+            v_nidx = v_ny * 64 + v_nx
+            
+            if v_frost[v_nidx] == 0 then
+                # Check breath zone for mode 7 only
+                v_can_freeze = 1
+                if v_formation_mode == 7 then
+                    v_bdx = v_nx - v_breath_x
+                    v_bdy = v_ny - v_breath_y
+                    v_bdist = sqrt(v_bdx * v_bdx + v_bdy * v_bdy)
+                    if v_bdist < v_breath_radius then
+                        v_coverage_pct = (v_frozen_count * 100) / 4096
+                        if v_coverage_pct < 60 then
+                            v_breath_resist = random(0, 100, 0)
+                            if v_breath_resist < 85 then
+                                v_can_freeze = 0
+                            endif
+                        elseif v_coverage_pct < 80 then
+                            v_breath_resist = random(0, 100, 0)
+                            if v_breath_resist < 50 then
+                                v_can_freeze = 0
+                            endif
+                        endif
+                    endif
+                endif
+                
+                if v_can_freeze == 1 then
+                    v_grow_roll = random(0, 100, 0)
+                    if v_grow_roll < v_grow_chance then
+                        # Freeze this pixel
+                        v_frost[v_nidx] = 1
+                        v_frozen_count = v_frozen_count + 1
+                        
+                        # Add to frontier
+                        if v_frontier_count < 499 then
+                            v_frontier_x[v_frontier_count] = v_nx
+                            v_frontier_y[v_frontier_count] = v_ny
+                            v_frontier_count = v_frontier_count + 1
+                        endif
+                        
+                        # Get color and draw
+                        v_frost_intensity = 90
+                        if v_edge_glow == 1 then
+                            v_frost_intensity = 95
+                        endif
+                        if v_edge_glow == 2 then
+                            v_frost_intensity = 100
+                        endif
+                        
+                        # Simple color selection
+                        if v_color_palette == 0 then
+                            plot(v_nx, v_ny, white, v_frost_intensity)
+                        elseif v_color_palette == 1 then
+                            v_croll = random(0, 100, 0)
+                            if v_croll < 70 then
+                                plot(v_nx, v_ny, white, v_frost_intensity)
+                            else
+                                plot(v_nx, v_ny, cyan, v_frost_intensity)
+                            endif
+                        elseif v_color_palette == 2 then
+                            v_croll = random(0, 100, 0)
+                            if v_croll < 60 then
+                                plot(v_nx, v_ny, white, v_frost_intensity)
+                            elseif v_croll < 85 then
+                                plot(v_nx, v_ny, cyan, v_frost_intensity)
+                            else
+                                plot(v_nx, v_ny, lavender, v_frost_intensity)
+                            endif
+                        else
+                            v_croll = random(0, 100, 0)
+                            if v_croll < 50 then
+                                plot(v_nx, v_ny, white, v_frost_intensity)
+                            else
+                                plot(v_nx, v_ny, silver, v_frost_intensity)
+                            endif
+                        endif
+                        
+                        # Branch chance
+                        if v_branch_chance > 0 then
+                            v_branch_roll = random(0, 100, 0)
+                            if v_branch_roll < v_branch_chance then
+                                v_bdir = random(0, 7, 0)
+                                # Quick inline direction
+                                v_bdx2 = 0
+                                v_bdy2 = 0
+                                if v_bdir == 0 then
+                                    v_bdy2 = -1
+                                endif
+                                if v_bdir == 1 then
+                                    v_bdx2 = 1
+                                    v_bdy2 = -1
+                                endif
+                                if v_bdir == 2 then
+                                    v_bdx2 = 1
+                                endif
+                                if v_bdir == 3 then
+                                    v_bdx2 = 1
+                                    v_bdy2 = 1
+                                endif
+                                if v_bdir == 4 then
+                                    v_bdy2 = 1
+                                endif
+                                if v_bdir == 5 then
+                                    v_bdx2 = -1
+                                    v_bdy2 = 1
+                                endif
+                                if v_bdir == 6 then
+                                    v_bdx2 = -1
+                                endif
+                                if v_bdir == 7 then
+                                    v_bdx2 = -1
+                                    v_bdy2 = -1
+                                endif
+                                
+                                v_bx = v_fx + v_bdx2
+                                v_by = v_fy + v_bdy2
+                                
+                                if v_bx >= 0 and v_bx <= 63 and v_by >= 0 and v_by <= 63 then
+                                    v_bidx = v_by * 64 + v_bx
+                                    if v_frost[v_bidx] == 0 then
+                                        v_frost[v_bidx] = 1
+                                        v_frozen_count = v_frozen_count + 1
+                                        if v_frontier_count < 499 then
+                                            v_frontier_x[v_frontier_count] = v_bx
+                                            v_frontier_y[v_frontier_count] = v_by
+                                            v_frontier_count = v_frontier_count + 1
+                                        endif
+                                        plot(v_bx, v_by, white, v_frost_intensity)
+                                    endif
+                                endif
+                            endif
+                        endif
+                        
+                        # Early exit - we froze a pixel, move on
+                        v_try = v_num_tries
+                    endif
+                endif
+            endif
+        endif
+        
+        v_try = v_try + 1
+    endwhile
+}
+
+# Connection flash is now handled in do_connection_flash called from grow_frost
+
+# Apply shimmer effect to frozen pixels
+def apply_shimmer {
+    if v_shimmer_level > 0 then
+        # Determine shimmer count based on level
+        if v_shimmer_level == 1 then
+            v_shimmer_count = random(1, 2, 0)
+        endif
+        if v_shimmer_level == 2 then
+            v_shimmer_count = random(3, 5, 0)
+        endif
+        if v_shimmer_level == 3 then
+            v_shimmer_count = random(6, 10, 0)
+        endif
+        
+        for v_sh in (0, v_shimmer_count - 1, 1)
+            v_shx = random(0, 63, 0)
+            v_shy = random(0, 63, 0)
+            v_tx = v_shx
+            v_ty = v_shy
+            call calc_index
+            if v_frost[v_tidx] == 1 then
+                # Bright sparkle
+                plot(v_shx, v_shy, white, 100)
+            endif
+        endfor v_sh
+    endif
+}
+
+# Age tracking removed for performance - intensity is handled at draw time
+
+# Main growth loop
+def grow_frost {
+    v_target_count = (4096 * v_target_coverage) / 100
+    v_growth_iterations = 0
+    v_max_iterations = 2000
+    
+    # Pre-calculate some values to avoid repeated work
+    v_last_cleanup = 0
+    v_last_flash_check = 0
+    
+    while v_frozen_count < v_target_count and v_growth_iterations < v_max_iterations then
+        v_growth_iterations = v_growth_iterations + 1
+        
+        # Process frontier pixels
+        if v_frontier_count > 0 then
+            # Process more pixels per iteration for speed
+            v_grow_attempts = min(v_frontier_count, 40)
+            
+            for v_ga in (0, v_grow_attempts - 1, 1)
+                v_fi = random(0, v_frontier_count - 1, 0)
+                v_fx = v_frontier_x[v_fi]
+                v_fy = v_frontier_y[v_fi]
+                
+                call try_grow_from_pixel
+            endfor v_ga
+            
+            # Apply shimmer less frequently
+            if v_shimmer_level > 0 then
+                v_shimmer_roll = random(0, 5, 0)
+                if v_shimmer_roll == 0 then
+                    call apply_shimmer
+                endif
+            endif
+            
+            # Check for connection flash less frequently
+            if v_connection_flash == 1 then
+                v_flash_interval = v_frozen_count - v_last_flash_check
+                if v_flash_interval > 150 then
+                    v_last_flash_check = v_frozen_count
+                    call do_connection_flash
+                endif
+            endif
+            
+            # Clean up frontier more aggressively
+            v_cleanup_interval = v_growth_iterations - v_last_cleanup
+            if v_cleanup_interval > 50 then
+                v_last_cleanup = v_growth_iterations
+                call cleanup_frontier
+            endif
+        endif
+        
+        rest(v_growth_delay)
+    endwhile
+    
+    print(f"Frost complete: {v_frozen_count} pixels frozen in {v_growth_iterations} iterations")
+}
+
+# Separate procedure for connection flash effect
+def do_connection_flash {
+    v_flash_x = random(5, 58, 0)
+    v_flash_y = random(5, 58, 0)
+    for v_ffy in (v_flash_y - 3, v_flash_y + 3, 1)
+        for v_ffx in (v_flash_x - 3, v_flash_x + 3, 1)
+            v_tx = v_ffx
+            v_ty = v_ffy
+            call check_bounds
+            if v_tvalid == 1 then
+                call calc_index
+                if v_frost[v_tidx] == 1 then
+                    plot(v_ffx, v_ffy, white, 100)
+                endif
+            endif
+        endfor v_ffx
+    endfor v_ffy
+    rest(0.03)
+}
+
+# Separate procedure for frontier cleanup
+def cleanup_frontier {
+    v_new_frontier = 0
+    for v_cfi in (0, v_frontier_count - 1, 1)
+        v_cfx = v_frontier_x[v_cfi]
+        v_cfy = v_frontier_y[v_cfi]
+        
+        # Quick check if still on edge (has unfrozen neighbor)
+        v_still_edge = 0
+        
+        v_tx = v_cfx - 1
+        v_ty = v_cfy
+        if v_tx >= 0 then
+            call calc_index
+            if v_frost[v_tidx] == 0 then
+                v_still_edge = 1
+            endif
+        endif
+        
+        if v_still_edge == 0 then
+            v_tx = v_cfx + 1
+            if v_tx <= 63 then
+                call calc_index
+                if v_frost[v_tidx] == 0 then
+                    v_still_edge = 1
+                endif
+            endif
+        endif
+        
+        if v_still_edge == 0 then
+            v_tx = v_cfx
+            v_ty = v_cfy - 1
+            if v_ty >= 0 then
+                call calc_index
+                if v_frost[v_tidx] == 0 then
+                    v_still_edge = 1
+                endif
+            endif
+        endif
+        
+        if v_still_edge == 0 then
+            v_ty = v_cfy + 1
+            if v_ty <= 63 then
+                call calc_index
+                if v_frost[v_tidx] == 0 then
+                    v_still_edge = 1
+                endif
+            endif
+        endif
+        
+        if v_still_edge == 1 then
+            if v_new_frontier < 499 then
+                v_frontier_x[v_new_frontier] = v_cfx
+                v_frontier_y[v_new_frontier] = v_cfy
+                v_new_frontier = v_new_frontier + 1
+            endif
+        endif
+    endfor v_cfi
+    v_frontier_count = v_new_frontier
+}
+
+# ============================================================================
+# DISPLAY COMPLETION PAUSE WITH SHIMMER
+# ============================================================================
+
+def pause_with_shimmer {
+    # Determine pause time
+    if v_pause_duration == 0 then
+        v_pause_time = random(1, 2, 0)
+    endif
+    if v_pause_duration == 1 then
+        v_pause_time = random(3, 5, 0)
+    endif
+    if v_pause_duration == 2 then
+        v_pause_time = random(6, 10, 0)
+    endif
+    
+    print(f"Pausing for {v_pause_time} seconds")
+    
+    v_pause_frames = v_pause_time * 10
+    for v_pf in (0, v_pause_frames, 1)
+        # Continue shimmer during pause
+        if v_shimmer_level > 0 then
+            call apply_shimmer
+        endif
+        rest(0.1)
+    endfor v_pf
+}
+
+# ============================================================================
+# THAW PROCEDURES
+# ============================================================================
+
+# Mode 0: Fade out
+def thaw_fade {
+    print("Thaw: Fade Out")
+    
+    if v_thaw_speed == 0 then
+        v_fade_steps = 8
+    endif
+    if v_thaw_speed == 1 then
+        v_fade_steps = 12
+    endif
+    if v_thaw_speed == 2 then
+        v_fade_steps = 18
+    endif
+    
+    for v_fs in (0, v_fade_steps, 1)
+        v_intensity = 100 - ((v_fs * 100) / v_fade_steps)
+        
+        if v_intensity > 5 then
+            begin_frame
+            for v_fy in (0, 63, 1)
+                for v_fx in (0, 63, 1)
+                    v_fidx = v_fy * 64 + v_fx
+                    if v_frost[v_fidx] == 1 then
+                        plot(v_fx, v_fy, white, v_intensity)
+                    endif
+                endfor v_fx
+            endfor v_fy
+            end_frame
+        endif
+        
+        rest(0.1)
+    endfor v_fs
+    
+    clear()
+}
+
+# Mode 1: Melt down (top to bottom)
+def thaw_melt {
+    print("Thaw: Melt Down")
+    
+    if v_thaw_speed == 0 then
+        v_melt_delay = 0.01
+        v_row_step = 2
+    endif
+    if v_thaw_speed == 1 then
+        v_melt_delay = 0.03
+        v_row_step = 1
+    endif
+    if v_thaw_speed == 2 then
+        v_melt_delay = 0.05
+        v_row_step = 1
+    endif
+    
+    v_my = 0
+    while v_my <= 63 then
+        # Clear this row
+        for v_mx in (0, 63, 1)
+            v_midx = v_my * 64 + v_mx
+            if v_frost[v_midx] == 1 then
+                # Drip effect - brief blue at melt line
+                plot(v_mx, v_my, cyan, 60, 150, fade)
+            endif
+        endfor v_mx
+        
+        rest(v_melt_delay)
+        v_my = v_my + v_row_step
+    endwhile
+    
+    rest(0.2)
+    clear()
+}
+
+# Mode 2: Reverse growth (recede to origins)
+def thaw_reverse {
+    print("Thaw: Reverse Growth")
+    
+    if v_thaw_speed == 0 then
+        v_rev_delay = 0.02
+        v_dist_step = 8
+    endif
+    if v_thaw_speed == 1 then
+        v_rev_delay = 0.04
+        v_dist_step = 5
+    endif
+    if v_thaw_speed == 2 then
+        v_rev_delay = 0.06
+        v_dist_step = 3
+    endif
+    
+    # Thaw based on distance from nearest origin (furthest first)
+    # Use larger steps to reduce iterations
+    v_dist = 90
+    while v_dist >= 0 then
+        begin_frame(true)
+        
+        for v_ry in (0, 63, 1)
+            for v_rx in (0, 63, 1)
+                v_ridx = v_ry * 64 + v_rx
+                
+                if v_frost[v_ridx] == 1 then
+                    # Find distance to nearest origin (simplified - just use first origin)
+                    v_odx = v_rx - v_origin_x[0]
+                    v_ody = v_ry - v_origin_y[0]
+                    v_min_dist = sqrt(v_odx * v_odx + v_ody * v_ody)
+                    
+                    # Check other origins if they exist
+                    if v_origin_count > 1 then
+                        v_odx = v_rx - v_origin_x[1]
+                        v_ody = v_ry - v_origin_y[1]
+                        v_od = sqrt(v_odx * v_odx + v_ody * v_ody)
+                        if v_od < v_min_dist then
+                            v_min_dist = v_od
+                        endif
+                    endif
+                    
+                    if v_min_dist >= v_dist then
+                        v_frost[v_ridx] = 0
+                        plot(v_rx, v_ry, black, 100)
+                    else
+                        # Still frozen - redraw
+                        plot(v_rx, v_ry, white, 85)
+                    endif
+                endif
+            endfor v_rx
+        endfor v_ry
+        
+        end_frame
+        rest(v_rev_delay)
+        
+        v_dist = v_dist - v_dist_step
+    endwhile
+    
+    clear()
+}
+
+# Mode 3: Warm glow melt
+def thaw_warm {
+    print("Thaw: Warm Glow")
+    
+    if v_thaw_speed == 0 then
+        v_warm_steps = 12
+    endif
+    if v_thaw_speed == 1 then
+        v_warm_steps = 18
+    endif
+    if v_thaw_speed == 2 then
+        v_warm_steps = 25
+    endif
+    
+    # Warm glow spreads from center
+    for v_ws in (0, v_warm_steps, 1)
+        v_warm_radius = (v_ws * 50) / v_warm_steps
+        
+        begin_frame
+        for v_wy in (0, 63, 1)
+            for v_wx in (0, 63, 1)
+                v_widx = v_wy * 64 + v_wx
+                
+                if v_frost[v_widx] == 1 then
+                    v_wdx = v_wx - 32
+                    v_wdy = v_wy - 32
+                    v_wdist = sqrt(v_wdx * v_wdx + v_wdy * v_wdy)
+                    
+                    if v_wdist < v_warm_radius then
+                        # Melted - show warm color fading
+                        v_warm_int = 60 - ((v_warm_radius - v_wdist) * 2)
+                        if v_warm_int > 10 then
+                            plot(v_wx, v_wy, orange, v_warm_int)
+                        endif
+                    elseif v_wdist < v_warm_radius + 5 then
+                        # Melting edge - yellow/orange
+                        plot(v_wx, v_wy, coral, 70)
+                    else
+                        # Still frozen
+                        plot(v_wx, v_wy, white, 85)
+                    endif
+                endif
+            endfor v_wx
+        endfor v_wy
+        end_frame
+        
+        rest(0.1)
+    endfor v_ws
+    
+    clear()
+}
+
+# Mode 4: Sparkle burst
+def thaw_sparkle {
+    print("Thaw: Sparkle Burst")
+    
+    if v_thaw_speed == 0 then
+        v_burst_frames = 10
+    endif
+    if v_thaw_speed == 1 then
+        v_burst_frames = 18
+    endif
+    if v_thaw_speed == 2 then
+        v_burst_frames = 28
+    endif
+    
+    # Intense sparkle phase
+    for v_bf in (0, v_burst_frames, 1)
+        v_sparkle_count = 20 + random(0, 30, 0)
+        
+        for v_sp in (0, v_sparkle_count, 1)
+            v_spx = random(0, 63, 0)
+            v_spy = random(0, 63, 0)
+            v_spidx = v_spy * 64 + v_spx
+            if v_frost[v_spidx] == 1 then
+                v_sp_int = random(70, 100, 0)
+                plot(v_spx, v_spy, white, v_sp_int)
+            endif
+        endfor v_sp
+        
+        rest(0.05)
+    endfor v_bf
+    
+    # Quick fade - fewer steps
+    for v_ff in (0, 6, 1)
+        v_fade_int = 85 - (v_ff * 14)
+        
+        if v_fade_int > 10 then
+            begin_frame
+            for v_ffy in (0, 63, 1)
+                for v_ffx in (0, 63, 1)
+                    v_ffidx = v_ffy * 64 + v_ffx
+                    if v_frost[v_ffidx] == 1 then
+                        plot(v_ffx, v_ffy, white, v_fade_int)
+                    endif
+                endfor v_ffx
+            endfor v_ffy
+            end_frame
+        endif
+        
+        rest(0.06)
+    endfor v_ff
+    
+    clear()
+}
+
+# Main thaw dispatcher
+def run_thaw {
+    if v_thaw_mode == 0 then
+        call thaw_fade
+    endif
+    if v_thaw_mode == 1 then
+        call thaw_melt
+    endif
+    if v_thaw_mode == 2 then
+        call thaw_reverse
+    endif
+    if v_thaw_mode == 3 then
+        call thaw_warm
+    endif
+    if v_thaw_mode == 4 then
+        call thaw_sparkle
+    endif
+}
+
+# ============================================================================
+# MAIN CYCLE
+# ============================================================================
+
+def run_frost_cycle {
+    # Randomize all parameters
+    call randomize_parameters
+    
+    # Clear arrays and display
+    call clear_frost_arrays
+    clear()
+    rest(0.5)
+    
+    # Setup formation origins
+    call setup_formation
+    
+    # Draw initial seed pixels
+    for v_di in (0, v_frontier_count - 1, 1)
+        v_px = v_frontier_x[v_di]
+        v_py = v_frontier_y[v_di]
+        v_is_edge = 1
+        call get_frost_color
+        plot(v_px, v_py, v_frost_color, v_frost_intensity)
+    endfor v_di
+    
+    # Grow the frost
+    call grow_frost
+    
+    # Pause to admire
+    call pause_with_shimmer
+    
+    # Thaw
+    call run_thaw
+    
+    # Brief pause before next cycle
+    rest(1)
+}
+
+# ============================================================================
+# FOREVER LOOP
+# ============================================================================
+
+print("=== Frost Forming ===")
+print("Dynamic ice crystal simulation")
+print("Over 1 million unique combinations")
+print("")
+
+# Initialize
+clear()
+throttle(0.3)
+
+# Run forever
+while 1 == 1 then
+    call run_frost_cycle
+endwhile

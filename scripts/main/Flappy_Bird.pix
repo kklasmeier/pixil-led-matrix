@@ -1,0 +1,457 @@
+# Flappy Bird - AI Self-Play Demo
+# 64x64 LED Matrix
+# Features: Title screen, AI gameplay, game over screen, looping
+
+#================================================
+# CONSTANTS AND CONFIGURATION
+#================================================
+v_screen_width = 64
+v_screen_height = 64
+v_bird_x = 12
+v_gravity = 0.4
+v_flap_power = -3.2
+v_pipe_speed = 2
+v_min_gap = 16
+v_max_gap = 20
+v_pipe_width = 8
+v_cap_height = 3
+v_ground_y = 58
+v_play_area_bottom = 57
+v_num_pipes = 4
+
+#================================================
+# BIRD SPRITE DEFINITION (3 cels for animation)
+#================================================
+define_sprite(flappy, 6, 5)
+    # Cel 0 - Wings Up
+    sprite_cel(0)
+        # Body (yellow/orange)
+        plot(1, 1, yellow, 100)
+        plot(2, 1, yellow, 100)
+        plot(3, 1, yellow, 100)
+        plot(0, 2, yellow, 100)
+        plot(1, 2, yellow, 100)
+        plot(2, 2, yellow, 100)
+        plot(3, 2, orange, 100)
+        plot(4, 2, orange, 100)
+        plot(1, 3, yellow, 100)
+        plot(2, 3, yellow, 100)
+        plot(3, 3, orange, 100)
+        # Wing up
+        plot(0, 0, white, 100)
+        plot(1, 0, white, 100)
+        # Eye
+        plot(4, 1, white, 100)
+        # Beak
+        plot(5, 2, coral, 100)
+    
+    # Cel 1 - Wings Middle
+    sprite_cel(1)
+        # Body
+        plot(1, 1, yellow, 100)
+        plot(2, 1, yellow, 100)
+        plot(3, 1, yellow, 100)
+        plot(0, 2, yellow, 100)
+        plot(1, 2, yellow, 100)
+        plot(2, 2, yellow, 100)
+        plot(3, 2, orange, 100)
+        plot(4, 2, orange, 100)
+        plot(1, 3, yellow, 100)
+        plot(2, 3, yellow, 100)
+        plot(3, 3, orange, 100)
+        # Wing middle (to the side)
+        plot(0, 2, white, 100)
+        # Eye
+        plot(4, 1, white, 100)
+        # Beak
+        plot(5, 2, coral, 100)
+    
+    # Cel 2 - Wings Down
+    sprite_cel(2)
+        # Body
+        plot(1, 1, yellow, 100)
+        plot(2, 1, yellow, 100)
+        plot(3, 1, yellow, 100)
+        plot(0, 2, yellow, 100)
+        plot(1, 2, yellow, 100)
+        plot(2, 2, yellow, 100)
+        plot(3, 2, orange, 100)
+        plot(4, 2, orange, 100)
+        plot(1, 3, yellow, 100)
+        plot(2, 3, yellow, 100)
+        plot(3, 3, orange, 100)
+        # Wing down
+        plot(0, 3, white, 100)
+        plot(0, 4, white, 100)
+        # Eye
+        plot(4, 1, white, 100)
+        # Beak
+        plot(5, 2, coral, 100)
+endsprite
+
+#================================================
+# PROCEDURES
+#================================================
+
+# Draw blue sky background with ground
+def draw_background {
+    draw_rectangle(0, 0, 64, v_ground_y, sky_blue, 100, true)
+    draw_rectangle(0, v_ground_y, 64, 6, forest_green, 100, true)
+    # Ground detail line
+    draw_line(0, v_ground_y, 63, v_ground_y, green, 100)
+}
+
+# Draw decorative clouds for title screen
+def draw_clouds {
+    # Cloud 1 - left side
+    draw_ellipse(12, 10, 6, 3, white, 70, true, 0)
+    draw_ellipse(8, 11, 4, 2, white, 70, true, 0)
+    draw_ellipse(16, 11, 4, 2, white, 70, true, 0)
+    
+    # Cloud 2 - right side
+    draw_ellipse(50, 8, 5, 3, white, 60, true, 0)
+    draw_ellipse(45, 9, 4, 2, white, 60, true, 0)
+    draw_ellipse(54, 9, 3, 2, white, 60, true, 0)
+    
+    # Cloud 3 - small center
+    draw_ellipse(32, 6, 4, 2, white, 50, true, 0)
+}
+
+# Draw a single pipe pair
+# Uses globals: v_pipe_x, v_gap_y, v_gap_size
+def draw_pipe {
+    # Top pipe body (narrower)
+    v_top_height = v_gap_y
+    if v_top_height > v_cap_height then
+        draw_rectangle(v_pipe_x + 1, 0, v_pipe_width - 2, v_top_height - v_cap_height, green, 100, true)
+    endif
+    
+    # Top pipe cap (wider, darker)
+    if v_top_height >= v_cap_height then
+        draw_rectangle(v_pipe_x, v_gap_y - v_cap_height, v_pipe_width, v_cap_height, forest_green, 100, true)
+    endif
+    
+    # Bottom pipe cap (wider, darker)
+    v_bottom_start = v_gap_y + v_gap_size
+    draw_rectangle(v_pipe_x, v_bottom_start, v_pipe_width, v_cap_height, forest_green, 100, true)
+    
+    # Bottom pipe body (narrower)
+    v_bottom_body_start = v_bottom_start + v_cap_height
+    v_bottom_body_height = v_ground_y - v_bottom_body_start
+    if v_bottom_body_height > 0 then
+        draw_rectangle(v_pipe_x + 1, v_bottom_body_start, v_pipe_width - 2, v_bottom_body_height, green, 100, true)
+    endif
+}
+
+#================================================
+# TITLE SCREEN
+#================================================
+def show_title_screen {
+    clear()
+    
+    begin_frame
+        call draw_background
+        call draw_clouds
+    end_frame
+    
+    # Title text with shadow effect
+    draw_text(7, 16, "FLAPPY", tiny64_font, 8, black, 50)
+    draw_text(6, 15, "FLAPPY", tiny64_font, 8, white, 100)
+    draw_text(14, 27, "BIRD", tiny64_font, 8, black, 50)
+    draw_text(13, 26, "BIRD", tiny64_font, 8, yellow, 100)
+    
+    # Show flappy bird flapping in center area
+    show_sprite(flappy, 29, 38, 0)
+    
+    # Animate bird flapping and bobbing for ~3 seconds
+    v_bob_y = 38
+    v_bob_dir = 1
+    for v_title_frame in (0, 40, 1)
+        # Bob up and down
+        v_bob_y = v_bob_y + v_bob_dir
+        if v_bob_y > 42 then
+            v_bob_dir = -1
+        endif
+        if v_bob_y < 36 then
+            v_bob_dir = 1
+        endif
+        
+        # move_sprite auto-advances animation cel
+        move_sprite(flappy, 29, v_bob_y, 0)
+        rest(0.075)
+    endfor v_title_frame
+    
+    hide_sprite(flappy, 0)
+    rest(0.3)
+}
+
+#================================================
+# GAME OVER SCREEN
+#================================================
+def show_game_over {
+    # Flash effect
+    draw_rectangle(0, 0, 64, 64, white, 100, true)
+    rest(0.1)
+    
+    begin_frame
+        call draw_background
+    end_frame
+    
+    # Game over banner background
+    draw_rectangle(4, 18, 56, 28, black, 60, true)
+    draw_rectangle(5, 19, 54, 26, navy, 80, true)
+    
+    # Game over text
+    draw_text(8, 22, "GAME OVER", tiny64_font, 7, red, 100)
+    
+    # Score display
+    draw_text(14, 34, "SCORE", tiny64_font, 6, white, 100)
+    
+    # Convert score to string position
+    if v_score < 10 then
+        draw_text(44, 34, v_score, tiny64_font, 6, yellow, 100)
+    else
+        draw_text(40, 34, v_score, tiny64_font, 6, yellow, 100)
+    endif
+    
+    rest(3)
+}
+
+#================================================
+# MAIN GAME LOGIC
+#================================================
+def play_game {
+    # Initialize game state
+    v_bird_y = 28.0
+    v_bird_vel = 0.0
+    v_score = 0
+    v_game_over = 0
+    
+    # Pipe arrays (4 pipes, indices 0-3)
+    create_array(v_pipe_x_arr, 4, numeric)
+    create_array(v_gap_y_arr, 4, numeric)
+    create_array(v_gap_size_arr, 4, numeric)
+    create_array(v_pipe_scored, 4, numeric)
+    
+    # AI mistake tracking - wait longer before mistakes
+    v_mistake_threshold = random(12, 20, 0)
+    v_pipes_passed = 0
+    v_making_mistake = 0
+    
+    # Initialize pipes with random spacing - start further out
+    v_next_pipe_x = 80
+    for v_i in (0, 3, 1)
+        v_pipe_x_arr[v_i] = v_next_pipe_x
+        v_temp_gap = random(v_min_gap, v_max_gap, 0)
+        v_gap_size_arr[v_i] = v_temp_gap
+        v_max_gap_y = 40 - v_temp_gap
+        if v_max_gap_y < 10 then
+            v_max_gap_y = 10
+        endif
+        v_gap_y_arr[v_i] = random(10, v_max_gap_y, 0)
+        v_pipe_scored[v_i] = 0
+        v_spacing = random(30, 45, 0)
+        v_next_pipe_x = v_next_pipe_x + v_spacing
+    endfor v_i
+    
+    # Show bird sprite
+    show_sprite(flappy, v_bird_x, 28, 0)
+    
+    # Main game loop
+    while v_game_over == 0 then
+        
+        # --- AI DECISION LOGIC ---
+        # Find next pipe bird needs to navigate
+        v_target_pipe = -1
+        v_closest_x = 999
+        
+        for v_i in (0, 3, 1)
+            v_check_x = v_pipe_x_arr[v_i]
+            # Look for pipes that bird hasn't fully passed yet
+            if v_check_x + v_pipe_width > v_bird_x + 3 then
+                if v_check_x < v_closest_x then
+                    v_closest_x = v_check_x
+                    v_target_pipe = v_i
+                endif
+            endif
+        endfor v_i
+        
+        # Calculate target Y and decide whether to flap
+        if v_target_pipe >= 0 then
+            v_gap_top_target = v_gap_y_arr[v_target_pipe]
+            v_gap_size_target = v_gap_size_arr[v_target_pipe]
+            v_gap_center = v_gap_top_target + v_gap_size_target / 2
+            
+            # If making a mistake, aim too low (will hit bottom pipe)
+            if v_making_mistake == 1 then
+                v_gap_center = v_gap_center + 12
+            endif
+            
+            # Predictive flapping - account for where bird will be
+            v_predicted_y = v_bird_y + v_bird_vel * 2
+            
+            # Flap if predicted position is below gap center
+            if v_predicted_y > v_gap_center then
+                # Only flap if not already moving up fast
+                if v_bird_vel > -2 then
+                    v_bird_vel = v_flap_power
+                endif
+            endif
+            
+            # Emergency flap if getting too low
+            if v_bird_y > v_gap_top_target + v_gap_size_target - 6 then
+                v_bird_vel = v_flap_power
+            endif
+            
+            # Don't go too high
+            if v_bird_y < v_gap_top_target + 3 then
+                # Let gravity work, don't flap
+                v_bird_vel = v_bird_vel
+            endif
+        else
+            # No pipe found, just stay in middle
+            if v_bird_y > 30 then
+                if v_bird_vel > -1 then
+                    v_bird_vel = v_flap_power
+                endif
+            endif
+        endif
+        
+        # --- PHYSICS UPDATE ---
+        v_bird_vel = v_bird_vel + v_gravity
+        # Terminal velocity
+        if v_bird_vel > 4 then
+            v_bird_vel = 4
+        endif
+        v_bird_y = v_bird_y + v_bird_vel
+        
+        # --- UPDATE PIPES ---
+        for v_i in (0, 3, 1)
+            v_pipe_x_arr[v_i] = v_pipe_x_arr[v_i] - v_pipe_speed
+            
+            # Check if pipe was passed for scoring
+            v_pipe_right = v_pipe_x_arr[v_i] + v_pipe_width
+            if v_pipe_right < v_bird_x then
+                if v_pipe_scored[v_i] == 0 then
+                    v_score = v_score + 1
+                    v_pipe_scored[v_i] = 1
+                    v_pipes_passed = v_pipes_passed + 1
+                    
+                    # Check if AI should start making a mistake
+                    if v_pipes_passed >= v_mistake_threshold then
+                        v_making_mistake = 1
+                    endif
+                endif
+            endif
+            
+            # Respawn pipe when it goes off screen
+            if v_pipe_x_arr[v_i] + v_pipe_width < 0 then
+                # Find rightmost pipe to spawn after it
+                v_max_x = 0
+                for v_j in (0, 3, 1)
+                    if v_pipe_x_arr[v_j] > v_max_x then
+                        v_max_x = v_pipe_x_arr[v_j]
+                    endif
+                endfor v_j
+                
+                # Random spacing for new pipe
+                v_spacing = random(30, 45, 0)
+                v_pipe_x_arr[v_i] = v_max_x + v_spacing
+                
+                # Random gap size and position
+                v_temp_gap = random(v_min_gap, v_max_gap, 0)
+                v_gap_size_arr[v_i] = v_temp_gap
+                v_max_gap_y = 40 - v_temp_gap
+                if v_max_gap_y < 10 then
+                    v_max_gap_y = 10
+                endif
+                v_gap_y_arr[v_i] = random(10, v_max_gap_y, 0)
+                v_pipe_scored[v_i] = 0
+                
+                # Reset mistake state after dying
+                v_making_mistake = 0
+                v_pipes_passed = 0
+                v_mistake_threshold = random(12, 20, 0)
+            endif
+        endfor v_i
+        
+        # --- COLLISION DETECTION ---
+        # Use smaller hitbox than visual sprite for forgiving collisions
+        v_bird_top = int(v_bird_y) + 1
+        v_bird_bottom = v_bird_top + 3
+        v_bird_left = v_bird_x + 1
+        v_bird_right = v_bird_x + 5
+        
+        # Check screen bounds (ceiling and ground)
+        if v_bird_top < 0 then
+            v_game_over = 1
+        endif
+        if v_bird_bottom >= v_ground_y - 1 then
+            v_game_over = 1
+        endif
+        
+        # Check pipe collisions
+        for v_i in (0, 3, 1)
+            v_px = v_pipe_x_arr[v_i]
+            v_px_right = v_px + v_pipe_width
+            v_gap_top = v_gap_y_arr[v_i]
+            v_gap_bot = v_gap_y_arr[v_i] + v_gap_size_arr[v_i]
+            
+            # Check horizontal overlap with pipe
+            if v_bird_right > v_px and v_bird_left < v_px_right then
+                # Check if bird is outside the gap (collision)
+                if v_bird_top < v_gap_top or v_bird_bottom > v_gap_bot then
+                    v_game_over = 1
+                endif
+            endif
+        endfor v_i
+        
+        # --- RENDER FRAME ---
+        begin_frame
+            call draw_background
+            
+            # Draw all visible pipes
+            for v_i in (0, 3, 1)
+                v_pipe_x = v_pipe_x_arr[v_i]
+                v_gap_y = v_gap_y_arr[v_i]
+                v_gap_size = v_gap_size_arr[v_i]
+                
+                # Only draw pipes that are on screen
+                if v_pipe_x < 64 and v_pipe_x + v_pipe_width > 0 then
+                    call draw_pipe
+                endif
+            endfor v_i
+        end_frame
+        
+        # Update bird sprite position (auto-advances cel for wing animation)
+        v_bird_draw_y = int(v_bird_y)
+        move_sprite(flappy, v_bird_x, v_bird_draw_y, 0)
+        
+        # Draw score in top corner
+        draw_text(2, 2, v_score, tiny64_font, 6, white, 100)
+        
+        # Frame timing for arcade feel
+        rest(0.04)
+        
+    endwhile
+    
+    # Game over - hide bird
+    hide_sprite(flappy, 0)
+}
+
+#================================================
+# MAIN PROGRAM - INFINITE LOOP
+#================================================
+print("Starting Flappy Bird Demo")
+
+while 1 == 1 then
+    # Show title screen
+    call show_title_screen
+    
+    # Play game until collision
+    call play_game
+    
+    # Show game over screen
+    call show_game_over
+    
+endwhile

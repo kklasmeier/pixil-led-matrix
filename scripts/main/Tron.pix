@@ -1,0 +1,691 @@
+# Tron Light Cycles
+# Two AI-controlled light cycles battle it out
+# Each leaves a trail - crash into any trail or wall and you lose!
+
+# Game settings
+v_game_speed = 0
+v_max_rounds = 5
+v_p1_wins = 0
+v_p2_wins = 0
+
+# AI personality settings (set per round for variety)
+v_p1_aggression = 70
+v_p2_aggression = 70
+v_p1_chaos = 20
+v_p2_chaos = 20
+
+# Direction constants (0=up, 1=right, 2=down, 3=left)
+v_dir_up = 0
+v_dir_right = 1
+v_dir_down = 2
+v_dir_left = 3
+
+# Grid array to track trails (64x64 = 4096 cells)
+# 0 = empty, 1 = player 1 trail, 2 = player 2 trail, 3 = wall
+create_array(v_grid, 4096, numeric)
+
+# Procedure to initialize the grid with walls
+def init_grid {
+    # Clear grid
+    for v_i in (0, 4095, 1)
+        v_grid[v_i] = 0
+    endfor v_i
+    
+    # Set walls (top, bottom, left, right edges)
+    for v_i in (0, 63, 1)
+        # Top wall
+        v_idx = v_i
+        v_grid[v_idx] = 3
+        # Bottom wall
+        v_idx = 63 * 64 + v_i
+        v_grid[v_idx] = 3
+        # Left wall
+        v_idx = v_i * 64
+        v_grid[v_idx] = 3
+        # Right wall
+        v_idx = v_i * 64 + 63
+        v_grid[v_idx] = 3
+    endfor v_i
+}
+
+# Procedure to draw the arena walls
+def draw_arena {
+    clear()
+    # Draw border walls
+    draw_line(0, 0, 63, 0, blue, 60)
+    draw_line(0, 63, 63, 63, blue, 60)
+    draw_line(0, 0, 0, 63, blue, 60)
+    draw_line(63, 0, 63, 63, blue, 60)
+}
+
+# Procedure to get grid value at x,y
+def get_grid_value {
+    v_grid_idx = v_check_y * 64 + v_check_x
+    v_grid_val = v_grid[v_grid_idx]
+}
+
+# Procedure to set grid value at x,y
+def set_grid_value {
+    v_grid_idx = v_set_y * 64 + v_set_x
+    v_grid[v_grid_idx] = v_set_val
+}
+
+# Procedure to check if a move is safe
+def check_safe {
+    v_is_safe = 1
+    # Check bounds
+    if v_check_x < 1 or v_check_x > 62 then
+        v_is_safe = 0
+    endif
+    if v_check_y < 1 or v_check_y > 62 then
+        v_is_safe = 0
+    endif
+    # Check grid collision
+    if v_is_safe == 1 then
+        call get_grid_value
+        if v_grid_val != 0 then
+            v_is_safe = 0
+        endif
+    endif
+}
+
+# Procedure to count open spaces in a direction (for AI lookahead)
+def count_open_spaces {
+    v_open_count = 0
+    v_scan_x = v_start_x
+    v_scan_y = v_start_y
+    v_scanning = 1
+    
+    while v_scanning == 1 and v_open_count < 10 then
+        # Move in scan direction
+        if v_scan_dir == 0 then
+            v_scan_y = v_scan_y - 1
+        endif
+        if v_scan_dir == 1 then
+            v_scan_x = v_scan_x + 1
+        endif
+        if v_scan_dir == 2 then
+            v_scan_y = v_scan_y + 1
+        endif
+        if v_scan_dir == 3 then
+            v_scan_x = v_scan_x - 1
+        endif
+        
+        # Check if valid
+        v_check_x = v_scan_x
+        v_check_y = v_scan_y
+        call check_safe
+        
+        if v_is_safe == 1 then
+            v_open_count = v_open_count + 1
+        else
+            v_scanning = 0
+        endif
+    endwhile
+}
+
+# AI decision making for a player
+def ai_decide {
+    # Current direction movement deltas
+    v_dx = 0
+    v_dy = 0
+    if v_ai_dir == 0 then
+        v_dy = -1
+    endif
+    if v_ai_dir == 1 then
+        v_dx = 1
+    endif
+    if v_ai_dir == 2 then
+        v_dy = 1
+    endif
+    if v_ai_dir == 3 then
+        v_dx = -1
+    endif
+    
+    # Check if current direction is safe
+    v_check_x = v_ai_x + v_dx
+    v_check_y = v_ai_y + v_dy
+    call check_safe
+    v_forward_safe = v_is_safe
+    
+    # Calculate left and right directions
+    v_left_dir = v_ai_dir - 1
+    if v_left_dir < 0 then
+        v_left_dir = 3
+    endif
+    v_right_dir = v_ai_dir + 1
+    if v_right_dir > 3 then
+        v_right_dir = 0
+    endif
+    
+    # Check left
+    v_ldx = 0
+    v_ldy = 0
+    if v_left_dir == 0 then
+        v_ldy = -1
+    endif
+    if v_left_dir == 1 then
+        v_ldx = 1
+    endif
+    if v_left_dir == 2 then
+        v_ldy = 1
+    endif
+    if v_left_dir == 3 then
+        v_ldx = -1
+    endif
+    v_check_x = v_ai_x + v_ldx
+    v_check_y = v_ai_y + v_ldy
+    call check_safe
+    v_left_safe = v_is_safe
+    
+    # Check right
+    v_rdx = 0
+    v_rdy = 0
+    if v_right_dir == 0 then
+        v_rdy = -1
+    endif
+    if v_right_dir == 1 then
+        v_rdx = 1
+    endif
+    if v_right_dir == 2 then
+        v_rdy = 1
+    endif
+    if v_right_dir == 3 then
+        v_rdx = -1
+    endif
+    v_check_x = v_ai_x + v_rdx
+    v_check_y = v_ai_y + v_rdy
+    call check_safe
+    v_right_safe = v_is_safe
+    
+    # Count safe directions
+    v_safe_count = 0
+    if v_forward_safe == 1 then
+        v_safe_count = v_safe_count + 1
+    endif
+    if v_left_safe == 1 then
+        v_safe_count = v_safe_count + 1
+    endif
+    if v_right_safe == 1 then
+        v_safe_count = v_safe_count + 1
+    endif
+    
+    # Calculate positions and distances
+    v_fwd_x = v_ai_x + v_dx
+    v_fwd_y = v_ai_y + v_dy
+    v_left_x = v_ai_x + v_ldx
+    v_left_y = v_ai_y + v_ldy
+    v_right_x = v_ai_x + v_rdx
+    v_right_y = v_ai_y + v_rdy
+    
+    v_fwd_dist = abs(v_fwd_x - v_enemy_x) + abs(v_fwd_y - v_enemy_y)
+    v_left_dist = abs(v_left_x - v_enemy_x) + abs(v_left_y - v_enemy_y)
+    v_right_dist = abs(v_right_x - v_enemy_x) + abs(v_right_y - v_enemy_y)
+    
+    # Get lookahead space for each direction
+    v_forward_space = 0
+    v_left_space = 0
+    v_right_space = 0
+    
+    if v_forward_safe == 1 then
+        v_start_x = v_fwd_x
+        v_start_y = v_fwd_y
+        v_scan_dir = v_ai_dir
+        call count_open_spaces
+        v_forward_space = v_open_count
+    endif
+    
+    if v_left_safe == 1 then
+        v_start_x = v_left_x
+        v_start_y = v_left_y
+        v_scan_dir = v_left_dir
+        call count_open_spaces
+        v_left_space = v_open_count
+    endif
+    
+    if v_right_safe == 1 then
+        v_start_x = v_right_x
+        v_start_y = v_right_y
+        v_scan_dir = v_right_dir
+        call count_open_spaces
+        v_right_space = v_open_count
+    endif
+    
+    v_new_dir = v_ai_dir
+    
+    # Only one safe option - take it
+    if v_safe_count == 1 then
+        if v_left_safe == 1 then
+            v_new_dir = v_left_dir
+        elseif v_right_safe == 1 then
+            v_new_dir = v_right_dir
+        endif
+    elseif v_safe_count == 0 then
+        # No safe options, keep going (will crash)
+        v_new_dir = v_ai_dir
+    else
+        # Multiple options - make strategic decision
+        v_enemy_dist = abs(v_ai_x - v_enemy_x) + abs(v_ai_y - v_enemy_y)
+        
+        # CHAOS CHECK - but only if forward has LOTS of space (8+)
+        v_chaos_roll = random(0, 100, 0)
+        v_did_chaos = 0
+        if v_chaos_roll < v_ai_chaos and v_forward_space >= 8 then
+            v_chaos_turn = random(0, 1, 0)
+            if v_chaos_turn == 0 and v_left_safe == 1 and v_left_space >= 6 then
+                v_new_dir = v_left_dir
+                v_did_chaos = 1
+            elseif v_right_safe == 1 and v_right_space >= 6 then
+                v_new_dir = v_right_dir
+                v_did_chaos = 1
+            endif
+        endif
+        
+        if v_did_chaos == 0 then
+            # Normal decision making
+            
+            # If forward is blocked or very limited, must turn
+            if v_forward_safe == 0 or v_forward_space < 3 then
+                # Pick the turn with more space
+                if v_left_safe == 1 and v_right_safe == 1 then
+                    if v_left_space > v_right_space then
+                        v_new_dir = v_left_dir
+                    elseif v_right_space > v_left_space then
+                        v_new_dir = v_right_dir
+                    else
+                        v_turn_pick = random(0, 1, 0)
+                        if v_turn_pick == 0 then
+                            v_new_dir = v_left_dir
+                        else
+                            v_new_dir = v_right_dir
+                        endif
+                    endif
+                elseif v_left_safe == 1 then
+                    v_new_dir = v_left_dir
+                elseif v_right_safe == 1 then
+                    v_new_dir = v_right_dir
+                endif
+            else
+                # Forward is safe with decent space
+                # Decide based on aggression vs survival
+                
+                v_aggro_roll = random(0, 100, 0)
+                
+                if v_aggro_roll < v_ai_aggression and v_enemy_dist < 30 then
+                    # Be aggressive - try to move toward enemy
+                    # But only turn if it significantly closes distance AND has good space
+                    
+                    v_dominated_by_left = 0
+                    v_dominated_by_right = 0
+                    
+                    # Check if left is better for chasing
+                    if v_left_safe == 1 and v_left_space >= 5 then
+                        if v_left_dist < v_fwd_dist - 2 then
+                            v_dominated_by_left = 1
+                        endif
+                    endif
+                    
+                    # Check if right is better for chasing
+                    if v_right_safe == 1 and v_right_space >= 5 then
+                        if v_right_dist < v_fwd_dist - 2 then
+                            v_dominated_by_right = 1
+                        endif
+                    endif
+                    
+                    if v_dominated_by_left == 1 and v_dominated_by_right == 1 then
+                        # Both turns get closer - pick the one with more space
+                        if v_left_space >= v_right_space then
+                            v_new_dir = v_left_dir
+                        else
+                            v_new_dir = v_right_dir
+                        endif
+                    elseif v_dominated_by_left == 1 then
+                        v_new_dir = v_left_dir
+                    elseif v_dominated_by_right == 1 then
+                        v_new_dir = v_right_dir
+                    else
+                        # Forward is fine for chasing, keep going straight
+                        v_new_dir = v_ai_dir
+                    endif
+                else
+                    # Survival mode - prefer forward unless a turn has much more space
+                    v_turn_threshold = v_forward_space + 5
+                    
+                    if v_left_safe == 1 and v_left_space > v_turn_threshold then
+                        v_new_dir = v_left_dir
+                    elseif v_right_safe == 1 and v_right_space > v_turn_threshold then
+                        v_new_dir = v_right_dir
+                    else
+                        # Keep going forward
+                        v_new_dir = v_ai_dir
+                    endif
+                endif
+            endif
+        endif
+    endif
+    
+    v_ai_dir = v_new_dir
+}
+
+# Procedure to move a player
+def move_player {
+    # Calculate new position based on direction
+    if v_p_dir == 0 then
+        v_p_y = v_p_y - 1
+    endif
+    if v_p_dir == 1 then
+        v_p_x = v_p_x + 1
+    endif
+    if v_p_dir == 2 then
+        v_p_y = v_p_y + 1
+    endif
+    if v_p_dir == 3 then
+        v_p_x = v_p_x - 1
+    endif
+}
+
+# Procedure to check collision for a player
+def check_collision {
+    v_crashed = 0
+    # Check bounds
+    if v_p_x < 1 or v_p_x > 62 then
+        v_crashed = 1
+    endif
+    if v_p_y < 1 or v_p_y > 62 then
+        v_crashed = 1
+    endif
+    # Check grid
+    if v_crashed == 0 then
+        v_check_x = v_p_x
+        v_check_y = v_p_y
+        call get_grid_value
+        if v_grid_val != 0 then
+            v_crashed = 1
+        endif
+    endif
+}
+
+# Draw explosion effect
+def draw_explosion {
+    for v_exp_r in (1, 8, 1)
+        draw_circle(v_exp_x, v_exp_y, v_exp_r, v_exp_color, 100, false, 300, fade)
+        rest(0.05)
+    endfor v_exp_r
+}
+
+# Show winner announcement
+def show_winner {
+    clear()
+    rest(0.3)
+    
+    if v_winner == 1 then
+        # Player 1 (cyan) wins
+        draw_text(8, 20, "CYAN", tiny64_font, 12, cyan, 100)
+        draw_text(8, 35, "WINS!", tiny64_font, 12, cyan, 100)
+    else
+        # Player 2 (orange) wins
+        draw_text(4, 20, "ORANGE", tiny64_font, 12, orange, 100)
+        draw_text(8, 35, "WINS!", tiny64_font, 12, orange, 100)
+    endif
+    
+    rest(2)
+    
+    # Show score
+    clear()
+    draw_text(8, 15, "SCORE", tiny64_font, 10, white, 100)
+    
+    # Cyan score
+    draw_rectangle(10, 30, 8, 8, cyan, 100, true)
+    v_score_txt = v_p1_wins
+    draw_text(22, 30, v_score_txt, tiny64_font, 10, cyan, 100)
+    
+    # Orange score
+    draw_rectangle(10, 45, 8, 8, orange, 100, true)
+    v_score_txt = v_p2_wins
+    draw_text(22, 45, v_score_txt, tiny64_font, 10, orange, 100)
+    
+    rest(2)
+}
+
+# Title screen
+def show_title {
+    clear()
+    draw_text(12, 10, "TRON", tiny64_font, 14, cyan, 100)
+    draw_text(10, 28, "LIGHT", tiny64_font, 10, orange, 100)
+    draw_text(6, 42, "CYCLES", tiny64_font, 10, orange, 100)
+    
+    # Animated light trails on title
+    for v_t in (0, 63, 2)
+        plot(v_t, 55, cyan, 100, 500, fade)
+        plot(63 - v_t, 58, orange, 100, 500, fade)
+        rest(0.03)
+    endfor v_t
+    
+    rest(1.5)
+}
+
+# Main game procedure
+def play_round {
+    # Randomize AI personalities each round
+    v_p1_aggression = random(60, 85, 0)
+    v_p2_aggression = random(60, 85, 0)
+    v_p1_chaos = random(3, 8, 0)
+    v_p2_chaos = random(3, 8, 0)
+    
+    # Initialize
+    call init_grid
+    call draw_arena
+    
+    # Randomize starting positions slightly
+    v_p1_y_offset = random(-10, 10, 0)
+    v_p2_y_offset = random(-10, 10, 0)
+    
+    # Player 1 starting position (left side)
+    v_p1_x = 15
+    v_p1_y = 32 + v_p1_y_offset
+    
+    # Player 2 starting position (right side)
+    v_p2_x = 48
+    v_p2_y = 32 + v_p2_y_offset
+    
+    # Randomize starting directions (not facing walls)
+    v_p1_start_dir = random(0, 2, 0)
+    if v_p1_start_dir == 0 then
+        v_p1_dir = v_dir_up
+    elseif v_p1_start_dir == 1 then
+        v_p1_dir = v_dir_right
+    else
+        v_p1_dir = v_dir_down
+    endif
+    
+    v_p2_start_dir = random(0, 2, 0)
+    if v_p2_start_dir == 0 then
+        v_p2_dir = v_dir_up
+    elseif v_p2_start_dir == 1 then
+        v_p2_dir = v_dir_left
+    else
+        v_p2_dir = v_dir_down
+    endif
+    
+    # Mark starting positions
+    v_set_x = v_p1_x
+    v_set_y = v_p1_y
+    v_set_val = 1
+    call set_grid_value
+    plot(v_p1_x, v_p1_y, cyan, 100)
+    
+    v_set_x = v_p2_x
+    v_set_y = v_p2_y
+    v_set_val = 2
+    call set_grid_value
+    plot(v_p2_x, v_p2_y, orange, 100)
+    
+    # Countdown
+    draw_text(28, 28, "3", tiny64_font, 12, white, 100)
+    rest(0.7)
+    clear_text(28, 28)
+    draw_text(28, 28, "2", tiny64_font, 12, white, 100)
+    rest(0.7)
+    clear_text(28, 28)
+    draw_text(28, 28, "1", tiny64_font, 12, white, 100)
+    rest(0.7)
+    clear_text(28, 28)
+    
+    # Redraw arena and trails after countdown clears
+    call draw_arena
+    plot(v_p1_x, v_p1_y, cyan, 100)
+    plot(v_p2_x, v_p2_y, orange, 100)
+    
+    v_game_over = 0
+    v_winner = 0
+    
+    # Game loop
+    while v_game_over == 0 then
+        # AI decides for player 1 (target player 2)
+        v_ai_x = v_p1_x
+        v_ai_y = v_p1_y
+        v_ai_dir = v_p1_dir
+        v_enemy_x = v_p2_x
+        v_enemy_y = v_p2_y
+        v_ai_aggression = v_p1_aggression
+        v_ai_chaos = v_p1_chaos
+        call ai_decide
+        v_p1_dir = v_ai_dir
+        
+        # AI decides for player 2 (target player 1)
+        v_ai_x = v_p2_x
+        v_ai_y = v_p2_y
+        v_ai_dir = v_p2_dir
+        v_enemy_x = v_p1_x
+        v_enemy_y = v_p1_y
+        v_ai_aggression = v_p2_aggression
+        v_ai_chaos = v_p2_chaos
+        call ai_decide
+        v_p2_dir = v_ai_dir
+        
+        # Move player 1
+        v_p_x = v_p1_x
+        v_p_y = v_p1_y
+        v_p_dir = v_p1_dir
+        call move_player
+        v_p1_x = v_p_x
+        v_p1_y = v_p_y
+        
+        # Move player 2
+        v_p_x = v_p2_x
+        v_p_y = v_p2_y
+        v_p_dir = v_p2_dir
+        call move_player
+        v_p2_x = v_p_x
+        v_p2_y = v_p_y
+        
+        # Check collisions
+        v_p1_crashed = 0
+        v_p2_crashed = 0
+        
+        # Check player 1 collision
+        v_p_x = v_p1_x
+        v_p_y = v_p1_y
+        call check_collision
+        v_p1_crashed = v_crashed
+        
+        # Check player 2 collision
+        v_p_x = v_p2_x
+        v_p_y = v_p2_y
+        call check_collision
+        v_p2_crashed = v_crashed
+        
+        # Check head-on collision
+        if v_p1_x == v_p2_x and v_p1_y == v_p2_y then
+            v_p1_crashed = 1
+            v_p2_crashed = 1
+        endif
+        
+        # Handle crashes
+        if v_p1_crashed == 1 or v_p2_crashed == 1 then
+            v_game_over = 1
+            
+            if v_p1_crashed == 1 and v_p2_crashed == 1 then
+                # Both crashed - tie, random winner
+                v_winner = random(1, 2, 0)
+            elseif v_p1_crashed == 1 then
+                v_winner = 2
+                v_exp_x = v_p1_x
+                v_exp_y = v_p1_y
+                v_exp_color = "cyan"
+                call draw_explosion
+            else
+                v_winner = 1
+                v_exp_x = v_p2_x
+                v_exp_y = v_p2_y
+                v_exp_color = "orange"
+                call draw_explosion
+            endif
+        else
+            # No crash, update grid and draw trails
+            v_set_x = v_p1_x
+            v_set_y = v_p1_y
+            v_set_val = 1
+            call set_grid_value
+            
+            v_set_x = v_p2_x
+            v_set_y = v_p2_y
+            v_set_val = 2
+            call set_grid_value
+            
+            # Draw trails (permanent)
+            plot(v_p1_x, v_p1_y, cyan, 100)
+            plot(v_p2_x, v_p2_y, orange, 100)
+        endif
+        
+        rest(v_game_speed)
+    endwhile
+    
+    # Update scores
+    if v_winner == 1 then
+        v_p1_wins = v_p1_wins + 1
+    else
+        v_p2_wins = v_p2_wins + 1
+    endif
+    
+    rest(1)
+    call show_winner
+}
+
+# Main game loop - runs forever
+while 1 == 1 then
+    # Reset scores for new series
+    v_p1_wins = 0
+    v_p2_wins = 0
+    
+    call show_title
+    
+    while v_p1_wins < v_max_rounds and v_p2_wins < v_max_rounds then
+        call play_round
+    endwhile
+    
+    # Final winner
+    clear()
+    if v_p1_wins >= v_max_rounds then
+        draw_text(8, 15, "CYAN", tiny64_font, 12, cyan, 100)
+        draw_text(2, 32, "CHAMPION", tiny64_font, 10, cyan, 100)
+        
+        # Victory animation
+        for v_v in (0, 10, 1)
+            draw_circle(32, 48, v_v, cyan, 80, false, 800, fade)
+            rest(0.15)
+        endfor v_v
+    else
+        draw_text(4, 15, "ORANGE", tiny64_font, 12, orange, 100)
+        draw_text(2, 32, "CHAMPION", tiny64_font, 10, orange, 100)
+        
+        # Victory animation
+        for v_v in (0, 10, 1)
+            draw_circle(32, 48, v_v, orange, 80, false, 800, fade)
+            rest(0.15)
+        endfor v_v
+    endif
+    
+    rest(3)
+    clear()
+endwhile

@@ -226,8 +226,8 @@ plot(v_array[0], v_array[1], red, 100)               # Direct array values
 draw_circle(v_array[0] + 5, v_array[1] * 2, 5, blue, 100)  # Array with math
 
 # String arrays in text
-draw_text(10, 10, v_words[0], piboto-regular, 12, white, 100)  # Direct string value
-draw_text(10, 10, v_words[0] & " " & v_words[1], piboto-regular, 12, white, 100)  # Concatenated strings
+draw_text(10, 10, v_words[0], tiny64_font, 12, white, 100)  # Direct string value
+draw_text(10, 10, v_words[0] & " " & v_words[1], tiny64_font, 12, white, 100)  # Concatenated strings
 
 # Complex expressions
 # Numeric arrays
@@ -256,7 +256,7 @@ draw_circle(v_points[0], v_points[1], v_radius, red, 100, true)
 draw_circle((v_points[v_i] / 2) * v_size[v_i], v_y, v_radius, red, 100, true)
 
 # String arrays
-draw_text(10, v_y, v_words[0] & "!", piboto-regular, 12, white, 100)
+draw_text(10, v_y, v_words[0] & "!", tiny64_font, 12, white, 100)
 print(f"Current word: {v_words[v_i]}")
 
 
@@ -808,7 +808,7 @@ WIPE   - IN_LEFT (default), IN_RIGHT, IN_UP, IN_DOWN,
          OUT_LEFT, OUT_RIGHT, OUT_UP, OUT_DOWN
 
 Example:
-draw_text(10, 20, "Hello World", piboto-regular, 12, white, 75, SLIDE, LEFT)
+draw_text(10, 20, "Hello World", tiny64_font, 12, white, 75, SLIDE, LEFT)
 
 
 COMMAND: clear_text
@@ -830,7 +830,7 @@ COLOR SPECIFICATIONS:
    - intensity: Number (0-100)
 
 Example:
-draw_text(10, 20, "Hello", piboto-regular, 12, red, 75)
+draw_text(10, 20, "Hello", tiny64_font, 12, red, 75)
 
 I created the start of a proprietary scripting language that will generate commands in a python program called Pixil.py that will be sent to this library and i need your help extending it to perform more capabilities. Here is the current code for Pixil.py. Please go through the current code, understand it and then i will work with you on extending it. 
 
