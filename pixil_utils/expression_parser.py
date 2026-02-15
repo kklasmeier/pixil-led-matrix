@@ -40,6 +40,27 @@ def escape_string(s: str) -> str:
     result = result.replace('"', '\\"')
     return result
 
+def format_numeric_for_display(value: Any) -> str:
+    """
+    Format a numeric value for text display.
+    Converts whole-number floats to integers for cleaner display.
+    
+    Args:
+        value: The value to format (can be int, float, or other)
+        
+    Returns:
+        String representation with clean integer display for whole numbers
+        
+    Examples:
+        1.0 -> "1"
+        234.0 -> "234"
+        3.14159 -> "3.14159"
+        "hello" -> "hello"
+    """
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    return str(value)
+
 def format_parameter(value: Any, command: str, position: int, variables: Union[Dict[str, Any], VariableRegistry]) -> str:
     """Format parameter value for command string construction."""
     try:
@@ -60,19 +81,19 @@ def format_parameter(value: Any, command: str, position: int, variables: Union[D
                 
             # For non-string values (like numbers), convert to string and quote
             if not isinstance(value, str):
-                return f'"{str(value)}"'
+                return f'"{format_numeric_for_display(value)}"'
                 
             # For variables, evaluate them first
             if isinstance(value, str) and value.startswith('v_'):
                 if value in variables:
                     var_value = variables[value]
-                    return f'"{str(var_value)}"'
+                    return f'"{format_numeric_for_display(var_value)}"'
                 
             # For expressions, evaluate then quote
             if isinstance(value, str) and has_math_expression(value):
                 try:
                     result = evaluate_math_expression(value, variables)
-                    return f'"{str(result)}"'
+                    return f'"{format_numeric_for_display(result)}"'
                 except Exception as e:
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"Error evaluating expression for text: {e}", DEBUG_VERBOSE)

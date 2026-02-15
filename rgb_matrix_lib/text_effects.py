@@ -14,7 +14,7 @@ class TextEffect(Enum):
 
 class EffectModifier(Enum):
     """Defines modifiers for text effects"""
-    # NORMAL effect has no modifiers
+    # NORMAL effect alignment modifiers (NONE defaults to LEFT behavior)
     NONE = auto()
     
     # PIXEL effect modifiers
@@ -26,11 +26,12 @@ class EffectModifier(Enum):
     MEDIUM = auto()
     FAST = auto()
     
-    # SLIDE effect modifiers
+    # SLIDE effect modifiers (LEFT/RIGHT/CENTER also used by NORMAL for alignment)
     LEFT = auto()
     RIGHT = auto()
     UP = auto()
     DOWN = auto()
+    CENTER = auto()  # Used by NORMAL for text alignment
     
     # DISSOLVE effect modifiers
     IN = auto()
@@ -48,7 +49,7 @@ class EffectModifier(Enum):
 
 # Define valid modifier mappings and defaults
 EFFECT_MODIFIER_MAP = {
-    TextEffect.NORMAL: [EffectModifier.NONE],
+    TextEffect.NORMAL: [EffectModifier.NONE, EffectModifier.LEFT, EffectModifier.CENTER, EffectModifier.RIGHT],
     TextEffect.SCAN: [EffectModifier.NONE],
     TextEffect.PIXEL: [EffectModifier.TOP, EffectModifier.BOTTOM],
     TextEffect.TYPE: [EffectModifier.SLOW, EffectModifier.MEDIUM, EffectModifier.FAST],

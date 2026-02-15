@@ -776,10 +776,6 @@ for v_y in (0, 50, 10)
     call draw_target        # Inside a loop
 endfor v_y
 
-
-
-
-
 TEXT COMMANDS REFERENCE
 -----------------------
 Text can be drawn on the LED display by using the draw_text command. Different colors, fonts, font sizes and effects are supported.
@@ -794,21 +790,43 @@ Parameters:
 - font_name: string - Name of installed font to use
 - font_size: integer - Font size in pixels
 - color: string - Color name or specification
-- Intensity: Color intensity
+- intensity: Color intensity (0-100)
 - effect: string (optional) - Text effect to apply (defaults to NORMAL)
 - effect_modifier: string (optional) - Modifier for the effect
 
 Effects and Valid Modifiers:
-NORMAL - No modifiers
-TYPE   - SLOW, MEDIUM (default), FAST
-SCAN   - No modifiers
-SLIDE  - LEFT (default), RIGHT, UP, DOWN
+NORMAL   - LEFT (default), CENTER, RIGHT - Text alignment relative to x coordinate
+TYPE     - SLOW, MEDIUM (default), FAST
+SCAN     - No modifiers
+SLIDE    - LEFT (default), RIGHT, UP, DOWN
 DISSOLVE - IN (default), OUT
-WIPE   - IN_LEFT (default), IN_RIGHT, IN_UP, IN_DOWN, 
-         OUT_LEFT, OUT_RIGHT, OUT_UP, OUT_DOWN
+WIPE     - IN_LEFT (default), IN_RIGHT, IN_UP, IN_DOWN, 
+           OUT_LEFT, OUT_RIGHT, OUT_UP, OUT_DOWN
 
-Example:
+Text Alignment (NORMAL effect):
+The NORMAL effect supports text alignment modifiers that control how text is positioned relative to the x coordinate:
+- LEFT (default): x is the left edge of the text
+- CENTER: x is the center point of the text (text renders equally on both sides)
+- RIGHT: x is the right edge of the text (text renders to the left of x)
+
+Examples:
+# Basic text (left-aligned by default)
+draw_text(10, 20, "Hello World", tiny64_font, 12, white, 75)
+
+# Centered text at middle of display (x=32)
+draw_text(32, 20, "SCORE", tiny64_font, 12, yellow, 100, NORMAL, CENTER)
+
+# Right-aligned text ending at x=60
+draw_text(60, 20, "100", tiny64_font, 12, green, 100, NORMAL, RIGHT)
+
+# Left-aligned explicitly
+draw_text(5, 20, "Start", tiny64_font, 12, white, 100, NORMAL, LEFT)
+
+# Slide effect
 draw_text(10, 20, "Hello World", tiny64_font, 12, white, 75, SLIDE, LEFT)
+
+# Typewriter effect
+draw_text(10, 30, "Loading...", tiny64_font, 12, cyan, 100, TYPE, SLOW)
 
 
 COMMAND: clear_text

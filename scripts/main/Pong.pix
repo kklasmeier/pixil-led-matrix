@@ -83,9 +83,9 @@ show_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
 def update_score {
     # Draw new score text
     clear_text(20, 3)  # Clear left score position
-    draw_text(20, 3, int(v_left_score), piboto-regular, 9, white)
+    draw_text(20, 3, int(v_left_score), piboto-regular, 9, white, 100, NORMAL, RIGHT)
     clear_text(44, 3)  # Clear right score position
-    draw_text(44, 3, int(v_right_score), piboto-regular, 9, white)
+    draw_text(44, 3, int(v_right_score), piboto-regular, 9, white, 100, NORMAL, LEFT)
 }
 
 # Update paddle positions based on ball trajectory

@@ -190,12 +190,23 @@ class TextRenderer:
             draw = ImageDraw.Draw(img)
             draw.text((-bbox[0], -bbox[1]), text, font=font, fill=(255, 255, 255))
         
+        # Apply text alignment for NORMAL effect
+        # Adjust x coordinate based on alignment modifier
+        render_x = x
+        if effect == TextEffect.NORMAL:
+            if modifier == EffectModifier.CENTER:
+                render_x = x - (int(text_width) // 2)
+            elif modifier == EffectModifier.RIGHT:
+                render_x = x - int(text_width)
+            # LEFT or NONE: render_x stays as x (default left-aligned behavior)
+        
         # Update text bounds tracking
-        self._text_bounds[(x, y)] = TextBounds(x, y, int(text_width), int(text_height))
+        # Key is original (x, y) for lookup, but bounds store actual render position
+        self._text_bounds[(x, y)] = TextBounds(render_x, y, int(text_width), int(text_height))
         
         # Apply the selected effect
         if effect == TextEffect.NORMAL:
-            self._render_normal(img, x, y, color)
+            self._render_normal(img, render_x, y, color)
         elif effect == TextEffect.TYPE:
             if modifier is None:
                 modifier = EffectModifier.MEDIUM
