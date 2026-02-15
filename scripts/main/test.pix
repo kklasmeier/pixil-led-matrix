@@ -1,30 +1,182 @@
-# Burnout Flicker Test
-# This script demonstrates a flicker bug when burnout overlaps with active drawing
+# Sprite Frame Flicker Diagnostic Script
+# Purpose: Demonstrate flicker when using begin_frame(false) with sprites
+# 
+# Test methodology:
+# 1. Draw a full-screen background pattern
+# 2. Create a simple sprite
+# 3. Move the sprite across the screen using begin_frame(false)/end_frame
+# 4. Use rest() calls to slow down and observe the flicker
+#
+# Adjust v_speed to control animation speed (higher = slower, easier to see flicker)
 
-clear()
+v_speed = 0.1
 
-v_x = 32
-v_y = 32
-v_direction = 1
+# ============================================
+# PHASE 1: Create a colorful background pattern
+# ============================================
+print("Phase 1: Drawing background pattern...")
 
-while true then
-    # Move ball back and forth
-    v_x = v_x + v_direction
-    if v_x >= 50 then
-        v_direction = -1
-    endif
-    if v_x <= 14 then
-        v_direction = 1
-    endif
-    
-    # Every other frame, plot a burnout pixel at the ball's position
-    if v_x % 2 == 0 then
-        plot(v_x, v_y, red, 100, 2000, fade)
-    endif
-    
-    # Draw the ball every frame
-    begin_frame
-        draw_circle(v_x, v_y, 5, blue, 100, true)
+# Draw a gradient/checkerboard background that fills the entire 64x64 matrix
+# This makes it obvious when the background disappears (flicker to black)
+
+for v_y in (0, 63, 1)
+    begin_frame(true)
+    for v_x in (0, 63, 1)
+        # Create a checkerboard pattern with colors
+        v_check = (v_x + v_y) % 2
+        if v_check == 0 then
+            # Dark blue squares
+            plot(v_x, v_y, navy, 60)
+        else
+            # Dark green squares
+            plot(v_x, v_y, forest_green, 60)
+        endif
+    endfor v_x
+    end_frame
+endfor v_y
+
+# Add some reference lines so we can see tearing/artifacts
+draw_line(0, 32, 63, 32, yellow, 80)
+draw_line(32, 0, 32, 63, yellow, 80)
+
+# Corner markers
+draw_rectangle(0, 0, 5, 5, red, 100, true)
+draw_rectangle(59, 0, 5, 5, green, 100, true)
+draw_rectangle(0, 59, 5, 5, blue, 100, true)
+draw_rectangle(59, 59, 5, 5, purple, 100, true)
+
+sync_queue
+print("Background complete. Starting sprite definition...")
+sync_queue
+rest(1)
+
+# ============================================
+# PHASE 2: Define a simple, visible sprite
+# ============================================
+
+define_sprite(test_ball, 8, 8)
+    # Bright filled circle - easy to see
+    draw_circle(4, 4, 3, white, 100, true)
+    # Red center dot
+    plot(4, 4, red, 100)
+endsprite
+
+print("Sprite defined. Starting movement test...")
+sync_queue
+rest(0.5)
+
+# ============================================
+# PHASE 3: Test with begin_frame(false) - THE PROBLEM CASE
+# ============================================
+print("=== TEST A: begin_frame(false) - Watch for flicker ===")
+sync_queue
+
+show_sprite(test_ball, 10, 28, 0, 0)
+rest(0.5)
+
+# Move sprite horizontally across screen
+for v_x in (10, 50, 2)
+    begin_frame(true)
+        # Redraw background (since we're not preserving)
+        for v_y in (0, 63, 1)
+            for v_bx in (0, 63, 1)
+                v_check = (v_bx + v_y) % 2
+                if v_check == 0 then
+                    plot(v_bx, v_y, navy, 60)
+                else
+                    plot(v_bx, v_y, forest_green, 60)
+                endif
+            endfor v_bx
+        endfor v_y
+        
+        # Reference lines
+        draw_line(0, 32, 63, 32, yellow, 80)
+        draw_line(32, 0, 32, 63, yellow, 80)
+        
+        # Corner markers
+        draw_rectangle(0, 0, 5, 5, red, 100, true)
+        draw_rectangle(59, 0, 5, 5, green, 100, true)
+        draw_rectangle(0, 59, 5, 5, blue, 100, true)
+        draw_rectangle(59, 59, 5, 5, purple, 100, true)
+        
+        # Move sprite
+        move_sprite(test_ball, v_x, 28, 0)
     end_frame
     
-endwhile
+    rest(v_speed)
+endfor v_x
+
+sync_queue
+print("Test A complete.")
+sync_queue
+rest(1)
+
+# ============================================
+# PHASE 4: Test with begin_frame(true) - THE WORKING CASE
+# ============================================
+print("=== TEST B: begin_frame(true) - Should be smooth ===")
+sync_queue
+
+# Reset sprite position
+move_sprite(test_ball, 10, 28, 0)
+rest(0.5)
+
+# Move sprite horizontally across screen
+for v_x in (10, 50, 2)
+    begin_frame(true)
+        # With preserve=true, we don't need to redraw background
+        # Just move the sprite
+        move_sprite(test_ball, v_x, 28, 0)
+    end_frame
+    
+    rest(v_speed)
+endfor v_x
+
+sync_queue
+print("Test B complete.")
+sync_queue
+
+rest(1)
+
+# ============================================
+# PHASE 5: Slow motion comparison
+# ============================================
+print("=== TEST C: SLOW MOTION - begin_frame(false) ===")
+print("Watch carefully for black flashes...")
+sync_queue
+
+v_slow = 0.5
+
+# Reset
+move_sprite(test_ball, 10, 28, 0)
+rest(0.5)
+
+for v_x in (10, 30, 4)
+    print(f"Frame at x={v_x}")
+    sync_queue
+
+    begin_frame(false)
+        # Simplified background - just solid color to make flicker obvious
+        draw_rectangle(0, 0, 64, 64, blue, 80, true)
+        draw_line(0, 32, 63, 32, yellow, 80)
+        
+        move_sprite(test_ball, v_x, 28, 0)
+    end_frame
+    
+    rest(v_slow)
+endfor v_x
+
+sync_queue
+print("Test C complete.")
+sync_queue
+
+rest(1)
+
+# ============================================
+# Cleanup
+# ============================================
+print("Tests complete. Cleaning up...")
+hide_sprite(test_ball, 0)
+dispose_all_sprites()
+clear()
+print("Done.")

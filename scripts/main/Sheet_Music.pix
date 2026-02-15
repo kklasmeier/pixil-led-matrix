@@ -1,0 +1,1352 @@
+# Sheet Music - Musical notes scrolling with bouncing ball
+# Features: Treble clef, 10 songs, bar lines, ledger lines, note durations
+
+# ============================================
+# CONFIGURATION
+# ============================================
+v_tempo = 108
+v_beat_ms = 60000 / v_tempo
+v_scroll_speed = 16
+v_play_line_x = 16
+v_staff_color = 25
+v_note_color = "white"
+v_ball_color = "yellow"
+v_bar_color = 25
+
+# Staff line Y positions (3px spacing, centered)
+v_line1_y = 38
+v_line2_y = 35
+v_line3_y = 32
+v_line4_y = 29
+v_line5_y = 26
+
+# ============================================
+# PITCH TO Y COORDINATE MAPPING
+# Pitch values: 0=C4, 1=D4, 2=E4, 3=F4, 4=G4, 5=A4, 6=B4, 7=C5, 8=D5, 9=E5, 10=F5, 11=G5
+# ============================================
+create_array(v_pitch_y, 12, numeric)
+v_pitch_y[0] = 41
+v_pitch_y[1] = 39
+v_pitch_y[2] = 38
+v_pitch_y[3] = 36
+v_pitch_y[4] = 35
+v_pitch_y[5] = 33
+v_pitch_y[6] = 32
+v_pitch_y[7] = 30
+v_pitch_y[8] = 29
+v_pitch_y[9] = 27
+v_pitch_y[10] = 26
+v_pitch_y[11] = 24
+
+# ============================================
+# TREBLE CLEF SPRITE (simplified pixel art)
+# ============================================
+define_sprite(treble_clef, 9, 18)
+    sprite_cel(0)
+        # Vertical spine
+        draw_line(4, 1, 4, 16, white, 100)
+        # Top curl
+        draw_arc(4, 2, 7, 4, -2, white, 100, false)
+        # Upper loop
+        draw_arc(2, 5, 6, 8, 3, white, 100, false)
+        # Middle S curve
+        draw_arc(3, 8, 6, 11, -2, white, 100, false)
+        # Bottom loop
+        draw_arc(2, 11, 6, 14, 3, white, 100, false)
+        # Bottom dot
+        draw_circle(3, 15, 1, white, 100, true)
+endsprite
+
+# ============================================
+# SONG DATA
+# Format: pitch (0-11), duration (1=quarter, 2=half, 4=whole)
+# Using two parallel arrays per song: pitches and durations
+# ============================================
+
+# Song 0: Twinkle Twinkle Little Star
+create_array(v_song0_pitch, 42, numeric)
+create_array(v_song0_dur, 42, numeric)
+v_song0_len = 42
+# C C G G A A G - F F E E D D C - G G F F E E D - G G F F E E D - C C G G A A G - F F E E D D C
+v_song0_pitch[0] = 0
+v_song0_dur[0] = 1
+v_song0_pitch[1] = 0
+v_song0_dur[1] = 1
+v_song0_pitch[2] = 4
+v_song0_dur[2] = 1
+v_song0_pitch[3] = 4
+v_song0_dur[3] = 1
+v_song0_pitch[4] = 5
+v_song0_dur[4] = 1
+v_song0_pitch[5] = 5
+v_song0_dur[5] = 1
+v_song0_pitch[6] = 4
+v_song0_dur[6] = 2
+v_song0_pitch[7] = 3
+v_song0_dur[7] = 1
+v_song0_pitch[8] = 3
+v_song0_dur[8] = 1
+v_song0_pitch[9] = 2
+v_song0_dur[9] = 1
+v_song0_pitch[10] = 2
+v_song0_dur[10] = 1
+v_song0_pitch[11] = 1
+v_song0_dur[11] = 1
+v_song0_pitch[12] = 1
+v_song0_dur[12] = 1
+v_song0_pitch[13] = 0
+v_song0_dur[13] = 2
+v_song0_pitch[14] = 4
+v_song0_dur[14] = 1
+v_song0_pitch[15] = 4
+v_song0_dur[15] = 1
+v_song0_pitch[16] = 3
+v_song0_dur[16] = 1
+v_song0_pitch[17] = 3
+v_song0_dur[17] = 1
+v_song0_pitch[18] = 2
+v_song0_dur[18] = 1
+v_song0_pitch[19] = 2
+v_song0_dur[19] = 1
+v_song0_pitch[20] = 1
+v_song0_dur[20] = 2
+v_song0_pitch[21] = 4
+v_song0_dur[21] = 1
+v_song0_pitch[22] = 4
+v_song0_dur[22] = 1
+v_song0_pitch[23] = 3
+v_song0_dur[23] = 1
+v_song0_pitch[24] = 3
+v_song0_dur[24] = 1
+v_song0_pitch[25] = 2
+v_song0_dur[25] = 1
+v_song0_pitch[26] = 2
+v_song0_dur[26] = 1
+v_song0_pitch[27] = 1
+v_song0_dur[27] = 2
+v_song0_pitch[28] = 0
+v_song0_dur[28] = 1
+v_song0_pitch[29] = 0
+v_song0_dur[29] = 1
+v_song0_pitch[30] = 4
+v_song0_dur[30] = 1
+v_song0_pitch[31] = 4
+v_song0_dur[31] = 1
+v_song0_pitch[32] = 5
+v_song0_dur[32] = 1
+v_song0_pitch[33] = 5
+v_song0_dur[33] = 1
+v_song0_pitch[34] = 4
+v_song0_dur[34] = 2
+v_song0_pitch[35] = 3
+v_song0_dur[35] = 1
+v_song0_pitch[36] = 3
+v_song0_dur[36] = 1
+v_song0_pitch[37] = 2
+v_song0_dur[37] = 1
+v_song0_pitch[38] = 2
+v_song0_dur[38] = 1
+v_song0_pitch[39] = 1
+v_song0_dur[39] = 1
+v_song0_pitch[40] = 1
+v_song0_dur[40] = 1
+v_song0_pitch[41] = 0
+v_song0_dur[41] = 4
+
+# Song 1: Mary Had a Little Lamb
+create_array(v_song1_pitch, 26, numeric)
+create_array(v_song1_dur, 26, numeric)
+v_song1_len = 26
+# E D C D E E E - D D D - E G G - E D C D E E E E D D E D C
+v_song1_pitch[0] = 2
+v_song1_dur[0] = 1
+v_song1_pitch[1] = 1
+v_song1_dur[1] = 1
+v_song1_pitch[2] = 0
+v_song1_dur[2] = 1
+v_song1_pitch[3] = 1
+v_song1_dur[3] = 1
+v_song1_pitch[4] = 2
+v_song1_dur[4] = 1
+v_song1_pitch[5] = 2
+v_song1_dur[5] = 1
+v_song1_pitch[6] = 2
+v_song1_dur[6] = 2
+v_song1_pitch[7] = 1
+v_song1_dur[7] = 1
+v_song1_pitch[8] = 1
+v_song1_dur[8] = 1
+v_song1_pitch[9] = 1
+v_song1_dur[9] = 2
+v_song1_pitch[10] = 2
+v_song1_dur[10] = 1
+v_song1_pitch[11] = 4
+v_song1_dur[11] = 1
+v_song1_pitch[12] = 4
+v_song1_dur[12] = 2
+v_song1_pitch[13] = 2
+v_song1_dur[13] = 1
+v_song1_pitch[14] = 1
+v_song1_dur[14] = 1
+v_song1_pitch[15] = 0
+v_song1_dur[15] = 1
+v_song1_pitch[16] = 1
+v_song1_dur[16] = 1
+v_song1_pitch[17] = 2
+v_song1_dur[17] = 1
+v_song1_pitch[18] = 2
+v_song1_dur[18] = 1
+v_song1_pitch[19] = 2
+v_song1_dur[19] = 1
+v_song1_pitch[20] = 2
+v_song1_dur[20] = 1
+v_song1_pitch[21] = 1
+v_song1_dur[21] = 1
+v_song1_pitch[22] = 1
+v_song1_dur[22] = 1
+v_song1_pitch[23] = 2
+v_song1_dur[23] = 1
+v_song1_pitch[24] = 1
+v_song1_dur[24] = 1
+v_song1_pitch[25] = 0
+v_song1_dur[25] = 4
+
+# Song 2: Ode to Joy
+create_array(v_song2_pitch, 32, numeric)
+create_array(v_song2_dur, 32, numeric)
+v_song2_len = 32
+# E E F G G F E D C C D E E D D - E E F G G F E D C C D E D C C
+v_song2_pitch[0] = 2
+v_song2_dur[0] = 1
+v_song2_pitch[1] = 2
+v_song2_dur[1] = 1
+v_song2_pitch[2] = 3
+v_song2_dur[2] = 1
+v_song2_pitch[3] = 4
+v_song2_dur[3] = 1
+v_song2_pitch[4] = 4
+v_song2_dur[4] = 1
+v_song2_pitch[5] = 3
+v_song2_dur[5] = 1
+v_song2_pitch[6] = 2
+v_song2_dur[6] = 1
+v_song2_pitch[7] = 1
+v_song2_dur[7] = 1
+v_song2_pitch[8] = 0
+v_song2_dur[8] = 1
+v_song2_pitch[9] = 0
+v_song2_dur[9] = 1
+v_song2_pitch[10] = 1
+v_song2_dur[10] = 1
+v_song2_pitch[11] = 2
+v_song2_dur[11] = 1
+v_song2_pitch[12] = 2
+v_song2_dur[12] = 2
+v_song2_pitch[13] = 1
+v_song2_dur[13] = 1
+v_song2_pitch[14] = 1
+v_song2_dur[14] = 2
+v_song2_pitch[15] = 2
+v_song2_dur[15] = 1
+v_song2_pitch[16] = 2
+v_song2_dur[16] = 1
+v_song2_pitch[17] = 3
+v_song2_dur[17] = 1
+v_song2_pitch[18] = 4
+v_song2_dur[18] = 1
+v_song2_pitch[19] = 4
+v_song2_dur[19] = 1
+v_song2_pitch[20] = 3
+v_song2_dur[20] = 1
+v_song2_pitch[21] = 2
+v_song2_dur[21] = 1
+v_song2_pitch[22] = 1
+v_song2_dur[22] = 1
+v_song2_pitch[23] = 0
+v_song2_dur[23] = 1
+v_song2_pitch[24] = 0
+v_song2_dur[24] = 1
+v_song2_pitch[25] = 1
+v_song2_dur[25] = 1
+v_song2_pitch[26] = 2
+v_song2_dur[26] = 1
+v_song2_pitch[27] = 1
+v_song2_dur[27] = 2
+v_song2_pitch[28] = 0
+v_song2_dur[28] = 1
+v_song2_pitch[29] = 0
+v_song2_dur[29] = 4
+v_song2_pitch[30] = 0
+v_song2_dur[30] = 0
+v_song2_pitch[31] = 0
+v_song2_dur[31] = 0
+
+# Song 3: Hot Cross Buns
+create_array(v_song3_pitch, 17, numeric)
+create_array(v_song3_dur, 17, numeric)
+v_song3_len = 17
+# E D C - E D C - C C C C D D D D E D C
+v_song3_pitch[0] = 2
+v_song3_dur[0] = 1
+v_song3_pitch[1] = 1
+v_song3_dur[1] = 1
+v_song3_pitch[2] = 0
+v_song3_dur[2] = 2
+v_song3_pitch[3] = 2
+v_song3_dur[3] = 1
+v_song3_pitch[4] = 1
+v_song3_dur[4] = 1
+v_song3_pitch[5] = 0
+v_song3_dur[5] = 2
+v_song3_pitch[6] = 0
+v_song3_dur[6] = 1
+v_song3_pitch[7] = 0
+v_song3_dur[7] = 1
+v_song3_pitch[8] = 0
+v_song3_dur[8] = 1
+v_song3_pitch[9] = 0
+v_song3_dur[9] = 1
+v_song3_pitch[10] = 1
+v_song3_dur[10] = 1
+v_song3_pitch[11] = 1
+v_song3_dur[11] = 1
+v_song3_pitch[12] = 1
+v_song3_dur[12] = 1
+v_song3_pitch[13] = 1
+v_song3_dur[13] = 1
+v_song3_pitch[14] = 2
+v_song3_dur[14] = 1
+v_song3_pitch[15] = 1
+v_song3_dur[15] = 1
+v_song3_pitch[16] = 0
+v_song3_dur[16] = 4
+
+# Song 4: Jingle Bells (chorus)
+create_array(v_song4_pitch, 25, numeric)
+create_array(v_song4_dur, 25, numeric)
+v_song4_len = 25
+# E E E - E E E - E G C D E - F F F F F E E E E D D E D G
+v_song4_pitch[0] = 2
+v_song4_dur[0] = 1
+v_song4_pitch[1] = 2
+v_song4_dur[1] = 1
+v_song4_pitch[2] = 2
+v_song4_dur[2] = 2
+v_song4_pitch[3] = 2
+v_song4_dur[3] = 1
+v_song4_pitch[4] = 2
+v_song4_dur[4] = 1
+v_song4_pitch[5] = 2
+v_song4_dur[5] = 2
+v_song4_pitch[6] = 2
+v_song4_dur[6] = 1
+v_song4_pitch[7] = 4
+v_song4_dur[7] = 1
+v_song4_pitch[8] = 0
+v_song4_dur[8] = 1
+v_song4_pitch[9] = 1
+v_song4_dur[9] = 1
+v_song4_pitch[10] = 2
+v_song4_dur[10] = 4
+v_song4_pitch[11] = 3
+v_song4_dur[11] = 1
+v_song4_pitch[12] = 3
+v_song4_dur[12] = 1
+v_song4_pitch[13] = 3
+v_song4_dur[13] = 1
+v_song4_pitch[14] = 3
+v_song4_dur[14] = 1
+v_song4_pitch[15] = 3
+v_song4_dur[15] = 1
+v_song4_pitch[16] = 2
+v_song4_dur[16] = 1
+v_song4_pitch[17] = 2
+v_song4_dur[17] = 1
+v_song4_pitch[18] = 2
+v_song4_dur[18] = 1
+v_song4_pitch[19] = 2
+v_song4_dur[19] = 1
+v_song4_pitch[20] = 1
+v_song4_dur[20] = 1
+v_song4_pitch[21] = 1
+v_song4_dur[21] = 1
+v_song4_pitch[22] = 2
+v_song4_dur[22] = 1
+v_song4_pitch[23] = 1
+v_song4_dur[23] = 1
+v_song4_pitch[24] = 4
+v_song4_dur[24] = 4
+
+# Song 5: Happy Birthday
+create_array(v_song5_pitch, 25, numeric)
+create_array(v_song5_dur, 25, numeric)
+v_song5_len = 25
+# C C D C F E - C C D C G F - C C C5 A F E D - Bb Bb A F G F
+v_song5_pitch[0] = 0
+v_song5_dur[0] = 1
+v_song5_pitch[1] = 0
+v_song5_dur[1] = 1
+v_song5_pitch[2] = 1
+v_song5_dur[2] = 1
+v_song5_pitch[3] = 0
+v_song5_dur[3] = 1
+v_song5_pitch[4] = 3
+v_song5_dur[4] = 1
+v_song5_pitch[5] = 2
+v_song5_dur[5] = 2
+v_song5_pitch[6] = 0
+v_song5_dur[6] = 1
+v_song5_pitch[7] = 0
+v_song5_dur[7] = 1
+v_song5_pitch[8] = 1
+v_song5_dur[8] = 1
+v_song5_pitch[9] = 0
+v_song5_dur[9] = 1
+v_song5_pitch[10] = 4
+v_song5_dur[10] = 1
+v_song5_pitch[11] = 3
+v_song5_dur[11] = 2
+v_song5_pitch[12] = 0
+v_song5_dur[12] = 1
+v_song5_pitch[13] = 0
+v_song5_dur[13] = 1
+v_song5_pitch[14] = 7
+v_song5_dur[14] = 1
+v_song5_pitch[15] = 5
+v_song5_dur[15] = 1
+v_song5_pitch[16] = 3
+v_song5_dur[16] = 1
+v_song5_pitch[17] = 2
+v_song5_dur[17] = 1
+v_song5_pitch[18] = 1
+v_song5_dur[18] = 2
+v_song5_pitch[19] = 6
+v_song5_dur[19] = 1
+v_song5_pitch[20] = 6
+v_song5_dur[20] = 1
+v_song5_pitch[21] = 5
+v_song5_dur[21] = 1
+v_song5_pitch[22] = 3
+v_song5_dur[22] = 1
+v_song5_pitch[23] = 4
+v_song5_dur[23] = 1
+v_song5_pitch[24] = 3
+v_song5_dur[24] = 4
+
+# Song 6: London Bridge
+create_array(v_song6_pitch, 22, numeric)
+create_array(v_song6_dur, 22, numeric)
+v_song6_len = 22
+# G A G F E F G - D E F - E F G - G A G F E F G - D G E C
+v_song6_pitch[0] = 4
+v_song6_dur[0] = 2
+v_song6_pitch[1] = 5
+v_song6_dur[1] = 1
+v_song6_pitch[2] = 4
+v_song6_dur[2] = 1
+v_song6_pitch[3] = 3
+v_song6_dur[3] = 1
+v_song6_pitch[4] = 2
+v_song6_dur[4] = 1
+v_song6_pitch[5] = 3
+v_song6_dur[5] = 1
+v_song6_pitch[6] = 4
+v_song6_dur[6] = 2
+v_song6_pitch[7] = 1
+v_song6_dur[7] = 1
+v_song6_pitch[8] = 2
+v_song6_dur[8] = 1
+v_song6_pitch[9] = 3
+v_song6_dur[9] = 2
+v_song6_pitch[10] = 2
+v_song6_dur[10] = 1
+v_song6_pitch[11] = 3
+v_song6_dur[11] = 1
+v_song6_pitch[12] = 4
+v_song6_dur[12] = 2
+v_song6_pitch[13] = 4
+v_song6_dur[13] = 2
+v_song6_pitch[14] = 5
+v_song6_dur[14] = 1
+v_song6_pitch[15] = 4
+v_song6_dur[15] = 1
+v_song6_pitch[16] = 3
+v_song6_dur[16] = 1
+v_song6_pitch[17] = 2
+v_song6_dur[17] = 1
+v_song6_pitch[18] = 3
+v_song6_dur[18] = 1
+v_song6_pitch[19] = 4
+v_song6_dur[19] = 2
+v_song6_pitch[20] = 1
+v_song6_dur[20] = 2
+v_song6_pitch[21] = 0
+v_song6_dur[21] = 4
+
+# Song 7: Row Row Row Your Boat
+create_array(v_song7_pitch, 22, numeric)
+create_array(v_song7_dur, 22, numeric)
+v_song7_len = 22
+# C C C D E - E D E F G - C C C G G G E E E C C C - G F E D C
+v_song7_pitch[0] = 0
+v_song7_dur[0] = 1
+v_song7_pitch[1] = 0
+v_song7_dur[1] = 1
+v_song7_pitch[2] = 0
+v_song7_dur[2] = 1
+v_song7_pitch[3] = 1
+v_song7_dur[3] = 1
+v_song7_pitch[4] = 2
+v_song7_dur[4] = 2
+v_song7_pitch[5] = 2
+v_song7_dur[5] = 1
+v_song7_pitch[6] = 1
+v_song7_dur[6] = 1
+v_song7_pitch[7] = 2
+v_song7_dur[7] = 1
+v_song7_pitch[8] = 3
+v_song7_dur[8] = 1
+v_song7_pitch[9] = 4
+v_song7_dur[9] = 2
+v_song7_pitch[10] = 7
+v_song7_dur[10] = 1
+v_song7_pitch[11] = 7
+v_song7_dur[11] = 1
+v_song7_pitch[12] = 7
+v_song7_dur[12] = 1
+v_song7_pitch[13] = 4
+v_song7_dur[13] = 1
+v_song7_pitch[14] = 4
+v_song7_dur[14] = 1
+v_song7_pitch[15] = 4
+v_song7_dur[15] = 1
+v_song7_pitch[16] = 2
+v_song7_dur[16] = 1
+v_song7_pitch[17] = 2
+v_song7_dur[17] = 1
+v_song7_pitch[18] = 2
+v_song7_dur[18] = 1
+v_song7_pitch[19] = 0
+v_song7_dur[19] = 1
+v_song7_pitch[20] = 0
+v_song7_dur[20] = 1
+v_song7_pitch[21] = 0
+v_song7_dur[21] = 4
+
+# Song 8: Frere Jacques
+create_array(v_song8_pitch, 24, numeric)
+create_array(v_song8_dur, 24, numeric)
+v_song8_len = 24
+# C D E C - C D E C - E F G - E F G - G A G F E C - G A G F E C - C G C - C G C
+v_song8_pitch[0] = 0
+v_song8_dur[0] = 1
+v_song8_pitch[1] = 1
+v_song8_dur[1] = 1
+v_song8_pitch[2] = 2
+v_song8_dur[2] = 1
+v_song8_pitch[3] = 0
+v_song8_dur[3] = 1
+v_song8_pitch[4] = 0
+v_song8_dur[4] = 1
+v_song8_pitch[5] = 1
+v_song8_dur[5] = 1
+v_song8_pitch[6] = 2
+v_song8_dur[6] = 1
+v_song8_pitch[7] = 0
+v_song8_dur[7] = 1
+v_song8_pitch[8] = 2
+v_song8_dur[8] = 1
+v_song8_pitch[9] = 3
+v_song8_dur[9] = 1
+v_song8_pitch[10] = 4
+v_song8_dur[10] = 2
+v_song8_pitch[11] = 2
+v_song8_dur[11] = 1
+v_song8_pitch[12] = 3
+v_song8_dur[12] = 1
+v_song8_pitch[13] = 4
+v_song8_dur[13] = 2
+v_song8_pitch[14] = 4
+v_song8_dur[14] = 1
+v_song8_pitch[15] = 5
+v_song8_dur[15] = 1
+v_song8_pitch[16] = 4
+v_song8_dur[16] = 1
+v_song8_pitch[17] = 3
+v_song8_dur[17] = 1
+v_song8_pitch[18] = 2
+v_song8_dur[18] = 1
+v_song8_pitch[19] = 0
+v_song8_dur[19] = 1
+v_song8_pitch[20] = 0
+v_song8_dur[20] = 1
+v_song8_pitch[21] = 4
+v_song8_dur[21] = 1
+v_song8_pitch[22] = 0
+v_song8_dur[22] = 2
+v_song8_pitch[23] = 0
+v_song8_dur[23] = 4
+
+# Song 9: When The Saints Go Marching In
+create_array(v_song9_pitch, 28, numeric)
+create_array(v_song9_dur, 28, numeric)
+v_song9_len = 28
+# C E F G - C E F G - C E F G E C E D - C E F G - F E C D C
+v_song9_pitch[0] = 0
+v_song9_dur[0] = 1
+v_song9_pitch[1] = 2
+v_song9_dur[1] = 1
+v_song9_pitch[2] = 3
+v_song9_dur[2] = 1
+v_song9_pitch[3] = 4
+v_song9_dur[3] = 4
+v_song9_pitch[4] = 0
+v_song9_dur[4] = 1
+v_song9_pitch[5] = 2
+v_song9_dur[5] = 1
+v_song9_pitch[6] = 3
+v_song9_dur[6] = 1
+v_song9_pitch[7] = 4
+v_song9_dur[7] = 4
+v_song9_pitch[8] = 0
+v_song9_dur[8] = 1
+v_song9_pitch[9] = 2
+v_song9_dur[9] = 1
+v_song9_pitch[10] = 3
+v_song9_dur[10] = 1
+v_song9_pitch[11] = 4
+v_song9_dur[11] = 2
+v_song9_pitch[12] = 2
+v_song9_dur[12] = 2
+v_song9_pitch[13] = 0
+v_song9_dur[13] = 2
+v_song9_pitch[14] = 2
+v_song9_dur[14] = 1
+v_song9_pitch[15] = 1
+v_song9_dur[15] = 1
+v_song9_pitch[16] = 0
+v_song9_dur[16] = 4
+v_song9_pitch[17] = 2
+v_song9_dur[17] = 2
+v_song9_pitch[18] = 2
+v_song9_dur[18] = 1
+v_song9_pitch[19] = 1
+v_song9_dur[19] = 1
+v_song9_pitch[20] = 2
+v_song9_dur[20] = 2
+v_song9_pitch[21] = 3
+v_song9_dur[21] = 2
+v_song9_pitch[22] = 3
+v_song9_dur[22] = 2
+v_song9_pitch[23] = 2
+v_song9_dur[23] = 1
+v_song9_pitch[24] = 0
+v_song9_dur[24] = 1
+v_song9_pitch[25] = 1
+v_song9_dur[25] = 1
+v_song9_pitch[26] = 0
+v_song9_dur[26] = 4
+v_song9_pitch[27] = 0
+v_song9_dur[27] = 0
+
+# ============================================
+# LYRICS DATA - One syllable per note
+# ============================================
+
+# Song 0: Twinkle Twinkle Little Star
+create_array(v_lyrics0, 42, string)
+v_lyrics0[0] = "Twin"
+v_lyrics0[1] = "kle"
+v_lyrics0[2] = "twin"
+v_lyrics0[3] = "kle"
+v_lyrics0[4] = "lit"
+v_lyrics0[5] = "tle"
+v_lyrics0[6] = "star"
+v_lyrics0[7] = "How"
+v_lyrics0[8] = "I"
+v_lyrics0[9] = "won"
+v_lyrics0[10] = "der"
+v_lyrics0[11] = "what"
+v_lyrics0[12] = "you"
+v_lyrics0[13] = "are"
+v_lyrics0[14] = "Up"
+v_lyrics0[15] = "a"
+v_lyrics0[16] = "bove"
+v_lyrics0[17] = "the"
+v_lyrics0[18] = "world"
+v_lyrics0[19] = "so"
+v_lyrics0[20] = "high"
+v_lyrics0[21] = "Like"
+v_lyrics0[22] = "a"
+v_lyrics0[23] = "dia"
+v_lyrics0[24] = "mond"
+v_lyrics0[25] = "in"
+v_lyrics0[26] = "the"
+v_lyrics0[27] = "sky"
+v_lyrics0[28] = "Twin"
+v_lyrics0[29] = "kle"
+v_lyrics0[30] = "twin"
+v_lyrics0[31] = "kle"
+v_lyrics0[32] = "lit"
+v_lyrics0[33] = "tle"
+v_lyrics0[34] = "star"
+v_lyrics0[35] = "How"
+v_lyrics0[36] = "I"
+v_lyrics0[37] = "won"
+v_lyrics0[38] = "der"
+v_lyrics0[39] = "what"
+v_lyrics0[40] = "you"
+v_lyrics0[41] = "are"
+
+# Song 1: Mary Had a Little Lamb
+create_array(v_lyrics1, 26, string)
+v_lyrics1[0] = "Ma"
+v_lyrics1[1] = "ry"
+v_lyrics1[2] = "had"
+v_lyrics1[3] = "a"
+v_lyrics1[4] = "lit"
+v_lyrics1[5] = "tle"
+v_lyrics1[6] = "lamb"
+v_lyrics1[7] = "lit"
+v_lyrics1[8] = "tle"
+v_lyrics1[9] = "lamb"
+v_lyrics1[10] = "lit"
+v_lyrics1[11] = "tle"
+v_lyrics1[12] = "lamb"
+v_lyrics1[13] = "Ma"
+v_lyrics1[14] = "ry"
+v_lyrics1[15] = "had"
+v_lyrics1[16] = "a"
+v_lyrics1[17] = "lit"
+v_lyrics1[18] = "tle"
+v_lyrics1[19] = "lamb"
+v_lyrics1[20] = "its"
+v_lyrics1[21] = "fleece"
+v_lyrics1[22] = "was"
+v_lyrics1[23] = "white"
+v_lyrics1[24] = "as"
+v_lyrics1[25] = "snow"
+
+# Song 2: Ode to Joy
+create_array(v_lyrics2, 32, string)
+v_lyrics2[0] = "Joy"
+v_lyrics2[1] = "ful"
+v_lyrics2[2] = "joy"
+v_lyrics2[3] = "ful"
+v_lyrics2[4] = "we"
+v_lyrics2[5] = "a"
+v_lyrics2[6] = "dore"
+v_lyrics2[7] = "thee"
+v_lyrics2[8] = "God"
+v_lyrics2[9] = "of"
+v_lyrics2[10] = "glo"
+v_lyrics2[11] = "ry"
+v_lyrics2[12] = "Lord"
+v_lyrics2[13] = "of"
+v_lyrics2[14] = "love"
+v_lyrics2[15] = "Hearts"
+v_lyrics2[16] = "un"
+v_lyrics2[17] = "fold"
+v_lyrics2[18] = "like"
+v_lyrics2[19] = "flow"
+v_lyrics2[20] = "ers"
+v_lyrics2[21] = "be"
+v_lyrics2[22] = "fore"
+v_lyrics2[23] = "thee"
+v_lyrics2[24] = "o"
+v_lyrics2[25] = "pen"
+v_lyrics2[26] = "ing"
+v_lyrics2[27] = "to"
+v_lyrics2[28] = "the"
+v_lyrics2[29] = "sun"
+v_lyrics2[30] = ""
+v_lyrics2[31] = ""
+
+# Song 3: Hot Cross Buns
+create_array(v_lyrics3, 17, string)
+v_lyrics3[0] = "Hot"
+v_lyrics3[1] = "cross"
+v_lyrics3[2] = "buns"
+v_lyrics3[3] = "Hot"
+v_lyrics3[4] = "cross"
+v_lyrics3[5] = "buns"
+v_lyrics3[6] = "One"
+v_lyrics3[7] = "a"
+v_lyrics3[8] = "pen"
+v_lyrics3[9] = "ny"
+v_lyrics3[10] = "two"
+v_lyrics3[11] = "a"
+v_lyrics3[12] = "pen"
+v_lyrics3[13] = "ny"
+v_lyrics3[14] = "hot"
+v_lyrics3[15] = "cross"
+v_lyrics3[16] = "buns"
+
+# Song 4: Jingle Bells
+create_array(v_lyrics4, 25, string)
+v_lyrics4[0] = "Jin"
+v_lyrics4[1] = "gle"
+v_lyrics4[2] = "bells"
+v_lyrics4[3] = "jin"
+v_lyrics4[4] = "gle"
+v_lyrics4[5] = "bells"
+v_lyrics4[6] = "jin"
+v_lyrics4[7] = "gle"
+v_lyrics4[8] = "all"
+v_lyrics4[9] = "the"
+v_lyrics4[10] = "way"
+v_lyrics4[11] = "Oh"
+v_lyrics4[12] = "what"
+v_lyrics4[13] = "fun"
+v_lyrics4[14] = "it"
+v_lyrics4[15] = "is"
+v_lyrics4[16] = "to"
+v_lyrics4[17] = "ride"
+v_lyrics4[18] = "in"
+v_lyrics4[19] = "a"
+v_lyrics4[20] = "one"
+v_lyrics4[21] = "horse"
+v_lyrics4[22] = "o"
+v_lyrics4[23] = "pen"
+v_lyrics4[24] = "sleigh"
+
+# Song 5: Happy Birthday
+create_array(v_lyrics5, 25, string)
+v_lyrics5[0] = "Hap"
+v_lyrics5[1] = "py"
+v_lyrics5[2] = "birth"
+v_lyrics5[3] = "day"
+v_lyrics5[4] = "to"
+v_lyrics5[5] = "you"
+v_lyrics5[6] = "Hap"
+v_lyrics5[7] = "py"
+v_lyrics5[8] = "birth"
+v_lyrics5[9] = "day"
+v_lyrics5[10] = "to"
+v_lyrics5[11] = "you"
+v_lyrics5[12] = "Hap"
+v_lyrics5[13] = "py"
+v_lyrics5[14] = "birth"
+v_lyrics5[15] = "day"
+v_lyrics5[16] = "dear"
+v_lyrics5[17] = "friend"
+v_lyrics5[18] = "..."
+v_lyrics5[19] = "Hap"
+v_lyrics5[20] = "py"
+v_lyrics5[21] = "birth"
+v_lyrics5[22] = "day"
+v_lyrics5[23] = "to"
+v_lyrics5[24] = "you"
+
+# Song 6: London Bridge
+create_array(v_lyrics6, 22, string)
+v_lyrics6[0] = "Lon"
+v_lyrics6[1] = "don"
+v_lyrics6[2] = "Bridge"
+v_lyrics6[3] = "is"
+v_lyrics6[4] = "fal"
+v_lyrics6[5] = "ling"
+v_lyrics6[6] = "down"
+v_lyrics6[7] = "fal"
+v_lyrics6[8] = "ling"
+v_lyrics6[9] = "down"
+v_lyrics6[10] = "fal"
+v_lyrics6[11] = "ling"
+v_lyrics6[12] = "down"
+v_lyrics6[13] = "Lon"
+v_lyrics6[14] = "don"
+v_lyrics6[15] = "Bridge"
+v_lyrics6[16] = "is"
+v_lyrics6[17] = "fal"
+v_lyrics6[18] = "ling"
+v_lyrics6[19] = "down"
+v_lyrics6[20] = "my"
+v_lyrics6[21] = "lady"
+
+# Song 7: Row Row Row Your Boat
+create_array(v_lyrics7, 22, string)
+v_lyrics7[0] = "Row"
+v_lyrics7[1] = "row"
+v_lyrics7[2] = "row"
+v_lyrics7[3] = "your"
+v_lyrics7[4] = "boat"
+v_lyrics7[5] = "gent"
+v_lyrics7[6] = "ly"
+v_lyrics7[7] = "down"
+v_lyrics7[8] = "the"
+v_lyrics7[9] = "stream"
+v_lyrics7[10] = "Mer"
+v_lyrics7[11] = "ri"
+v_lyrics7[12] = "ly"
+v_lyrics7[13] = "mer"
+v_lyrics7[14] = "ri"
+v_lyrics7[15] = "ly"
+v_lyrics7[16] = "mer"
+v_lyrics7[17] = "ri"
+v_lyrics7[18] = "ly"
+v_lyrics7[19] = "life"
+v_lyrics7[20] = "is"
+v_lyrics7[21] = "dream"
+
+# Song 8: Frere Jacques
+create_array(v_lyrics8, 24, string)
+v_lyrics8[0] = "Fre"
+v_lyrics8[1] = "re"
+v_lyrics8[2] = "Jac"
+v_lyrics8[3] = "ques"
+v_lyrics8[4] = "Fre"
+v_lyrics8[5] = "re"
+v_lyrics8[6] = "Jac"
+v_lyrics8[7] = "ques"
+v_lyrics8[8] = "Dor"
+v_lyrics8[9] = "mez"
+v_lyrics8[10] = "vous"
+v_lyrics8[11] = "Dor"
+v_lyrics8[12] = "mez"
+v_lyrics8[13] = "vous"
+v_lyrics8[14] = "Son"
+v_lyrics8[15] = "nez"
+v_lyrics8[16] = "les"
+v_lyrics8[17] = "ma"
+v_lyrics8[18] = "tin"
+v_lyrics8[19] = "es"
+v_lyrics8[20] = "Ding"
+v_lyrics8[21] = "dang"
+v_lyrics8[22] = "dong"
+v_lyrics8[23] = "!"
+
+# Song 9: When The Saints Go Marching In
+create_array(v_lyrics9, 28, string)
+v_lyrics9[0] = "Oh"
+v_lyrics9[1] = "when"
+v_lyrics9[2] = "the"
+v_lyrics9[3] = "saints"
+v_lyrics9[4] = "Oh"
+v_lyrics9[5] = "when"
+v_lyrics9[6] = "the"
+v_lyrics9[7] = "saints"
+v_lyrics9[8] = "Oh"
+v_lyrics9[9] = "when"
+v_lyrics9[10] = "the"
+v_lyrics9[11] = "saints"
+v_lyrics9[12] = "go"
+v_lyrics9[13] = "march"
+v_lyrics9[14] = "ing"
+v_lyrics9[15] = "in"
+v_lyrics9[16] = "..."
+v_lyrics9[17] = "I"
+v_lyrics9[18] = "want"
+v_lyrics9[19] = "to"
+v_lyrics9[20] = "be"
+v_lyrics9[21] = "in"
+v_lyrics9[22] = "that"
+v_lyrics9[23] = "num"
+v_lyrics9[24] = "ber"
+v_lyrics9[25] = "when"
+v_lyrics9[26] = "the"
+v_lyrics9[27] = "saints"
+
+# ============================================
+# DRAW STAFF PROCEDURE
+# ============================================
+def draw_staff {
+    draw_line(0, v_line1_y, 63, v_line1_y, v_staff_color, 100)
+    draw_line(0, v_line2_y, 63, v_line2_y, v_staff_color, 100)
+    draw_line(0, v_line3_y, 63, v_line3_y, v_staff_color, 100)
+    draw_line(0, v_line4_y, 63, v_line4_y, v_staff_color, 100)
+    draw_line(0, v_line5_y, 63, v_line5_y, v_staff_color, 100)
+    # Play line indicator
+    draw_line(v_play_line_x, 23, v_play_line_x, 42, 15, 50)
+}
+
+# ============================================
+# DRAW NOTE PROCEDURE
+# Inputs: v_note_x, v_note_pitch, v_note_duration
+# ============================================
+def draw_note {
+    v_note_y = v_pitch_y[v_note_pitch]
+    
+    # Draw ledger line for C4 (pitch 0, y=41)
+    if v_note_pitch == 0 then
+        draw_line(v_note_x - 3, 41, v_note_x + 3, 41, v_staff_color, 100)
+    endif
+    
+    # Draw ledger line for notes above staff (G5+, pitch 11+)
+    if v_note_pitch >= 11 then
+        draw_line(v_note_x - 3, 24, v_note_x + 3, 24, v_staff_color, 100)
+    endif
+    
+    # Determine stem direction (B4 and above = stem down, below B4 = stem up)
+    # B4 is pitch 6, y=32
+    if v_note_pitch >= 6 then
+        v_stem_dir = 1
+    else
+        v_stem_dir = -1
+    endif
+    
+    # Draw based on duration
+    # Duration 4 = whole note (hollow, no stem, wider)
+    # Duration 2 = half note (hollow with stem)
+    # Duration 1 = quarter note (filled with stem)
+    
+    if v_note_duration == 4 then
+        # Whole note - hollow ellipse, no stem
+        draw_ellipse(v_note_x, v_note_y, 2, 1, v_note_color, 100, false, 0)
+    elseif v_note_duration == 2 then
+        # Half note - hollow ellipse with stem
+        draw_ellipse(v_note_x, v_note_y, 2, 1, v_note_color, 100, false, 0)
+        if v_stem_dir == 1 then
+            draw_line(v_note_x - 2, v_note_y, v_note_x - 2, v_note_y + 7, v_note_color, 100)
+        else
+            draw_line(v_note_x + 2, v_note_y, v_note_x + 2, v_note_y - 7, v_note_color, 100)
+        endif
+    else
+        # Quarter note - filled ellipse with stem
+        draw_ellipse(v_note_x, v_note_y, 2, 1, v_note_color, 100, true, 0)
+        if v_stem_dir == 1 then
+            draw_line(v_note_x - 2, v_note_y, v_note_x - 2, v_note_y + 7, v_note_color, 100)
+        else
+            draw_line(v_note_x + 2, v_note_y, v_note_x + 2, v_note_y - 7, v_note_color, 100)
+        endif
+    endif
+}
+
+# ============================================
+# DRAW BAR LINE PROCEDURE
+# Input: v_bar_x
+# ============================================
+def draw_bar_line {
+    if v_bar_x >= 0 and v_bar_x <= 63 then
+        draw_line(v_bar_x, v_line5_y, v_bar_x, v_line1_y, v_bar_color, 100)
+    endif
+}
+
+# ============================================
+# MAIN LOOP - PLAY SONGS FOREVER
+# ============================================
+clear()
+
+# Song lengths array
+create_array(v_song_lengths, 10, numeric)
+v_song_lengths[0] = 42
+v_song_lengths[1] = 26
+v_song_lengths[2] = 30
+v_song_lengths[3] = 17
+v_song_lengths[4] = 25
+v_song_lengths[5] = 25
+v_song_lengths[6] = 22
+v_song_lengths[7] = 22
+v_song_lengths[8] = 24
+v_song_lengths[9] = 28
+
+# Song titles
+create_array(v_song_titles, 10, string)
+v_song_titles[0] = "Twinkle Twinkle"
+v_song_titles[1] = "Mary Had a Lamb"
+v_song_titles[2] = "Ode to Joy"
+v_song_titles[3] = "Hot Cross Buns"
+v_song_titles[4] = "Jingle Bells"
+v_song_titles[5] = "Happy Birthday"
+v_song_titles[6] = "London Bridge"
+v_song_titles[7] = "Row Your Boat"
+v_song_titles[8] = "Frere Jacques"
+v_song_titles[9] = "The Saints"
+
+# Working arrays for current song
+create_array(v_cur_pitch, 50, numeric)
+create_array(v_cur_dur, 50, numeric)
+create_array(v_note_xpos, 50, numeric)
+v_cur_lyric = ""
+v_cur_title = ""
+
+# Main infinite loop
+while 1 == 1 then
+    # Pick random song
+    v_song_num = random(0, 9, 0)
+    v_cur_len = v_song_lengths[v_song_num]
+    
+    # Copy song data to working arrays (pitch and duration only)
+    v_cur_title = v_song_titles[v_song_num]
+    
+    if v_song_num == 0 then
+        for v_i in (0, 40, 1)
+            v_cur_pitch[v_i] = v_song0_pitch[v_i]
+            v_cur_dur[v_i] = v_song0_dur[v_i]
+        endfor v_i
+        v_cur_pitch[41] = v_song0_pitch[41]
+        v_cur_dur[41] = v_song0_dur[41]
+    endif
+    
+    if v_song_num == 1 then
+        for v_i in (0, 24, 1)
+            v_cur_pitch[v_i] = v_song1_pitch[v_i]
+            v_cur_dur[v_i] = v_song1_dur[v_i]
+        endfor v_i
+        v_cur_pitch[25] = v_song1_pitch[25]
+        v_cur_dur[25] = v_song1_dur[25]
+    endif
+    
+    if v_song_num == 2 then
+        for v_i in (0, 29, 1)
+            v_cur_pitch[v_i] = v_song2_pitch[v_i]
+            v_cur_dur[v_i] = v_song2_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 3 then
+        for v_i in (0, 16, 1)
+            v_cur_pitch[v_i] = v_song3_pitch[v_i]
+            v_cur_dur[v_i] = v_song3_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 4 then
+        for v_i in (0, 24, 1)
+            v_cur_pitch[v_i] = v_song4_pitch[v_i]
+            v_cur_dur[v_i] = v_song4_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 5 then
+        for v_i in (0, 24, 1)
+            v_cur_pitch[v_i] = v_song5_pitch[v_i]
+            v_cur_dur[v_i] = v_song5_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 6 then
+        for v_i in (0, 21, 1)
+            v_cur_pitch[v_i] = v_song6_pitch[v_i]
+            v_cur_dur[v_i] = v_song6_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 7 then
+        for v_i in (0, 21, 1)
+            v_cur_pitch[v_i] = v_song7_pitch[v_i]
+            v_cur_dur[v_i] = v_song7_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 8 then
+        for v_i in (0, 23, 1)
+            v_cur_pitch[v_i] = v_song8_pitch[v_i]
+            v_cur_dur[v_i] = v_song8_dur[v_i]
+        endfor v_i
+    endif
+    
+    if v_song_num == 9 then
+        for v_i in (0, 27, 1)
+            v_cur_pitch[v_i] = v_song9_pitch[v_i]
+            v_cur_dur[v_i] = v_song9_dur[v_i]
+        endfor v_i
+    endif
+    
+    # Calculate x positions for each note based on cumulative duration
+    # Start at x=70 (off screen right), spacing based on duration
+    v_spacing = 8
+    v_cumulative_x = 70
+    for v_i in (0, 49, 1)
+        if v_i < v_cur_len then
+            v_note_xpos[v_i] = v_cumulative_x
+            v_cumulative_x = v_cumulative_x + v_cur_dur[v_i] * v_spacing
+        endif
+    endfor v_i
+    
+    # Calculate total scroll distance (add lead-in measure at start)
+    v_lead_in = 32
+    v_total_scroll = v_cumulative_x + 20
+    
+    # Calculate bar positions (every 4 beats)
+    v_bar_spacing = 4 * v_spacing
+    
+    # Show treble clef initially (positioned so middle aligns with staff)
+    show_sprite(treble_clef, 2, 24, 0, 10)
+    
+    # Animation variables
+    # Start with negative scroll to give treble clef a measure of lead-in time
+    v_scroll_offset = -1 * v_lead_in
+    v_current_note = 0
+    v_ball_x = v_play_line_x
+    v_ball_y = 32
+    v_ball_target_y = v_pitch_y[v_cur_pitch[0]]
+    v_ball_start_y = 32
+    v_ball_progress = 1
+    v_frames_per_beat = 15
+    v_frame_count = 0
+    
+    # Set initial lyric
+    if v_song_num == 0 then
+        v_cur_lyric = v_lyrics0[0]
+    endif
+    if v_song_num == 1 then
+        v_cur_lyric = v_lyrics1[0]
+    endif
+    if v_song_num == 2 then
+        v_cur_lyric = v_lyrics2[0]
+    endif
+    if v_song_num == 3 then
+        v_cur_lyric = v_lyrics3[0]
+    endif
+    if v_song_num == 4 then
+        v_cur_lyric = v_lyrics4[0]
+    endif
+    if v_song_num == 5 then
+        v_cur_lyric = v_lyrics5[0]
+    endif
+    if v_song_num == 6 then
+        v_cur_lyric = v_lyrics6[0]
+    endif
+    if v_song_num == 7 then
+        v_cur_lyric = v_lyrics7[0]
+    endif
+    if v_song_num == 8 then
+        v_cur_lyric = v_lyrics8[0]
+    endif
+    if v_song_num == 9 then
+        v_cur_lyric = v_lyrics9[0]
+    endif
+    
+    # Scroll through the song
+    while v_scroll_offset < v_total_scroll then
+        begin_frame
+            # Draw staff
+            call draw_staff
+            
+            # Draw bar lines - calculate first visible bar directly
+            v_first_bar = floor((v_scroll_offset - 70) / v_bar_spacing)
+            if v_first_bar < 0 then
+                v_first_bar = 0
+            endif
+            v_bar_x = 70 - v_scroll_offset + v_first_bar * v_bar_spacing
+            while v_bar_x < 68 then
+                call draw_bar_line
+                v_bar_x = v_bar_x + v_bar_spacing
+            endwhile
+            
+            # Calculate visible note range based on scroll position
+            # Notes start at x=70, spaced by v_spacing * duration
+            # Visible range is roughly -5 to 68 on screen
+            v_first_note = 0
+            v_last_note = v_cur_len - 1
+            
+            # Find first visible note - estimate based on scroll position
+            # Only start looking when scroll is positive
+            if v_scroll_offset > 0 then
+                v_est_first = floor((v_scroll_offset - 75) / v_spacing)
+                if v_est_first < 0 then
+                    v_est_first = 0
+                endif
+                if v_est_first > v_cur_len - 1 then
+                    v_est_first = v_cur_len - 1
+                endif
+                v_first_note = v_est_first
+            endif
+            
+            # Only draw ~12 notes max (visible window)
+            v_notes_drawn = 0
+            v_i = v_first_note
+            while v_i < v_cur_len and v_notes_drawn < 12 then
+                v_note_x = v_note_xpos[v_i] - v_scroll_offset
+                if v_note_x >= -5 and v_note_x <= 68 then
+                    v_note_pitch = v_cur_pitch[v_i]
+                    v_note_duration = v_cur_dur[v_i]
+                    if v_note_duration > 0 then
+                        call draw_note
+                    endif
+                    v_notes_drawn = v_notes_drawn + 1
+                endif
+                v_i = v_i + 1
+            endwhile
+            
+            # Update treble clef position
+            v_clef_x = 2 - v_scroll_offset
+            if v_clef_x > -12 then
+                move_sprite(treble_clef, v_clef_x, 24, 0)
+            else
+                hide_sprite(treble_clef, 0)
+            endif
+            
+            # Calculate current note directly from scroll position
+            # A note is "current" when its x position crosses the play line
+            v_new_note = v_current_note
+            v_target_scroll = v_note_xpos[v_current_note + 1] - v_play_line_x
+            if v_current_note + 1 < v_cur_len then
+                if v_scroll_offset >= v_target_scroll - 2 then
+                    v_new_note = v_current_note + 1
+                endif
+            endif
+            
+            # If we hit a new note, start bouncing to it
+            if v_new_note > v_current_note and v_new_note < v_cur_len then
+                v_current_note = v_new_note
+                v_ball_start_y = v_ball_y
+                v_ball_target_y = v_pitch_y[v_cur_pitch[v_current_note]]
+                v_ball_progress = 0
+                # Get lyric from song-specific array
+                if v_song_num == 0 then
+                    v_cur_lyric = v_lyrics0[v_current_note]
+                endif
+                if v_song_num == 1 then
+                    v_cur_lyric = v_lyrics1[v_current_note]
+                endif
+                if v_song_num == 2 then
+                    v_cur_lyric = v_lyrics2[v_current_note]
+                endif
+                if v_song_num == 3 then
+                    v_cur_lyric = v_lyrics3[v_current_note]
+                endif
+                if v_song_num == 4 then
+                    v_cur_lyric = v_lyrics4[v_current_note]
+                endif
+                if v_song_num == 5 then
+                    v_cur_lyric = v_lyrics5[v_current_note]
+                endif
+                if v_song_num == 6 then
+                    v_cur_lyric = v_lyrics6[v_current_note]
+                endif
+                if v_song_num == 7 then
+                    v_cur_lyric = v_lyrics7[v_current_note]
+                endif
+                if v_song_num == 8 then
+                    v_cur_lyric = v_lyrics8[v_current_note]
+                endif
+                if v_song_num == 9 then
+                    v_cur_lyric = v_lyrics9[v_current_note]
+                endif
+            endif
+            
+            # Animate ball bounce (parabolic arc)
+            if v_ball_progress < 1 then
+                v_ball_progress = v_ball_progress + 0.15
+                if v_ball_progress > 1 then
+                    v_ball_progress = 1
+                endif
+                # Parabolic arc: y goes up then down
+                v_linear_y = v_ball_start_y + (v_ball_target_y - v_ball_start_y) * v_ball_progress
+                v_arc_offset = 32 * v_ball_progress * (1 - v_ball_progress)
+                v_ball_y = v_linear_y - v_arc_offset
+            else
+                v_ball_y = v_ball_target_y
+            endif
+            
+            # Draw the bouncing ball
+            draw_circle(v_play_line_x, v_ball_y - 5, 2, v_ball_color, 100, true)
+            
+            # Draw song title at top
+            draw_text(2, 2, v_cur_title, tiny64_font, 8, cyan, 80)
+            
+            # Draw current lyric syllable at bottom
+            draw_text(2, 54, v_cur_lyric, tiny64_font, 10, white, 100)
+            
+        end_frame
+        
+        # Scroll speed
+        v_scroll_offset = v_scroll_offset + 0.5
+    endwhile
+    
+    # Hide clef and pause before next song
+    hide_sprite(treble_clef, 0)
+    rest(1)
+    
+endwhile

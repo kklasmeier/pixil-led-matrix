@@ -8,11 +8,11 @@
 v_screen_width = 64
 v_screen_height = 64
 v_bird_x = 12
-v_gravity = 0.4
-v_flap_power = -3.2
+v_gravity = 0.35
+v_flap_power = -3.0
 v_pipe_speed = 2
-v_min_gap = 16
-v_max_gap = 20
+v_min_gap = 18
+v_max_gap = 22
 v_pipe_width = 8
 v_cap_height = 3
 v_ground_y = 58
@@ -95,10 +95,10 @@ endsprite
 
 # Draw blue sky background with ground
 def draw_background {
-    draw_rectangle(0, 0, 64, v_ground_y, sky_blue, 100, true)
-    draw_rectangle(0, v_ground_y, 64, 6, forest_green, 100, true)
+    draw_rectangle(0, 0, 64, v_ground_y, sky_blue, 60, true)
+    draw_rectangle(0, v_ground_y, 64, 6, forest_green, 60, true)
     # Ground detail line
-    draw_line(0, v_ground_y, 63, v_ground_y, green, 100)
+    draw_line(0, v_ground_y, 63, v_ground_y, green, 80)
 }
 
 # Draw decorative clouds for title screen
@@ -149,7 +149,7 @@ def draw_pipe {
 def show_title_screen {
     clear()
     
-    begin_frame
+    begin_frame(true)
         call draw_background
         call draw_clouds
     end_frame
@@ -189,29 +189,40 @@ def show_title_screen {
 # GAME OVER SCREEN
 #================================================
 def show_game_over {
+    # Update high score if current score is higher
+    if v_score > v_high_score then
+        v_high_score = v_score
+    endif
+    
     # Flash effect
     draw_rectangle(0, 0, 64, 64, white, 100, true)
     rest(0.1)
     
-    begin_frame
+    begin_frame(true)
         call draw_background
     end_frame
     
     # Game over banner background
-    draw_rectangle(4, 18, 56, 28, black, 60, true)
-    draw_rectangle(5, 19, 54, 26, navy, 80, true)
+    draw_rectangle(4, 14, 56, 36, black, 60, true)
+    draw_rectangle(5, 15, 54, 34, navy, 80, true)
     
     # Game over text
-    draw_text(8, 22, "GAME OVER", tiny64_font, 7, red, 100)
+    draw_text(8, 17, "GAME OVER", tiny64_font, 7, red, 100)
     
     # Score display
-    draw_text(14, 34, "SCORE", tiny64_font, 6, white, 100)
-    
-    # Convert score to string position
+    draw_text(10, 28, "SCORE", tiny64_font, 6, white, 100)
     if v_score < 10 then
-        draw_text(44, 34, v_score, tiny64_font, 6, yellow, 100)
+        draw_text(44, 28, v_score, tiny64_font, 6, yellow, 100)
     else
-        draw_text(40, 34, v_score, tiny64_font, 6, yellow, 100)
+        draw_text(40, 28, v_score, tiny64_font, 6, yellow, 100)
+    endif
+    
+    # High score display
+    draw_text(10, 38, "BEST", tiny64_font, 6, white, 100)
+    if v_high_score < 10 then
+        draw_text(44, 38, v_high_score, tiny64_font, 6, cyan, 100)
+    else
+        draw_text(40, 38, v_high_score, tiny64_font, 6, cyan, 100)
     endif
     
     rest(3)
@@ -234,7 +245,7 @@ def play_game {
     create_array(v_pipe_scored, 4, numeric)
     
     # AI mistake tracking - wait longer before mistakes
-    v_mistake_threshold = random(12, 20, 0)
+    v_mistake_threshold = random(15, 25, 0)
     v_pipes_passed = 0
     v_making_mistake = 0
     
@@ -244,13 +255,11 @@ def play_game {
         v_pipe_x_arr[v_i] = v_next_pipe_x
         v_temp_gap = random(v_min_gap, v_max_gap, 0)
         v_gap_size_arr[v_i] = v_temp_gap
-        v_max_gap_y = 40 - v_temp_gap
-        if v_max_gap_y < 10 then
-            v_max_gap_y = 10
-        endif
-        v_gap_y_arr[v_i] = random(10, v_max_gap_y, 0)
+        # Keep gaps in a safe range (gap top between 12 and 32)
+        # This ensures bottom of gap is at most 32 + 22 = 54, above ground
+        v_gap_y_arr[v_i] = random(12, 32, 0)
         v_pipe_scored[v_i] = 0
-        v_spacing = random(30, 45, 0)
+        v_spacing = random(32, 48, 0)
         v_next_pipe_x = v_next_pipe_x + v_spacing
     endfor v_i
     
@@ -268,7 +277,7 @@ def play_game {
         for v_i in (0, 3, 1)
             v_check_x = v_pipe_x_arr[v_i]
             # Look for pipes that bird hasn't fully passed yet
-            if v_check_x + v_pipe_width > v_bird_x + 3 then
+            if v_check_x + v_pipe_width > v_bird_x then
                 if v_check_x < v_closest_x then
                     v_closest_x = v_check_x
                     v_target_pipe = v_i
@@ -276,45 +285,46 @@ def play_game {
             endif
         endfor v_i
         
-        # Calculate target Y and decide whether to flap
+        # Simple and reliable AI: aim for lower part of gap
+        v_should_flap = 0
+        
         if v_target_pipe >= 0 then
             v_gap_top_target = v_gap_y_arr[v_target_pipe]
             v_gap_size_target = v_gap_size_arr[v_target_pipe]
-            v_gap_center = v_gap_top_target + v_gap_size_target / 2
+            # Aim for lower third of gap (not center) - this prevents flying too high
+            v_target_y = v_gap_top_target + v_gap_size_target * 2 / 3
             
-            # If making a mistake, aim too low (will hit bottom pipe)
+            # If making a mistake (after many pipes), aim even lower (will hit bottom)
             if v_making_mistake == 1 then
-                v_gap_center = v_gap_center + 12
+                v_target_y = v_target_y + 15
             endif
             
-            # Predictive flapping - account for where bird will be
-            v_predicted_y = v_bird_y + v_bird_vel * 2
-            
-            # Flap if predicted position is below gap center
-            if v_predicted_y > v_gap_center then
-                # Only flap if not already moving up fast
-                if v_bird_vel > -2 then
-                    v_bird_vel = v_flap_power
-                endif
+            # Only flap if bird is BELOW the target point
+            if v_bird_y > v_target_y then
+                v_should_flap = 1
             endif
             
-            # Emergency flap if getting too low
-            if v_bird_y > v_gap_top_target + v_gap_size_target - 6 then
-                v_bird_vel = v_flap_power
+            # Safety: flap if getting dangerously close to bottom of gap
+            v_danger_zone = v_gap_top_target + v_gap_size_target - 5
+            if v_bird_y > v_danger_zone then
+                v_should_flap = 1
             endif
             
-            # Don't go too high
-            if v_bird_y < v_gap_top_target + 3 then
-                # Let gravity work, don't flap
-                v_bird_vel = v_bird_vel
+            # Don't flap if already in upper half of gap - let gravity pull down
+            v_upper_limit = v_gap_top_target + v_gap_size_target / 3
+            if v_bird_y < v_upper_limit then
+                v_should_flap = 0
             endif
         else
-            # No pipe found, just stay in middle
-            if v_bird_y > 30 then
-                if v_bird_vel > -1 then
-                    v_bird_vel = v_flap_power
-                endif
+            # No pipe in range, stay near middle of screen
+            if v_bird_y > 32 then
+                v_should_flap = 1
             endif
+        endif
+        
+        # Execute flap if decided
+        if v_should_flap == 1 then
+            v_bird_vel = v_flap_power
         endif
         
         # --- PHYSICS UPDATE ---
@@ -354,24 +364,42 @@ def play_game {
                     endif
                 endfor v_j
                 
-                # Random spacing for new pipe
-                v_spacing = random(30, 45, 0)
+                # Dynamic spacing based on score - gets tighter as score increases
+                # Base spacing: 32-48, reduces by 3 for every 10 points after 20
+                v_spacing_min = 32
+                v_spacing_max = 48
+                
+                if v_score >= 20 then
+                    # Calculate difficulty tier (0 at score 20, 1 at 30, 2 at 40, etc.)
+                    v_difficulty = (v_score - 20) / 10
+                    
+                    # Reduce spacing by 3 per tier, but don't go below minimums
+                    v_spacing_reduction = v_difficulty * 3
+                    v_spacing_min = 32 - v_spacing_reduction
+                    v_spacing_max = 48 - v_spacing_reduction
+                    
+                    # Clamp to reasonable minimums (don't make it impossible)
+                    if v_spacing_min < 20 then
+                        v_spacing_min = 20
+                    endif
+                    if v_spacing_max < 28 then
+                        v_spacing_max = 28
+                    endif
+                endif
+                
+                v_spacing = random(v_spacing_min, v_spacing_max, 0)
                 v_pipe_x_arr[v_i] = v_max_x + v_spacing
                 
-                # Random gap size and position
+                # Random gap size and position (keep gaps in safe centered range)
                 v_temp_gap = random(v_min_gap, v_max_gap, 0)
                 v_gap_size_arr[v_i] = v_temp_gap
-                v_max_gap_y = 40 - v_temp_gap
-                if v_max_gap_y < 10 then
-                    v_max_gap_y = 10
-                endif
-                v_gap_y_arr[v_i] = random(10, v_max_gap_y, 0)
+                v_gap_y_arr[v_i] = random(12, 32, 0)
                 v_pipe_scored[v_i] = 0
                 
-                # Reset mistake state after dying
+                # Reset mistake state after pipe respawn
                 v_making_mistake = 0
                 v_pipes_passed = 0
-                v_mistake_threshold = random(12, 20, 0)
+                v_mistake_threshold = random(15, 25, 0)
             endif
         endfor v_i
         
@@ -407,7 +435,7 @@ def play_game {
         endfor v_i
         
         # --- RENDER FRAME ---
-        begin_frame
+        begin_frame(true)
             call draw_background
             
             # Draw all visible pipes
@@ -421,14 +449,14 @@ def play_game {
                     call draw_pipe
                 endif
             endfor v_i
+            
+            # Draw score in top corner
+            draw_text(2, 2, v_score, tiny64_font, 6, white, 100)
         end_frame
         
         # Update bird sprite position (auto-advances cel for wing animation)
         v_bird_draw_y = int(v_bird_y)
         move_sprite(flappy, v_bird_x, v_bird_draw_y, 0)
-        
-        # Draw score in top corner
-        draw_text(2, 2, v_score, tiny64_font, 6, white, 100)
         
         # Frame timing for arcade feel
         rest(0.04)
@@ -443,6 +471,9 @@ def play_game {
 # MAIN PROGRAM - INFINITE LOOP
 #================================================
 print("Starting Flappy Bird Demo")
+
+# Initialize high score (persists across games)
+v_high_score = 0
 
 while 1 == 1 then
     # Show title screen
