@@ -9,6 +9,7 @@ from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLO
 from typing import Optional, List, Tuple, Union, Any
 from .debug import debug, Level, Component, configure_debug
 from .sprite import MatrixSprite, SpriteManager, SpriteInstance
+from .background import BackgroundManager
 import numpy as np
 from .text_effects import TextEffect, EffectModifier
 from .text_renderer import TextRenderer
@@ -64,6 +65,7 @@ class RGB_Api:
         self.preserve_frame_changes = False
         self.grid_dirty = np.zeros((self.matrix.height // GRID_SIZE, self.matrix.width // GRID_SIZE), dtype=bool)
         self.sprite_manager = SpriteManager()
+        self.background_manager = BackgroundManager(self.sprite_manager)
         self.text_renderer = TextRenderer(self)
         self.burnout_manager = ThreadedBurnoutManager(self)
         self.burnout_manager.start()
@@ -73,6 +75,10 @@ class RGB_Api:
     def dispose_all_sprites(self):
         """Remove all sprites from memory and clear them from display."""
         debug("Disposing all sprites", Level.INFO, Component.SPRITE)
+        # Notify background manager before disposing templates
+        # (dispose_all_sprites destroys templates, so background must be cleared)
+        self.background_manager.hide_background()
+        self.background_manager._active_sprite_name = None
         dirty_cells = self.sprite_manager.dispose_all_sprites()
         if dirty_cells:
             self._mark_cells_dirty(dirty_cells)
@@ -80,6 +86,33 @@ class RGB_Api:
                 self._restore_dirty_cells()
                 self.refresh_display()
         debug("All sprites disposed", Level.DEBUG, Component.SPRITE)
+
+    # Background Layer Methods
+    def set_background(self, sprite_name: str, cel_index: int = 0):
+        """Activate a sprite as the background layer."""
+        success = self.background_manager.set_background(sprite_name, cel_index)
+        if not success:
+            debug(f"Background sprite '{sprite_name}' not found", Level.ERROR, Component.SYSTEM)
+        if not self.frame_mode:
+            self.refresh_display()
+
+    def hide_background(self):
+        """Remove the background layer (template persists for reactivation)."""
+        self.background_manager.hide_background()
+        if not self.frame_mode:
+            self.refresh_display()
+
+    def nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None):
+        """Shift background viewport. Auto-advances cel unless cel_index specified."""
+        self.background_manager.nudge(dx, dy, cel_index)
+        if not self.frame_mode:
+            self.refresh_display()
+
+    def set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None):
+        """Set absolute background viewport position. Auto-advances cel unless cel_index specified."""
+        self.background_manager.set_offset(x, y, cel_index)
+        if not self.frame_mode:
+            self.refresh_display()
 
     def _configure_matrix_options(self):
         """Configure and return matrix options."""
@@ -128,17 +161,37 @@ class RGB_Api:
 
     def end_frame(self):
         if self.frame_mode:
-            # FIRST: Draw all visible sprites to the current canvas (before swap)
+            # FIRST: Composite all layers to the current canvas (before swap)
+            # Layer 1: Background + Drawing Buffer
+            if self.background_manager.has_background():
+                bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
+                # Overlay drawing_buffer on top (black = transparent over background)
+                mask = np.any(self.drawing_buffer != 0, axis=2)
+                bg_viewport[mask] = self.drawing_buffer[mask]
+                pil_image = Image.fromarray(bg_viewport, mode='RGB')
+                self.canvas.SetImage(pil_image)
+            else:
+                # No background - use drawing_buffer directly (existing behavior)
+                pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
+                self.canvas.SetImage(pil_image)
+
+            # Layer 2: Draw all visible sprites on top
             for sprite_name, instance_id in self.sprite_manager.z_order:
                 instance = self.sprite_manager.get_instance(sprite_name, instance_id)
                 if instance and instance.visible:
                     self.copy_sprite_to_buffer(instance, self.canvas)
             
-            # NOW swap - front buffer has background + sprites
+            # NOW swap - front buffer has background + drawing + sprites
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             
             # Prepare back buffer for next frame
-            if USE_PIL_FOR_FRAME_MODE:
+            if self.background_manager.has_background():
+                bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
+                mask = np.any(self.drawing_buffer != 0, axis=2)
+                bg_viewport[mask] = self.drawing_buffer[mask]
+                pil_image = Image.fromarray(bg_viewport, mode='RGB')
+                self.canvas.SetImage(pil_image)
+            elif USE_PIL_FOR_FRAME_MODE:
                 pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
                 self.canvas.SetImage(pil_image)
             else:
@@ -151,7 +204,8 @@ class RGB_Api:
                 for x, y, r, g, b in self.current_command_pixels:
                     self.canvas.SetPixel(x, y, r, g, b)
             else:
-                self.canvas.Fill(0, 0, 0)  # Keep this - prepares back buffer
+                if not self.background_manager.has_background():
+                    self.canvas.Fill(0, 0, 0)  # Only clear if no background
             
             self.current_command_pixels.clear()
             self.frame_mode = False
@@ -770,12 +824,13 @@ class RGB_Api:
 
     # Utility Methods
     def clear(self):
-        """Clear both buffers."""
+        """Clear both buffers and hide background."""
         self.drawing_buffer.fill(0)
         self.canvas.Fill(0, 0, 0)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
         if not self.frame_mode:
             self.canvas.Fill(0, 0, 0)
+        self.background_manager.hide_background()
         self.burnout_manager.clear_all()
         self.current_command_pixels.clear()
 
@@ -942,7 +997,16 @@ class RGB_Api:
                 self.refresh_display()
 
     def refresh_display(self):
-        """Refresh the display with all visible sprites in z-order."""
+        """Refresh the display with all layers in correct order."""
+        # If background is active, composite background + drawing_buffer first
+        if self.background_manager.has_background():
+            bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
+            mask = np.any(self.drawing_buffer != 0, axis=2)
+            bg_viewport[mask] = self.drawing_buffer[mask]
+            pil_image = Image.fromarray(bg_viewport, mode='RGB')
+            self.canvas.SetImage(pil_image)
+
+        # Then draw all visible sprites on top in z-order
         for sprite_name, instance_id in self.sprite_manager.z_order:
             instance = self.sprite_manager.get_instance(sprite_name, instance_id)
             if instance and instance.visible:
@@ -1090,22 +1154,36 @@ class RGB_Api:
             if 0 <= gx < self.grid_dirty.shape[1] and 0 <= gy < self.grid_dirty.shape[0]:
                 self.grid_dirty[gy, gx] = True
 
-    def _restore_cell(self, grid_x: int, grid_y: int):
+    def _restore_cell(self, grid_x: int, grid_y: int, bg_viewport: Optional[np.ndarray] = None):
+        """Restore a cell from background (if active) + drawing_buffer."""
         start_x = grid_x * GRID_SIZE
         start_y = grid_y * GRID_SIZE
         end_x = min(start_x + GRID_SIZE, self.matrix.width)
         end_y = min(start_y + GRID_SIZE, self.matrix.height)
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
-                color = self.drawing_buffer[y, x]
-                self.canvas.SetPixel(x, y, int(color[0]), int(color[1]), int(color[2]))
+                # Start with background or black
+                if bg_viewport is not None:
+                    r, g, b = int(bg_viewport[y, x, 0]), int(bg_viewport[y, x, 1]), int(bg_viewport[y, x, 2])
+                else:
+                    r, g, b = 0, 0, 0
+                # Overlay drawing_buffer if non-black
+                db_color = self.drawing_buffer[y, x]
+                if db_color[0] != 0 or db_color[1] != 0 or db_color[2] != 0:
+                    r, g, b = int(db_color[0]), int(db_color[1]), int(db_color[2])
+                self.canvas.SetPixel(x, y, r, g, b)
                 if not self.frame_mode:
-                    self.current_command_pixels.append((x, y, int(color[0]), int(color[1]), int(color[2])))
+                    self.current_command_pixels.append((x, y, r, g, b))
 
     def _restore_dirty_cells(self):
+        # Compute background viewport once for all dirty cells
+        bg_viewport = None
+        if self.background_manager.has_background():
+            bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
+
         dirty_yx = np.where(self.grid_dirty)
         for grid_y, grid_x in zip(dirty_yx[0], dirty_yx[1]):
-            self._restore_cell(grid_x, grid_y)
+            self._restore_cell(grid_x, grid_y, bg_viewport)
             self.grid_dirty[grid_y, grid_x] = False
             cell_sprites = self.sprite_manager.get_overlapping_sprites([(grid_x, grid_y)])
             for sprite in cell_sprites:

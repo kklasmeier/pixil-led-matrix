@@ -38,6 +38,10 @@ class CommandExecutor:
             'dispose_all_sprites': self._handle_dispose_all_sprites,
             'sync_queue': self._handle_sync_queue,
             'plot_batch': self._handle_plot_batch,
+            'set_background': self._handle_set_background,
+            'hide_background': self._handle_hide_background,
+            'nudge_background': self._handle_nudge_background,
+            'set_background_offset': self._handle_set_background_offset,
         }
         self.current_command = None
         self.current_sprite_command = None
@@ -53,7 +57,7 @@ class CommandExecutor:
         debug(f"Processing command: {command}", Level.DEBUG, Component.COMMAND)
 
         try:
-            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite']:
+            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite', 'hide_background']:
                 debug(f"Executing simple command: {command}", Level.DEBUG, Component.COMMAND)
                 self.current_command = command
                 handler = self.command_handlers.get(command)
@@ -430,6 +434,32 @@ class CommandExecutor:
         """Handle sync_queue command - exists purely for synchronization."""
         debug("Processing sync_queue", Level.DEBUG, Component.COMMAND)
         pass
+
+    # Background Command Handlers
+    def _handle_set_background(self, sprite_name: str, cel_index: int = 0):
+        """Handle set_background command."""
+        debug(f"Setting background to sprite '{sprite_name}' cel {cel_index}",
+              Level.DEBUG, Component.COMMAND)
+        self.api.set_background(sprite_name, cel_index)
+
+    def _handle_hide_background(self):
+        """Handle hide_background command."""
+        debug("Hiding background", Level.DEBUG, Component.COMMAND)
+        self.api.hide_background()
+
+    def _handle_nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None):
+        """Handle nudge_background command."""
+        debug(f"Nudging background by ({dx}, {dy})" +
+              (f" to cel {cel_index}" if cel_index is not None else " (auto-advance)"),
+              Level.DEBUG, Component.COMMAND)
+        self.api.nudge_background(dx, dy, cel_index)
+
+    def _handle_set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None):
+        """Handle set_background_offset command."""
+        debug(f"Setting background offset to ({x}, {y})" +
+              (f" cel {cel_index}" if cel_index is not None else " (auto-advance)"),
+              Level.DEBUG, Component.COMMAND)
+        self.api.set_background_offset(x, y, cel_index)
 
     def _handle_plot_batch(self, encoded_data: str):
         """Handle plot_batch command with multiple packed plots."""
