@@ -38,12 +38,12 @@ while true then
             
             # OPTIMIZED: Using compound condition for bounds check
             if v_pos_y >= 0 and v_pos_y < 64 then
-                plot(v_x[v_i], v_pos_y, green, 1)
+                mplot(v_x[v_i], v_pos_y, green, 1)
             endif
             
             v_j = v_j + 1
         endwhile
-        
+        mflush
         # Update head position
         v_head_y[v_i] = v_head_y[v_i] + v_speed[v_i]
         
@@ -57,20 +57,20 @@ while true then
                 # OPTIMIZED: Using compound condition for brightness calculation
                 if v_j == 0 then
                     # Head of trail is brightest
-                    plot(v_x[v_i], v_pos_y, green, 99)
+                    mplot(v_x[v_i], v_pos_y, green, 99)
                 else
                     # Trail gets dimmer
                     v_bright = 80 - (v_j * 10)
                     if v_bright < 20 then
                         v_bright = 20
                     endif
-                    plot(v_x[v_i], v_pos_y, green, v_bright, random(4000, 15000, 0))
+                    mplot(v_x[v_i], v_pos_y, green, v_bright, random(4000, 15000, 0))
                 endif
             endif
             
             v_j = v_j + 1
         endwhile
-        
+        mflush
         # Reset if off screen, but stagger the drops
         if v_head_y[v_i] - v_length[v_i] > 63 then
             v_x[v_i] = random(0, 63, 0)
