@@ -1,0 +1,927 @@
+# space_shooter.pxl
+# Enhanced space shooter with dynamic pacing, flight patterns, and visual variety
+# Runs forever. Spacebar to skip to next script.
+
+# ============================================================
+# Configuration
+# ============================================================
+v_base_scroll = 2
+v_base_cooldown = 12
+
+# Phase system: smooth sine-based pacing
+# Full cycle = 2400 frames (~40 sec at 60fps)
+v_phase_timer = 0
+v_phase = 0
+
+# Speed envelope
+v_speed_mult = 100
+v_speed_wave = 0
+v_scroll_speed = 2
+v_laser_cooldown_max = 12
+v_laser_speed = 5
+
+# Flight pattern: changes every ~400 frames
+v_pattern_length = 400
+v_pattern_timer = 0
+v_pattern = 0
+
+# Asteroid wave system
+v_wave_timer = 0
+v_wave_active = 0
+
+# Background banking
+v_bank_dy = 0
+v_bank_timer = 0
+v_bank_duration = 0
+
+# Color shift (0=normal, 1=red zone, 2=blue zone)
+v_color_zone = 0
+v_zone_timer = 0
+v_zone_length = 800
+
+# Global frame counter
+v_gf = 0
+
+# ============================================================
+# Build animated starfield background (128x64, 4 cels)
+# ============================================================
+define_sprite(stars, 128, 64)
+
+# --- Cel 0 ---
+sprite_cel(0)
+draw_rectangle(0, 0, 128, 64, navy, 8, true)
+draw_rectangle(0, 15, 128, 34, blue, 4, true)
+v_s = 0
+for v_s in (0, 59, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(15, 40, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 24, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(50, 80, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 7, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, cyan, 90)
+endfor v_s
+for v_s in (0, 4, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, yellow, 85)
+endfor v_s
+draw_circle(100, 20, 12, purple, 8, true)
+draw_circle(30, 50, 15, blue, 6, true)
+draw_circle(80, 45, 10, indigo, 7, true)
+
+# --- Cel 1 ---
+sprite_cel(1)
+draw_rectangle(0, 0, 128, 64, navy, 8, true)
+draw_rectangle(0, 15, 128, 34, blue, 4, true)
+for v_s in (0, 59, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(10, 35, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 24, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(45, 75, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 7, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, sky_blue, 85)
+endfor v_s
+for v_s in (0, 4, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, gold, 80)
+endfor v_s
+draw_circle(100, 20, 12, purple, 10, true)
+draw_circle(30, 50, 15, blue, 5, true)
+draw_circle(80, 45, 10, indigo, 9, true)
+
+# --- Cel 2 ---
+sprite_cel(2)
+draw_rectangle(0, 0, 128, 64, navy, 8, true)
+draw_rectangle(0, 15, 128, 34, blue, 4, true)
+for v_s in (0, 59, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(20, 45, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 24, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(55, 85, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 7, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, azure, 95)
+endfor v_s
+for v_s in (0, 4, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, white, 100)
+endfor v_s
+draw_circle(100, 20, 12, purple, 12, true)
+draw_circle(30, 50, 15, blue, 7, true)
+draw_circle(80, 45, 10, indigo, 5, true)
+
+# --- Cel 3 ---
+sprite_cel(3)
+draw_rectangle(0, 0, 128, 64, navy, 8, true)
+draw_rectangle(0, 15, 128, 34, blue, 4, true)
+for v_s in (0, 59, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(12, 38, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 24, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    v_bright = random(40, 70, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_s
+for v_s in (0, 7, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, cyan, 80)
+endfor v_s
+for v_s in (0, 4, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 63, 0)
+    plot(v_sx, v_sy, yellow, 90)
+endfor v_s
+draw_circle(100, 20, 12, purple, 6, true)
+draw_circle(30, 50, 15, blue, 8, true)
+draw_circle(80, 45, 10, indigo, 11, true)
+
+endsprite
+
+# ============================================================
+# Ship sprite (2 cels: normal engine / engine flare)
+# ============================================================
+define_sprite(ship, 9, 7)
+
+sprite_cel(0)
+plot(0, 3, cyan, 60)
+plot(1, 2, cyan, 80)
+plot(1, 3, cyan, 100)
+plot(1, 4, cyan, 80)
+plot(2, 1, sky_blue, 70)
+plot(2, 2, white, 100)
+plot(2, 3, white, 100)
+plot(2, 4, white, 100)
+plot(2, 5, sky_blue, 70)
+plot(3, 1, sky_blue, 60)
+plot(3, 2, cyan, 100)
+plot(3, 3, white, 100)
+plot(3, 4, cyan, 100)
+plot(3, 5, sky_blue, 60)
+plot(4, 2, cyan, 90)
+plot(4, 3, cyan, 100)
+plot(4, 4, cyan, 90)
+plot(5, 2, blue, 70)
+plot(5, 3, cyan, 80)
+plot(5, 4, blue, 70)
+plot(6, 3, blue, 60)
+plot(0, 2, orange, 50)
+plot(0, 4, orange, 50)
+
+sprite_cel(1)
+plot(0, 3, cyan, 60)
+plot(1, 2, cyan, 80)
+plot(1, 3, cyan, 100)
+plot(1, 4, cyan, 80)
+plot(2, 1, sky_blue, 70)
+plot(2, 2, white, 100)
+plot(2, 3, white, 100)
+plot(2, 4, white, 100)
+plot(2, 5, sky_blue, 70)
+plot(3, 1, sky_blue, 60)
+plot(3, 2, cyan, 100)
+plot(3, 3, white, 100)
+plot(3, 4, cyan, 100)
+plot(3, 5, sky_blue, 60)
+plot(4, 2, cyan, 90)
+plot(4, 3, cyan, 100)
+plot(4, 4, cyan, 90)
+plot(5, 2, blue, 70)
+plot(5, 3, cyan, 80)
+plot(5, 4, blue, 70)
+plot(6, 3, blue, 60)
+plot(0, 2, yellow, 90)
+plot(0, 3, orange, 80)
+plot(0, 4, yellow, 90)
+
+endsprite
+
+# ============================================================
+# Laser bolt sprite
+# ============================================================
+define_sprite(laser, 4, 1)
+plot(0, 0, yellow, 60)
+plot(1, 0, yellow, 100)
+plot(2, 0, white, 100)
+plot(3, 0, yellow, 80)
+endsprite
+
+# ============================================================
+# Asteroid sprites (normal + color zone variants)
+# ============================================================
+define_sprite(rock_lg, 8, 8)
+draw_circle(4, 4, 3, gray, 80, true)
+draw_circle(3, 3, 1, light_gray, 60, true)
+plot(5, 2, dark_gray, 100)
+plot(2, 5, dark_gray, 90)
+endsprite
+
+define_sprite(rock_md, 6, 6)
+draw_circle(3, 3, 2, gray, 70, true)
+plot(2, 2, light_gray, 50)
+plot(4, 3, dark_gray, 80)
+endsprite
+
+define_sprite(rock_sm, 4, 4)
+draw_circle(2, 2, 1, gray, 60, true)
+plot(1, 1, light_gray, 40)
+endsprite
+
+# Red zone variants
+define_sprite(rock_red_lg, 8, 8)
+draw_circle(4, 4, 3, maroon, 80, true)
+draw_circle(3, 3, 1, red, 50, true)
+plot(5, 2, crimson, 90)
+plot(2, 5, red, 70)
+endsprite
+
+define_sprite(rock_red_md, 6, 6)
+draw_circle(3, 3, 2, maroon, 70, true)
+plot(2, 2, red, 50)
+plot(4, 3, crimson, 70)
+endsprite
+
+# Blue zone variants
+define_sprite(rock_blue_lg, 8, 8)
+draw_circle(4, 4, 3, navy, 80, true)
+draw_circle(3, 3, 1, azure, 50, true)
+plot(5, 2, royal_blue, 90)
+plot(2, 5, blue, 70)
+endsprite
+
+define_sprite(rock_blue_md, 6, 6)
+draw_circle(3, 3, 2, navy, 70, true)
+plot(2, 2, azure, 50)
+plot(4, 3, blue, 80)
+endsprite
+
+# ============================================================
+# Explosion sprite (3 cels)
+# ============================================================
+define_sprite(boom, 10, 10)
+
+sprite_cel(0)
+draw_circle(5, 5, 2, white, 100, true)
+draw_circle(5, 5, 3, yellow, 80, true)
+
+sprite_cel(1)
+draw_circle(5, 5, 3, yellow, 90, true)
+draw_circle(5, 5, 4, orange, 60, true)
+plot(2, 2, red, 70)
+plot(8, 3, red, 60)
+plot(3, 7, orange, 70)
+plot(7, 7, red, 50)
+
+sprite_cel(2)
+draw_circle(5, 5, 4, orange, 40, true)
+plot(1, 1, red, 30)
+plot(8, 2, orange, 25)
+plot(2, 8, red, 20)
+plot(7, 6, orange, 30)
+plot(5, 5, yellow, 50)
+
+endsprite
+
+# ============================================================
+# Initialize game state
+# ============================================================
+
+set_background(stars)
+
+# Ship
+v_ship_x = 8
+v_ship_y = 28
+v_ship_cel = 0
+
+# Lasers (3 slots)
+v_laser0_x = -10
+v_laser0_y = 0
+v_laser0_active = 0
+v_laser1_x = -10
+v_laser1_y = 0
+v_laser1_active = 0
+v_laser2_x = -10
+v_laser2_y = 0
+v_laser2_active = 0
+v_laser_cd = 0
+
+# Asteroids (5 slots)
+v_rock0_x = 70
+v_rock0_y = random(4, 56, 0)
+v_rock0_spd = random(2, 4, 0)
+v_rock1_x = 85
+v_rock1_y = random(4, 56, 0)
+v_rock1_spd = random(2, 4, 0)
+v_rock2_x = 100
+v_rock2_y = random(4, 56, 0)
+v_rock2_spd = random(2, 5, 0)
+v_rock3_x = 75
+v_rock3_y = random(4, 56, 0)
+v_rock3_spd = random(2, 4, 0)
+v_rock4_x = 95
+v_rock4_y = random(4, 56, 0)
+v_rock4_spd = random(2, 4, 0)
+
+# Explosion
+v_boom_active = 0
+v_boom_x = 0
+v_boom_y = 0
+v_boom_frame = 0
+
+# Near-miss streak
+v_streak_active = 0
+v_streak_x = 0
+v_streak_y = 0
+v_streak_timer = 0
+
+# Twinkle counter
+v_twinkle = 0
+
+# Show sprites
+show_sprite(ship, v_ship_x, v_ship_y)
+show_sprite(rock_lg, v_rock0_x, v_rock0_y, 0)
+show_sprite(rock_md, v_rock1_x, v_rock1_y, 0)
+show_sprite(rock_sm, v_rock2_x, v_rock2_y, 0)
+show_sprite(rock_lg, v_rock3_x, v_rock3_y, 1)
+show_sprite(rock_md, v_rock4_x, v_rock4_y, 1)
+
+# ============================================================
+# MAIN GAME LOOP (infinite)
+# ============================================================
+while 1 == 1 then
+
+    begin_frame(true)
+
+    # ==========================================================
+    # PHASE / PACING SYSTEM
+    # Smooth sine-based speed envelope for seamless transitions
+    # Full cycle = 2400 frames (~40 sec at 60fps)
+    # sin curve: slow -> fast -> slow -> fast (continuous)
+    # ==========================================================
+    v_phase_timer = v_phase_timer + 1
+    if v_phase_timer >= 2400 then
+        v_phase_timer = 0
+    endif
+
+    # Sine-based speed: oscillates smoothly between 80 and 220
+    # sin returns -1..1, scale to 80..220 range (center 150, amplitude 70)
+    v_speed_wave = sin(v_phase_timer * 0.002618)
+    v_speed_mult = 150 + round(v_speed_wave * 70)
+
+    # Determine phase for wave triggers (used by asteroid waves)
+    # Phase 2 (max speed) when speed > 180
+    if v_speed_mult > 180 then
+        v_phase = 2
+    elseif v_speed_mult > 140 then
+        if v_speed_wave > 0 then
+            v_phase = 1
+        else
+            v_phase = 3
+        endif
+    else
+        v_phase = 0
+    endif
+
+    # Derive game parameters smoothly from speed
+    # Scroll: 1-5 px/frame
+    v_scroll_speed = round(v_base_scroll * v_speed_mult / 100)
+    if v_scroll_speed < 1 then
+        v_scroll_speed = 1
+    endif
+    if v_scroll_speed > 5 then
+        v_scroll_speed = 5
+    endif
+
+    # Laser burst mode: faster cooldown at high speed
+    v_laser_cooldown_max = round(16 - v_speed_mult / 25)
+    if v_laser_cooldown_max < 4 then
+        v_laser_cooldown_max = 4
+    endif
+    if v_laser_cooldown_max > 16 then
+        v_laser_cooldown_max = 16
+    endif
+
+    v_laser_speed = round(4 + v_speed_mult / 50)
+    if v_laser_speed > 8 then
+        v_laser_speed = 8
+    endif
+
+    # ==========================================================
+    # FLIGHT PATTERN SYSTEM
+    # Cycles: sine wave -> tight weave -> wide swoop ->
+    #         dive/climb -> hover/dart -> repeat
+    # ==========================================================
+    v_pattern_timer = v_pattern_timer + 1
+    if v_pattern_timer >= v_pattern_length then
+        v_pattern_timer = 0
+        v_pattern = v_pattern + 1
+        if v_pattern > 4 then
+            v_pattern = 0
+        endif
+    endif
+
+    # Pattern 0: Classic compound sine
+    if v_pattern == 0 then
+        v_ship_y = 28 + round(sin(v_gf * 0.06) * 18 + cos(v_gf * 0.03) * 6)
+    endif
+    # Pattern 1: Tight fast weave
+    if v_pattern == 1 then
+        v_ship_y = 32 + round(sin(v_gf * 0.14) * 12)
+    endif
+    # Pattern 2: Wide lazy swoops
+    if v_pattern == 2 then
+        v_ship_y = 30 + round(sin(v_gf * 0.025) * 24)
+    endif
+    # Pattern 3: Dive and climb
+    if v_pattern == 3 then
+        v_ship_y = 28 + round(sin(v_gf * 0.04) * 20 + sin(v_gf * 0.12) * 5)
+    endif
+    # Pattern 4: Hover center then dart to edges
+    if v_pattern == 4 then
+        v_dart = v_gf % 120
+        if v_dart < 60 then
+            v_ship_y = 30 + round(sin(v_gf * 0.2) * 3)
+        elseif v_dart < 80 then
+            v_ship_y = 8 + round(sin(v_gf * 0.15) * 4)
+        elseif v_dart < 100 then
+            v_ship_y = 30 + round(sin(v_gf * 0.2) * 3)
+        else
+            v_ship_y = 50 + round(sin(v_gf * 0.15) * 4)
+        endif
+    endif
+
+    # Clamp
+    if v_ship_y < 2 then
+        v_ship_y = 2
+    endif
+    if v_ship_y > 55 then
+        v_ship_y = 55
+    endif
+
+    # Ship X: leans forward smoothly with speed
+    v_ship_x = 8 + round((v_speed_mult - 80) / 35)
+    if v_ship_x < 8 then
+        v_ship_x = 8
+    endif
+    if v_ship_x > 12 then
+        v_ship_x = 12
+    endif
+
+    # Engine flicker: faster at high speed
+    if v_speed_mult > 150 then
+        v_ship_cel = v_gf % 2
+    else
+        v_ship_cel = round((v_gf / 2) % 2)
+    endif
+
+    move_sprite(ship, v_ship_x, v_ship_y, 0, v_ship_cel)
+
+    # ==========================================================
+    # BACKGROUND: SCROLL + TWINKLE + BANKING
+    # ==========================================================
+
+    # Banking: random diagonal scroll shifts
+    v_bank_timer = v_bank_timer - 1
+    if v_bank_timer <= 0 then
+        v_bank_roll = random(0, 100, 0)
+        if v_bank_roll < 8 then
+            v_bank_pick = random(0, 2, 0)
+            if v_bank_pick == 0 then
+                v_bank_dy = 1
+            elseif v_bank_pick == 1 then
+                v_bank_dy = -1
+            else
+                v_bank_dy = 0
+            endif
+            v_bank_timer = random(40, 120, 0)
+        else
+            v_bank_dy = 0
+            v_bank_timer = 30
+        endif
+    endif
+
+    # Twinkle: auto-advance background cel every 8 frames
+    v_twinkle = v_twinkle + 1
+    if v_twinkle >= 8 then
+        nudge_background(v_scroll_speed, v_bank_dy)
+        v_twinkle = 0
+    else
+        nudge_background(v_scroll_speed, v_bank_dy, 0)
+    endif
+
+    # ==========================================================
+    # COLOR ZONE SYSTEM
+    # Cycles: normal gray -> red zone -> blue zone -> repeat
+    # ==========================================================
+    v_zone_timer = v_zone_timer + 1
+    if v_zone_timer >= v_zone_length then
+        v_zone_timer = 0
+        v_color_zone = v_color_zone + 1
+        if v_color_zone > 2 then
+            v_color_zone = 0
+        endif
+    endif
+
+    # ==========================================================
+    # ASTEROID WAVE SYSTEM
+    # During max speed phase, chance to spawn a dense cluster
+    # ==========================================================
+    if v_phase == 2 then
+        if v_wave_active == 0 then
+            v_wave_roll = random(0, 100, 0)
+            if v_wave_roll < 3 then
+                v_wave_active = 1
+                v_rock0_x = 66
+                v_rock0_y = random(8, 24, 0)
+                v_rock0_spd = random(3, 5, 0)
+                v_rock1_x = 70
+                v_rock1_y = random(16, 36, 0)
+                v_rock1_spd = random(3, 5, 0)
+                v_rock2_x = 68
+                v_rock2_y = random(28, 48, 0)
+                v_rock2_spd = random(4, 6, 0)
+                v_rock3_x = 72
+                v_rock3_y = random(10, 30, 0)
+                v_rock3_spd = random(3, 5, 0)
+                v_rock4_x = 67
+                v_rock4_y = random(32, 54, 0)
+                v_rock4_spd = random(3, 5, 0)
+                v_wave_timer = 90
+            endif
+        endif
+    endif
+    if v_wave_active == 1 then
+        v_wave_timer = v_wave_timer - 1
+        if v_wave_timer <= 0 then
+            v_wave_active = 0
+        endif
+    endif
+
+    # ==========================================================
+    # FIRE LASERS
+    # ==========================================================
+    v_laser_cd = v_laser_cd - 1
+    if v_laser_cd <= 0 then
+        if v_laser0_active == 0 then
+            v_laser0_x = v_ship_x + 7
+            v_laser0_y = v_ship_y + 3
+            v_laser0_active = 1
+            show_sprite(laser, v_laser0_x, v_laser0_y, 0)
+            v_laser_cd = v_laser_cooldown_max
+        elseif v_laser1_active == 0 then
+            v_laser1_x = v_ship_x + 7
+            v_laser1_y = v_ship_y + 3
+            v_laser1_active = 1
+            show_sprite(laser, v_laser1_x, v_laser1_y, 1)
+            v_laser_cd = v_laser_cooldown_max
+        elseif v_laser2_active == 0 then
+            v_laser2_x = v_ship_x + 7
+            v_laser2_y = v_ship_y + 3
+            v_laser2_active = 1
+            show_sprite(laser, v_laser2_x, v_laser2_y, 2)
+            v_laser_cd = v_laser_cooldown_max
+        endif
+    endif
+
+    # ==========================================================
+    # MOVE LASERS
+    # ==========================================================
+    if v_laser0_active == 1 then
+        v_laser0_x = v_laser0_x + v_laser_speed
+        if v_laser0_x > 64 then
+            v_laser0_active = 0
+            hide_sprite(laser, 0)
+        else
+            move_sprite(laser, v_laser0_x, v_laser0_y, 0)
+        endif
+    endif
+    if v_laser1_active == 1 then
+        v_laser1_x = v_laser1_x + v_laser_speed
+        if v_laser1_x > 64 then
+            v_laser1_active = 0
+            hide_sprite(laser, 1)
+        else
+            move_sprite(laser, v_laser1_x, v_laser1_y, 1)
+        endif
+    endif
+    if v_laser2_active == 1 then
+        v_laser2_x = v_laser2_x + v_laser_speed
+        if v_laser2_x > 64 then
+            v_laser2_active = 0
+            hide_sprite(laser, 2)
+        else
+            move_sprite(laser, v_laser2_x, v_laser2_y, 2)
+        endif
+    endif
+
+    # ==========================================================
+    # MOVE ASTEROIDS
+    # Base speed + individual speed + pace boost = always moving
+    # ==========================================================
+    v_rock_pace = round(v_speed_mult / 100)
+    if v_rock_pace < 1 then
+        v_rock_pace = 1
+    endif
+
+    # Rock 0 (large)
+    v_rock0_x = v_rock0_x - v_rock0_spd - v_rock_pace
+    if v_rock0_x < -10 then
+        v_rock0_x = 68 + random(0, 16, 0)
+        v_rock0_y = random(4, 56, 0)
+        v_rock0_spd = random(2, 4, 0)
+    endif
+    if v_color_zone == 1 then
+        move_sprite(rock_red_lg, v_rock0_x, v_rock0_y, 0)
+    elseif v_color_zone == 2 then
+        move_sprite(rock_blue_lg, v_rock0_x, v_rock0_y, 0)
+    else
+        move_sprite(rock_lg, v_rock0_x, v_rock0_y, 0)
+    endif
+
+    # Rock 1 (medium)
+    v_rock1_x = v_rock1_x - v_rock1_spd - v_rock_pace
+    if v_rock1_x < -10 then
+        v_rock1_x = 68 + random(0, 16, 0)
+        v_rock1_y = random(4, 56, 0)
+        v_rock1_spd = random(2, 4, 0)
+    endif
+    if v_color_zone == 1 then
+        move_sprite(rock_red_md, v_rock1_x, v_rock1_y, 0)
+    elseif v_color_zone == 2 then
+        move_sprite(rock_blue_md, v_rock1_x, v_rock1_y, 0)
+    else
+        move_sprite(rock_md, v_rock1_x, v_rock1_y, 0)
+    endif
+
+    # Rock 2 (small - no color variant)
+    v_rock2_x = v_rock2_x - v_rock2_spd - v_rock_pace
+    if v_rock2_x < -10 then
+        v_rock2_x = 68 + random(0, 12, 0)
+        v_rock2_y = random(4, 56, 0)
+        v_rock2_spd = random(2, 5, 0)
+    endif
+    move_sprite(rock_sm, v_rock2_x, v_rock2_y, 0)
+
+    # Rock 3 (large instance 1)
+    v_rock3_x = v_rock3_x - v_rock3_spd - v_rock_pace
+    if v_rock3_x < -10 then
+        v_rock3_x = 68 + random(0, 16, 0)
+        v_rock3_y = random(4, 56, 0)
+        v_rock3_spd = random(2, 4, 0)
+    endif
+    if v_color_zone == 1 then
+        move_sprite(rock_red_lg, v_rock3_x, v_rock3_y, 1)
+    elseif v_color_zone == 2 then
+        move_sprite(rock_blue_lg, v_rock3_x, v_rock3_y, 1)
+    else
+        move_sprite(rock_lg, v_rock3_x, v_rock3_y, 1)
+    endif
+
+    # Rock 4 (medium instance 1)
+    v_rock4_x = v_rock4_x - v_rock4_spd - v_rock_pace
+    if v_rock4_x < -10 then
+        v_rock4_x = 68 + random(0, 16, 0)
+        v_rock4_y = random(4, 56, 0)
+        v_rock4_spd = random(2, 4, 0)
+    endif
+    if v_color_zone == 1 then
+        move_sprite(rock_red_md, v_rock4_x, v_rock4_y, 1)
+    elseif v_color_zone == 2 then
+        move_sprite(rock_blue_md, v_rock4_x, v_rock4_y, 1)
+    else
+        move_sprite(rock_md, v_rock4_x, v_rock4_y, 1)
+    endif
+
+    # ==========================================================
+    # EXPLOSION ANIMATION
+    # ==========================================================
+    if v_boom_active > 0 then
+        v_boom_frame = v_boom_frame + 1
+        if v_boom_frame < 3 then
+            move_sprite(boom, v_boom_x, v_boom_y, 0, v_boom_frame)
+        else
+            hide_sprite(boom, 0)
+            v_boom_active = 0
+        endif
+    endif
+
+    # ==========================================================
+    # NEAR-MISS STREAKS (drawing buffer with burnout)
+    # ==========================================================
+    v_ship_cx = v_ship_x + 4
+    v_ship_cy = v_ship_y + 3
+
+    # Check large rocks for near miss
+    if v_streak_active == 0 then
+        v_nmx = v_rock0_x + 4 - v_ship_cx
+        v_nmy = v_rock0_y + 4 - v_ship_cy
+        if v_nmx > -4 then
+            if v_nmx < 4 then
+                if v_nmy > -14 then
+                    if v_nmy < 14 then
+                        if v_nmx < -1 then
+                            v_streak_x = v_ship_x + 8
+                            v_streak_y = v_ship_y + 3
+                            v_streak_active = 1
+                            v_streak_timer = 0
+                        endif
+                    endif
+                endif
+            endif
+        endif
+    endif
+
+    if v_streak_active == 0 then
+        v_nmx = v_rock3_x + 4 - v_ship_cx
+        v_nmy = v_rock3_y + 4 - v_ship_cy
+        if v_nmx > -4 then
+            if v_nmx < 4 then
+                if v_nmy > -14 then
+                    if v_nmy < 14 then
+                        if v_nmx < -1 then
+                            v_streak_x = v_ship_x + 8
+                            v_streak_y = v_ship_y + 3
+                            v_streak_active = 1
+                            v_streak_timer = 0
+                        endif
+                    endif
+                endif
+            endif
+        endif
+    endif
+
+    # Draw fading streak
+    if v_streak_active == 1 then
+        v_streak_timer = v_streak_timer + 1
+        if v_streak_timer < 5 then
+            v_streak_int = 100 - v_streak_timer * 20
+            draw_line(v_streak_x, v_streak_y, v_streak_x + 5, v_streak_y, white, v_streak_int, 0.08, instant)
+        else
+            v_streak_active = 0
+        endif
+    endif
+
+    # ==========================================================
+    # COLLISION DETECTION
+    # Each laser checks 2 rocks for balanced coverage
+    # ==========================================================
+
+    # Laser 0 vs rock0 (8x8) and rock1 (6x6)
+    if v_laser0_active == 1 then
+        if v_laser0_x > v_rock0_x then
+            if v_laser0_x < v_rock0_x + 8 then
+                if v_laser0_y > v_rock0_y then
+                    if v_laser0_y < v_rock0_y + 8 then
+                        v_boom_x = v_rock0_x - 1
+                        v_boom_y = v_rock0_y - 1
+                        v_boom_active = 1
+                        v_boom_frame = 0
+                        show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                        v_rock0_x = 68 + random(0, 20, 0)
+                        v_rock0_y = random(4, 56, 0)
+                        v_laser0_active = 0
+                        hide_sprite(laser, 0)
+                    endif
+                endif
+            endif
+        endif
+        if v_laser0_active == 1 then
+            if v_laser0_x > v_rock1_x then
+                if v_laser0_x < v_rock1_x + 6 then
+                    if v_laser0_y > v_rock1_y then
+                        if v_laser0_y < v_rock1_y + 6 then
+                            v_boom_x = v_rock1_x - 2
+                            v_boom_y = v_rock1_y - 2
+                            v_boom_active = 1
+                            v_boom_frame = 0
+                            show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                            v_rock1_x = 68 + random(0, 25, 0)
+                            v_rock1_y = random(4, 56, 0)
+                            v_laser0_active = 0
+                            hide_sprite(laser, 0)
+                        endif
+                    endif
+                endif
+            endif
+        endif
+    endif
+
+    # Laser 1 vs rock2 (4x4) and rock3 (8x8)
+    if v_laser1_active == 1 then
+        if v_laser1_x > v_rock2_x then
+            if v_laser1_x < v_rock2_x + 4 then
+                if v_laser1_y > v_rock2_y then
+                    if v_laser1_y < v_rock2_y + 4 then
+                        v_boom_x = v_rock2_x - 3
+                        v_boom_y = v_rock2_y - 3
+                        v_boom_active = 1
+                        v_boom_frame = 0
+                        show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                        v_rock2_x = 68 + random(0, 15, 0)
+                        v_rock2_y = random(4, 56, 0)
+                        v_laser1_active = 0
+                        hide_sprite(laser, 1)
+                    endif
+                endif
+            endif
+        endif
+        if v_laser1_active == 1 then
+            if v_laser1_x > v_rock3_x then
+                if v_laser1_x < v_rock3_x + 8 then
+                    if v_laser1_y > v_rock3_y then
+                        if v_laser1_y < v_rock3_y + 8 then
+                            v_boom_x = v_rock3_x - 1
+                            v_boom_y = v_rock3_y - 1
+                            v_boom_active = 1
+                            v_boom_frame = 0
+                            show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                            v_rock3_x = 68 + random(0, 20, 0)
+                            v_rock3_y = random(4, 56, 0)
+                            v_laser1_active = 0
+                            hide_sprite(laser, 1)
+                        endif
+                    endif
+                endif
+            endif
+        endif
+    endif
+
+    # Laser 2 vs rock4 (6x6) and rock0 (8x8)
+    if v_laser2_active == 1 then
+        if v_laser2_x > v_rock4_x then
+            if v_laser2_x < v_rock4_x + 6 then
+                if v_laser2_y > v_rock4_y then
+                    if v_laser2_y < v_rock4_y + 6 then
+                        v_boom_x = v_rock4_x - 2
+                        v_boom_y = v_rock4_y - 2
+                        v_boom_active = 1
+                        v_boom_frame = 0
+                        show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                        v_rock4_x = 68 + random(0, 25, 0)
+                        v_rock4_y = random(4, 56, 0)
+                        v_laser2_active = 0
+                        hide_sprite(laser, 2)
+                    endif
+                endif
+            endif
+        endif
+        if v_laser2_active == 1 then
+            if v_laser2_x > v_rock0_x then
+                if v_laser2_x < v_rock0_x + 8 then
+                    if v_laser2_y > v_rock0_y then
+                        if v_laser2_y < v_rock0_y + 8 then
+                            v_boom_x = v_rock0_x - 1
+                            v_boom_y = v_rock0_y - 1
+                            v_boom_active = 1
+                            v_boom_frame = 0
+                            show_sprite(boom, v_boom_x, v_boom_y, 0, 0, 0)
+                            v_rock0_x = 68 + random(0, 20, 0)
+                            v_rock0_y = random(4, 56, 0)
+                            v_laser2_active = 0
+                            hide_sprite(laser, 2)
+                        endif
+                    endif
+                endif
+            endif
+        endif
+    endif
+
+    # ==========================================================
+    # END FRAME
+    # ==========================================================
+    end_frame
+    v_gf = v_gf + 1
+
+endwhile

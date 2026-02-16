@@ -157,56 +157,68 @@ class RGB_Api:
         self.frame_mode = True
         self.preserve_frame_changes = preserve_changes
         if not preserve_changes:
-            self.canvas.Fill(0, 0, 0) # Clears the current canvas if not preserving
+            self.drawing_buffer.fill(0)  # Fresh drawing buffer each frame
+            self.canvas.Fill(0, 0, 0)    # Clears the current canvas if not preserving
 
     def end_frame(self):
         if self.frame_mode:
-            # FIRST: Composite all layers to the current canvas (before swap)
-            # Layer 1: Background + Drawing Buffer
             if self.background_manager.has_background():
+                # --- BACKGROUND PATH ---
+                # Layer 1+2: Composite background + drawing_buffer
                 bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
-                # Overlay drawing_buffer on top (black = transparent over background)
                 mask = np.any(self.drawing_buffer != 0, axis=2)
                 bg_viewport[mask] = self.drawing_buffer[mask]
                 pil_image = Image.fromarray(bg_viewport, mode='RGB')
-                self.canvas.SetImage(pil_image)
-            else:
-                # No background - use drawing_buffer directly (existing behavior)
-                pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
                 self.canvas.SetImage(pil_image)
 
-            # Layer 2: Draw all visible sprites on top
-            for sprite_name, instance_id in self.sprite_manager.z_order:
-                instance = self.sprite_manager.get_instance(sprite_name, instance_id)
-                if instance and instance.visible:
-                    self.copy_sprite_to_buffer(instance, self.canvas)
-            
-            # NOW swap - front buffer has background + drawing + sprites
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            
-            # Prepare back buffer for next frame
-            if self.background_manager.has_background():
+                # Layer 3: Sprites on top
+                for sprite_name, instance_id in self.sprite_manager.z_order:
+                    instance = self.sprite_manager.get_instance(sprite_name, instance_id)
+                    if instance and instance.visible:
+                        self.copy_sprite_to_buffer(instance, self.canvas)
+
+                # Swap
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+                # Prepare back buffer with background composite
                 bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
                 mask = np.any(self.drawing_buffer != 0, axis=2)
                 bg_viewport[mask] = self.drawing_buffer[mask]
                 pil_image = Image.fromarray(bg_viewport, mode='RGB')
                 self.canvas.SetImage(pil_image)
-            elif USE_PIL_FOR_FRAME_MODE:
-                pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
-                self.canvas.SetImage(pil_image)
+
+                if self.preserve_frame_changes:
+                    for x, y, r, g, b in self.current_command_pixels:
+                        self.canvas.SetPixel(x, y, r, g, b)
+                # No Fill(0,0,0) needed — background provides the base
+
             else:
-                for y in range(self.matrix.height):
-                    for x in range(self.matrix.width):
-                        r, g, b = self.drawing_buffer[y, x]
-                        self.canvas.SetPixel(x, y, int(r), int(g), int(b))
-            
-            if self.preserve_frame_changes:
-                for x, y, r, g, b in self.current_command_pixels:
-                    self.canvas.SetPixel(x, y, r, g, b)
-            else:
-                if not self.background_manager.has_background():
-                    self.canvas.Fill(0, 0, 0)  # Only clear if no background
-            
+                # --- ORIGINAL NO-BACKGROUND PATH (unchanged) ---
+                # Draw all visible sprites to the current canvas (before swap)
+                for sprite_name, instance_id in self.sprite_manager.z_order:
+                    instance = self.sprite_manager.get_instance(sprite_name, instance_id)
+                    if instance and instance.visible:
+                        self.copy_sprite_to_buffer(instance, self.canvas)
+
+                # Swap
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+                # Prepare back buffer for next frame
+                if USE_PIL_FOR_FRAME_MODE:
+                    pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
+                    self.canvas.SetImage(pil_image)
+                else:
+                    for y in range(self.matrix.height):
+                        for x in range(self.matrix.width):
+                            r, g, b = self.drawing_buffer[y, x]
+                            self.canvas.SetPixel(x, y, int(r), int(g), int(b))
+
+                if self.preserve_frame_changes:
+                    for x, y, r, g, b in self.current_command_pixels:
+                        self.canvas.SetPixel(x, y, r, g, b)
+                else:
+                    self.canvas.Fill(0, 0, 0)  # Prepares back buffer
+
             self.current_command_pixels.clear()
             self.frame_mode = False
             self.preserve_frame_changes = False
