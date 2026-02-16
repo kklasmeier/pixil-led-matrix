@@ -547,6 +547,10 @@ def process_script(filename, execute_func=None):
             cmd.startswith('define_sprite'),
             cmd.startswith('sprite_draw'),
             cmd == 'endsprite',
+            cmd.startswith('set_background'),
+            cmd.startswith('hide_background'),
+            cmd.startswith('nudge_background'),
+            cmd.startswith('set_background_offset'),
             sprite_context.in_sprite_definition,  # All commands in sprite definition
             in_frame_mode,  # All commands in frame mode
         ])
@@ -1590,6 +1594,10 @@ def process_script(filename, execute_func=None):
                     execute_command('sync_queue')  # Queue the command
                     queue.wait_until_empty()       # Wait for queue to empty
                     queue.last_command_time = time.time() * 1000  # Reset timing after sync
+                elif line == 'hide_background' or line == 'hide_background()':
+                    if DEBUG_LEVEL >= DEBUG_SUMMARY:
+                        debug_print(f"Found hide_background command: {line}", DEBUG_SUMMARY)
+                    store_frame_command('hide_background')
                 # Add throttle command handling here
                 elif command_match := re.match(r'throttle\((.*)\)', line):
                     try:

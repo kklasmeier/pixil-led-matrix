@@ -1,0 +1,248 @@
+# test_background.pxl
+# Background Layer Test Script for Pixil
+# Tests: set_background, hide_background, nudge_background, set_background_offset
+# Tests: scrolling, tiling, cel animation, layer compositing with sprites
+
+# ============================================================
+# Phase 1: Create background sprite (128x128 starfield)
+# ============================================================
+
+# Create a large background pattern with visual reference markers
+define_sprite(starfield, 128, 128)
+
+# Corner markers for scroll tracking
+draw_circle(16, 16, 10, red, 100, true)
+draw_circle(112, 16, 10, green, 100, true)
+draw_circle(16, 112, 10, blue, 100, true)
+draw_circle(112, 112, 10, yellow, 100, true)
+
+# Center marker
+draw_circle(64, 64, 6, magenta, 100, true)
+
+# Grid lines (dim) for visual reference
+v_gx = 0
+for v_gx in (0, 127, 16)
+    draw_line(v_gx, 0, v_gx, 127, white, 12)
+endfor v_gx
+
+v_gy = 0
+for v_gy in (0, 127, 16)
+    draw_line(0, v_gy, 127, v_gy, white, 12)
+endfor v_gy
+
+# Scatter stars
+v_seed = 42
+v_star = 0
+for v_star in (0, 99, 1)
+    v_sx = random(0, 127, 0)
+    v_sy = random(0, 127, 0)
+    v_bright = random(30, 100, 0)
+    plot(v_sx, v_sy, white, v_bright)
+endfor v_star
+
+endsprite
+
+# ============================================================
+# Phase 2: Static background test
+# ============================================================
+print(f"--- Phase 2: Static background (3 seconds) ---")
+
+set_background(starfield)
+rest(3)
+
+# ============================================================
+# Phase 3: Scrolling background test
+# ============================================================
+print(f"--- Phase 3: Scrolling background (5 seconds) ---")
+
+v_scroll = 0
+for v_scroll in (0, 149, 1)
+    begin_frame(true)
+    nudge_background(2, 1, 0)
+    end_frame
+    rest(0.033)
+endfor v_scroll
+
+# ============================================================
+# Phase 4: Drawing buffer overlay test
+# ============================================================
+print(f"--- Phase 4: Drawing buffer overlay (5 seconds) ---")
+
+# Draw some shapes to the drawing buffer
+draw_rectangle(10, 10, 20, 20, cyan, 100, true)
+draw_circle(50, 14, 6, magenta, 100, true)
+
+# Scroll background behind fixed drawings
+v_scroll = 0
+for v_scroll in (0, 149, 1)
+    begin_frame(true)
+    nudge_background(1, 0, 0)
+    end_frame
+    rest(0.033)
+endfor v_scroll
+
+# ============================================================
+# Phase 5: Sprite on top of everything
+# ============================================================
+print(f"--- Phase 5: Sprite + drawing + background (5 seconds) ---")
+
+# Create a small ship sprite
+define_sprite(ship, 10, 10)
+draw_circle(5, 5, 4, orange, 100, true)
+draw_circle(5, 5, 2, yellow, 100, true)
+endsprite
+
+show_sprite(ship, 32, 32)
+
+v_frame = 0
+for v_frame in (0, 149, 1)
+    v_angle = v_frame * 0.08
+    v_px = 32 + round(22 * cos(v_angle))
+    v_py = 32 + round(22 * sin(v_angle))
+
+    begin_frame(true)
+    nudge_background(1, 0, 0)
+    move_sprite(ship, v_px, v_py)
+    end_frame
+    rest(0.033)
+endfor v_frame
+
+# ============================================================
+# Phase 6: Hide / show background cycle
+# ============================================================
+print(f"--- Phase 6: Hide/show background cycle (6 seconds) ---")
+
+v_cycle = 0
+for v_cycle in (0, 2, 1)
+    # Show for 1 second
+    set_background(starfield)
+    rest(1)
+
+    # Hide for 1 second (drawing buffer should remain)
+    hide_background
+    rest(1)
+endfor v_cycle
+
+# ============================================================
+# Phase 7: Animated background (multi-cel)
+# ============================================================
+print(f"--- Phase 7: Animated background with cels (5 seconds) ---")
+
+hide_sprite(ship)
+
+# Create a 4-cel animated background
+define_sprite(anim_bg, 64, 64)
+
+# Cel 0: Red tint
+sprite_cel(0)
+draw_rectangle(0, 0, 64, 64, red, 20, true)
+draw_circle(10, 10, 5, white, 100, true)
+draw_rectangle(5, 50, 8, 8, white, 80, true)
+
+# Cel 1: Green tint
+sprite_cel(1)
+draw_rectangle(0, 0, 64, 64, green, 20, true)
+draw_circle(25, 10, 5, white, 100, true)
+draw_rectangle(5, 50, 14, 8, white, 80, true)
+
+# Cel 2: Blue tint
+sprite_cel(2)
+draw_rectangle(0, 0, 64, 64, blue, 20, true)
+draw_circle(40, 10, 5, white, 100, true)
+draw_rectangle(5, 50, 20, 8, white, 80, true)
+
+# Cel 3: Yellow tint
+sprite_cel(3)
+draw_rectangle(0, 0, 64, 64, yellow, 20, true)
+draw_circle(55, 10, 5, white, 100, true)
+draw_rectangle(5, 50, 26, 8, white, 80, true)
+
+endsprite
+
+# Clear drawing buffer before switching backgrounds
+clear
+
+set_background(anim_bg)
+
+# Animate through cels with auto-advance (no scroll)
+v_aframe = 0
+for v_aframe in (0, 19, 1)
+    begin_frame(true)
+    nudge_background(0, 0)
+    end_frame
+    rest(0.25)
+endfor v_aframe
+
+# ============================================================
+# Phase 8: set_background_offset test (absolute positioning)
+# ============================================================
+print(f"--- Phase 8: Absolute offset positioning (4 seconds) ---")
+
+clear
+set_background(starfield)
+
+# Jump to specific positions
+v_jump = 0
+for v_jump in (0, 7, 1)
+    v_ox = v_jump * 16
+    v_oy = v_jump * 8
+    begin_frame(true)
+    set_background_offset(v_ox, v_oy, 0)
+    end_frame
+    rest(0.5)
+endfor v_jump
+
+# ============================================================
+# Phase 9: Performance test - full layer stack at max speed
+# ============================================================
+print(f"--- Phase 9: Performance test (5 seconds at max speed) ---")
+
+clear
+set_background(starfield)
+draw_rectangle(22, 22, 20, 20, cyan, 80, true)
+show_sprite(ship, 32, 32)
+
+v_pframe = 0
+for v_pframe in (0, 299, 1)
+    v_angle = v_pframe * 0.1
+    v_px = 32 + round(22 * cos(v_angle))
+    v_py = 32 + round(22 * sin(v_angle))
+
+    begin_frame(true)
+    nudge_background(1, 0, 0)
+    move_sprite(ship, v_px, v_py)
+    end_frame
+endfor v_pframe
+
+# ============================================================
+# Phase 10: Clear vs dispose behavior test
+# ============================================================
+print(f"--- Phase 10: Clear preserves template, dispose destroys ---")
+
+# Clear should hide background but template survives
+clear
+rest(1)
+
+# Reactivate from surviving template
+set_background(starfield)
+rest(1)
+
+# Now dispose - template should be destroyed
+dispose_all_sprites
+rest(1)
+
+# Recreate from scratch to prove it was destroyed
+define_sprite(final_bg, 64, 64)
+draw_rectangle(0, 0, 64, 64, purple, 30, true)
+draw_circle(32, 32, 20, white, 60, true)
+draw_circle(32, 32, 10, cyan, 100, true)
+endsprite
+
+set_background(final_bg)
+rest(2)
+
+# ============================================================
+# Cleanup
+# ============================================================
+print(f"--- Background test script complete ---")
+clear
