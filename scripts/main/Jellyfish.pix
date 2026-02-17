@@ -1,8 +1,268 @@
-# Jellyfish Drift v6 - Depth Layering
-# Graceful jellyfish swimming across the matrix
-# Multiple jellyfish with staggered timing and depth, runs forever
+# Jellyfish Drift v7 - Ocean Background
+# Graceful jellyfish swimming with animated underwater background
+# Multi-directional ocean current with smooth caustic light shimmer
 
-# Configuration
+# ============================================================
+# OCEAN BACKGROUND DEFINITION - 8 cels for fluid animation
+# ============================================================
+# Each cel shifts caustics by small increments so transitions
+# are nearly imperceptible. The cycle breathes smoothly:
+#   Cels 0-3: caustics slowly brighten and drift right/down
+#   Cels 4-7: caustics slowly dim and drift back
+
+define_sprite(ocean, 128, 128)
+
+    # --- Cel 0: Base state ---
+    sprite_cel(0)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(20, 15, 18, 6, ocean_blue, 18, true, 15)
+    draw_ellipse(65, 22, 22, 7, ocean_blue, 16, true, -10)
+    draw_ellipse(105, 10, 16, 5, ocean_blue, 15, true, 30)
+    draw_ellipse(40, 45, 20, 8, ocean_blue, 14, true, 25)
+    draw_ellipse(90, 55, 15, 6, ocean_blue, 12, true, -20)
+    draw_ellipse(15, 60, 12, 5, ocean_blue, 11, true, 10)
+    draw_line(10, 8, 35, 14, sky_blue, 9)
+    draw_line(55, 12, 78, 18, sky_blue, 8)
+    draw_line(95, 5, 120, 12, sky_blue, 8)
+    draw_line(30, 35, 55, 40, sky_blue, 7)
+    draw_line(75, 42, 100, 48, sky_blue, 6)
+    draw_ellipse(50, 80, 25, 10, teal, 10, true, 5)
+    draw_ellipse(110, 75, 18, 7, teal, 8, true, -15)
+    draw_ellipse(25, 95, 20, 8, teal, 9, true, 20)
+    plot(12, 20, sky_blue, 14)
+    plot(45, 30, sky_blue, 12)
+    plot(78, 18, sky_blue, 15)
+    plot(100, 40, sky_blue, 11)
+    plot(33, 55, sky_blue, 13)
+    plot(88, 70, sky_blue, 10)
+    plot(60, 85, sky_blue, 11)
+    plot(18, 105, sky_blue, 8)
+    plot(120, 95, sky_blue, 9)
+
+    # --- Cel 1: Slight shift +1 ---
+    sprite_cel(1)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(21, 15, 18, 6, ocean_blue, 19, true, 16)
+    draw_ellipse(66, 22, 22, 7, ocean_blue, 17, true, -9)
+    draw_ellipse(106, 10, 16, 5, ocean_blue, 16, true, 31)
+    draw_ellipse(41, 45, 20, 8, ocean_blue, 15, true, 26)
+    draw_ellipse(90, 55, 15, 6, ocean_blue, 13, true, -19)
+    draw_ellipse(16, 60, 12, 5, ocean_blue, 12, true, 11)
+    draw_line(11, 8, 36, 14, sky_blue, 10)
+    draw_line(56, 12, 79, 18, sky_blue, 9)
+    draw_line(96, 5, 121, 12, sky_blue, 9)
+    draw_line(31, 35, 56, 40, sky_blue, 8)
+    draw_line(76, 42, 101, 48, sky_blue, 7)
+    draw_ellipse(51, 80, 25, 10, teal, 11, true, 6)
+    draw_ellipse(111, 75, 18, 7, teal, 9, true, -14)
+    draw_ellipse(26, 95, 20, 8, teal, 10, true, 21)
+    plot(13, 20, sky_blue, 15)
+    plot(46, 30, sky_blue, 13)
+    plot(79, 18, sky_blue, 16)
+    plot(101, 40, sky_blue, 12)
+    plot(34, 55, sky_blue, 14)
+    plot(89, 70, sky_blue, 11)
+    plot(61, 85, sky_blue, 12)
+    plot(19, 105, sky_blue, 9)
+    plot(121, 95, sky_blue, 10)
+
+    # --- Cel 2: Shift +2 ---
+    sprite_cel(2)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(22, 16, 18, 6, ocean_blue, 20, true, 17)
+    draw_ellipse(67, 22, 22, 7, ocean_blue, 18, true, -8)
+    draw_ellipse(107, 11, 16, 5, ocean_blue, 17, true, 32)
+    draw_ellipse(42, 46, 20, 8, ocean_blue, 16, true, 27)
+    draw_ellipse(91, 55, 15, 6, ocean_blue, 14, true, -18)
+    draw_ellipse(17, 61, 12, 5, ocean_blue, 13, true, 12)
+    draw_line(12, 9, 37, 15, sky_blue, 11)
+    draw_line(57, 13, 80, 19, sky_blue, 10)
+    draw_line(97, 6, 122, 13, sky_blue, 10)
+    draw_line(32, 36, 57, 41, sky_blue, 9)
+    draw_line(76, 43, 101, 49, sky_blue, 8)
+    draw_ellipse(52, 81, 25, 10, teal, 12, true, 7)
+    draw_ellipse(112, 75, 18, 7, teal, 10, true, -13)
+    draw_ellipse(27, 96, 20, 8, teal, 11, true, 22)
+    plot(14, 21, sky_blue, 16)
+    plot(47, 31, sky_blue, 14)
+    plot(80, 19, sky_blue, 17)
+    plot(102, 41, sky_blue, 13)
+    plot(35, 56, sky_blue, 15)
+    plot(90, 71, sky_blue, 12)
+    plot(62, 86, sky_blue, 13)
+    plot(20, 106, sky_blue, 10)
+    plot(122, 96, sky_blue, 11)
+
+    # --- Cel 3: Shift +3 approaching peak ---
+    sprite_cel(3)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(23, 16, 19, 7, ocean_blue, 21, true, 18)
+    draw_ellipse(68, 23, 23, 7, ocean_blue, 19, true, -7)
+    draw_ellipse(108, 11, 17, 5, ocean_blue, 18, true, 33)
+    draw_ellipse(43, 46, 21, 8, ocean_blue, 17, true, 28)
+    draw_ellipse(92, 56, 16, 6, ocean_blue, 15, true, -17)
+    draw_ellipse(17, 61, 13, 5, ocean_blue, 14, true, 13)
+    draw_line(13, 9, 38, 15, sky_blue, 12)
+    draw_line(58, 13, 81, 19, sky_blue, 11)
+    draw_line(98, 6, 123, 13, sky_blue, 11)
+    draw_line(33, 36, 58, 41, sky_blue, 10)
+    draw_line(77, 43, 102, 49, sky_blue, 9)
+    draw_ellipse(53, 81, 26, 10, teal, 13, true, 8)
+    draw_ellipse(113, 76, 19, 7, teal, 11, true, -12)
+    draw_ellipse(28, 96, 21, 8, teal, 12, true, 23)
+    plot(14, 21, sky_blue, 17)
+    plot(48, 31, sky_blue, 15)
+    plot(81, 19, sky_blue, 18)
+    plot(103, 41, sky_blue, 14)
+    plot(36, 56, sky_blue, 16)
+    plot(91, 71, sky_blue, 13)
+    plot(63, 86, sky_blue, 14)
+    plot(21, 106, sky_blue, 11)
+    plot(123, 96, sky_blue, 12)
+
+    # --- Cel 4: Peak brightness ---
+    sprite_cel(4)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(24, 17, 19, 7, ocean_blue, 22, true, 19)
+    draw_ellipse(69, 23, 23, 8, ocean_blue, 20, true, -6)
+    draw_ellipse(109, 12, 17, 6, ocean_blue, 19, true, 34)
+    draw_ellipse(44, 47, 21, 9, ocean_blue, 18, true, 29)
+    draw_ellipse(93, 56, 16, 7, ocean_blue, 16, true, -16)
+    draw_ellipse(18, 62, 13, 6, ocean_blue, 15, true, 14)
+    draw_line(14, 10, 39, 16, sky_blue, 13)
+    draw_line(59, 14, 82, 20, sky_blue, 12)
+    draw_line(99, 7, 124, 14, sky_blue, 12)
+    draw_line(34, 37, 59, 42, sky_blue, 11)
+    draw_line(78, 44, 103, 50, sky_blue, 10)
+    draw_ellipse(54, 82, 26, 11, teal, 14, true, 9)
+    draw_ellipse(114, 76, 19, 8, teal, 12, true, -11)
+    draw_ellipse(29, 97, 21, 9, teal, 13, true, 24)
+    plot(15, 22, sky_blue, 18)
+    plot(49, 32, sky_blue, 16)
+    plot(82, 20, sky_blue, 19)
+    plot(104, 42, sky_blue, 15)
+    plot(37, 57, sky_blue, 17)
+    plot(92, 72, sky_blue, 14)
+    plot(64, 87, sky_blue, 15)
+    plot(22, 107, sky_blue, 12)
+    plot(124, 97, sky_blue, 13)
+
+    # --- Cel 5: Dimming -1 from peak ---
+    sprite_cel(5)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(23, 16, 19, 7, ocean_blue, 21, true, 18)
+    draw_ellipse(68, 23, 23, 7, ocean_blue, 19, true, -7)
+    draw_ellipse(108, 11, 17, 5, ocean_blue, 18, true, 33)
+    draw_ellipse(43, 46, 21, 8, ocean_blue, 17, true, 28)
+    draw_ellipse(92, 56, 16, 6, ocean_blue, 15, true, -17)
+    draw_ellipse(17, 61, 13, 5, ocean_blue, 14, true, 13)
+    draw_line(13, 9, 38, 15, sky_blue, 12)
+    draw_line(58, 13, 81, 19, sky_blue, 11)
+    draw_line(98, 6, 123, 13, sky_blue, 11)
+    draw_line(33, 36, 58, 41, sky_blue, 10)
+    draw_line(77, 43, 102, 49, sky_blue, 9)
+    draw_ellipse(53, 81, 26, 10, teal, 13, true, 8)
+    draw_ellipse(113, 76, 19, 7, teal, 11, true, -12)
+    draw_ellipse(28, 96, 21, 8, teal, 12, true, 23)
+    plot(14, 21, sky_blue, 17)
+    plot(48, 31, sky_blue, 15)
+    plot(81, 19, sky_blue, 18)
+    plot(103, 41, sky_blue, 14)
+    plot(36, 56, sky_blue, 16)
+    plot(91, 71, sky_blue, 13)
+    plot(63, 86, sky_blue, 14)
+    plot(21, 106, sky_blue, 11)
+    plot(123, 96, sky_blue, 12)
+
+    # --- Cel 6: Dimming -2 ---
+    sprite_cel(6)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(22, 16, 18, 6, ocean_blue, 20, true, 17)
+    draw_ellipse(67, 22, 22, 7, ocean_blue, 18, true, -8)
+    draw_ellipse(107, 11, 16, 5, ocean_blue, 17, true, 32)
+    draw_ellipse(42, 46, 20, 8, ocean_blue, 16, true, 27)
+    draw_ellipse(91, 55, 15, 6, ocean_blue, 14, true, -18)
+    draw_ellipse(17, 61, 12, 5, ocean_blue, 13, true, 12)
+    draw_line(12, 9, 37, 15, sky_blue, 11)
+    draw_line(57, 13, 80, 19, sky_blue, 10)
+    draw_line(97, 6, 122, 13, sky_blue, 10)
+    draw_line(32, 36, 57, 41, sky_blue, 9)
+    draw_line(76, 43, 101, 49, sky_blue, 8)
+    draw_ellipse(52, 81, 25, 10, teal, 12, true, 7)
+    draw_ellipse(112, 75, 18, 7, teal, 10, true, -13)
+    draw_ellipse(27, 96, 20, 8, teal, 11, true, 22)
+    plot(14, 21, sky_blue, 16)
+    plot(47, 31, sky_blue, 14)
+    plot(80, 19, sky_blue, 17)
+    plot(102, 41, sky_blue, 13)
+    plot(35, 56, sky_blue, 15)
+    plot(90, 71, sky_blue, 12)
+    plot(62, 86, sky_blue, 13)
+    plot(20, 106, sky_blue, 10)
+    plot(122, 96, sky_blue, 11)
+
+    # --- Cel 7: Almost back to base ---
+    sprite_cel(7)
+    draw_rectangle(0, 0, 128, 128, navy, 40, true)
+    draw_rectangle(0, 90, 128, 38, navy, 55, true)
+    draw_rectangle(0, 100, 128, 28, navy, 65, true)
+    draw_ellipse(21, 15, 18, 6, ocean_blue, 19, true, 16)
+    draw_ellipse(66, 22, 22, 7, ocean_blue, 17, true, -9)
+    draw_ellipse(106, 10, 16, 5, ocean_blue, 16, true, 31)
+    draw_ellipse(41, 45, 20, 8, ocean_blue, 15, true, 26)
+    draw_ellipse(90, 55, 15, 6, ocean_blue, 13, true, -19)
+    draw_ellipse(16, 60, 12, 5, ocean_blue, 12, true, 11)
+    draw_line(11, 8, 36, 14, sky_blue, 10)
+    draw_line(56, 12, 79, 18, sky_blue, 9)
+    draw_line(96, 5, 121, 12, sky_blue, 9)
+    draw_line(31, 35, 56, 40, sky_blue, 8)
+    draw_line(76, 42, 101, 48, sky_blue, 7)
+    draw_ellipse(51, 80, 25, 10, teal, 11, true, 6)
+    draw_ellipse(111, 75, 18, 7, teal, 9, true, -14)
+    draw_ellipse(26, 95, 20, 8, teal, 10, true, 21)
+    plot(13, 20, sky_blue, 15)
+    plot(46, 30, sky_blue, 13)
+    plot(79, 18, sky_blue, 16)
+    plot(101, 40, sky_blue, 12)
+    plot(34, 55, sky_blue, 14)
+    plot(89, 70, sky_blue, 11)
+    plot(61, 85, sky_blue, 12)
+    plot(19, 105, sky_blue, 9)
+    plot(121, 95, sky_blue, 10)
+
+endsprite
+
+# ============================================================
+# OCEAN DRIFT CONFIGURATION
+# ============================================================
+v_drift_angle = 0.0
+v_drift_angle_speed = 0.008
+v_drift_base_speed = 0.6
+v_drift_accum_x = 0.0
+v_drift_accum_y = 0.0
+
+# Cel animation pacer
+v_cel_counter = 0
+v_cel_pace = 4
+v_current_cel = 0
+
+# ============================================================
+# JELLYFISH CONFIGURATION
+# ============================================================
 v_max_jellyfish = 4
 v_swim_speed = 0.4
 v_sway_amount = 0.2
@@ -13,11 +273,9 @@ v_spawn_variance = 50
 v_base_intensity = 60
 v_intensity_step = 15
 
-# Spawn timer
 v_spawn_timer = 0
 v_next_spawn = 50
 
-# Jellyfish state arrays (sized to 5 for flexibility)
 create_array(v_jx, 5, numeric)
 create_array(v_jy, 5, numeric)
 create_array(v_vx, 5, numeric)
@@ -29,13 +287,11 @@ create_array(v_sway_angle, 5, numeric)
 create_array(v_size, 5, numeric)
 create_array(v_active, 5, numeric)
 
-# Pre-calculated bell widths (per jellyfish)
 create_array(v_bw1, 5, numeric)
 create_array(v_bw2, 5, numeric)
 create_array(v_bw3, 5, numeric)
 create_array(v_bw4, 5, numeric)
 
-# Pre-calculated tentacle values
 create_array(v_tspread, 5, numeric)
 create_array(v_tlen0, 5, numeric)
 create_array(v_tlen1, 5, numeric)
@@ -43,14 +299,15 @@ create_array(v_tlen2, 5, numeric)
 create_array(v_tpush, 5, numeric)
 create_array(v_tsway_mult, 5, numeric)
 
-# Cached colors (string arrays)
 create_array(v_bell_col, 5, string)
 create_array(v_tent_col, 5, string)
 
-# Current index
 v_idx = 0
 
-# Calculate size-dependent values for jellyfish at v_idx
+# ============================================================
+# JELLYFISH PROCEDURES
+# ============================================================
+
 def calc_size_values {
     v_s = v_size[v_idx]
     v_bw1[v_idx] = int(2 * v_s)
@@ -66,7 +323,6 @@ def calc_size_values {
     v_tsway_mult[v_idx] = 3 * v_s
 }
 
-# Pick random color for jellyfish at v_idx
 def pick_color {
     v_color_pick = random(1, 4, 0)
     if v_color_pick == 1 then
@@ -84,7 +340,6 @@ def pick_color {
     endif
 }
 
-# Spawn jellyfish at edge (normal spawn)
 def spawn_at_edge {
     v_spawn_edge = random(1, 4, 0)
     v_exit_bias = random(-20, 20, 0)
@@ -119,7 +374,6 @@ def spawn_at_edge {
     v_active[v_idx] = 1
 }
 
-# Spawn jellyfish mid-screen (for initial stagger)
 def spawn_mid_screen {
     v_jx[v_idx] = random(10, 54, 0)
     v_jy[v_idx] = random(10, 54, 0)
@@ -148,7 +402,6 @@ def spawn_mid_screen {
     v_active[v_idx] = 1
 }
 
-# Count active jellyfish
 def count_active {
     v_count = 0
     for v_i in (0, v_max_jellyfish - 1, 1)
@@ -158,7 +411,6 @@ def count_active {
     endfor v_i
 }
 
-# Find an inactive slot
 def find_free_slot {
     v_free_slot = -1
     for v_i in (0, v_max_jellyfish - 1, 1)
@@ -168,7 +420,6 @@ def find_free_slot {
     endfor v_i
 }
 
-# Initial staggered spawn
 def initial_spawn {
     v_initial_count = random(1, 2, 0)
     for v_i in (0, v_initial_count - 1, 1)
@@ -177,7 +428,6 @@ def initial_spawn {
     endfor v_i
 }
 
-# Draw and update one jellyfish
 def process_one {
     v_cx = int(v_jx[v_idx])
     v_cy = int(v_jy[v_idx])
@@ -239,7 +489,6 @@ def process_one {
     endif
 }
 
-# Timer-based spawn check
 def check_spawn {
     v_spawn_timer = v_spawn_timer + 1
     if v_spawn_timer >= v_next_spawn then
@@ -256,13 +505,50 @@ def check_spawn {
     endif
 }
 
-# Main loop
+# ============================================================
+# OCEAN DRIFT PROCEDURE
+# ============================================================
+
+def update_ocean {
+    v_drift_angle = v_drift_angle + v_drift_angle_speed
+    v_drift_speed = v_drift_base_speed + sin(v_drift_angle * 0.7) * 0.3
+    v_drift_accum_x = v_drift_accum_x + cos(v_drift_angle) * v_drift_speed
+    v_drift_accum_y = v_drift_accum_y + sin(v_drift_angle) * v_drift_speed
+    v_nudge_x = int(v_drift_accum_x)
+    v_nudge_y = int(v_drift_accum_y)
+    v_cel_counter = v_cel_counter + 1
+    v_do_cel_advance = 0
+    if v_cel_counter >= v_cel_pace then
+        v_do_cel_advance = 1
+        v_cel_counter = 0
+    endif
+    if v_nudge_x != 0 or v_nudge_y != 0 then
+        if v_do_cel_advance == 1 then
+            nudge_background(v_nudge_x, v_nudge_y)
+        else
+            nudge_background(v_nudge_x, v_nudge_y, v_current_cel)
+        endif
+        v_drift_accum_x = v_drift_accum_x - v_nudge_x
+        v_drift_accum_y = v_drift_accum_y - v_nudge_y
+    else
+        if v_do_cel_advance == 1 then
+            nudge_background(0, 0)
+        endif
+    endif
+}
+
+# ============================================================
+# MAIN
+# ============================================================
 clear()
-print("Jellyfish Drift v6 - Starting")
+print("Jellyfish Drift v7 - Ocean Background")
+
+set_background(ocean)
 call initial_spawn
 
 while 1 == 1 then
     begin_frame
+        call update_ocean
         for v_idx in (0, v_max_jellyfish - 1, 1)
             if v_active[v_idx] == 1 then
                 call process_one
@@ -270,4 +556,5 @@ while 1 == 1 then
         endfor v_idx
     end_frame
     call check_spawn
+    rest(0.033)
 endwhile
