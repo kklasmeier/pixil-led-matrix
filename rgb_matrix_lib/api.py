@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 import math
 from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager, BurnoutMode
-from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells
+from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells, is_transparent
 from typing import Optional, List, Tuple, Union, Any
 from .debug import debug, Level, Component, configure_debug
 from .sprite import MatrixSprite, SpriteManager, SpriteInstance
@@ -59,7 +59,7 @@ class RGB_Api:
         self.options = self._configure_matrix_options()
         self.matrix = RGBMatrix(options=self.options)
         self.canvas = self.matrix.CreateFrameCanvas()
-        self.drawing_buffer = np.zeros((self.matrix.height, self.matrix.width, 3), dtype=np.uint8)
+        self.drawing_buffer = np.full((self.matrix.height, self.matrix.width, 3), TRANSPARENT_COLOR, dtype=np.uint8)
         self.current_command_pixels = []
         self.frame_mode = False
         self.preserve_frame_changes = False
@@ -75,42 +75,40 @@ class RGB_Api:
     def dispose_all_sprites(self):
         """Remove all sprites from memory and clear them from display."""
         debug("Disposing all sprites", Level.INFO, Component.SPRITE)
-        # Notify background manager before disposing templates
-        # (dispose_all_sprites destroys templates, so background must be cleared)
-        self.background_manager.hide_background()
-        self.background_manager._active_sprite_name = None
+        # Destroy all background layer state (templates are about to be deleted)
+        self.background_manager.destroy_all()
         dirty_cells = self.sprite_manager.dispose_all_sprites()
         if dirty_cells:
             self._mark_cells_dirty(dirty_cells)
-            if not self.frame_mode:
-                self._restore_dirty_cells()
-                self.refresh_display()
+        if not self.frame_mode:
+            self.refresh_display()
         debug("All sprites disposed", Level.DEBUG, Component.SPRITE)
 
     # Background Layer Methods
-    def set_background(self, sprite_name: str, cel_index: int = 0):
-        """Activate a sprite as the background layer."""
-        success = self.background_manager.set_background(sprite_name, cel_index)
+    def set_background(self, sprite_name: str, cel_index: int = 0, layer: int = 0):
+        """Activate a sprite as a background layer."""
+        success = self.background_manager.set_background(sprite_name, cel_index, layer)
         if not success:
-            debug(f"Background sprite '{sprite_name}' not found", Level.ERROR, Component.SYSTEM)
+            debug(f"Failed to set background layer {layer} to sprite '{sprite_name}'",
+                  Level.ERROR, Component.SYSTEM)
         if not self.frame_mode:
             self.refresh_display()
 
-    def hide_background(self):
-        """Remove the background layer (template persists for reactivation)."""
-        self.background_manager.hide_background()
+    def hide_background(self, layer: Optional[int] = None):
+        """Hide a background layer (default layer 0). Preserves state for reactivation."""
+        self.background_manager.hide_background(layer)
         if not self.frame_mode:
             self.refresh_display()
 
-    def nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None):
+    def nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None, layer: int = 0):
         """Shift background viewport. Auto-advances cel unless cel_index specified."""
-        self.background_manager.nudge(dx, dy, cel_index)
+        self.background_manager.nudge(dx, dy, cel_index, layer)
         if not self.frame_mode:
             self.refresh_display()
 
-    def set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None):
+    def set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None, layer: int = 0):
         """Set absolute background viewport position. Auto-advances cel unless cel_index specified."""
-        self.background_manager.set_offset(x, y, cel_index)
+        self.background_manager.set_offset(x, y, cel_index, layer)
         if not self.frame_mode:
             self.refresh_display()
 
@@ -157,17 +155,23 @@ class RGB_Api:
         self.frame_mode = True
         self.preserve_frame_changes = preserve_changes
         if not preserve_changes:
-            self.drawing_buffer.fill(0)  # Fresh drawing buffer each frame
+            self.drawing_buffer[:] = TRANSPARENT_COLOR  # Fresh drawing buffer each frame
             self.canvas.Fill(0, 0, 0)    # Clears the current canvas if not preserving
 
     def end_frame(self):
         if self.frame_mode:
             if self.background_manager.has_background():
                 # --- BACKGROUND PATH ---
-                # Layer 1+2: Composite background + drawing_buffer
+                # Composite background layers + drawing_buffer once
                 bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
-                mask = np.any(self.drawing_buffer != 0, axis=2)
-                bg_viewport[mask] = self.drawing_buffer[mask]
+                draw_mask = np.any(self.drawing_buffer != TRANSPARENT_COLOR, axis=2)
+                bg_viewport[draw_mask] = self.drawing_buffer[draw_mask]
+
+                # Convert remaining transparent sentinel to true black for LEDs
+                sentinel_mask = np.all(bg_viewport == TRANSPARENT_COLOR, axis=2)
+                bg_viewport[sentinel_mask] = (0, 0, 0)
+
+                # Build PIL image once, use for both front and back buffer
                 pil_image = Image.fromarray(bg_viewport, mode='RGB')
                 self.canvas.SetImage(pil_image)
 
@@ -180,11 +184,7 @@ class RGB_Api:
                 # Swap
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-                # Prepare back buffer with background composite
-                bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
-                mask = np.any(self.drawing_buffer != 0, axis=2)
-                bg_viewport[mask] = self.drawing_buffer[mask]
-                pil_image = Image.fromarray(bg_viewport, mode='RGB')
+                # Prepare back buffer — reuse the same composited image
                 self.canvas.SetImage(pil_image)
 
                 if self.preserve_frame_changes:
@@ -836,13 +836,13 @@ class RGB_Api:
 
     # Utility Methods
     def clear(self):
-        """Clear both buffers and hide background."""
-        self.drawing_buffer.fill(0)
+        """Clear both buffers and hide all background layers."""
+        self.drawing_buffer[:] = TRANSPARENT_COLOR
         self.canvas.Fill(0, 0, 0)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
         if not self.frame_mode:
             self.canvas.Fill(0, 0, 0)
-        self.background_manager.hide_background()
+        self.background_manager.hide_all()
         self.burnout_manager.clear_all()
         self.current_command_pixels.clear()
 
@@ -1010,12 +1010,22 @@ class RGB_Api:
 
     def refresh_display(self):
         """Refresh the display with all layers in correct order."""
-        # If background is active, composite background + drawing_buffer first
         if self.background_manager.has_background():
+            # Composite background layers + drawing_buffer
             bg_viewport = self.background_manager.get_viewport(self.matrix.width, self.matrix.height)
-            mask = np.any(self.drawing_buffer != 0, axis=2)
+            mask = np.any(self.drawing_buffer != TRANSPARENT_COLOR, axis=2)
             bg_viewport[mask] = self.drawing_buffer[mask]
+            # Convert remaining transparent sentinel to true black for LEDs
+            sentinel_mask = np.all(bg_viewport == TRANSPARENT_COLOR, axis=2)
+            bg_viewport[sentinel_mask] = (0, 0, 0)
             pil_image = Image.fromarray(bg_viewport, mode='RGB')
+            self.canvas.SetImage(pil_image)
+        else:
+            # No background — push drawing buffer with sentinel converted to black
+            display_buf = self.drawing_buffer.copy()
+            sentinel_mask = np.all(display_buf == TRANSPARENT_COLOR, axis=2)
+            display_buf[sentinel_mask] = (0, 0, 0)
+            pil_image = Image.fromarray(display_buf, mode='RGB')
             self.canvas.SetImage(pil_image)
 
         # Then draw all visible sprites on top in z-order
@@ -1070,11 +1080,10 @@ class RGB_Api:
             Level.TRACE, Component.SPRITE)
     
     def clear_sprite_position(self, sprite: Union[SpriteInstance, MatrixSprite], dest_buffer):
-        """Clear the sprite's current position with black."""
+        """Clear the sprite's current position on the display canvas."""
         if isinstance(sprite, SpriteInstance):
             x, y = round(sprite.x), round(sprite.y)
         else:
-            # MatrixSprite doesn't have x/y attributes; clear at origin
             x, y = 0, 0
         start_x = max(0, x)
         start_y = max(0, y)
@@ -1179,10 +1188,13 @@ class RGB_Api:
                     r, g, b = int(bg_viewport[y, x, 0]), int(bg_viewport[y, x, 1]), int(bg_viewport[y, x, 2])
                 else:
                     r, g, b = 0, 0, 0
-                # Overlay drawing_buffer if non-black
-                db_color = self.drawing_buffer[y, x]
-                if db_color[0] != 0 or db_color[1] != 0 or db_color[2] != 0:
-                    r, g, b = int(db_color[0]), int(db_color[1]), int(db_color[2])
+                # Overlay drawing_buffer if non-transparent
+                db_r, db_g, db_b = int(self.drawing_buffer[y, x, 0]), int(self.drawing_buffer[y, x, 1]), int(self.drawing_buffer[y, x, 2])
+                if (db_r, db_g, db_b) != TRANSPARENT_COLOR:
+                    r, g, b = db_r, db_g, db_b
+                # Convert sentinel to true black for display
+                if (r, g, b) == TRANSPARENT_COLOR:
+                    r, g, b = 0, 0, 0
                 self.canvas.SetPixel(x, y, r, g, b)
                 if not self.frame_mode:
                     self.current_command_pixels.append((x, y, r, g, b))

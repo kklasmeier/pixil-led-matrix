@@ -57,7 +57,7 @@ class CommandExecutor:
         debug(f"Processing command: {command}", Level.DEBUG, Component.COMMAND)
 
         try:
-            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite', 'hide_background']:
+            if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite']:
                 debug(f"Executing simple command: {command}", Level.DEBUG, Component.COMMAND)
                 self.current_command = command
                 handler = self.command_handlers.get(command)
@@ -65,6 +65,13 @@ class CommandExecutor:
                     handler()
                 else:
                     raise ValueError(f"No handler found for command: {command}")
+                return
+
+            # Handle hide_background as bare command (no args = layer 0)
+            if command == 'hide_background':
+                debug("Executing hide_background (no args, layer 0)", Level.DEBUG, Component.COMMAND)
+                self.current_command = command
+                self.command_handlers['hide_background']()
                 return
 
             cmd_name, params = self._parse_command(command)
@@ -436,30 +443,31 @@ class CommandExecutor:
         pass
 
     # Background Command Handlers
-    def _handle_set_background(self, sprite_name: str, cel_index: int = 0):
+    def _handle_set_background(self, sprite_name: str, cel_index: int = 0, layer: int = 0):
         """Handle set_background command."""
-        debug(f"Setting background to sprite '{sprite_name}' cel {cel_index}",
+        debug(f"Setting background layer {layer} to sprite '{sprite_name}' cel {cel_index}",
               Level.DEBUG, Component.COMMAND)
-        self.api.set_background(sprite_name, cel_index)
+        self.api.set_background(sprite_name, cel_index, layer)
 
-    def _handle_hide_background(self):
+    def _handle_hide_background(self, layer: Optional[int] = None):
         """Handle hide_background command."""
-        debug("Hiding background", Level.DEBUG, Component.COMMAND)
-        self.api.hide_background()
+        debug(f"Hiding background layer {layer if layer is not None else 0}",
+              Level.DEBUG, Component.COMMAND)
+        self.api.hide_background(layer)
 
-    def _handle_nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None):
+    def _handle_nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None, layer: int = 0):
         """Handle nudge_background command."""
-        debug(f"Nudging background by ({dx}, {dy})" +
+        debug(f"Nudging background layer {layer} by ({dx}, {dy})" +
               (f" to cel {cel_index}" if cel_index is not None else " (auto-advance)"),
               Level.DEBUG, Component.COMMAND)
-        self.api.nudge_background(dx, dy, cel_index)
+        self.api.nudge_background(dx, dy, cel_index, layer)
 
-    def _handle_set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None):
+    def _handle_set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None, layer: int = 0):
         """Handle set_background_offset command."""
-        debug(f"Setting background offset to ({x}, {y})" +
+        debug(f"Setting background layer {layer} offset to ({x}, {y})" +
               (f" cel {cel_index}" if cel_index is not None else " (auto-advance)"),
               Level.DEBUG, Component.COMMAND)
-        self.api.set_background_offset(x, y, cel_index)
+        self.api.set_background_offset(x, y, cel_index, layer)
 
     def _handle_plot_batch(self, encoded_data: str):
         """Handle plot_batch command with multiple packed plots."""
