@@ -67,9 +67,9 @@ class CommandExecutor:
                     raise ValueError(f"No handler found for command: {command}")
                 return
 
-            # Handle hide_background as bare command (no args = layer 0)
+            # Handle hide_background as bare command (no args = hide all layers)
             if command == 'hide_background':
-                debug("Executing hide_background (no args, layer 0)", Level.DEBUG, Component.COMMAND)
+                debug("Executing hide_background (no args, hide all layers)", Level.DEBUG, Component.COMMAND)
                 self.current_command = command
                 self.command_handlers['hide_background']()
                 return
@@ -318,7 +318,7 @@ class CommandExecutor:
         elif cmd == 'draw_rectangle' and len(args) >= 5:
             x, y, width, height, color = args[:5]
             intensity = int(args[5]) if len(args) > 5 else 100
-            fill = args[6] if len(args) > 6 else False
+            fill = bool(args[6]) if len(args) > 6 else False
             self.api.draw_to_sprite(name, cmd, x, y, width, height, color, intensity, fill)
         elif cmd == 'draw_circle' and len(args) >= 4:
             x, y, radius, color = args[:4]
@@ -443,31 +443,59 @@ class CommandExecutor:
         pass
 
     # Background Command Handlers
-    def _handle_set_background(self, sprite_name: str, cel_index: int = 0, layer: int = 0):
-        """Handle set_background command."""
+    # New parameter order: layer before cel_index
+    def _handle_set_background(self, sprite_name: str, layer: int = 0, cel_index: int = 0):
+        """
+        Handle set_background command.
+        
+        Args:
+            sprite_name: Name of the sprite to use as background.
+            layer:       Layer number (default 0).
+            cel_index:   Initial cel (default 0).
+        """
         debug(f"Setting background layer {layer} to sprite '{sprite_name}' cel {cel_index}",
               Level.DEBUG, Component.COMMAND)
-        self.api.set_background(sprite_name, cel_index, layer)
+        self.api.set_background(sprite_name, layer, cel_index)
 
     def _handle_hide_background(self, layer: Optional[int] = None):
-        """Handle hide_background command."""
-        debug(f"Hiding background layer {layer if layer is not None else 0}",
-              Level.DEBUG, Component.COMMAND)
+        """
+        Handle hide_background command.
+        
+        No args = hide all layers. With layer = hide specific layer.
+        """
+        if layer is None:
+            debug("Hiding all background layers", Level.DEBUG, Component.COMMAND)
+        else:
+            debug(f"Hiding background layer {layer}", Level.DEBUG, Component.COMMAND)
         self.api.hide_background(layer)
 
-    def _handle_nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None, layer: int = 0):
-        """Handle nudge_background command."""
+    def _handle_nudge_background(self, dx: int, dy: int, layer: int = 0, cel_index: Optional[int] = None):
+        """
+        Handle nudge_background command.
+        
+        Args:
+            dx, dy:    Relative shift.
+            layer:     Layer number (default 0).
+            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
+        """
         debug(f"Nudging background layer {layer} by ({dx}, {dy})" +
               (f" to cel {cel_index}" if cel_index is not None else " (auto-advance)"),
               Level.DEBUG, Component.COMMAND)
-        self.api.nudge_background(dx, dy, cel_index, layer)
+        self.api.nudge_background(dx, dy, layer, cel_index)
 
-    def _handle_set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None, layer: int = 0):
-        """Handle set_background_offset command."""
+    def _handle_set_background_offset(self, x: int, y: int, layer: int = 0, cel_index: Optional[int] = None):
+        """
+        Handle set_background_offset command.
+        
+        Args:
+            x, y:      Absolute offset.
+            layer:     Layer number (default 0).
+            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
+        """
         debug(f"Setting background layer {layer} offset to ({x}, {y})" +
               (f" cel {cel_index}" if cel_index is not None else " (auto-advance)"),
               Level.DEBUG, Component.COMMAND)
-        self.api.set_background_offset(x, y, cel_index, layer)
+        self.api.set_background_offset(x, y, layer, cel_index)
 
     def _handle_plot_batch(self, encoded_data: str):
         """Handle plot_batch command with multiple packed plots."""

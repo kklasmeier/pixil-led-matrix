@@ -1,0 +1,456 @@
+# space_cruise.pxl
+# Cinematic spaceship cruising through space
+# Ship stays near center, offset opposite to heading for "road ahead" perspective
+# Backgrounds scroll in heading direction at different speeds for 3D depth
+# Runs forever - press spacebar to skip to next script or Ctrl+C to quit
+
+throttle(0.3)
+
+# =========================================
+# BACKGROUND SPRITES
+# =========================================
+
+# --- Layer 0: Deep star field (128x128) - very far away ---
+define_sprite(bg_stars, 128, 128)
+    # Dense field of dim distant stars
+    plot(3, 5, white, 35)
+    plot(15, 2, white, 80)
+    plot(28, 10, white, 45)
+    plot(41, 7, white, 100)
+    plot(55, 3, white, 30)
+    plot(68, 12, white, 65)
+    plot(82, 1, white, 50)
+    plot(96, 8, white, 85)
+    plot(109, 4, white, 40)
+    plot(122, 11, white, 70)
+    plot(7, 20, white, 60)
+    plot(21, 26, white, 35)
+    plot(34, 18, white, 90)
+    plot(48, 24, white, 50)
+    plot(61, 30, white, 75)
+    plot(75, 17, white, 40)
+    plot(88, 23, white, 55)
+    plot(102, 29, white, 95)
+    plot(115, 19, white, 45)
+    plot(126, 27, white, 70)
+    plot(10, 36, white, 55)
+    plot(24, 42, white, 80)
+    plot(37, 34, white, 40)
+    plot(51, 40, white, 65)
+    plot(64, 46, white, 90)
+    plot(78, 33, white, 35)
+    plot(91, 39, white, 75)
+    plot(105, 45, white, 50)
+    plot(118, 35, white, 85)
+    plot(5, 52, white, 70)
+    plot(19, 58, white, 40)
+    plot(32, 50, white, 60)
+    plot(46, 56, white, 95)
+    plot(59, 62, white, 45)
+    plot(73, 49, white, 80)
+    plot(86, 55, white, 35)
+    plot(100, 61, white, 65)
+    plot(113, 51, white, 50)
+    plot(125, 59, white, 90)
+    plot(8, 68, white, 45)
+    plot(22, 74, white, 75)
+    plot(35, 66, white, 55)
+    plot(49, 72, white, 85)
+    plot(62, 78, white, 40)
+    plot(76, 65, white, 100)
+    plot(89, 71, white, 50)
+    plot(103, 77, white, 70)
+    plot(116, 67, white, 35)
+    plot(4, 84, white, 60)
+    plot(17, 90, white, 80)
+    plot(31, 82, white, 45)
+    plot(44, 88, white, 65)
+    plot(58, 94, white, 90)
+    plot(71, 81, white, 35)
+    plot(85, 87, white, 55)
+    plot(98, 93, white, 75)
+    plot(112, 83, white, 50)
+    plot(124, 91, white, 100)
+    plot(11, 100, white, 40)
+    plot(25, 106, white, 70)
+    plot(38, 98, white, 55)
+    plot(52, 104, white, 85)
+    plot(65, 110, white, 45)
+    plot(79, 97, white, 60)
+    plot(92, 103, white, 80)
+    plot(106, 109, white, 35)
+    plot(119, 99, white, 75)
+    plot(6, 116, white, 50)
+    plot(20, 122, white, 90)
+    plot(33, 114, white, 40)
+    plot(47, 120, white, 65)
+    plot(60, 126, white, 80)
+    plot(74, 113, white, 55)
+    plot(87, 119, white, 95)
+    plot(101, 125, white, 45)
+    plot(114, 115, white, 70)
+    plot(127, 121, white, 60)
+endsprite
+
+# --- Layer 1: Far nebula (112x112) - distant large gas formations ---
+define_sprite(bg_nebula_far, 112, 112)
+    # Large dim cloud masses - deep background gas
+    draw_ellipse(15, 20, 14, 7, indigo, 11, true, 25)
+    draw_ellipse(22, 17, 8, 4, purple, 8, true, -15)
+    draw_ellipse(65, 45, 16, 8, navy, 10, true, 40)
+    draw_ellipse(74, 42, 9, 5, blue, 7, true, -20)
+    draw_ellipse(35, 80, 12, 6, violet, 10, true, 50)
+    draw_ellipse(95, 18, 10, 6, indigo, 9, true, -35)
+    draw_ellipse(10, 60, 13, 5, purple, 8, true, 65)
+    draw_ellipse(55, 100, 11, 6, navy, 9, true, 15)
+    # Dim embedded stars
+    plot(19, 21, cyan, 20)
+    plot(68, 44, sky_blue, 18)
+    plot(38, 82, lavender, 22)
+    plot(97, 20, cyan, 15)
+endsprite
+
+# --- Layer 2: Near nebula (80x80) - closer bright wisps ---
+define_sprite(bg_nebula_near, 80, 80)
+    # Smaller brighter cloud wisps - closer gas tendrils
+    draw_ellipse(18, 12, 7, 4, violet, 18, true, 30)
+    draw_ellipse(22, 10, 4, 2, magenta, 14, true, -10)
+    draw_ellipse(55, 50, 8, 4, purple, 16, true, -25)
+    draw_ellipse(60, 48, 5, 3, indigo, 12, true, 15)
+    draw_ellipse(12, 55, 6, 3, violet, 15, true, 45)
+    draw_ellipse(68, 20, 7, 4, magenta, 14, true, -40)
+    draw_ellipse(35, 70, 8, 4, purple, 16, true, 20)
+    draw_ellipse(72, 65, 6, 3, indigo, 13, true, -30)
+    # Brighter accent stars caught in wisps
+    plot(20, 13, cyan, 35)
+    plot(57, 51, sky_blue, 30)
+    plot(14, 57, lavender, 40)
+    plot(70, 22, cyan, 28)
+endsprite
+
+# --- Layer 2: Close particles / space dust (80x80) - nearby ---
+define_sprite(bg_dust, 80, 80)
+    # Bright close particles that streak past
+    plot(4, 7, silver, 70)
+    plot(5, 7, silver, 55)
+    plot(6, 7, silver, 35)
+    plot(19, 14, light_gray, 65)
+    plot(20, 14, light_gray, 45)
+    plot(34, 3, gray, 60)
+    plot(35, 3, gray, 40)
+    plot(50, 20, silver, 70)
+    plot(51, 20, silver, 50)
+    plot(52, 20, silver, 30)
+    plot(65, 10, light_gray, 55)
+    plot(66, 10, light_gray, 35)
+    plot(11, 28, silver, 65)
+    plot(12, 28, silver, 45)
+    plot(27, 35, gray, 60)
+    plot(42, 25, light_gray, 70)
+    plot(43, 25, light_gray, 50)
+    plot(58, 32, silver, 55)
+    plot(72, 22, gray, 65)
+    plot(73, 22, gray, 45)
+    plot(8, 45, light_gray, 60)
+    plot(9, 45, light_gray, 40)
+    plot(22, 50, silver, 70)
+    plot(23, 50, silver, 50)
+    plot(24, 50, silver, 30)
+    plot(38, 42, gray, 55)
+    plot(53, 48, light_gray, 65)
+    plot(67, 40, silver, 50)
+    plot(78, 38, gray, 60)
+    plot(15, 62, silver, 70)
+    plot(16, 62, silver, 50)
+    plot(30, 58, light_gray, 55)
+    plot(45, 65, gray, 65)
+    plot(46, 65, gray, 45)
+    plot(60, 55, silver, 60)
+    plot(74, 60, light_gray, 50)
+    plot(5, 75, gray, 65)
+    plot(6, 75, gray, 45)
+    plot(20, 72, silver, 55)
+    plot(35, 78, light_gray, 70)
+    plot(36, 78, light_gray, 50)
+    plot(50, 70, gray, 60)
+    plot(65, 76, silver, 55)
+    plot(78, 68, light_gray, 45)
+    # Tiny rock fragments
+    draw_circle(14, 18, 1, dark_gray, 50, true)
+    draw_circle(55, 42, 1, dark_gray, 45, true)
+    draw_circle(32, 60, 1, dark_gray, 55, true)
+    draw_circle(70, 15, 1, dark_gray, 40, true)
+endsprite
+
+# =========================================
+# SHIP SPRITE - 8 directional cels
+# =========================================
+define_sprite(ship, 7, 7)
+    # Cel 0: East -->
+    sprite_cel(0)
+        plot(6, 3, white, 100)
+        plot(5, 2, cyan, 90)
+        plot(5, 3, cyan, 100)
+        plot(5, 4, cyan, 90)
+        draw_line(1, 3, 4, 3, white, 85)
+        draw_line(2, 2, 4, 2, sky_blue, 65)
+        draw_line(2, 4, 4, 4, sky_blue, 65)
+        plot(0, 1, orange, 70)
+        plot(0, 5, orange, 70)
+
+    # Cel 1: Northeast
+    sprite_cel(1)
+        plot(6, 0, white, 100)
+        plot(5, 0, cyan, 90)
+        plot(5, 1, cyan, 100)
+        plot(6, 1, cyan, 90)
+        draw_line(2, 4, 4, 2, white, 85)
+        draw_line(1, 3, 3, 1, sky_blue, 65)
+        draw_line(3, 5, 5, 3, sky_blue, 65)
+        plot(0, 5, orange, 70)
+        plot(1, 6, orange, 70)
+
+    # Cel 2: North ^
+    sprite_cel(2)
+        plot(3, 0, white, 100)
+        plot(2, 1, cyan, 90)
+        plot(3, 1, cyan, 100)
+        plot(4, 1, cyan, 90)
+        draw_line(3, 2, 3, 5, white, 85)
+        draw_line(2, 2, 2, 4, sky_blue, 65)
+        draw_line(4, 2, 4, 4, sky_blue, 65)
+        plot(1, 6, orange, 70)
+        plot(5, 6, orange, 70)
+
+    # Cel 3: Northwest
+    sprite_cel(3)
+        plot(0, 0, white, 100)
+        plot(0, 1, cyan, 90)
+        plot(1, 0, cyan, 90)
+        plot(1, 1, cyan, 100)
+        draw_line(2, 2, 4, 4, white, 85)
+        draw_line(1, 3, 3, 5, sky_blue, 65)
+        draw_line(3, 1, 5, 3, sky_blue, 65)
+        plot(6, 5, orange, 70)
+        plot(5, 6, orange, 70)
+
+    # Cel 4: West <--
+    sprite_cel(4)
+        plot(0, 3, white, 100)
+        plot(1, 2, cyan, 90)
+        plot(1, 3, cyan, 100)
+        plot(1, 4, cyan, 90)
+        draw_line(2, 3, 5, 3, white, 85)
+        draw_line(2, 2, 4, 2, sky_blue, 65)
+        draw_line(2, 4, 4, 4, sky_blue, 65)
+        plot(6, 1, orange, 70)
+        plot(6, 5, orange, 70)
+
+    # Cel 5: Southwest
+    sprite_cel(5)
+        plot(0, 6, white, 100)
+        plot(0, 5, cyan, 90)
+        plot(1, 5, cyan, 100)
+        plot(1, 6, cyan, 90)
+        draw_line(2, 4, 4, 2, white, 85)
+        draw_line(1, 3, 3, 1, sky_blue, 65)
+        draw_line(3, 5, 5, 3, sky_blue, 65)
+        plot(5, 0, orange, 70)
+        plot(6, 1, orange, 70)
+
+    # Cel 6: South v
+    sprite_cel(6)
+        plot(3, 6, white, 100)
+        plot(2, 5, cyan, 90)
+        plot(3, 5, cyan, 100)
+        plot(4, 5, cyan, 90)
+        draw_line(3, 1, 3, 4, white, 85)
+        draw_line(2, 2, 2, 4, sky_blue, 65)
+        draw_line(4, 2, 4, 4, sky_blue, 65)
+        plot(1, 0, orange, 70)
+        plot(5, 0, orange, 70)
+
+    # Cel 7: Southeast
+    sprite_cel(7)
+        plot(6, 6, white, 100)
+        plot(5, 5, cyan, 100)
+        plot(5, 6, cyan, 90)
+        plot(6, 5, cyan, 90)
+        draw_line(2, 2, 4, 4, white, 85)
+        draw_line(1, 3, 3, 5, sky_blue, 65)
+        draw_line(3, 1, 5, 3, sky_blue, 65)
+        plot(0, 1, orange, 70)
+        plot(1, 0, orange, 70)
+endsprite
+
+# =========================================
+# ACTIVATE BACKGROUNDS
+# =========================================
+set_background(bg_stars, 0)
+set_background(bg_nebula_far, 1)
+set_background(bg_nebula_near, 2)
+set_background(bg_dust, 3)
+
+# =========================================
+# FLIGHT VARIABLES
+# =========================================
+v_heading = 0.0
+v_turn_rate = 0.0
+v_speed = 2.2
+
+# Center of display
+v_cx = 32
+v_cy = 32
+
+# Perspective offset strength (how far ship drifts from center)
+v_offset_strength = 14
+
+# Scroll accumulators
+v_acc_star_x = 0.0
+v_acc_star_y = 0.0
+v_acc_nfar_x = 0.0
+v_acc_nfar_y = 0.0
+v_acc_nnear_x = 0.0
+v_acc_nnear_y = 0.0
+v_acc_dust_x = 0.0
+v_acc_dust_y = 0.0
+
+# Frame counter
+v_frame = 0
+
+# =========================================
+# SHOW SHIP
+# =========================================
+show_sprite(ship, v_cx, v_cy, 0, 10, 0)
+
+# =========================================
+# MAIN LOOP - RUNS FOREVER
+# =========================================
+v_running = 1
+while v_running == 1 then
+
+    begin_frame(true)
+
+    # --- Smooth heading change ---
+    # Turn rate oscillates gently using layered sine waves
+    # This creates long sweeping arcs with gentle direction changes
+    v_turn_rate = sin(radians(v_frame * 0.47)) * 1.2 + sin(radians(v_frame * 0.13)) * 0.6 + sin(radians(v_frame * 1.1)) * 0.3
+
+    v_heading = v_heading + v_turn_rate
+
+    # Normalize heading 0-360
+    if v_heading >= 360 then
+        v_heading = v_heading - 360
+    endif
+    if v_heading < 0 then
+        v_heading = v_heading + 360
+    endif
+
+    v_heading_rad = radians(v_heading)
+
+    # --- Velocity vector (world scrolls this direction) ---
+    v_vx = cos(v_heading_rad) * v_speed
+    v_vy = sin(v_heading_rad) * v_speed
+
+    # --- Ship screen position: center minus heading offset ---
+    # Ship drifts opposite to heading so more space is visible ahead
+    v_ship_x = v_cx - cos(v_heading_rad) * v_offset_strength
+    v_ship_y = v_cy - sin(v_heading_rad) * v_offset_strength
+
+    # Clamp to safe area
+    v_ship_x = max(3, min(57, v_ship_x))
+    v_ship_y = max(3, min(57, v_ship_y))
+
+    # --- Pick ship cel (8 directions) ---
+    # Map heading to cel: 0=E, 1=NE, 2=N, 3=NW, 4=W, 5=SW, 6=S, 7=SE
+    # Each cel covers 45 degrees, offset by 22.5 so cel 0 centers on 0°
+    v_cel_angle = v_heading + 22.5
+    if v_cel_angle >= 360 then
+        v_cel_angle = v_cel_angle - 360
+    endif
+    v_cel = int(v_cel_angle / 45)
+    if v_cel > 7 then
+        v_cel = 0
+    endif
+
+    # Pixil convention: positive Y is down on screen
+    # So heading 0° = east (cel 0), 90° = south (cel 6), etc.
+    # Remap: 0=E, 1=SE, 2=S, 3=SW, 4=W, 5=NW, 6=N, 7=NE
+    # But our cels are: 0=E, 1=NE, 2=N, 3=NW, 4=W, 5=SW, 6=S, 7=SE
+    # Need to mirror Y: cel_remap[raw] -> display
+    # raw 0(E)->0, 1(ESE)->7(SE), 2(S)->6(S), 3(SSW)->5(SW), 4(W)->4, 5(WNW)->3(NW), 6(N)->2(N), 7(NNE)->1(NE)
+    v_display_cel = 0
+    if v_cel == 0 then
+        v_display_cel = 0
+    endif
+    if v_cel == 1 then
+        v_display_cel = 7
+    endif
+    if v_cel == 2 then
+        v_display_cel = 6
+    endif
+    if v_cel == 3 then
+        v_display_cel = 5
+    endif
+    if v_cel == 4 then
+        v_display_cel = 4
+    endif
+    if v_cel == 5 then
+        v_display_cel = 3
+    endif
+    if v_cel == 6 then
+        v_display_cel = 2
+    endif
+    if v_cel == 7 then
+        v_display_cel = 1
+    endif
+
+    move_sprite(ship, v_ship_x, v_ship_y, 0, v_display_cel)
+
+    # --- Parallax background scrolling (4 layers) ---
+    # World scrolls in heading direction (ship flies forward)
+    # Layer 0 (far stars): 0.12x - barely drifts
+    v_acc_star_x = v_acc_star_x + v_vx * 0.12
+    v_acc_star_y = v_acc_star_y + v_vy * 0.12
+
+    # Layer 1 (far nebula): 0.35x - distant gas
+    v_acc_nfar_x = v_acc_nfar_x + v_vx * 0.35
+    v_acc_nfar_y = v_acc_nfar_y + v_vy * 0.35
+
+    # Layer 2 (near nebula): 0.7x - closer wisps
+    v_acc_nnear_x = v_acc_nnear_x + v_vx * 0.7
+    v_acc_nnear_y = v_acc_nnear_y + v_vy * 0.7
+
+    # Layer 3 (dust): 1.3x - close particles streak past
+    v_acc_dust_x = v_acc_dust_x + v_vx * 1.3
+    v_acc_dust_y = v_acc_dust_y + v_vy * 1.3
+
+    # Set absolute offsets from accumulators
+    set_background_offset(int(v_acc_star_x), int(v_acc_star_y), 0, 0)
+    set_background_offset(int(v_acc_nfar_x), int(v_acc_nfar_y), 1, 0)
+    set_background_offset(int(v_acc_nnear_x), int(v_acc_nnear_y), 2, 0)
+    set_background_offset(int(v_acc_dust_x), int(v_acc_dust_y), 3, 0)
+
+    end_frame
+    rest(0.018)
+
+    v_frame = v_frame + 1
+
+    # Prevent accumulator overflow (wrap periodically)
+    # Background tiles seamlessly so this is invisible
+    if v_frame - floor(v_frame / 10000) * 10000 == 0 then
+        v_acc_star_x = v_acc_star_x - floor(v_acc_star_x / 128) * 128
+        v_acc_star_y = v_acc_star_y - floor(v_acc_star_y / 128) * 128
+        v_acc_nfar_x = v_acc_nfar_x - floor(v_acc_nfar_x / 112) * 112
+        v_acc_nfar_y = v_acc_nfar_y - floor(v_acc_nfar_y / 112) * 112
+        v_acc_nnear_x = v_acc_nnear_x - floor(v_acc_nnear_x / 80) * 80
+        v_acc_nnear_y = v_acc_nnear_y - floor(v_acc_nnear_y / 80) * 80
+        v_acc_dust_x = v_acc_dust_x - floor(v_acc_dust_x / 80) * 80
+        v_acc_dust_y = v_acc_dust_y - floor(v_acc_dust_y / 80) * 80
+    endif
+
+endwhile
+
+hide_background
+dispose_all_sprites()
+clear()

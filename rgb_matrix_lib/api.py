@@ -85,9 +85,9 @@ class RGB_Api:
         debug("All sprites disposed", Level.DEBUG, Component.SPRITE)
 
     # Background Layer Methods
-    def set_background(self, sprite_name: str, cel_index: int = 0, layer: int = 0):
+    def set_background(self, sprite_name: str, layer: int = 0, cel_index: int = 0):
         """Activate a sprite as a background layer."""
-        success = self.background_manager.set_background(sprite_name, cel_index, layer)
+        success = self.background_manager.set_background(sprite_name, layer, cel_index)
         if not success:
             debug(f"Failed to set background layer {layer} to sprite '{sprite_name}'",
                   Level.ERROR, Component.SYSTEM)
@@ -95,20 +95,20 @@ class RGB_Api:
             self.refresh_display()
 
     def hide_background(self, layer: Optional[int] = None):
-        """Hide a background layer (default layer 0). Preserves state for reactivation."""
+        """Hide background layer(s). No args = hide all, with layer = hide specific."""
         self.background_manager.hide_background(layer)
         if not self.frame_mode:
             self.refresh_display()
 
-    def nudge_background(self, dx: int, dy: int, cel_index: Optional[int] = None, layer: int = 0):
+    def nudge_background(self, dx: int, dy: int, layer: int = 0, cel_index: Optional[int] = None):
         """Shift background viewport. Auto-advances cel unless cel_index specified."""
-        self.background_manager.nudge(dx, dy, cel_index, layer)
+        self.background_manager.nudge(dx, dy, layer, cel_index)
         if not self.frame_mode:
             self.refresh_display()
 
-    def set_background_offset(self, x: int, y: int, cel_index: Optional[int] = None, layer: int = 0):
+    def set_background_offset(self, x: int, y: int, layer: int = 0, cel_index: Optional[int] = None):
         """Set absolute background viewport position. Auto-advances cel unless cel_index specified."""
-        self.background_manager.set_offset(x, y, cel_index, layer)
+        self.background_manager.set_offset(x, y, layer, cel_index)
         if not self.frame_mode:
             self.refresh_display()
 

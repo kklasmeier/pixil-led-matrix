@@ -1,0 +1,501 @@
+# ============================================================
+# Parallax Meadow - Multi-layer scrolling landscape
+# ============================================================
+# 13 background layers (0 = static sky, 1-12 scroll):
+#   Layer 0:  Sky gradient + sun  (static - never scrolls)
+#   Layer 1:  Far clouds          (0.25 px/frame)
+#   Layer 2:  Near clouds         (0.5  px/frame)
+#   Layer 3:  Far mountains       (0.33 px/frame)
+#   Layer 4:  Near mountains      (0.5  px/frame)
+#   Layer 5:  Far hills           (0.75 px/frame)
+#   Layer 6:  Near hills          (1.0  px/frame)
+#   Layer 7:  Far trees           (1.5  px/frame)
+#   Layer 8:  Near trees          (2.0  px/frame)
+#   Layer 9:  Bushes/shrubs       (3.0  px/frame)
+#   Layer 10: Far grass           (4.0  px/frame)
+#   Layer 11: Mid grass           (5.0  px/frame)
+#   Layer 12: Near grass+flowers  (6.0  px/frame)
+#
+# Speed ratio: 24:1 (nearest to farthest)
+# ============================================================
+
+throttle(0)
+
+# ============================================================
+# LAYER 0: SKY GRADIENT + SUN (static background layer)
+# Full 64x64 sprite, never scrolls
+# ============================================================
+define_sprite(sky, 64, 64)
+    # Deep navy at top
+    draw_rectangle(0, 0, 64, 8, navy, 95, true)
+    # Royal blue
+    draw_rectangle(0, 8, 64, 8, royal_blue, 85, true)
+    # Blue
+    draw_rectangle(0, 16, 64, 6, blue, 75, true)
+    # Sky blue bright
+    draw_rectangle(0, 22, 64, 6, sky_blue, 70, true)
+    # Sky blue medium
+    draw_rectangle(0, 28, 64, 6, sky_blue, 55, true)
+    # Azure
+    draw_rectangle(0, 34, 64, 6, azure, 50, true)
+    # Pale azure horizon glow
+    draw_rectangle(0, 40, 64, 6, azure, 38, true)
+    # Earthy base (covered by terrain layers above)
+    draw_rectangle(0, 46, 64, 18, forest_green, 25, true)
+
+    # Sun with glow
+    draw_circle(52, 8, 6, yellow, 18, false)
+    draw_circle(52, 8, 5, gold, 30, true)
+    draw_circle(52, 8, 4, yellow, 85, true)
+    draw_circle(52, 8, 3, white, 70, true)
+
+    # Sun rays
+    draw_line(52, 1, 52, 0, yellow, 20)
+    draw_line(46, 4, 44, 2, yellow, 15)
+    draw_line(58, 4, 60, 2, yellow, 15)
+    draw_line(46, 12, 44, 14, yellow, 15)
+    draw_line(58, 12, 60, 14, yellow, 15)
+endsprite
+
+# ============================================================
+# LAYER 1: FAR CLOUDS - wispy, high, sparse
+# 128x64, content in rows 8-18
+# ============================================================
+define_sprite(far_clouds, 128, 64)
+    draw_ellipse(15, 11, 8, 2, white, 25, true, 0)
+    draw_ellipse(19, 10, 5, 2, white, 20, true, 0)
+
+    draw_ellipse(48, 13, 10, 2, white, 22, true, 0)
+    draw_ellipse(53, 12, 6, 2, white, 18, true, 0)
+    draw_ellipse(44, 14, 5, 2, white, 16, true, 0)
+
+    draw_ellipse(88, 10, 7, 2, white, 28, true, 0)
+    draw_ellipse(92, 9, 5, 2, white, 22, true, 0)
+
+    draw_ellipse(118, 14, 6, 2, white, 20, true, 0)
+endsprite
+
+# ============================================================
+# LAYER 2: NEAR CLOUDS - puffier, brighter
+# Content in rows 14-24
+# ============================================================
+define_sprite(near_clouds, 128, 64)
+    draw_ellipse(20, 18, 12, 4, white, 42, true, 0)
+    draw_ellipse(26, 16, 8, 3, white, 48, true, 0)
+    draw_ellipse(15, 17, 7, 3, white, 38, true, 0)
+    draw_ellipse(22, 20, 6, 2, light_gray, 25, true, 0)
+
+    draw_ellipse(72, 19, 14, 4, white, 45, true, 0)
+    draw_ellipse(78, 17, 9, 3, white, 50, true, 0)
+    draw_ellipse(66, 18, 8, 3, white, 40, true, 0)
+    draw_ellipse(74, 21, 7, 2, light_gray, 22, true, 0)
+
+    draw_ellipse(112, 17, 8, 3, white, 35, true, 0)
+    draw_ellipse(116, 16, 5, 2, white, 30, true, 0)
+endsprite
+
+# ============================================================
+# LAYER 3: FAR MOUNTAINS - purple/indigo, hazy
+# Peaks rows 24-30, solid base rows 28-36
+# ============================================================
+define_sprite(far_mtns, 128, 64)
+    # Solid base band
+    draw_rectangle(0, 28, 128, 9, indigo, 36, true)
+
+    # Mountain peaks
+    draw_polygon(14, 27, 6, 3, indigo, 42, 0, true)
+    draw_polygon(32, 25, 8, 3, purple, 38, 0, true)
+    draw_polygon(54, 23, 10, 3, indigo, 45, 0, true)
+    draw_polygon(76, 26, 7, 3, purple, 40, 0, true)
+    draw_polygon(96, 24, 9, 3, indigo, 44, 0, true)
+    draw_polygon(116, 27, 6, 3, purple, 36, 0, true)
+
+    # Snow caps
+    plot(54, 19, white, 55)
+    plot(53, 20, white, 45)
+    plot(55, 20, white, 45)
+    plot(96, 20, white, 50)
+    plot(95, 21, white, 40)
+    plot(97, 21, white, 40)
+endsprite
+
+# ============================================================
+# LAYER 4: NEAR MOUNTAINS - darker, larger
+# Peaks rows 28-34, solid base rows 32-40
+# ============================================================
+define_sprite(near_mtns, 128, 64)
+    # Solid base
+    draw_rectangle(0, 32, 128, 9, navy, 46, true)
+
+    # Larger peaks
+    draw_polygon(10, 31, 7, 3, navy, 52, 0, true)
+    draw_polygon(30, 28, 10, 3, navy, 58, 0, true)
+    draw_polygon(50, 32, 6, 3, navy, 50, 0, true)
+    draw_polygon(68, 27, 11, 3, navy, 60, 0, true)
+    draw_polygon(88, 30, 8, 3, navy, 54, 0, true)
+    draw_polygon(108, 29, 9, 3, navy, 56, 0, true)
+    draw_polygon(125, 32, 6, 3, navy, 48, 0, true)
+
+    # Snow
+    plot(68, 22, white, 65)
+    plot(67, 23, white, 50)
+    plot(69, 23, white, 50)
+    plot(30, 24, white, 60)
+    plot(29, 25, white, 45)
+    plot(31, 25, white, 45)
+endsprite
+
+# ============================================================
+# LAYER 5: FAR HILLS - muted dark green, rolling
+# Curves rows 36-42, solid base rows 42-47
+# ============================================================
+define_sprite(far_hills, 128, 64)
+    # Solid base
+    draw_rectangle(0, 42, 128, 6, forest_green, 40, true)
+
+    # Rolling hill curves
+    draw_circle(16, 44, 10, forest_green, 42, true)
+    draw_circle(42, 43, 12, forest_green, 40, true)
+    draw_circle(68, 44, 10, forest_green, 44, true)
+    draw_circle(94, 43, 12, forest_green, 38, true)
+    draw_circle(120, 44, 10, forest_green, 42, true)
+
+    # Ridge highlights
+    draw_arc(0, 39, 32, 39, -5, forest_green, 50, false)
+    draw_arc(32, 38, 64, 38, -6, forest_green, 48, false)
+    draw_arc(64, 39, 96, 39, -5, forest_green, 50, false)
+    draw_arc(96, 38, 128, 38, -6, forest_green, 48, false)
+endsprite
+
+# ============================================================
+# LAYER 6: NEAR HILLS - richer green, bigger
+# Curves rows 40-47, solid base rows 47-51
+# ============================================================
+define_sprite(near_hills, 128, 64)
+    # Solid base
+    draw_rectangle(0, 47, 128, 5, green, 50, true)
+
+    # Bigger hills
+    draw_circle(14, 49, 11, green, 52, true)
+    draw_circle(38, 48, 13, green, 48, true)
+    draw_circle(62, 49, 11, green, 55, true)
+    draw_circle(86, 48, 14, green, 50, true)
+    draw_circle(112, 49, 12, green, 52, true)
+
+    # Hilltop highlights
+    draw_arc(5, 43, 30, 43, -5, lime, 30, false)
+    draw_arc(30, 42, 55, 42, -6, lime, 28, false)
+    draw_arc(55, 43, 80, 43, -5, lime, 30, false)
+    draw_arc(80, 42, 105, 42, -6, lime, 28, false)
+    draw_arc(105, 43, 127, 43, -5, lime, 30, false)
+endsprite
+
+# ============================================================
+# LAYER 7: FAR TREES - small conifer silhouettes
+# Trees rows 44-50, solid ground rows 50-54
+# ============================================================
+define_sprite(far_trees, 128, 64)
+    # Ground
+    draw_rectangle(0, 50, 128, 5, olive, 48, true)
+
+    # Small conifers
+    for v_tx in (4, 124, 12)
+        v_th = random(4, 6, 0)
+        draw_polygon(v_tx, 50 - v_th, v_th - 1, 3, forest_green, 58, 0, true)
+        draw_line(v_tx, 50, v_tx, 49, standard_brown, 45)
+    endfor v_tx
+
+    # Extra offset trees
+    for v_tx in (10, 120, 12)
+        v_th = random(3, 5, 0)
+        draw_polygon(v_tx, 50 - v_th, v_th - 1, 3, forest_green, 52, 0, true)
+        draw_line(v_tx, 50, v_tx, 49, standard_brown, 40)
+    endfor v_tx
+endsprite
+
+# ============================================================
+# LAYER 8: NEAR TREES - taller, mixed types
+# Trees rows 46-54, solid ground rows 54-57
+# ============================================================
+define_sprite(near_trees, 128, 64)
+    # Ground
+    draw_rectangle(0, 54, 128, 4, olive, 55, true)
+
+    # Tall conifer 1
+    draw_polygon(10, 47, 5, 3, green, 72, 0, true)
+    draw_polygon(10, 50, 4, 3, green, 68, 0, true)
+    draw_line(10, 53, 10, 55, standard_brown, 60)
+
+    # Tall conifer 2
+    draw_polygon(30, 46, 6, 3, green, 75, 0, true)
+    draw_polygon(30, 49, 5, 3, green, 70, 0, true)
+    draw_line(30, 53, 30, 55, standard_brown, 62)
+
+    # Deciduous 1
+    draw_circle(48, 48, 4, green, 70, true)
+    draw_circle(48, 46, 3, lime, 55, true)
+    draw_line(48, 51, 48, 55, standard_brown, 60)
+
+    # Conifer 3
+    draw_polygon(64, 47, 5, 3, green, 74, 0, true)
+    draw_polygon(64, 50, 4, 3, green, 68, 0, true)
+    draw_line(64, 53, 64, 55, standard_brown, 60)
+
+    # Deciduous 2
+    draw_circle(82, 47, 5, green, 72, true)
+    draw_circle(82, 45, 3, lime, 58, true)
+    draw_line(82, 51, 82, 55, standard_brown, 62)
+
+    # Conifer 4
+    draw_polygon(98, 46, 6, 3, green, 76, 0, true)
+    draw_polygon(98, 49, 5, 3, green, 70, 0, true)
+    draw_line(98, 53, 98, 55, standard_brown, 62)
+
+    # Deciduous 3
+    draw_circle(116, 48, 4, green, 70, true)
+    draw_circle(116, 46, 3, lime, 55, true)
+    draw_line(116, 51, 116, 55, standard_brown, 60)
+endsprite
+
+# ============================================================
+# LAYER 9: BUSHES/SHRUBS - low scrub layer
+# Bushes rows 52-57, solid ground rows 57-60
+# ============================================================
+define_sprite(near_bushes, 128, 64)
+    # Ground
+    draw_rectangle(0, 57, 128, 4, green, 60, true)
+
+    # Scattered bushes
+    draw_circle(8, 56, 3, green, 65, true)
+    draw_circle(8, 55, 2, lime, 50, true)
+
+    draw_circle(24, 55, 4, forest_green, 62, true)
+    draw_circle(24, 54, 3, green, 58, true)
+
+    draw_circle(42, 56, 3, green, 68, true)
+    draw_circle(42, 55, 2, spring_green, 52, true)
+
+    draw_circle(58, 55, 4, forest_green, 60, true)
+    draw_circle(58, 54, 3, green, 55, true)
+
+    draw_circle(76, 56, 3, green, 66, true)
+    draw_circle(76, 55, 2, lime, 50, true)
+
+    draw_circle(92, 55, 4, forest_green, 62, true)
+    draw_circle(92, 54, 3, green, 58, true)
+
+    draw_circle(110, 56, 3, green, 65, true)
+    draw_circle(110, 55, 2, spring_green, 48, true)
+
+    draw_circle(125, 55, 3, forest_green, 60, true)
+    draw_circle(125, 54, 2, green, 55, true)
+endsprite
+
+# ============================================================
+# LAYER 10: FAR GRASS
+# Blades rows 57-60, solid base rows 59-62
+# ============================================================
+define_sprite(far_grass, 128, 64)
+    # Solid base
+    draw_rectangle(0, 59, 128, 4, green, 62, true)
+
+    # Grass blades
+    for v_x in (0, 126, 3)
+        v_h = random(1, 3, 0)
+        draw_line(v_x, 59, v_x, 59 - v_h, lime, 55)
+    endfor v_x
+
+    for v_x in (1, 127, 4)
+        v_h = random(1, 2, 0)
+        draw_line(v_x, 59, v_x, 59 - v_h, green, 65)
+    endfor v_x
+endsprite
+
+# ============================================================
+# LAYER 11: MID GRASS - denser, taller
+# Blades rows 59-62, solid base rows 61-63
+# ============================================================
+define_sprite(mid_grass, 128, 64)
+    # Solid base
+    draw_rectangle(0, 61, 128, 3, green, 72, true)
+
+    # Dense grass
+    for v_x in (0, 127, 2)
+        v_h = random(2, 4, 0)
+        draw_line(v_x, 61, v_x, 61 - v_h, lime, 65)
+    endfor v_x
+
+    for v_x in (1, 126, 3)
+        v_h = random(1, 3, 0)
+        draw_line(v_x, 61, v_x, 61 - v_h, spring_green, 58)
+    endfor v_x
+
+    # Dark patches
+    for v_x in (5, 120, 18)
+        draw_rectangle(v_x, 62, 4, 1, forest_green, 50, true)
+    endfor v_x
+endsprite
+
+# ============================================================
+# LAYER 12: NEAR GRASS WITH WILDFLOWERS - foreground
+# Blades rows 58-63, solid base at bottom
+# ============================================================
+define_sprite(near_grass, 128, 64)
+    # Solid vivid base
+    draw_rectangle(0, 62, 128, 2, green, 85, true)
+
+    # Tall foreground grass
+    for v_x in (0, 127, 2)
+        v_h = random(3, 6, 0)
+        draw_line(v_x, 62, v_x, 62 - v_h, lime, 80)
+    endfor v_x
+
+    for v_x in (1, 126, 3)
+        v_h = random(2, 4, 0)
+        draw_line(v_x, 62, v_x, 62 - v_h, spring_green, 72)
+    endfor v_x
+
+    # Red wildflowers
+    plot(5, 58, red, 92)
+    plot(22, 57, red, 88)
+    plot(48, 58, red, 90)
+    plot(75, 57, red, 85)
+    plot(100, 58, red, 92)
+    plot(120, 57, red, 88)
+
+    # Yellow wildflowers
+    plot(12, 57, yellow, 95)
+    plot(35, 58, yellow, 90)
+    plot(58, 57, yellow, 92)
+    plot(88, 58, yellow, 88)
+    plot(110, 57, yellow, 95)
+
+    # White daisies
+    plot(18, 58, white, 82)
+    plot(42, 57, white, 85)
+    plot(65, 58, white, 80)
+    plot(95, 57, white, 78)
+
+    # Lavender flowers
+    plot(28, 57, lavender, 85)
+    plot(55, 58, lavender, 80)
+    plot(82, 57, lavender, 88)
+    plot(108, 58, lavender, 82)
+
+    # Pink flowers
+    plot(38, 57, pink, 85)
+    plot(70, 58, pink, 80)
+    plot(115, 57, pink, 82)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE ALL 13 BACKGROUND LAYERS (0 = sky, 1-12 = terrain)
+# ============================================================
+set_background(sky)
+set_background(far_clouds, 1)
+set_background(near_clouds, 2)
+set_background(far_mtns, 3)
+set_background(near_mtns, 4)
+set_background(far_hills, 5)
+set_background(near_hills, 6)
+set_background(far_trees, 7)
+set_background(near_trees, 8)
+set_background(near_bushes, 9)
+set_background(far_grass, 10)
+set_background(mid_grass, 11)
+set_background(near_grass, 12)
+
+sync_queue
+
+# ============================================================
+# MAIN SCROLL LOOP
+# ============================================================
+# Layer 0 (sky) is never nudged - stays static
+# Layers 1-12 each scroll at unique speeds
+#
+# Layer  Content          Speed        Method
+# -----  -------          -----        ------
+#  0     Sky              0 (static)   never nudged
+#  1     Far clouds       0.25/frame   every 4th frame
+#  2     Near clouds      0.5/frame    every 2nd frame
+#  3     Far mountains    0.33/frame   every 3rd frame
+#  4     Near mountains   0.5/frame    every 2nd frame
+#  5     Far hills        0.75/frame   3 of every 4 frames
+#  6     Near hills       1.0/frame    every frame
+#  7     Far trees        1.5/frame    every frame + every 2nd
+#  8     Near trees       2.0/frame    2px every frame
+#  9     Bushes           3.0/frame    3px every frame
+# 10     Far grass        4.0/frame    4px every frame
+# 11     Mid grass        5.0/frame    5px every frame
+# 12     Near grass       6.0/frame    6px every frame
+# ============================================================
+
+v_frame = 0
+
+while v_frame >= 0 then
+    begin_frame(false)
+
+    v_mod2 = v_frame - (floor(v_frame / 2) * 2)
+    v_mod3 = v_frame - (floor(v_frame / 3) * 3)
+    v_mod4 = v_frame - (floor(v_frame / 4) * 4)
+
+    # Layer 1 - Far clouds: 0.25 px/frame
+    if v_mod4 == 0 then
+        nudge_background(1, 0, 1)
+    endif
+
+    # Layer 2 - Near clouds: 0.5 px/frame
+    if v_mod2 == 0 then
+        nudge_background(1, 0, 2)
+    endif
+
+    # Layer 3 - Far mountains: 0.33 px/frame
+    if v_mod3 == 0 then
+        nudge_background(1, 0, 3)
+    endif
+
+    # Layer 4 - Near mountains: 0.5 px/frame
+    if v_mod2 == 0 then
+        nudge_background(1, 0, 4)
+    endif
+
+    # Layer 5 - Far hills: 0.75 px/frame
+    if v_mod4 != 0 then
+        nudge_background(1, 0, 5)
+    endif
+
+    # Layer 6 - Near hills: 1.0 px/frame
+    nudge_background(1, 0, 6)
+
+    # Layer 7 - Far trees: 1.5 px/frame
+    nudge_background(1, 0, 7)
+    if v_mod2 == 0 then
+        nudge_background(1, 0, 7)
+    endif
+
+    # Layer 8 - Near trees: 2.0 px/frame
+    nudge_background(2, 0, 8)
+
+    # Layer 9 - Bushes: 3.0 px/frame
+    nudge_background(3, 0, 9)
+
+    # Layer 10 - Far grass: 4.0 px/frame
+    nudge_background(4, 0, 10)
+
+    # Layer 11 - Mid grass: 5.0 px/frame
+    nudge_background(5, 0, 11)
+
+    # Layer 12 - Near grass: 6.0 px/frame
+    nudge_background(6, 0, 12)
+
+    end_frame
+
+    rest(0.045)
+
+    v_frame = v_frame + 1
+    if v_frame >= 12 then
+        v_frame = 0
+    endif
+endwhile

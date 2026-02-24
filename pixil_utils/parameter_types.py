@@ -107,20 +107,26 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'args', 'type': 'str', 'position': 2}
     ],
     'dispose_all_sprites': [],
+    # Background commands — new parameter order: layer before cel_index
     'set_background': [
         {'name': 'sprite_name', 'type': 'str', 'position': 0},
-        {'name': 'cel_index', 'type': 'int', 'position': 1, 'optional': True, 'default': '0'}
+        {'name': 'layer', 'type': 'int', 'position': 1, 'optional': True, 'default': '0'},
+        {'name': 'cel_index', 'type': 'int', 'position': 2, 'optional': True, 'default': '0'}
     ],
-    'hide_background': [],
+    'hide_background': [
+        {'name': 'layer', 'type': 'int', 'position': 0, 'optional': True}
+    ],
     'nudge_background': [
         {'name': 'dx', 'type': 'int', 'position': 0},
         {'name': 'dy', 'type': 'int', 'position': 1},
-        {'name': 'cel_index', 'type': 'int', 'position': 2, 'optional': True}
+        {'name': 'layer', 'type': 'int', 'position': 2, 'optional': True, 'default': '0'},
+        {'name': 'cel_index', 'type': 'int', 'position': 3, 'optional': True}
     ],
     'set_background_offset': [
         {'name': 'x', 'type': 'int', 'position': 0},
         {'name': 'y', 'type': 'int', 'position': 1},
-        {'name': 'cel_index', 'type': 'int', 'position': 2, 'optional': True}
+        {'name': 'layer', 'type': 'int', 'position': 2, 'optional': True, 'default': '0'},
+        {'name': 'cel_index', 'type': 'int', 'position': 3, 'optional': True}
     ],
     'draw_polygon': [
         {'name': 'x', 'type': 'int', 'position': 0},

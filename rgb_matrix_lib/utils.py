@@ -55,6 +55,7 @@ NAMED_COLORS = {
     'violet': (212, 0, 255),
     'magenta': (255, 0, 255),
     'lavender': (212, 0, 212),
+    'transparent': TRANSPARENT_COLOR        
 }
 
 def hsv_to_rgb(h: float, s: float, v: float) -> Tuple[int, int, int]:

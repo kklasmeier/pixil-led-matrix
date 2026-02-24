@@ -625,42 +625,63 @@ Notes:
 
 
 Background Layer
-================
-
-The background layer system adds a scrollable, animated layer rendered behind all drawing commands and sprites. A background is defined using `define_sprite(...)` (including multi-cel sprites) and then activated with `set_background(...)`. Backgrounds can be scrolled, positioned, hidden/shown, and auto-animate through cels.
+----------------
+The background layer system adds one or more scrollable, animated layers rendered behind all drawing commands and sprites. A background is defined using `define_sprite(...)` (including multi-cel sprites) and then activated with `set_background(...)`. Multiple background layers can coexist, each independently scrolled, positioned, hidden/shown, and animated through cels.
 
 ### Key Concepts
 
-- **Render stack:** Background → Drawing Buffer (`draw_*`/`plot`/`mplot`) → Sprites
-- Background content persists across frames until changed, hidden, or cleared.
-- Black pixels `(0,0,0)` in the drawing buffer are transparent over the background. **Limitation:** You cannot draw actual black on top of a background.
-- Background sprites can be any size, including smaller or larger than the 64×64 display. The pattern tiles/wraps seamlessly in both axes, so a 32×32 background repeats 2×2 and a 128×64 background scrolls before repeating.
-- Rectangular backgrounds are supported — width and height are independent.
-- Offsets accept any integer value including negatives. Negative scrolling moves the viewport in the opposite direction.
-- Background updates are typically applied inside `begin_frame(true) ... end_frame` for smooth compositing.
+* **Render stack:** One or more background Layers (lowest layer index first) → Drawing Buffer (`draw_*`/`plot`/`mplot`) → Sprites
+* Multiple background layers are supported. Higher layer numbers render backgrounds above lower ones, but always below the drawing buffer and the sprites.
+* Background content persists across frames until changed, hidden, cleared, or disposed.
+* A special color `transparent` (numeric value `-1`) is supported. Pixels drawn with `transparent` are not rendered, allowing proper bleed-through between background layers and also the drawing layer.
+* Background sprites can be any size, including smaller or larger than the 64×64 display. The pattern tiles/wraps seamlessly in both axes, so a 32×32 background repeats 2×2 and a 128×64 background scrolls before repeating.
+* Rectangular backgrounds are supported — width and height are independent.
+* Offsets accept any integer value including negatives. Negative scrolling moves the viewport in the opposite direction.
+* Background updates are typically applied inside `begin_frame(true) ... end_frame` for smooth compositing.
 
 ### Commands
 
-**`set_background(sprite_name, [cel_index])`**
-Activates the named sprite as the background layer. Defaults to cel 0 if `cel_index` is omitted.
+**`set_background(sprite_name, [layer], [cel_index])`**
+Activates the named sprite as a background layer.
 
-**`hide_background`**
-Hides the background layer. The sprite template is preserved and can be reactivated with `set_background(...)`.
+* `layer` defaults to 0 if omitted.
+* `cel_index` defaults to 0 if omitted.
+* If the layer already has a background assigned, it is replaced.
 
-**`nudge_background(dx, dy, [cel_index])`**
-Shifts the background offset by `(dx, dy)` relative to its current position. Can accept positive and negatives. Cel behavior:
-- `cel_index` omitted → auto-advances to the next cel (wraps to 0)
-- `cel_index` specified → holds on that cel
+**`hide_background([layer])`**
+Hides the specified background layer.
+
+* If `layer` is omitted, all layers are hidden.
+* The sprite template is preserved and can be reactivated with `set_background(...)`.
+
+**`nudge_background(dx, dy, [layer], [cel_index])`**
+Shifts the background offset by `(dx, dy)` relative to its current position.
+
+* Accepts positive and negative values.
+* `layer` defaults to 0 if omitted.
+* Cel behavior:
+  * `cel_index` omitted → auto-advances to the next cel (wraps to 0)
+  * `cel_index` specified → holds on that cel
 
 This means `nudge_background(0, 0)` with no cel index is a valid way to animate cels without scrolling.
 
-**`set_background_offset(x, y, [cel_index])`**
-Sets the background offset to an absolute position. Same cel behavior as `nudge_background` — omit `cel_index` to auto-advance, specify it to hold.
+**`set_background_offset(x, y, [layer], [cel_index])`**
+Sets the background offset to an absolute position.
+
+* `layer` defaults to 0 if omitted.
+* Same cel behavior as `nudge_background` — omit `cel_index` to auto-advance, specify it to hold.
+
+### Transparency Behavior
+
+* Pixels drawn using `transparent` inside a background sprite do not render.
+* Lower background layers bleed through higher ones where `transparent` pixels exist.
+* Background layers bleed through to the drawing buffer.
+* `transparent` ignores intensity and should be used by name (do not pass `-1` directly).
 
 ### Cleanup Behavior
 
-- **`clear`** — Hides the background and zeros the drawing buffer, but sprite templates survive. Call `set_background(name)` to reactivate.
-- **`dispose_all_sprites`** — Destroys all sprite templates including any used as backgrounds. The background must be redefined with `define_sprite(...)` before it can be used again.
+* **`clear`** — Hides all background layers and zeros the drawing buffer, but sprite templates survive. Call `set_background(name, layer)` to reactivate.
+* **`dispose_all_sprites`** — Destroys all sprite templates including any used as backgrounds. Background sprites must be redefined with `define_sprite(...)` before reuse.
 
 ### Example
 
@@ -671,12 +692,17 @@ define_sprite(stars, 128, 128)
   # ... more drawing commands ...
 endsprite
 
-# Activate and scroll
+# Activate on default layer (0)
 set_background(stars)
+
+# Activate on specific layer
+set_background(stars, 2)
 
 for v_i in (0, 199, 1)
     begin_frame(true)
-    nudge_background(1, 0, 0)       # scroll right, hold cel 0
+    nudge_background(1, 0)           # scroll layer 0 right, auto-advance cel
+    nudge_background(1, 0, 2)       # scroll layer 2 right, auto-advance cel
+    nudge_background(1, 0, 2, 0)    # scroll layer 2 right, hold cel 0
     move_sprite(ship, v_px, v_py)   # sprite renders on top
     end_frame
     rest(0.033)
@@ -700,7 +726,8 @@ The color parameter accepts several formats for specifying colors and their inte
 
 1. Direct Color Names
    - Use predefined color names directly (e.g., red, blue, green)
-	black
+	trnasparent
+    black
 	white
 	gray
 	light_gray
@@ -783,7 +810,9 @@ The color parameter accepts several formats for specifying colors and their inte
     plot(10, 20, blue, 23)
     plot(10, 40, 43, 99)
 
-5. Color Rules:
+6. The transparent color will effectively erase the pixel allowing any background pixels to show through.
+
+7. Color Rules:
 - Numbers must be integers between 0-100 for both color and intensity.
 - Be sure your to use colors and intensity between 1-100. Do not specify outside this bounds.
 - Intensity is optional and need not be passed when all subsequent optional parameters are not supplied. The optional intensity defaults to 100.

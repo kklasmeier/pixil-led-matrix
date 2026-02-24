@@ -44,7 +44,7 @@ class BackgroundManager:
     # Public API
     # ------------------------------------------------------------------
 
-    def set_background(self, sprite_name: str, cel_index: int = 0, layer: int = 0) -> bool:
+    def set_background(self, sprite_name: str, layer: int = 0, cel_index: int = 0) -> bool:
         """
         Activate a sprite as a background layer.
 
@@ -54,8 +54,8 @@ class BackgroundManager:
 
         Args:
             sprite_name: Name of a defined sprite template.
-            cel_index:   Initial cel (default 0).
             layer:       Layer number (default 0). Must be >= 0.
+            cel_index:   Initial cel (default 0).
 
         Returns:
             True on success, False if sprite not found or invalid layer.
@@ -84,21 +84,24 @@ class BackgroundManager:
 
     def hide_background(self, layer: Optional[int] = None):
         """
-        Hide a background layer (preserves state for reactivation).
+        Hide background layer(s).
 
         Args:
-            layer: Layer to hide. Defaults to 0 for backward compatibility.
-                   If no argument is provided, only layer 0 is hidden.
+            layer: Layer to hide. If None (default), hides ALL layers.
+                   If an integer is provided, hides only that specific layer.
         """
-        target = 0 if layer is None else layer
+        if layer is None:
+            # Hide all layers
+            self.hide_all()
+            return
 
-        if target not in self._layers:
-            debug(f"Background layer {target} does not exist, nothing to hide",
+        if layer not in self._layers:
+            debug(f"Background layer {layer} does not exist, nothing to hide",
                   Level.WARNING, Component.SYSTEM)
             return
 
-        self._layers[target].visible = False
-        debug(f"Background layer {target} hidden", Level.INFO, Component.SYSTEM)
+        self._layers[layer].visible = False
+        debug(f"Background layer {layer} hidden", Level.INFO, Component.SYSTEM)
 
     def hide_all(self):
         """Hide all background layers (preserves state)."""
@@ -111,14 +114,14 @@ class BackgroundManager:
         self._layers.clear()
         debug("All background layer state destroyed", Level.INFO, Component.SYSTEM)
 
-    def nudge(self, dx: int, dy: int, cel_index: Optional[int] = None, layer: int = 0):
+    def nudge(self, dx: int, dy: int, layer: int = 0, cel_index: Optional[int] = None):
         """
         Shift background offset relative to current position.
 
         Args:
             dx, dy:    Relative shift (positive or negative).
-            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
             layer:     Layer number (default 0).
+            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
         """
         if layer not in self._layers:
             debug(f"Background layer {layer} does not exist for nudge",
@@ -133,14 +136,14 @@ class BackgroundManager:
         debug(f"Background layer {layer} nudged by ({dx},{dy}) -> offset ({state.offset_x},{state.offset_y}), "
               f"cel {state.cel_index}", Level.TRACE, Component.SYSTEM)
 
-    def set_offset(self, x: int, y: int, cel_index: Optional[int] = None, layer: int = 0):
+    def set_offset(self, x: int, y: int, layer: int = 0, cel_index: Optional[int] = None):
         """
         Set absolute background offset position.
 
         Args:
             x, y:      Absolute offset.
-            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
             layer:     Layer number (default 0).
+            cel_index: If omitted, auto-advance cel. If specified, hold on that cel.
         """
         if layer not in self._layers:
             debug(f"Background layer {layer} does not exist for set_offset",
