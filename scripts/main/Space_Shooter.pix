@@ -501,9 +501,9 @@ while 1 == 1 then
 
     # Engine flicker: faster at high speed
     if v_speed_mult > 150 then
-        v_ship_cel = v_gf % 2
+        v_ship_cel = floor(v_gf / 2) % 2
     else
-        v_ship_cel = round((v_gf / 2) % 2)
+        v_ship_cel = floor((v_gf / 2) % 2)
     endif
 
     move_sprite(ship, v_ship_x, v_ship_y, 0, v_ship_cel)
@@ -535,10 +535,10 @@ while 1 == 1 then
     # Twinkle: auto-advance background cel every 8 frames
     v_twinkle = v_twinkle + 1
     if v_twinkle >= 8 then
-        nudge_background(v_scroll_speed, v_bank_dy)
+        nudge_background(v_scroll_speed, v_bank_dy, 0)
         v_twinkle = 0
     else
-        nudge_background(v_scroll_speed, v_bank_dy, 0)
+        nudge_background(v_scroll_speed, v_bank_dy, 0, 0)
     endif
 
     # ==========================================================
@@ -787,7 +787,7 @@ while 1 == 1 then
         v_streak_timer = v_streak_timer + 1
         if v_streak_timer < 5 then
             v_streak_int = 100 - v_streak_timer * 20
-            draw_line(v_streak_x, v_streak_y, v_streak_x + 5, v_streak_y, white, v_streak_int, 0.08, instant)
+            draw_line(v_streak_x, v_streak_y, v_streak_x + 5, v_streak_y, white, v_streak_int, 80, instant)
         else
             v_streak_active = 0
         endif

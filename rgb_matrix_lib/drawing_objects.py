@@ -236,7 +236,7 @@ class ThreadedBurnoutManager:
             for x, y in points_to_clear:
                 entries = self.pixel_index.get((x, y), [])
                 if not entries or max(t for _, t in entries) <= current_time:
-                    self.api._draw_to_buffers(x, y, 0, 0, 0)
+                    self.api._draw_to_buffers(x, y, 0, 0, 1) # TRANSPARENT_COLOR
                     pixels_changed = True
 
         with self.index_lock:

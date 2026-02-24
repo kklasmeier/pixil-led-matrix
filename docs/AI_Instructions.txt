@@ -637,7 +637,7 @@ The background layer system adds one or more scrollable, animated layers rendere
 * Background sprites can be any size, including smaller or larger than the 64×64 display. The pattern tiles/wraps seamlessly in both axes, so a 32×32 background repeats 2×2 and a 128×64 background scrolls before repeating.
 * Rectangular backgrounds are supported — width and height are independent.
 * Offsets accept any integer value including negatives. Negative scrolling moves the viewport in the opposite direction.
-* Background updates are typically applied inside `begin_frame(true) ... end_frame` for smooth compositing.
+* Background updates are typically applied inside `begin_frame(true) ... end_frame` for smooth compositing but can also be used outside of the frame system.
 
 ### Commands
 

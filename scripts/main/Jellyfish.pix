@@ -526,7 +526,7 @@ def update_ocean {
         if v_do_cel_advance == 1 then
             nudge_background(v_nudge_x, v_nudge_y)
         else
-            nudge_background(v_nudge_x, v_nudge_y, v_current_cel)
+            nudge_background(v_nudge_x, v_nudge_y, 0, v_current_cel)
         endif
         v_drift_accum_x = v_drift_accum_x - v_nudge_x
         v_drift_accum_y = v_drift_accum_y - v_nudge_y
