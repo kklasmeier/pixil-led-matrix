@@ -1084,6 +1084,8 @@ Solution file map:
 ```
 /
 ├── Pixil.py                 # Main script interpreter - Parses and executes Pixil script commands
+├── README.md                # Project documentation and overview
+├── requirement.txt          # Python dependencies for the project
 │
 ├── pixil_utils/            
 │   ├── __init__.py          # Package exports for pixil utilities
@@ -1094,9 +1096,13 @@ Solution file map:
 │   ├── parameter_types.py   # Defines valid command parameters and types
 │   ├── array_manager.py     # Handles numeric and string arrays with bounds checking
 │   ├── cli.py               # Command line argument parsing and validation
+│   ├── condition_templates.py # Precompiled condition parsing templates
+│   ├── optimization_flags.py  # Performance optimization settings and flags
+│   ├── regex_patterns.py    # Precompiled regex patterns for command parsing
 │   ├── script_manager.py    # Manages script loading and execution queuing
 │   ├── terminal_handler.py  # Raw terminal input handling for keyboard control
 │   ├── timer_manager.py     # Script duration tracking and timing control
+│   ├── variable_registry.py # Variable management, tracking, and validation
 │   └── jit_compiler/        # JIT compilation system for mathematical expressions
 │       ├── __init__.py      # JIT compiler package exports
 │       ├── bytecode.py      # Bytecode instruction definitions and data structures
@@ -1107,6 +1113,8 @@ Solution file map:
 ├── rgb_matrix_lib/       
 │   ├── __init__.py          # Package exports for RGB matrix library
 │   ├── api.py               # Main interface for LED matrix operations
+│   ├── background.py        # Background layer system with scrolling and multi-layer support
+│   ├── bitmap_font.py       # Bitmap font loading and rendering
 │   ├── commands.py          # Command parsing and execution management
 │   ├── debug.py             # Hardware-level debug logging
 │   ├── drawing_objects.py   # Shape drawing and burnout management
@@ -1114,11 +1122,13 @@ Solution file map:
 │   ├── sprite.py            # Sprite creation and manipulation
 │   ├── text_effects.py      # Text animation effects (type, scan, slide, etc.)
 │   ├── text_renderer.py     # Renders text with effects to matrix
+│   ├── tiny64_font.txt      # Tiny 64-pixel font definition data
 │   └── utils.py             # Color handling and general matrix utilities
 │
 ├── shared/
 │   ├── __init__.py          # Package exports for shared components
 │   ├── command_queue.py     # Producer/consumer queue for matrix commands
+│   ├── mplot_protocol.py    # Batch plotting protocol for mplot/mflush commands
 │   └── queue_monitor.py     # Real-time monitoring of queue depth
 │
 ├── database/                # Database package for performance metrics
@@ -1137,8 +1147,18 @@ Solution file map:
 │       ├── backups/         # Database backups (auto-created)
 │       └── .gitkeep         # Preserve directory in git
 │
-├── tools/                   # Database utilities and analysis tools
-│   └── view_pixil_metrics.py # View and analyze Pixil performance data
+├── tools/                   # Utilities and analysis tools
+│   ├── view_pixil_metrics.py # View and analyze Pixil performance data
+│   ├── check_db.py          # Database verification and health check
+│   ├── color_test.py        # Color palette testing utility
+│   ├── color_variants.py    # Color variant generation and preview
+│   ├── sprite_commands.py   # Sprite command testing utility
+│   └── test_timer.py        # Timer functionality testing
+│
+├── docs/                    # Documentation
+│   ├── AI_Instructions.txt  # AI assistant instructions and command reference
+│   ├── INSTALL.md           # Installation and setup guide
+│   └── Pixil_Performance_Reporting.txt # Performance metrics documentation
 │
 └── scripts/                 # Contains Pixil script files
     ├── main/                # Main scripts
