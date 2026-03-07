@@ -1,0 +1,437 @@
+================================================================================
+PIXIL DEVELOPMENT GUIDE
+================================================================================
+
+This guide is for making code changes to the Pixil system - fixing defects,
+adding new commands, and extending functionality. For writing Pixil scripts,
+see Pixil_Scripting_Guide.txt.
+
+TABLE OF CONTENTS
+-----------------
+1. System Overview
+2. Architecture
+3. File Map
+4. Adding New Commands
+5. The Command Flow
+6. Key Components
+7. Common Modification Patterns
+8. Testing Changes
+9. Performance Considerations
+
+================================================================================
+1. SYSTEM OVERVIEW
+================================================================================
+
+Pixil is a Python-based scripting language interpreter that controls a 64x64
+RGB LED matrix via a Raspberry Pi 4. The system consists of:
+
+- **Pixil.py**: Main interpreter that parses and executes .pix scripts
+- **pixil_utils/**: Parsing, math evaluation, and script management
+- **rgb_matrix_lib/**: Hardware interface and rendering
+- **shared/**: Inter-process communication (command queue)
+- **database/**: Performance metrics collection
+
+Hardware:
+- Raspberry Pi 4 (limited CPU - performance matters)
+- 64x64 RGB LED matrix (4,096 pixels)
+- Adafruit RGB Matrix Bonnet (hardware interface)
+
+================================================================================
+2. ARCHITECTURE
+================================================================================
+
+PRODUCER/CONSUMER PATTERN
+-------------------------
+Pixil uses a producer/consumer architecture to separate script interpretation
+from hardware rendering:
+
+```
+Pixil.py (Producer)          shared/command_queue.py          rgb_matrix_lib (Consumer)
+    │                               │                                │
+    │  Parse script                 │                                │
+    │  Generate commands ──────────>│  Queue commands                │
+    │  Continue parsing             │                 ──────────────>│  Process commands
+    │                               │                                │  Update LED matrix
+    │                               │                                │
+```
+
+Benefits:
+- Script execution doesn't block on rendering
+- Smooth animations even with complex calculations
+- sync_queue command provides synchronization when needed
+
+RENDER STACK
+------------
+Content renders in this order (back to front):
+
+1. Background Layers (multiple, indexed by layer number)
+2. Drawing Buffer (plot, draw_circle, etc.)
+3. Sprites (with z-index ordering)
+
+================================================================================
+3. FILE MAP
+================================================================================
+
+/
+├── Pixil.py                 # Main interpreter - START HERE for command parsing
+│
+├── pixil_utils/             # Script parsing and utilities
+│   ├── __init__.py          # Package exports
+│   ├── debug.py             # Debug levels and logging
+│   ├── expression_parser.py # Variable/math parsing - MODIFY for expression changes
+│   ├── file_manager.py      # Script file loading
+│   ├── math_functions.py    # Math operations - ADD new math functions here
+│   ├── parameter_types.py   # Command parameter definitions
+│   ├── array_manager.py     # Array handling
+│   ├── cli.py               # Command line argument parsing
+│   ├── condition_templates.py # If/while condition parsing
+│   ├── optimization_flags.py  # Performance flags
+│   ├── regex_patterns.py    # Precompiled regex patterns
+│   ├── script_manager.py    # Script loading and queuing
+│   ├── terminal_handler.py  # Terminal input handling
+│   ├── timer_manager.py     # Script duration tracking
+│   ├── variable_registry.py # Variable storage and management
+│   └── jit_compiler/        # JIT compilation for math expressions
+│       ├── __init__.py
+│       ├── bytecode.py      # Bytecode instruction definitions
+│       ├── compiler.py      # Expression tokenizer and compiler
+│       ├── vm.py            # Virtual machine for bytecode execution
+│       └── cache.py         # LRU cache for compiled expressions
+│
+├── rgb_matrix_lib/          # LED matrix interface - MODIFY for rendering changes
+│   ├── __init__.py          # Package exports
+│   ├── api.py               # Main interface - receives commands from queue
+│   ├── background.py        # Background layer system
+│   ├── bitmap_font.py       # Font loading
+│   ├── commands.py          # Command execution dispatch
+│   ├── debug.py             # Hardware-level debug logging
+│   ├── drawing_objects.py   # Shape drawing and burnout - ADD shapes here
+│   ├── fonts.py             # Font management
+│   ├── sprite.py            # Sprite system
+│   ├── text_effects.py      # Text animation effects
+│   ├── text_renderer.py     # Text rendering
+│   ├── tiny64_font.txt      # Font definition data
+│   └── utils.py             # Color handling - MODIFY for color changes
+│
+├── shared/                  # Inter-process communication
+│   ├── __init__.py
+│   ├── command_queue.py     # Producer/consumer queue
+│   ├── mplot_protocol.py    # Batch plotting protocol
+│   └── queue_monitor.py     # Queue depth monitoring
+│
+├── database/                # Performance metrics
+│   ├── __init__.py
+│   ├── base.py              # Database utilities
+│   ├── pixil_metrics.py     # Metrics collection
+│   ├── migrate.py           # Schema migrations
+│   ├── queries/
+│   │   ├── __init__.py
+│   │   └── pixil_queries.py # Advanced queries
+│   ├── migrations/          # SQL migration files
+│   └── data/                # Database files (auto-created)
+│
+├── tools/                   # Utilities
+│   ├── view_pixil_metrics.py # Performance data viewer
+│   ├── check_db.py          # Database health check
+│   ├── color_test.py        # Color testing
+│   ├── color_variants.py    # Color variant generation
+│   ├── sprite_commands.py   # Sprite testing
+│   └── test_timer.py        # Timer testing
+│
+├── docs/
+│   ├── Pixil_Scripting_Guide.txt   # Script writing reference
+│   ├── Pixil_Development_Guide.txt # This file
+│   ├── INSTALL.md                  # Installation guide
+│   └── Pixil_Performance_Reporting.txt
+│
+└── scripts/                 # Pixil script files
+    ├── main/                # Main animations (140+ scripts)
+    └── testing/             # Test scripts
+
+================================================================================
+4. ADDING NEW COMMANDS
+================================================================================
+
+To add a new drawing command (e.g., draw_star), modify these files:
+
+STEP 1: Pixil.py - Add command parsing
+--------------------------------------
+Find the command parsing section and add a case for your command:
+
+```python
+elif command_name == 'draw_star':
+    # Parse parameters
+    x = parse_value(params[0])
+    y = parse_value(params[1])
+    size = parse_value(params[2])
+    color = parse_color(params[3])
+    # ... more parameters
+    
+    # Send to queue
+    command_queue.put(('draw_star', x, y, size, color, ...))
+```
+
+STEP 2: rgb_matrix_lib/commands.py - Add command dispatch
+---------------------------------------------------------
+Add handling for the command in the command processor:
+
+```python
+elif cmd[0] == 'draw_star':
+    x, y, size, color = cmd[1], cmd[2], cmd[3], cmd[4]
+    drawing_objects.draw_star(matrix, x, y, size, color, ...)
+```
+
+STEP 3: rgb_matrix_lib/drawing_objects.py - Implement rendering
+---------------------------------------------------------------
+Add the actual drawing function:
+
+```python
+def draw_star(matrix, x, y, size, color, intensity=100, ...):
+    # Calculate star points
+    # Draw lines or pixels to matrix
+    # Handle burnout if applicable
+```
+
+STEP 4: Update documentation
+----------------------------
+Add the new command to Pixil_Scripting_Guide.txt.
+
+================================================================================
+5. THE COMMAND FLOW
+================================================================================
+
+Here's how a command flows through the system:
+
+1. SCRIPT PARSING (Pixil.py)
+   - Script line is read
+   - Command name and parameters are extracted
+   - Parameters are evaluated (variables resolved, math computed)
+   - Command tuple is created and queued
+
+2. QUEUE (shared/command_queue.py)
+   - Command sits in queue until consumer is ready
+   - Producer continues parsing without waiting
+
+3. COMMAND DISPATCH (rgb_matrix_lib/commands.py)
+   - Consumer pulls command from queue
+   - Dispatches to appropriate handler based on command name
+
+4. RENDERING (rgb_matrix_lib/drawing_objects.py, sprite.py, etc.)
+   - Actual pixels are drawn to matrix buffer
+   - Burnout tracking is set up if applicable
+
+5. DISPLAY (rgb_matrix_lib/api.py)
+   - Matrix buffer is sent to hardware
+   - LED matrix updates
+
+EXPRESSION EVALUATION
+---------------------
+Math expressions go through the JIT compiler:
+
+1. Expression string is parsed
+2. Checked against cache (compiled bytecode)
+3. If not cached, compiled to bytecode
+4. Executed by virtual machine
+5. Result returned
+
+Files involved:
+- pixil_utils/expression_parser.py - Initial parsing
+- pixil_utils/jit_compiler/compiler.py - Compilation
+- pixil_utils/jit_compiler/vm.py - Execution
+- pixil_utils/jit_compiler/cache.py - Caching
+
+================================================================================
+6. KEY COMPONENTS
+================================================================================
+
+VARIABLE SYSTEM (pixil_utils/variable_registry.py)
+--------------------------------------------------
+- All variables prefixed with v_
+- Global scope (accessible everywhere)
+- Supports numeric and string types
+- Array support via array_manager.py
+
+BURNOUT SYSTEM (rgb_matrix_lib/drawing_objects.py)
+--------------------------------------------------
+- Each drawn object can have a burnout time
+- BurnoutManager tracks active burnouts
+- Supports instant (disappear) and fade modes
+- Runs on a timer thread
+
+SPRITE SYSTEM (rgb_matrix_lib/sprite.py)
+----------------------------------------
+- Sprites defined with drawing commands
+- Multi-cel support for animation
+- Instancing allows same sprite shown multiple times
+- Z-index controls rendering order
+
+BACKGROUND SYSTEM (rgb_matrix_lib/background.py)
+------------------------------------------------
+- Sprites can be used as backgrounds
+- Multiple layers with transparency
+- Scrolling via offset manipulation
+- Tiles seamlessly for any size
+
+JIT COMPILER (pixil_utils/jit_compiler/)
+----------------------------------------
+- Compiles math expressions to bytecode
+- LRU cache avoids recompilation
+- Supports variables, arrays, all math functions
+- Significant performance improvement for complex scripts
+
+================================================================================
+7. COMMON MODIFICATION PATTERNS
+================================================================================
+
+ADDING A NEW MATH FUNCTION
+--------------------------
+1. Add to MATH_FUNCTIONS dict in pixil_utils/math_functions.py
+2. Add handling in jit_compiler/compiler.py if needed
+3. Add handling in jit_compiler/vm.py for bytecode execution
+
+ADDING A NEW COLOR
+------------------
+1. Add to COLOR_MAP in rgb_matrix_lib/utils.py
+2. Define RGB values
+
+ADDING A TEXT EFFECT
+--------------------
+1. Add effect class in rgb_matrix_lib/text_effects.py
+2. Register in text_renderer.py
+
+MODIFYING COMMAND PARAMETERS
+----------------------------
+1. Update parsing in Pixil.py
+2. Update dispatch in rgb_matrix_lib/commands.py
+3. Update implementation in appropriate module
+4. Update documentation
+
+ADDING A CONTROL STRUCTURE
+--------------------------
+1. Add parsing logic in Pixil.py (look for if/for/while handling)
+2. Handle block nesting correctly
+3. Test with nested structures
+
+================================================================================
+8. TESTING CHANGES
+================================================================================
+
+TEST SCRIPTS
+------------
+Use scripts in scripts/testing/ for quick tests:
+
+```bash
+sudo python Pixil.py scripts/testing/test.pix
+```
+
+Create specific test scripts for your changes.
+
+DEBUG OUTPUT
+------------
+Use debug levels via command line:
+
+```bash
+sudo python Pixil.py script.pix -d DEBUG_VERBOSE
+```
+
+Levels:
+- DEBUG_OFF - No debug output
+- DEBUG_CONCISE - Minimal info
+- DEBUG_SUMMARY - Summary info
+- DEBUG_VERBOSE - Full debug output
+
+PRINT DEBUGGING
+---------------
+Add print statements in Python code:
+
+```python
+print(f"DEBUG: x={x}, y={y}")
+```
+
+In Pixil scripts:
+```
+print(f"Variable v_x = {v_x}")
+sync_queue
+```
+
+PERFORMANCE TESTING
+-------------------
+Use the metrics database:
+
+```bash
+python tools/view_pixil_metrics.py
+```
+
+Check JIT cache efficiency, command timing, etc.
+
+================================================================================
+9. PERFORMANCE CONSIDERATIONS
+================================================================================
+
+The Raspberry Pi 4 has limited CPU. Keep these in mind:
+
+PARSER PERFORMANCE
+------------------
+- Regex patterns are precompiled (regex_patterns.py)
+- JIT compiler caches compiled expressions
+- Avoid repeated string operations
+
+RENDERING PERFORMANCE
+---------------------
+- Batch operations when possible (mplot/mflush)
+- Minimize per-pixel function calls
+- Use numpy for array operations where applicable
+
+QUEUE MANAGEMENT
+----------------
+- Producer can outpace consumer
+- throttle() adjusts producer speed
+- sync_queue waits for queue to empty
+- Monitor queue depth with -q flag
+
+MEMORY
+------
+- Sprite templates stay in memory until disposed
+- Large arrays consume memory
+- Background sprites of large sizes use more memory
+
+PROFILING
+---------
+For serious optimization, use Python profiling:
+
+```bash
+python -m cProfile -o profile.out Pixil.py script.pix
+```
+
+Then analyze with:
+```python
+import pstats
+p = pstats.Stats('profile.out')
+p.sort_stats('cumulative').print_stats(20)
+```
+
+================================================================================
+KEY FILES QUICK REFERENCE
+================================================================================
+
+To modify...                    Edit...
+-----------                     -------
+Command parsing                 Pixil.py
+Command execution               rgb_matrix_lib/commands.py
+Shape drawing                   rgb_matrix_lib/drawing_objects.py
+Sprite system                   rgb_matrix_lib/sprite.py
+Background system               rgb_matrix_lib/background.py
+Text rendering                  rgb_matrix_lib/text_renderer.py
+Text effects                    rgb_matrix_lib/text_effects.py
+Colors                          rgb_matrix_lib/utils.py
+Math functions                  pixil_utils/math_functions.py
+Expression parsing              pixil_utils/expression_parser.py
+Variable handling               pixil_utils/variable_registry.py
+Array handling                  pixil_utils/array_manager.py
+JIT compilation                 pixil_utils/jit_compiler/
+Command queue                   shared/command_queue.py
+Performance metrics             database/pixil_metrics.py
+
+================================================================================
+END OF DEVELOPMENT GUIDE
+================================================================================

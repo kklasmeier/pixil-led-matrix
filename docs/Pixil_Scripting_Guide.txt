@@ -1,0 +1,1202 @@
+================================================================================
+PIXIL SCRIPTING GUIDE
+================================================================================
+
+Pixil is a scripting language for creating animations on a 64x64 RGB LED matrix 
+display. Scripts run on a Raspberry Pi 4, which has limited CPU power, so 
+efficient scripting practices matter for smooth animations.
+
+HARDWARE CONTEXT
+----------------
+- Display: 64x64 RGB LED matrix (4,096 pixels)
+- Controller: Raspberry Pi 4
+- Coordinates: x and y range from 0-63, origin (0,0) is top-left
+- Performance: CPU-limited; complex math and large loops affect frame rate
+
+TABLE OF CONTENTS
+-----------------
+1. Quick Reference
+2. Drawing Commands
+3. Colors
+4. Burnout System
+5. Variables and Expressions
+6. Control Structures
+7. Arrays
+8. Math Functions
+9. Procedures
+10. Frame Control
+11. Batch Plotting
+12. Text Commands
+13. Sprites
+14. Background Layers
+15. Performance Commands
+16. Debugging
+17. Performance Tips
+18. Script Examples
+
+================================================================================
+1. QUICK REFERENCE
+================================================================================
+
+Key Rules:
+- All commands must be on a single line (no line wrapping)
+- Variables must be prefixed with v_ (e.g., v_x, v_color)
+- Variables are case sensitive
+- Color names and sprite names are NOT wrapped in quotes in commands
+- String values in variable assignments ARE wrapped in quotes
+
+Basic Example:
+```
+# Draw a red circle that fades out over 2 seconds
+draw_circle(32, 32, 10, red, 100, true, 2000, fade)
+
+# Animation loop
+for v_i in (0, 63, 1)
+    plot(v_i, 32, blue, 100, 500, fade)
+    rest(0.05)
+endfor v_i
+```
+
+================================================================================
+2. DRAWING COMMANDS
+================================================================================
+
+All drawing commands use this pattern:
+command(position, size, color, [intensity], [options], [burnout], [burnout_mode])
+
+Brackets indicate optional parameters.
+
+PLOT (Single Pixel)
+-------------------
+plot(x, y, color, [intensity], [burnout], [burnout_mode])
+
+Examples:
+plot(32, 32, red, 100)                    # Permanent red pixel
+plot(32, 32, blue, 75, 2000)              # Blue at 75%, disappears after 2s
+plot(32, 32, green, 100, 1000, fade)      # Green that fades over 1s
+
+LINE
+----
+draw_line(x1, y1, x2, y2, color, [intensity], [burnout], [burnout_mode])
+
+Examples:
+draw_line(0, 0, 63, 63, yellow, 100)              # Diagonal line
+draw_line(10, 10, 50, 10, white, 80, 2000, fade)  # Fading horizontal line
+
+RECTANGLE
+---------
+draw_rectangle(x, y, width, height, color, [intensity], [filled], [burnout], [burnout_mode])
+
+Examples:
+draw_rectangle(10, 10, 20, 15, green, 100, true)           # Filled rectangle
+draw_rectangle(10, 10, 20, 15, blue, 100, false)           # Outline only
+draw_rectangle(10, 10, 20, 15, red, 100, true, 1500)       # Disappears after 1.5s
+
+CIRCLE
+------
+draw_circle(x, y, radius, color, [intensity], [filled], [burnout], [burnout_mode])
+
+Examples:
+draw_circle(32, 32, 10, blue, 100, true)              # Filled blue circle
+draw_circle(32, 32, 15, red, 100, false, 3000, fade)  # Outline that fades
+
+POLYGON
+-------
+draw_polygon(x, y, radius, sides, color, [intensity], [rotation], [filled], [burnout], [burnout_mode])
+
+Parameters:
+- sides: Number of sides (3=triangle, 4=square, 5=pentagon, 6=hexagon, etc.)
+- rotation: Degrees clockwise rotation
+
+Examples:
+draw_polygon(32, 32, 15, 6, purple, 100, 0, true)     # Filled hexagon
+draw_polygon(32, 32, 20, 3, yellow, 100, 30, false)   # Rotated triangle outline
+
+ELLIPSE
+-------
+draw_ellipse(x_center, y_center, x_radius, y_radius, color, [intensity], [filled], [rotation], [burnout], [burnout_mode])
+
+Examples:
+draw_ellipse(32, 32, 20, 10, cyan, 100, true, 0)           # Horizontal ellipse
+draw_ellipse(32, 32, 10, 20, orange, 100, false, 45, 2000) # Rotated outline
+
+ARC
+---
+draw_arc(x1, y1, x2, y2, bulge, color, [intensity], [filled], [burnout], [burnout_mode])
+
+Bulge Parameter:
+- Positive bulge: Arc curves left (port side) when traveling from start to end
+- Negative bulge: Arc curves right (starboard side)
+- Zero bulge: Straight line
+- Larger values: More pronounced curve
+
+Examples:
+draw_arc(10, 32, 54, 32, 15, red)                     # Arc curving up
+draw_arc(10, 32, 54, 32, -15, blue)                   # Arc curving down
+draw_arc(10, 32, 54, 32, 12, cyan, 75, true)          # Filled arc
+
+CLEAR
+-----
+clear()
+
+Clears the entire display, hiding all backgrounds and removing all drawn content.
+
+================================================================================
+3. COLORS
+================================================================================
+
+Named Colors
+------------
+transparent    black         white         gray          light_gray
+dark_gray      silver        red           crimson       maroon
+rose           pink          salmon        coral         brown
+standard_brown dark_brown    wood_brown    tan           orange
+gold           peach         bronze        yellow        lime
+green          olive         spring_green  forest_green  mint
+teal           turquoise     cyan          sky_blue      azure
+blue           navy          royal_blue    ocean_blue    indigo
+purple         violet        magenta       lavender
+
+Using Colors
+------------
+# Direct color name
+plot(10, 20, red, 100)
+
+# Numeric color (0-99)
+plot(10, 20, 45, 100)
+
+# Color stored in variable (must use quotes when assigning)
+v_color = "blue"
+plot(10, 20, v_color, 100)
+
+# Numeric color in variable
+v_color = 45
+plot(10, 20, v_color, 100)
+
+Intensity
+---------
+- Range: 0-100 (100 is full brightness)
+- Optional parameter, defaults to 100 if not specified
+
+Examples:
+plot(10, 20, red, 100)         # Full brightness
+plot(10, 20, red, 50)          # Half brightness
+plot(10, 20, red, v_intensity) # Variable intensity
+
+Transparent Color
+-----------------
+The transparent color erases pixels, allowing background layers to show through.
+
+plot(10, 20, transparent)
+
+================================================================================
+4. BURNOUT SYSTEM
+================================================================================
+
+Burnout automatically removes drawn objects after a specified time. This is 
+essential for animations as it eliminates manual tracking of pixels.
+
+Parameters
+----------
+- burnout: Duration in milliseconds before removal (-1 for permanent)
+- burnout_mode: "instant" (default) or "fade"
+
+Modes
+-----
+- instant: Object disappears immediately after duration
+- fade: Object gradually fades to black over the duration
+
+Examples
+--------
+# Permanent (no burnout)
+plot(32, 32, red, 100)
+
+# Disappears after 2 seconds
+plot(32, 32, red, 100, 2000)
+
+# Fades out over 2 seconds
+plot(32, 32, red, 100, 2000, fade)
+
+# Explicit instant mode
+plot(32, 32, red, 100, 2000, instant)
+
+# Permanent with explicit -1
+plot(32, 32, red, 100, -1)
+
+Shape Examples
+--------------
+# Circle that fades
+draw_circle(32, 32, 10, blue, 100, true, 3000, fade)
+
+# Rectangle that disappears instantly
+draw_rectangle(10, 10, 20, 15, green, 100, true, 1500, instant)
+
+# Line that fades
+draw_line(0, 0, 63, 63, yellow, 100, 2000, fade)
+
+# Polygon that fades
+draw_polygon(32, 32, 15, 6, purple, 100, 0, true, 4000, fade)
+
+Practical Animation Examples
+----------------------------
+# Trailing effect - particles that fade behind a moving object
+for v_i in (0, 50, 1)
+    v_x = 10 + v_i
+    plot(v_x, 32, orange, 100, 500, fade)
+    rest(0.05)
+endfor v_i
+
+# Explosion effect - expanding ring that fades
+for v_radius in (1, 20, 1)
+    draw_circle(32, 32, v_radius, red, 100, false, 800, fade)
+    rest(0.03)
+endfor v_radius
+
+# Comet trail
+for v_frame in (0, 60, 1)
+    v_x = v_frame
+    plot(v_x, 32, white, 100, 100, instant)      # Bright head
+    plot(v_x - 1, 32, yellow, 80, 400, fade)     # Trail
+    plot(v_x - 2, 32, orange, 60, 400, fade)
+    plot(v_x - 3, 32, red, 40, 400, fade)
+    rest(0.05)
+endfor v_frame
+
+================================================================================
+5. VARIABLES AND EXPRESSIONS
+================================================================================
+
+Variable Naming
+---------------
+All variables must be prefixed with v_ and are case sensitive.
+
+v_x = 10            # Numeric
+v_color = "red"     # String (must use quotes)
+v_delay = 2.5       # Decimal
+v_text = "Hello"    # String
+
+Variable Assignment
+-------------------
+Each assignment must be on its own line.
+
+v_x = 10
+v_y = 20
+v_result = v_x + v_y
+
+Math in Assignments
+-------------------
+v_x = v_x + 10
+v_y = v_size * 2
+v_z = abs(v_x - 25)
+v_angle = sin(v_time) * 30
+
+Inline Math in Commands
+-----------------------
+Math expressions can be used directly in command parameters.
+
+plot(v_x + 5, v_y * 2, red, 100)
+draw_circle(v_x - 10, v_y / 2, v_size + 1, blue, 100, true)
+draw_line(v_x, v_y, v_x + 10, v_y + 10, yellow, 100)
+
+Examples with Variables
+-----------------------
+v_x = 32
+v_y = 32
+v_radius = 10
+v_color = "blue"
+v_intensity = 75
+
+draw_circle(v_x, v_y, v_radius, v_color, v_intensity, true)
+draw_circle(v_x + cos(v_angle) * 20, v_y + sin(v_angle) * 20, 5, red, 100, true)
+
+================================================================================
+6. CONTROL STRUCTURES
+================================================================================
+
+IF/THEN/ELSE
+------------
+
+Basic syntax:
+if <condition> then
+    # commands
+endif
+
+With else:
+if <condition> then
+    # commands if true
+else
+    # commands if false
+endif
+
+With elseif:
+if <condition> then
+    # commands
+elseif <condition> then
+    # commands
+else
+    # commands
+endif
+
+Comparison Operators:
+==    Equal to
+!=    Not equal to
+>     Greater than
+<     Less than
+>=    Greater than or equal
+<=    Less than or equal
+
+Logical Operators:
+and   Both conditions must be true
+or    At least one condition must be true
+
+Examples:
+if v_x > 10 then
+    plot(v_x, v_y, red, 100)
+endif
+
+if v_count < 5 then
+    draw_circle(v_x, v_y, 5, red, 100, true)
+else
+    draw_circle(v_x, v_y, 10, blue, 100, true)
+endif
+
+if v_value < 10 then
+    draw_text(10, 20, "Low", tiny64_font, 12, red, 100)
+elseif v_value < 20 then
+    draw_text(10, 20, "Medium", tiny64_font, 12, yellow, 100)
+else
+    draw_text(10, 20, "High", tiny64_font, 12, green, 100)
+endif
+
+Compound Conditions:
+if v_x > 5 and v_y < 20 then
+    draw_circle(v_x, v_y, 5, red, 100, true)
+endif
+
+if v_x < 5 or v_y > 30 then
+    draw_rectangle(v_x, v_y, 10, 10, blue, 100, true)
+endif
+
+Operator Precedence:
+- AND has higher precedence than OR
+- Use nested if statements to override precedence (parentheses NOT supported)
+
+# To implement "(v_x > 5 or v_y < 10) and v_z == 15":
+if v_z == 15 then
+    if v_x > 5 or v_y < 10 then
+        # Commands here
+    endif
+endif
+
+FOR LOOPS
+---------
+
+Syntax:
+for <variable> in (<start>, <end>, <step>)
+    # commands
+endfor <variable>
+
+Parameters support numbers, variables, and expressions.
+
+Examples:
+for v_x in (0, 63, 1)
+    plot(v_x, 32, red, 100)
+endfor v_x
+
+for v_i in (0, 10, 2)
+    draw_circle(v_i * 5, 30, 3, blue, 100, true)
+endfor v_i
+
+# With expressions
+for v_i in (v_start, v_end, v_step)
+    plot(v_i, v_y, green, 100)
+endfor v_i
+
+WHILE LOOPS
+-----------
+
+Syntax:
+while <condition> then
+    # commands
+endwhile
+
+Note: There is no break statement to exit while loops early.
+
+Examples:
+v_x = 0
+while v_x < 64 then
+    plot(v_x, 32, red, 100)
+    v_x = v_x + 1
+endwhile
+
+v_running = 1
+while v_running then
+    draw_circle(v_x, v_y, 5, blue, 100, true)
+    v_x = v_x + 1
+    if v_x > 63 then
+        v_running = 0
+    endif
+endwhile
+
+Nesting:
+All control structures can be nested within each other.
+
+for v_y in (0, 63, 8)
+    for v_x in (0, 63, 8)
+        if v_x + v_y < 64 then
+            plot(v_x, v_y, red, 100)
+        else
+            plot(v_x, v_y, blue, 100)
+        endif
+    endfor v_x
+endfor v_y
+
+================================================================================
+7. ARRAYS
+================================================================================
+
+Arrays store multiple values of the same type (numeric or string).
+
+Creation
+--------
+create_array(v_array, size)                # Numeric array (default)
+create_array(v_array, size, numeric)       # Explicit numeric
+create_array(v_array, size, string)        # String array
+
+Arrays are 0-indexed. A size of 10 creates indices 0-9.
+
+Assignment
+----------
+# Numeric arrays
+v_array[0] = 10
+v_array[v_i] = 20
+v_array[v_i + 1] = 30
+
+# String arrays
+v_words[0] = "Hello"
+v_words[1] = v_message
+
+Access
+------
+v_x = v_array[0]
+v_text = v_words[0]
+v_result = v_array[0] + v_array[1]
+
+# String concatenation
+v_message = v_words[0] & " " & v_words[1]
+
+Using in Commands
+-----------------
+plot(v_array[0], v_array[1], red, 100)
+draw_circle(v_points[0] + 5, v_points[1] * 2, 5, blue, 100, true)
+draw_text(10, 10, v_words[0], tiny64_font, 12, white, 100)
+
+Notes
+-----
+- Arrays are zero-based (first element is index 0)
+- Array size is fixed at creation
+- Index must be a number or expression that evaluates to a number
+- Cannot mix types: numeric arrays store numbers, string arrays store text
+- Be careful with array bounds in loops to avoid exceeding the index
+
+================================================================================
+8. MATH FUNCTIONS
+================================================================================
+
+Basic Math
+----------
+cos(x)      Cosine (radians)
+sin(x)      Sine (radians)
+tan(x)      Tangent (radians)
+abs(x)      Absolute value
+pow(x,y)    Power (x raised to y)
+sqrt(x)     Square root
+exp(x)      Exponential (e^x)
+log(x)      Natural logarithm
+log10(x)    Base-10 logarithm
+
+Rounding
+--------
+round(x)    Round to nearest integer
+floor(x)    Round down
+ceil(x)     Round up
+trunc(x)    Truncate decimal portion
+int(x)      Convert to integer
+
+Trigonometry
+------------
+asin(x)     Arc sine
+acos(x)     Arc cosine
+atan(x)     Arc tangent
+atan2(y,x)  Arc tangent with correct quadrant
+degrees(x)  Convert radians to degrees
+radians(x)  Convert degrees to radians
+
+Min/Max
+-------
+min(x,y)    Minimum of two values
+max(x,y)    Maximum of two values
+
+Constants
+---------
+pi          3.14159...
+e           2.71828...
+tau         6.28318... (2π)
+
+Random Numbers
+--------------
+random(min, max, precision)
+
+Parameters:
+- min: Minimum value
+- max: Maximum value
+- precision: Number of decimal places (0 = integer)
+
+Examples:
+v_x = random(0, 63, 0)      # Random integer 0-63
+v_speed = random(1, 5, 1)   # Random decimal like 2.3, 4.1
+v_factor = random(-1, 1, 2) # Random like -0.45, 0.78
+
+Advanced
+--------
+copysign(x,y)    Copy sign of y to x
+fabs(x)          Floating point absolute value
+remainder(x,y)   IEEE 754 remainder
+fmod(x,y)        Floating point modulo
+
+================================================================================
+9. PROCEDURES
+================================================================================
+
+Procedures define reusable blocks of commands.
+
+Definition
+----------
+def procedure_name {
+    # commands
+}
+
+Calling
+-------
+call procedure_name
+
+Notes
+-----
+- Procedures don't accept parameters or return values
+- All variables are global and accessible inside procedures
+- Procedures can call other procedures
+- Procedures can contain any valid commands
+
+Example
+-------
+# Define a procedure
+def draw_target {
+    draw_circle(32, 32, 20, red, 75, true)
+    draw_circle(32, 32, 15, white, 75, true)
+    draw_circle(32, 32, 10, red, 75, true)
+    draw_circle(32, 32, 5, white, 75, true)
+}
+
+# Call the procedure
+call draw_target
+
+# Use in loops
+for v_i in (0, 3, 1)
+    call draw_target
+    rest(0.5)
+    clear()
+endfor v_i
+
+# Use in frames
+begin_frame
+    call draw_target
+    draw_rectangle(0, 0, 64, 5, blue, 75, true)
+end_frame
+
+================================================================================
+10. FRAME CONTROL
+================================================================================
+
+Frame buffering allows multiple drawing commands to appear simultaneously.
+
+Commands
+--------
+begin_frame           Start buffering (clears display)
+begin_frame(true)     Start buffering (preserves existing content)
+end_frame             Display all buffered commands at once
+
+Standard Mode (begin_frame or begin_frame(false))
+-------------------------------------------------
+- Clears the display before buffering
+- All commands are buffered until end_frame
+- Only new content is visible after end_frame
+- Do NOT use clear() inside - it causes flicker
+
+begin_frame
+    draw_circle(32, 32, 20, red, 100, true)
+    draw_line(10, 10, 54, 54, yellow, 100)
+    draw_rectangle(22, 22, 20, 20, green, 100, false)
+end_frame
+
+Preserve Mode (begin_frame(true))
+---------------------------------
+- Keeps existing display content
+- New commands overlay on top
+- Useful for layered animations
+
+draw_circle(32, 32, 20, red, 100, true)
+rest(1)
+
+begin_frame(true)
+    draw_circle(16, 16, 10, blue, 100, true)
+    draw_circle(48, 48, 10, green, 100, true)
+end_frame
+
+Animation Example
+-----------------
+for v_frame in (0, 100, 1)
+    begin_frame
+        v_x = 32 + cos(v_frame * 0.1) * 20
+        v_y = 32 + sin(v_frame * 0.1) * 20
+        draw_circle(v_x, v_y, 5, red, 100, true)
+    end_frame
+    rest(0.033)
+endfor v_frame
+
+================================================================================
+11. BATCH PLOTTING
+================================================================================
+
+For drawing many pixels efficiently, use mplot/mflush instead of individual 
+plot commands. This is important on the Raspberry Pi where many individual 
+commands can slow down animations.
+
+Commands
+--------
+mplot(x, y, color, [intensity], [burnout], [burnout_mode])
+mflush()
+
+mplot queues pixels without displaying. mflush sends all queued pixels at once.
+
+Example
+-------
+# Draw 100 random pixels efficiently
+for v_i in (0, 100, 1)
+    mplot(random(0, 63, 0), random(0, 63, 0), red, 100)
+endfor v_i
+mflush()
+
+With Burnout
+------------
+mplot(10, 10, red, 100, 2000, fade)
+mplot(11, 10, red, 100, 2000, fade)
+mplot(12, 10, red, 100, 2000, fade)
+mflush()
+
+With Frame Buffering
+--------------------
+begin_frame
+    draw_circle(32, 32, 15, blue, 100, true)
+    for v_i in (0, 100, 1)
+        mplot(random(20, 44, 0), random(20, 44, 0), white, 80)
+    endfor v_i
+    mflush()
+end_frame
+
+Notes
+-----
+- Buffer persists until mflush() is called
+- Always call mflush() before end_frame
+- Use for starfields, particle effects, noise patterns
+
+================================================================================
+12. TEXT COMMANDS
+================================================================================
+
+DRAW_TEXT
+---------
+draw_text(x, y, text, font_name, font_size, color, intensity, [effect], [modifier])
+
+Parameters:
+- x, y: Position (0-63)
+- text: String to display (in quotes)
+- font_name: Font to use (e.g., tiny64_font)
+- font_size: Size in pixels
+- color: Color name or variable
+- intensity: Brightness (0-100)
+- effect: Optional animation effect
+- modifier: Optional effect modifier
+
+Effects and Modifiers:
+NORMAL   - LEFT (default), CENTER, RIGHT
+TYPE     - SLOW, MEDIUM (default), FAST
+SCAN     - No modifiers
+SLIDE    - LEFT (default), RIGHT, UP, DOWN
+DISSOLVE - IN (default), OUT
+WIPE     - IN_LEFT, IN_RIGHT, IN_UP, IN_DOWN, OUT_LEFT, OUT_RIGHT, OUT_UP, OUT_DOWN
+
+Examples
+--------
+# Basic text
+draw_text(10, 20, "Hello", tiny64_font, 12, white, 100)
+
+# Centered text
+draw_text(32, 20, "SCORE", tiny64_font, 12, yellow, 100, NORMAL, CENTER)
+
+# Right-aligned
+draw_text(60, 20, "100", tiny64_font, 12, green, 100, NORMAL, RIGHT)
+
+# Typewriter effect
+draw_text(10, 30, "Loading...", tiny64_font, 12, cyan, 100, TYPE, SLOW)
+
+# Slide in from left
+draw_text(10, 20, "Hello", tiny64_font, 12, white, 75, SLIDE, LEFT)
+
+CLEAR_TEXT
+----------
+clear_text(x, y)
+
+Clears text at the specified coordinates.
+
+clear_text(10, 20)
+
+================================================================================
+13. SPRITES
+================================================================================
+
+Sprites are reusable graphical objects that can be animated and instanced.
+
+DEFINING SPRITES
+----------------
+
+Single-Cel Sprite:
+define_sprite(name, width, height)
+    # drawing commands
+endsprite
+
+Example:
+define_sprite(ball, 10, 10)
+    draw_circle(5, 5, 4, red, 100, true)
+endsprite
+
+Multi-Cel Animated Sprite:
+define_sprite(name, width, height)
+    sprite_cel(0)
+        # frame 0 drawing
+    sprite_cel(1)
+        # frame 1 drawing
+endsprite
+
+Example:
+define_sprite(pacman, 12, 12)
+    sprite_cel(0)
+        draw_circle(6, 6, 5, yellow, 100, true)
+    sprite_cel(1)
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+endsprite
+
+Auto-indexing (omit cel number):
+define_sprite(blinker, 8, 8)
+    sprite_cel()
+        draw_circle(4, 4, 3, green, 100, true)
+    sprite_cel()
+        draw_circle(4, 4, 3, red, 100, true)
+endsprite
+
+Drawing Commands in Sprites:
+- plot
+- draw_line
+- draw_rectangle
+- draw_circle
+- draw_polygon
+- draw_ellipse
+- draw_arc
+
+Note: draw_text and burnout are NOT supported inside sprites.
+
+SPRITE COMMANDS
+---------------
+
+show_sprite(name, x, y, [instance_id], [z_index], [cel_idx])
+hide_sprite(name, [instance_id])
+move_sprite(name, x, y, [instance_id], [cel_idx])
+dispose_sprite(name, [instance_id])
+dispose_all_sprites()
+
+Show Sprite:
+show_sprite(ball, 10, 20)                    # Default instance 0
+show_sprite(ball, 10, 20, 1)                 # Instance 1
+show_sprite(ball, 10, 20, 1, 0, 2)           # Instance 1, z_index 0, cel 2
+
+Hide Sprite:
+hide_sprite(ball)                            # Hide instance 0
+hide_sprite(ball, 1)                         # Hide instance 1
+
+Move Sprite:
+move_sprite(ball, 30, 40)                    # Auto-advances cel
+move_sprite(ball, 30, 40, 1)                 # Move instance 1
+move_sprite(ball, 30, 40, 0, 2)              # Jump to cel 2 (no auto-advance)
+
+CEL ANIMATION BEHAVIOR
+----------------------
+- Auto-advance: move_sprite without cel_idx advances to next cel (wraps to 0)
+- Explicit cel: Provide cel_idx to jump to specific frame
+- Cel preservation: hide_sprite preserves current cel
+- Independent tracking: Each instance tracks its own cel
+
+Animation Example:
+define_sprite(walker, 8, 8)
+    sprite_cel(0)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+    sprite_cel(1)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(2, 4, 1, 7, cyan, 100)
+    sprite_cel(2)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(3, 4, 3, 7, cyan, 100)
+    sprite_cel(3)
+        draw_rectangle(2, 0, 4, 4, cyan, 100, true)
+        draw_line(4, 4, 5, 7, cyan, 100)
+endsprite
+
+show_sprite(walker, 0, 28, 0, 0, 0)
+for v_x in (0, 55, 1)
+    move_sprite(walker, v_x, 28, 0)
+    rest(0.08)
+endfor v_x
+
+SPRITE INSTANCING
+-----------------
+Create multiple instances of the same sprite:
+
+show_sprite(enemy, 10, 10, 0)    # Instance 0
+show_sprite(enemy, 30, 10, 1)    # Instance 1
+show_sprite(enemy, 50, 10, 2)    # Instance 2
+
+# Move each independently
+move_sprite(enemy, 12, 10, 0)
+move_sprite(enemy, 32, 10, 1)
+move_sprite(enemy, 52, 10, 2)
+
+SPRITE NOTES
+------------
+- Coordinates inside sprites are relative to top-left (0,0)
+- Sprite names don't use quotes
+- Instance IDs are optional (defaults to 0)
+- Sprites render above all background and drawing operations
+- Background buffer is preserved when sprites move or hide
+
+================================================================================
+14. BACKGROUND LAYERS
+================================================================================
+
+Background layers are scrollable, animated layers rendered behind everything else.
+
+KEY CONCEPTS
+------------
+- Render stack: Background Layers → Drawing Buffer → Sprites
+- Multiple layers supported (higher numbers render above lower)
+- Backgrounds tile/wrap seamlessly
+- Can be any size (tiles if smaller than 64x64, scrolls if larger)
+
+COMMANDS
+--------
+
+set_background(sprite_name, [layer], [cel_index])
+    Activates a sprite as a background layer.
+    - layer defaults to 0
+    - cel_index defaults to 0
+
+hide_background([layer])
+    Hides background layer (omit layer to hide all).
+    Sprite template is preserved for reactivation.
+
+nudge_background(dx, dy, [layer], [cel_index])
+    Shifts background by (dx, dy) relative to current position.
+    - Omit cel_index to auto-advance cel
+    - Specify cel_index to hold on that frame
+
+set_background_offset(x, y, [layer], [cel_index])
+    Sets absolute background position.
+    Same cel behavior as nudge_background.
+
+TRANSPARENCY
+------------
+- Use transparent color in background sprites for see-through areas
+- Lower layers bleed through higher layers where transparent
+- Backgrounds bleed through to drawing buffer
+
+EXAMPLE
+-------
+# Define scrolling starfield
+define_sprite(stars, 128, 128)
+    for v_i in (0, 50, 1)
+        plot(random(0, 127, 0), random(0, 127, 0), white, random(50, 100, 0))
+    endfor v_i
+endsprite
+
+# Activate background
+set_background(stars)
+
+# Scroll animation
+for v_i in (0, 200, 1)
+    begin_frame(true)
+        nudge_background(1, 0)
+        draw_circle(32, 32, 5, red, 100, true)
+    end_frame
+    rest(0.033)
+endfor v_i
+
+# Cleanup
+hide_background
+
+CLEANUP BEHAVIOR
+----------------
+- clear(): Hides backgrounds, clears drawing buffer, sprite templates survive
+- dispose_all_sprites(): Destroys all sprite templates including backgrounds
+
+================================================================================
+15. PERFORMANCE COMMANDS
+================================================================================
+
+REST
+----
+rest(seconds)
+
+Pauses script execution. Use for timing animations.
+
+rest(1)       # Pause 1 second
+rest(0.05)    # Pause 50 milliseconds
+rest(v_delay) # Variable delay
+
+SYNC_QUEUE
+----------
+sync_queue
+
+Waits for all queued commands to complete before continuing. Use when you need 
+to ensure display is updated before proceeding.
+
+for v_i in (0, 5, 1)
+    draw_circle(v_i * 10, 30, 3, red, 100, true)
+    rest(0.4)
+endfor v_i
+sync_queue
+print("All circles drawn")
+
+THROTTLE
+--------
+throttle(factor)
+
+Adjusts timing delay between commands.
+- factor < 1.0: Faster execution (less delay)
+- factor = 1.0: Default timing
+- factor > 1.0: Slower execution (more delay)
+
+throttle(0.3)           # Run faster
+throttle(2.0)           # Run slower
+throttle(v_speed)       # Variable throttle
+
+Use throttle to:
+- Reduce queue backup in complex animations (lower values)
+- Slow down for debugging (higher values)
+- Dynamically adjust animation speed
+
+================================================================================
+16. DEBUGGING
+================================================================================
+
+PRINT
+-----
+print("message")
+print(f"value is: {v_variable}")
+
+Outputs text to the console for debugging.
+
+Examples:
+print("Starting animation")
+print(f"Position: {v_x}, {v_y}")
+print(f"Array value: {v_data[v_i]}")
+
+Notes:
+- Use f"..." syntax with curly braces for variables
+- Works with single or double quotes
+
+IMPORTANT: SYNC_QUEUE WITH PRINT
+--------------------------------
+Pixil uses a command queue - drawing commands are sent to the queue and 
+executed by the display asynchronously. This means print statements execute
+immediately while drawing commands may still be queued.
+
+To ensure a print statement reflects what's actually displayed, add sync_queue
+BEFORE the print:
+
+# WRONG - print happens before circles are actually drawn
+for v_i in (0, 5, 1)
+    draw_circle(v_i * 10, 30, 3, red, 100, true)
+    rest(0.4)
+endfor v_i
+print("All circles drawn")  # This prints while circles are still being drawn!
+
+# CORRECT - sync_queue waits for display to catch up
+for v_i in (0, 5, 1)
+    draw_circle(v_i * 10, 30, 3, red, 100, true)
+    rest(0.4)
+endfor v_i
+sync_queue                   # Wait for all queued commands to complete
+print("All circles drawn")   # Now this accurately reflects the display state
+
+Use sync_queue before print when:
+- Confirming an animation sequence completed
+- Debugging timing issues
+- Writing regression tests
+- Any time the print should reflect what's on screen
+
+================================================================================
+17. PERFORMANCE TIPS
+================================================================================
+
+The Raspberry Pi 4 has limited CPU power. Follow these tips for smooth animations:
+
+GENERAL TIPS
+------------
+1. Use mplot/mflush for many pixels instead of individual plot() calls
+2. Use burnout instead of manually clearing pixels
+3. Prefer simpler shapes when possible (circles are more expensive than rectangles)
+4. Use throttle() to manage queue depth in complex animations
+
+LOOP OPTIMIZATION
+-----------------
+# Less efficient - many individual commands
+for v_i in (0, 100, 1)
+    plot(v_i, 32, red, 100)
+endfor v_i
+
+# More efficient - batched
+for v_i in (0, 100, 1)
+    mplot(v_i, 32, red, 100)
+endfor v_i
+mflush()
+
+FRAME RATE TIPS
+---------------
+- Target 30 FPS (rest(0.033)) for smooth animation
+- Complex calculations inside loops slow down frame rate
+- Pre-calculate values outside loops when possible
+
+# Less efficient
+for v_frame in (0, 100, 1)
+    v_angle = v_frame * 0.1
+    v_cos_val = cos(v_angle)
+    v_sin_val = sin(v_angle)
+    # ... use values
+endfor v_frame
+
+# More efficient - if angle increment is constant
+v_angle = 0
+for v_frame in (0, 100, 1)
+    v_cos_val = cos(v_angle)
+    v_sin_val = sin(v_angle)
+    v_angle = v_angle + 0.1
+    # ... use values
+endfor v_frame
+
+SPRITE VS DRAWING
+-----------------
+- Sprites are efficient for moving objects (only redraws what changes)
+- Use sprites for game characters, moving elements
+- Use direct drawing for backgrounds, static elements, particle effects
+
+BURNOUT FOR TRAILS
+------------------
+Instead of tracking and erasing pixels manually, use burnout:
+
+# Automatic cleanup with burnout
+for v_i in (0, 60, 1)
+    plot(v_i, 32, red, 100, 500, fade)
+    rest(0.05)
+endfor v_i
+
+================================================================================
+18. SCRIPT EXAMPLES
+================================================================================
+
+SIMPLE BOUNCING BALL
+--------------------
+v_x = 32
+v_y = 10
+v_dx = 1
+v_dy = 1
+
+while 1 then
+    begin_frame
+        draw_circle(v_x, v_y, 3, red, 100, true)
+    end_frame
+    
+    v_x = v_x + v_dx
+    v_y = v_y + v_dy
+    
+    if v_x < 3 or v_x > 60 then
+        v_dx = v_dx * -1
+    endif
+    if v_y < 3 or v_y > 60 then
+        v_dy = v_dy * -1
+    endif
+    
+    rest(0.033)
+endwhile
+
+STARFIELD
+---------
+create_array(v_star_x, 50)
+create_array(v_star_y, 50)
+create_array(v_star_speed, 50)
+
+# Initialize stars
+for v_i in (0, 49, 1)
+    v_star_x[v_i] = random(0, 63, 0)
+    v_star_y[v_i] = random(0, 63, 0)
+    v_star_speed[v_i] = random(1, 3, 0)
+endfor v_i
+
+# Animation loop
+while 1 then
+    begin_frame
+        for v_i in (0, 49, 1)
+            v_intensity = v_star_speed[v_i] * 33
+            plot(v_star_x[v_i], v_star_y[v_i], white, v_intensity)
+            
+            v_star_x[v_i] = v_star_x[v_i] - v_star_speed[v_i]
+            if v_star_x[v_i] < 0 then
+                v_star_x[v_i] = 63
+                v_star_y[v_i] = random(0, 63, 0)
+            endif
+        endfor v_i
+    end_frame
+    rest(0.05)
+endwhile
+
+ANIMATED SPRITE EXAMPLE
+-----------------------
+# Define a 2-frame animated character
+define_sprite(character, 8, 8)
+    sprite_cel(0)
+        draw_circle(4, 2, 2, yellow, 100, true)
+        draw_rectangle(2, 4, 4, 4, blue, 100, true)
+    sprite_cel(1)
+        draw_circle(4, 2, 2, yellow, 100, true)
+        draw_rectangle(2, 4, 4, 4, green, 100, true)
+endsprite
+
+# Animate across screen
+show_sprite(character, 0, 28)
+for v_x in (0, 55, 1)
+    move_sprite(character, v_x, 28)
+    rest(0.1)
+endfor v_x
+hide_sprite(character)
+
+================================================================================
+END OF SCRIPTING GUIDE
+================================================================================
