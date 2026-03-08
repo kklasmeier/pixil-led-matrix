@@ -13,7 +13,7 @@ from rgb_matrix_lib import execute_command
 from typing import Union, Dict, Optional, List
 from pixil_utils.variable_registry import VariableRegistry
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
-from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats, report_condition_template_stats, reset_condition_template_stats)
+from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats, report_condition_template_stats, reset_condition_template_stats, set_script_start_time)
 from pixil_utils.file_manager import PixilFileManager
 from pixil_utils.parameter_types import (PARAMETER_TYPES, validate_command_params)
 from pixil_utils.expression_parser import format_parameter
@@ -115,6 +115,9 @@ def initialize_metrics():
     _metrics['active_time'] = 0
     _metrics['pause_start'] = None
     _metrics['total_pause_time'] = 0
+    
+    # Set start time for get_system("runtime")
+    set_script_start_time(_metrics['start_time'])
 
     # Reset mplot buffer
     mplot_buffer.clear()

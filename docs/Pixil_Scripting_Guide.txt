@@ -640,6 +640,33 @@ EXAMPLES - Using in commands:
 
 Note: Format strings must be passed as literals (in quotes), not variables.
 
+System Functions
+----------------
+get_system(metric)
+
+Returns system metrics. Currently available metrics:
+
+METRICS:
+  runtime   Milliseconds since script started (integer)
+
+EXAMPLES:
+  v_runtime = get_system("runtime")        # v_runtime = 45237
+  
+  # Convert to other units
+  v_seconds = get_system("runtime") / 1000
+  v_minutes = get_system("runtime") / 60000
+  
+  # Timed phase changes
+  if get_system("runtime") > 30000 then
+      # After 30 seconds, do something different
+  endif
+  
+  # Display runtime
+  v_secs = int(get_system("runtime") / 1000)
+  draw_text(2, 2, v_secs, tiny64_font, 5, white, 100)
+
+Note: Metric names must be passed as literals (in quotes), not variables.
+
 ================================================================================
 9. PROCEDURES
 ================================================================================

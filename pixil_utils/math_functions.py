@@ -41,9 +41,19 @@ _JIT_COMPILATION_FAILURES = 0
 _FAILED_SCRIPT_LINES = set()  # Use set for faster lookups
 _JIT_LINE_CACHE_SKIPS = 0
 _current_script_line = None  # Store current script line locally
+_script_start_time = None  # Script start timestamp for runtime calculation
 _CONDITION_TEMPLATE_HITS = 0
 _CONDITION_TEMPLATE_MISSES = 0
 _CONDITION_TEMPLATE_TIME_SAVED = 0.0
+
+def set_current_script_line(line):
+    """Set the current script line for JIT failure caching."""
+    global _current_script_line
+
+def set_script_start_time(start_time=None):
+    """Set the script start time for runtime calculation."""
+    global _script_start_time
+    _script_start_time = start_time if start_time is not None else time.time()
 
 def set_current_script_line(line):
     """Set the current script line for JIT failure caching."""
@@ -1186,6 +1196,37 @@ def get_datetime(format_str: str) -> Union[int, float, str]:
     
     return result
 
+def get_system(metric: str) -> int:
+    """
+    Get system metric value.
+    
+    Available metrics:
+        runtime - Milliseconds since script started (integer)
+    
+    Args:
+        metric: The system metric to retrieve
+        
+    Returns:
+        Integer value for the requested metric
+        
+    Raises:
+        ValueError: If metric is not recognized
+        
+    Examples:
+        get_system("runtime")     # Returns 45237 (ms since script start)
+    """
+    global _script_start_time
+    
+    metric_lower = metric.lower().strip()
+    
+    if metric_lower == "runtime":
+        if _script_start_time is None:
+            return 0
+        elapsed = time.time() - _script_start_time
+        return int(elapsed * 1000)
+    
+    raise ValueError(f"Unknown system metric: '{metric}' - valid options: runtime")
+
 # Math function dictionary containing all allowed mathematical operations
 MATH_FUNCTIONS = {
     # Basic Math
@@ -1231,7 +1272,8 @@ MATH_FUNCTIONS = {
 
     # Custom built functions
     'random': random_float,
-    'get_datetime': get_datetime
+    'get_datetime': get_datetime,
+    'get_system': get_system
 }
 
 def clear_all_math_caches():
@@ -1245,6 +1287,8 @@ __all__ = [
     'MATH_FUNCTIONS',
     'random_float',
     'get_datetime',
+    'get_system',
+    'set_script_start_time',
     'has_math_expression',
     'substitute_variables',
     'evaluate_math_expression',

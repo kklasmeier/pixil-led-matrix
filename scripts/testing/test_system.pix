@@ -1,0 +1,46 @@
+# Test script for get_system() function
+# Tests runtime metric
+
+clear
+
+# Test 1: Basic runtime
+draw_text(2, 2, "Runtime Test", tiny64_font, 5, white, 100)
+rest(1)
+
+v_start = get_system("runtime")
+draw_text(2, 10, "Start ms:", tiny64_font, 5, cyan, 100)
+draw_text(35, 10, v_start, tiny64_font, 5, green, 100)
+
+# Test 2: Runtime in different units
+rest(2)
+v_runtime_ms = get_system("runtime")
+v_runtime_sec = get_system("runtime") / 1000
+
+draw_text(2, 18, "After 2s:", tiny64_font, 5, cyan, 100)
+draw_text(35, 18, v_runtime_ms, tiny64_font, 5, yellow, 100)
+
+# Test 3: Use in conditional
+if get_system("runtime") > 2000 then
+    draw_text(2, 26, "Over 2 sec!", tiny64_font, 5, green, 100)
+endif
+
+# Test 4: Live runtime display
+draw_text(2, 34, "Live runtime:", tiny64_font, 5, white, 100)
+
+repeat 10 times
+    clear
+    v_ms = get_system("runtime")
+    v_sec = int(get_system("runtime") / 1000)
+    
+    draw_text(2, 2, "Runtime Test", tiny64_font, 5, white, 100)
+    draw_text(2, 12, "Milliseconds:", tiny64_font, 5, cyan, 100)
+    draw_text(2, 20, v_ms, tiny64_font, 5, green, 100)
+    draw_text(2, 30, "Seconds:", tiny64_font, 5, cyan, 100)
+    draw_text(2, 38, v_sec, tiny64_font, 5, yellow, 100)
+    
+    sync_queue
+    rest(0.5)
+endrepeat
+
+draw_text(2, 50, "Test Complete", tiny64_font, 5, magenta, 100)
+rest(2)
