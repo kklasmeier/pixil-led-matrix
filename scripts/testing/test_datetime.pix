@@ -8,16 +8,16 @@ clear
 # ============================================
 print("=== Test 1: Single Numeric Codes ===")
 
-set(v_hour24, get_datetime("H"))
-set(v_hour12, get_datetime("h"))
-set(v_minute, get_datetime("mi"))
-set(v_second, get_datetime("s"))
-set(v_ms, get_datetime("ms"))
-set(v_day, get_datetime("d"))
-set(v_month, get_datetime("m"))
-set(v_year, get_datetime("yyyy"))
-set(v_year_short, get_datetime("yy"))
-set(v_weekday, get_datetime("w"))
+v_hour24 = get_datetime("H")
+v_hour12 = get_datetime("h")
+v_minute = get_datetime("mi")
+v_second = get_datetime("s")
+v_ms = get_datetime("ms")
+v_day = get_datetime("d")
+v_month = get_datetime("m")
+v_year = get_datetime("yyyy")
+v_year_short = get_datetime("yy")
+v_weekday = get_datetime("w")
 
 print(f"Hour (24h): {v_hour24}")
 print(f"Hour (12h): {v_hour12}")
@@ -37,16 +37,16 @@ rest(1)
 # ============================================
 print("=== Test 2: Extended Numeric Codes ===")
 
-set(v_timestamp, get_datetime("ts"))
-set(v_timezone, get_datetime("tz"))
-set(v_day_of_year, get_datetime("doy"))
-set(v_week_of_year, get_datetime("woy"))
-set(v_days_left, get_datetime("diy"))
-set(v_quarter, get_datetime("q"))
-set(v_ispm, get_datetime("ispm"))
-set(v_isweekend, get_datetime("isweekend"))
-set(v_isleap, get_datetime("isleap"))
-set(v_days_in_month, get_datetime("dim"))
+v_timestamp = get_datetime("ts")
+v_timezone = get_datetime("tz")
+v_day_of_year = get_datetime("doy")
+v_week_of_year = get_datetime("woy")
+v_days_left = get_datetime("diy")
+v_quarter = get_datetime("q")
+v_ispm = get_datetime("ispm")
+v_isweekend = get_datetime("isweekend")
+v_isleap = get_datetime("isleap")
+v_days_in_month = get_datetime("dim")
 
 print(f"Unix timestamp: {v_timestamp}")
 print(f"Timezone offset: {v_timezone}")
@@ -66,11 +66,11 @@ rest(1)
 # ============================================
 print("=== Test 3: String Codes ===")
 
-set(v_ampm, get_datetime("a"))
-set(v_day_abbr, get_datetime("ddd"))
-set(v_day_full, get_datetime("dddd"))
-set(v_month_abbr, get_datetime("mmm"))
-set(v_month_full, get_datetime("mmmm"))
+v_ampm = get_datetime("a")
+v_day_abbr = get_datetime("ddd")
+v_day_full = get_datetime("dddd")
+v_month_abbr = get_datetime("mmm")
+v_month_full = get_datetime("mmmm")
 
 print(f"AM/PM: {v_ampm}")
 print(f"Day abbreviated: {v_day_abbr}")
@@ -85,11 +85,11 @@ rest(1)
 # ============================================
 print("=== Test 4: Compound Formats ===")
 
-set(v_time, get_datetime("H:mi:s"))
-set(v_time12, get_datetime("h:mi a"))
-set(v_date_us, get_datetime("m/d/yyyy"))
-set(v_date_full, get_datetime("dddd, mmmm d, yyyy"))
-set(v_date_short, get_datetime("ddd m/d"))
+v_time = get_datetime("H:mi:s")
+v_time12 = get_datetime("h:mi a")
+v_date_us = get_datetime("m/d/yyyy")
+v_date_full = get_datetime("dddd, mmmm d, yyyy")
+v_date_short = get_datetime("ddd m/d")
 
 print(f"Time 24h: {v_time}")
 print(f"Time 12h: {v_time12}")
@@ -118,19 +118,19 @@ rest(2)
 # ============================================
 print("=== Test 6: Conditionals ===")
 
-if(get_datetime("ispm") == 1)
+if get_datetime("ispm") == 1 then
     print("It is currently PM (afternoon/evening)")
 else
     print("It is currently AM (morning)")
 endif
 
-if(get_datetime("isweekend") == 1)
+if get_datetime("isweekend") == 1 then
     print("It's the weekend!")
 else
     print("It's a weekday")
 endif
 
-if(get_datetime("q") == 4)
+if get_datetime("q") == 4 then
     print("Q4 - Holiday season!")
 endif
 
@@ -142,16 +142,16 @@ rest(1)
 print("=== Test 7: Math Expressions ===")
 
 # Calculate angle for clock hand
-set(v_hour_angle, get_datetime("H") * 30)
-set(v_minute_angle, get_datetime("mi") * 6)
-set(v_second_angle, get_datetime("s") * 6)
+v_hour_angle = get_datetime("H") * 30
+v_minute_angle = get_datetime("mi") * 6
+v_second_angle = get_datetime("s") * 6
 
 print(f"Hour hand angle: {v_hour_angle} degrees")
 print(f"Minute hand angle: {v_minute_angle} degrees")
 print(f"Second hand angle: {v_second_angle} degrees")
 
 # Year progress percentage
-set(v_progress, get_datetime("doy") / 365 * 100)
+v_progress = get_datetime("doy") / 365 * 100
 print(f"Year progress: {v_progress}%")
 
 rest(1)
@@ -161,11 +161,11 @@ rest(1)
 # ============================================
 print("=== Test 8: Live Clock (5 seconds) ===")
 
-for(v_i, 1, 50)
+for v_i in (1, 50, 1)
     clear
     draw_text(8, 25, get_datetime("H:mi:s"), tiny64_font, 12, white, 100)
     sync_queue
     rest(0.1)
-endfor
+endfor v_i
 
 print("=== All get_datetime tests complete ===")

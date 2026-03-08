@@ -607,13 +607,13 @@ EXTENDED CODES (numeric):
   dim       Days in current month (28-31)
 
 EXAMPLES - Single codes (return numbers):
-  set(v_hour, get_datetime("H"))           # v_hour = 14
-  set(v_minute, get_datetime("mi"))        # v_minute = 30
-  set(v_day_of_year, get_datetime("doy"))  # v_day_of_year = 67
+  v_hour = get_datetime("H")               # v_hour = 14
+  v_minute = get_datetime("mi")            # v_minute = 30
+  v_day_of_year = get_datetime("doy")      # v_day_of_year = 67
 
 EXAMPLES - String codes:
-  set(v_day_name, get_datetime("dddd"))    # v_day_name = "Sunday"
-  set(v_ampm, get_datetime("a"))           # v_ampm = "PM"
+  v_day_name = get_datetime("dddd")        # v_day_name = "Sunday"
+  v_ampm = get_datetime("a")               # v_ampm = "PM"
 
 EXAMPLES - Compound formats (return strings):
   get_datetime("H:mi:s")         -> "14:30:45"
@@ -625,16 +625,16 @@ EXAMPLES - Using in commands:
   # Display current time
   draw_text(10, 20, get_datetime("H:mi:s"), tiny64_font, 12, green, 100)
   
-  # Draw hour hand on clock
-  set(v_angle, get_datetime("H") * 30)
+  # Calculate hour hand angle
+  v_angle = get_datetime("H") * 30
   
   # Conditional based on time
-  if(get_datetime("ispm") == 1)
+  if get_datetime("ispm") == 1 then
       # afternoon/evening colors
   endif
   
   # Weekend special animation
-  if(get_datetime("isweekend") == 1)
+  if get_datetime("isweekend") == 1 then
       # party mode
   endif
 
