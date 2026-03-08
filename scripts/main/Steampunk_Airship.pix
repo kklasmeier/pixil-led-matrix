@@ -123,80 +123,81 @@ endsprite
 # Nose points RIGHT (front), propeller on LEFT (back)
 # Ship flies RIGHT into oncoming clouds
 # Brass/copper steampunk aesthetic - high intensity to stand out
+# Propeller spins clockwise (horizontal → \ → vertical → /)
 # ============================================================
-define_sprite(airship, 30, 16)
+define_sprite(airship, 30, 19)
     # Cel 0: Propeller position 1 (horizontal)
     sprite_cel(0)
         # Propeller on LEFT (back of ship)
         # Propeller hub
-        plot(1, 11, gold, 100)
-        plot(2, 11, bronze, 95)
+        plot(1, 13, gold, 100)
+        plot(2, 13, bronze, 95)
         # Propeller blades - horizontal
-        draw_line(0, 8, 2, 8, white, 100)
-        draw_line(0, 14, 2, 14, white, 100)
+        draw_line(0, 10, 2, 10, white, 100)
+        draw_line(0, 16, 2, 16, white, 100)
         # Propeller mount
-        draw_rectangle(3, 9, 4, 5, bronze, 95, true)
-        draw_rectangle(4, 10, 2, 3, gold, 85, true)
+        draw_rectangle(3, 11, 4, 5, bronze, 95, true)
+        draw_rectangle(4, 12, 2, 3, gold, 85, true)
         # Tail fin
-        draw_polygon(7, 3, 4, 3, bronze, 90, 270, true)
-        # Balloon envelope
-        draw_ellipse(17, 3, 11, 3, bronze, 95, true, 0)
-        draw_ellipse(18, 2, 9, 2, gold, 85, true, 0)
-        draw_ellipse(19, 2, 5, 1, yellow, 75, true, 0)
+        draw_polygon(7, 5, 4, 3, bronze, 90, 270, true)
+        # Balloon envelope - FATTER (+3 pixels height)
+        draw_ellipse(17, 5, 11, 5, bronze, 95, true, 0)
+        draw_ellipse(18, 4, 9, 4, gold, 85, true, 0)
+        draw_ellipse(19, 4, 5, 2, yellow, 75, true, 0)
         # Nose cone on RIGHT
-        draw_polygon(28, 3, 3, 3, bronze, 100, 270, true)
-        plot(29, 3, gold, 95)
+        draw_polygon(28, 5, 3, 3, bronze, 100, 270, true)
+        plot(29, 5, gold, 95)
         # Rigging lines
-        draw_line(10, 6, 12, 9, standard_brown, 80)
-        draw_line(24, 6, 22, 9, standard_brown, 80)
-        draw_line(17, 6, 17, 9, standard_brown, 85)
+        draw_line(10, 9, 12, 12, standard_brown, 80)
+        draw_line(24, 9, 22, 12, standard_brown, 80)
+        draw_line(17, 10, 17, 12, standard_brown, 85)
         # Gondola (cabin)
-        draw_rectangle(10, 9, 14, 5, wood_brown, 95, true)
-        draw_rectangle(11, 10, 12, 3, dark_brown, 85, true)
+        draw_rectangle(10, 12, 14, 5, wood_brown, 95, true)
+        draw_rectangle(11, 13, 12, 3, dark_brown, 85, true)
         # Windows (keep cyan moderate)
-        plot(13, 11, cyan, 70)
-        plot(16, 11, cyan, 70)
-        plot(19, 11, cyan, 70)
+        plot(13, 14, cyan, 70)
+        plot(16, 14, cyan, 70)
+        plot(19, 14, cyan, 70)
         # Smokestacks
-        draw_rectangle(13, 7, 2, 3, gray, 90, true)
-        draw_rectangle(19, 7, 2, 3, gray, 90, true)
+        draw_rectangle(13, 10, 2, 3, gray, 90, true)
+        draw_rectangle(19, 10, 2, 3, gray, 90, true)
         # Lightning rod on top
         draw_line(17, 0, 17, 1, white, 95)
         plot(17, 0, cyan, 65)
 
-    # Cel 1: Propeller position 2 (diagonal)
+    # Cel 1: Propeller position 2 (diagonal \) - REVERSED
     sprite_cel(1)
         # Propeller hub
-        plot(1, 11, gold, 100)
-        plot(2, 11, bronze, 95)
-        # Propeller blades - diagonal /
-        draw_line(0, 9, 2, 7, white, 100)
-        draw_line(0, 13, 2, 15, white, 100)
+        plot(1, 13, gold, 100)
+        plot(2, 13, bronze, 95)
+        # Propeller blades - diagonal \
+        draw_line(0, 9, 2, 11, white, 100)
+        draw_line(0, 17, 2, 15, white, 100)
         # Propeller mount
-        draw_rectangle(3, 9, 4, 5, bronze, 95, true)
-        draw_rectangle(4, 10, 2, 3, gold, 85, true)
+        draw_rectangle(3, 11, 4, 5, bronze, 95, true)
+        draw_rectangle(4, 12, 2, 3, gold, 85, true)
         # Tail fin
-        draw_polygon(7, 3, 4, 3, bronze, 90, 270, true)
-        # Balloon envelope
-        draw_ellipse(17, 3, 11, 3, bronze, 95, true, 0)
-        draw_ellipse(18, 2, 9, 2, gold, 85, true, 0)
-        draw_ellipse(19, 2, 5, 1, yellow, 75, true, 0)
+        draw_polygon(7, 5, 4, 3, bronze, 90, 270, true)
+        # Balloon envelope - FATTER
+        draw_ellipse(17, 5, 11, 5, bronze, 95, true, 0)
+        draw_ellipse(18, 4, 9, 4, gold, 85, true, 0)
+        draw_ellipse(19, 4, 5, 2, yellow, 75, true, 0)
         # Nose cone
-        draw_polygon(28, 3, 3, 3, bronze, 100, 270, true)
-        plot(29, 3, gold, 95)
+        draw_polygon(28, 5, 3, 3, bronze, 100, 270, true)
+        plot(29, 5, gold, 95)
         # Rigging
-        draw_line(10, 6, 12, 9, standard_brown, 80)
-        draw_line(24, 6, 22, 9, standard_brown, 80)
-        draw_line(17, 6, 17, 9, standard_brown, 85)
+        draw_line(10, 9, 12, 12, standard_brown, 80)
+        draw_line(24, 9, 22, 12, standard_brown, 80)
+        draw_line(17, 10, 17, 12, standard_brown, 85)
         # Gondola
-        draw_rectangle(10, 9, 14, 5, wood_brown, 95, true)
-        draw_rectangle(11, 10, 12, 3, dark_brown, 85, true)
-        plot(13, 11, cyan, 70)
-        plot(16, 11, cyan, 70)
-        plot(19, 11, cyan, 70)
+        draw_rectangle(10, 12, 14, 5, wood_brown, 95, true)
+        draw_rectangle(11, 13, 12, 3, dark_brown, 85, true)
+        plot(13, 14, cyan, 70)
+        plot(16, 14, cyan, 70)
+        plot(19, 14, cyan, 70)
         # Smokestacks
-        draw_rectangle(13, 7, 2, 3, gray, 90, true)
-        draw_rectangle(19, 7, 2, 3, gray, 90, true)
+        draw_rectangle(13, 10, 2, 3, gray, 90, true)
+        draw_rectangle(19, 10, 2, 3, gray, 90, true)
         # Lightning rod
         draw_line(17, 0, 17, 1, white, 95)
         plot(17, 0, cyan, 65)
@@ -204,73 +205,73 @@ define_sprite(airship, 30, 16)
     # Cel 2: Propeller position 3 (vertical)
     sprite_cel(2)
         # Propeller hub
-        plot(1, 11, gold, 100)
-        plot(2, 11, bronze, 95)
+        plot(1, 13, gold, 100)
+        plot(2, 13, bronze, 95)
         # Propeller blades - vertical
-        draw_line(1, 7, 1, 9, white, 100)
-        draw_line(1, 13, 1, 15, white, 100)
+        draw_line(1, 9, 1, 11, white, 100)
+        draw_line(1, 15, 1, 17, white, 100)
         # Propeller mount
-        draw_rectangle(3, 9, 4, 5, bronze, 95, true)
-        draw_rectangle(4, 10, 2, 3, gold, 85, true)
+        draw_rectangle(3, 11, 4, 5, bronze, 95, true)
+        draw_rectangle(4, 12, 2, 3, gold, 85, true)
         # Tail fin
-        draw_polygon(7, 3, 4, 3, bronze, 90, 270, true)
-        # Balloon envelope
-        draw_ellipse(17, 3, 11, 3, bronze, 95, true, 0)
-        draw_ellipse(18, 2, 9, 2, gold, 85, true, 0)
-        draw_ellipse(19, 2, 5, 1, yellow, 75, true, 0)
+        draw_polygon(7, 5, 4, 3, bronze, 90, 270, true)
+        # Balloon envelope - FATTER
+        draw_ellipse(17, 5, 11, 5, bronze, 95, true, 0)
+        draw_ellipse(18, 4, 9, 4, gold, 85, true, 0)
+        draw_ellipse(19, 4, 5, 2, yellow, 75, true, 0)
         # Nose cone
-        draw_polygon(28, 3, 3, 3, bronze, 100, 270, true)
-        plot(29, 3, gold, 95)
+        draw_polygon(28, 5, 3, 3, bronze, 100, 270, true)
+        plot(29, 5, gold, 95)
         # Rigging
-        draw_line(10, 6, 12, 9, standard_brown, 80)
-        draw_line(24, 6, 22, 9, standard_brown, 80)
-        draw_line(17, 6, 17, 9, standard_brown, 85)
+        draw_line(10, 9, 12, 12, standard_brown, 80)
+        draw_line(24, 9, 22, 12, standard_brown, 80)
+        draw_line(17, 10, 17, 12, standard_brown, 85)
         # Gondola
-        draw_rectangle(10, 9, 14, 5, wood_brown, 95, true)
-        draw_rectangle(11, 10, 12, 3, dark_brown, 85, true)
-        plot(13, 11, cyan, 70)
-        plot(16, 11, cyan, 70)
-        plot(19, 11, cyan, 70)
+        draw_rectangle(10, 12, 14, 5, wood_brown, 95, true)
+        draw_rectangle(11, 13, 12, 3, dark_brown, 85, true)
+        plot(13, 14, cyan, 70)
+        plot(16, 14, cyan, 70)
+        plot(19, 14, cyan, 70)
         # Smokestacks
-        draw_rectangle(13, 7, 2, 3, gray, 90, true)
-        draw_rectangle(19, 7, 2, 3, gray, 90, true)
+        draw_rectangle(13, 10, 2, 3, gray, 90, true)
+        draw_rectangle(19, 10, 2, 3, gray, 90, true)
         # Lightning rod
         draw_line(17, 0, 17, 1, white, 95)
         plot(17, 0, cyan, 65)
 
-    # Cel 3: Propeller position 4 (diagonal \)
+    # Cel 3: Propeller position 4 (diagonal /) - REVERSED
     sprite_cel(3)
         # Propeller hub
-        plot(1, 11, gold, 100)
-        plot(2, 11, bronze, 95)
-        # Propeller blades - diagonal \
-        draw_line(0, 7, 2, 9, white, 100)
-        draw_line(0, 15, 2, 13, white, 100)
+        plot(1, 13, gold, 100)
+        plot(2, 13, bronze, 95)
+        # Propeller blades - diagonal /
+        draw_line(0, 11, 2, 9, white, 100)
+        draw_line(0, 15, 2, 17, white, 100)
         # Propeller mount
-        draw_rectangle(3, 9, 4, 5, bronze, 95, true)
-        draw_rectangle(4, 10, 2, 3, gold, 85, true)
+        draw_rectangle(3, 11, 4, 5, bronze, 95, true)
+        draw_rectangle(4, 12, 2, 3, gold, 85, true)
         # Tail fin
-        draw_polygon(7, 3, 4, 3, bronze, 90, 270, true)
-        # Balloon envelope
-        draw_ellipse(17, 3, 11, 3, bronze, 95, true, 0)
-        draw_ellipse(18, 2, 9, 2, gold, 85, true, 0)
-        draw_ellipse(19, 2, 5, 1, yellow, 75, true, 0)
+        draw_polygon(7, 5, 4, 3, bronze, 90, 270, true)
+        # Balloon envelope - FATTER
+        draw_ellipse(17, 5, 11, 5, bronze, 95, true, 0)
+        draw_ellipse(18, 4, 9, 4, gold, 85, true, 0)
+        draw_ellipse(19, 4, 5, 2, yellow, 75, true, 0)
         # Nose cone
-        draw_polygon(28, 3, 3, 3, bronze, 100, 270, true)
-        plot(29, 3, gold, 95)
+        draw_polygon(28, 5, 3, 3, bronze, 100, 270, true)
+        plot(29, 5, gold, 95)
         # Rigging
-        draw_line(10, 6, 12, 9, standard_brown, 80)
-        draw_line(24, 6, 22, 9, standard_brown, 80)
-        draw_line(17, 6, 17, 9, standard_brown, 85)
+        draw_line(10, 9, 12, 12, standard_brown, 80)
+        draw_line(24, 9, 22, 12, standard_brown, 80)
+        draw_line(17, 10, 17, 12, standard_brown, 85)
         # Gondola
-        draw_rectangle(10, 9, 14, 5, wood_brown, 95, true)
-        draw_rectangle(11, 10, 12, 3, dark_brown, 85, true)
-        plot(13, 11, cyan, 70)
-        plot(16, 11, cyan, 70)
-        plot(19, 11, cyan, 70)
+        draw_rectangle(10, 12, 14, 5, wood_brown, 95, true)
+        draw_rectangle(11, 13, 12, 3, dark_brown, 85, true)
+        plot(13, 14, cyan, 70)
+        plot(16, 14, cyan, 70)
+        plot(19, 14, cyan, 70)
         # Smokestacks
-        draw_rectangle(13, 7, 2, 3, gray, 90, true)
-        draw_rectangle(19, 7, 2, 3, gray, 90, true)
+        draw_rectangle(13, 10, 2, 3, gray, 90, true)
+        draw_rectangle(19, 10, 2, 3, gray, 90, true)
         # Lightning rod
         draw_line(17, 0, 17, 1, white, 95)
         plot(17, 0, cyan, 65)
@@ -374,13 +375,13 @@ while 1 then
     if v_steam_timer >= v_steam_interval then
         v_steam_timer = 0
         
-        # Left smokestack steam (ship_x + 14, ship_y + 5)
+        # Left smokestack steam (ship_x + 14, ship_y + 8)
         v_steam_x1 = v_ship_x + 14
-        v_steam_y1 = v_ship_y + 5
+        v_steam_y1 = v_ship_y + 8
         
-        # Right smokestack steam (ship_x + 20, ship_y + 5)
+        # Right smokestack steam (ship_x + 20, ship_y + 8)
         v_steam_x2 = v_ship_x + 20
-        v_steam_y2 = v_ship_y + 5
+        v_steam_y2 = v_ship_y + 8
         
         # Puff that rises and fades - left stack
         plot(v_steam_x1, v_steam_y1, white, 70, 600, fade)
