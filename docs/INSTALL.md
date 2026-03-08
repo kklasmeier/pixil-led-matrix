@@ -4,7 +4,7 @@ This guide will help you set up Pixil to run on your Raspberry Pi with an RGB LE
 
 ## Hardware Requirements
 
-- **Raspberry Pi**: Model 4 recommended (Model 3B+ also works well) - I have not tried the Raspberry Pi 5 because the the hzeller libaray which teh Adafruit RGB Matrix Bonnet is based upon doesn't yet have support. 
+- **Raspberry Pi**: Model 4 recommended (Model 3B+ also works well) - I have not tried the Raspberry Pi 5 because the hzeller library which the Adafruit RGB Matrix Bonnet is based upon doesn't yet have support. 
 - **RGB LED Matrix**: 64x64 RGB LED matrix panel (other sizes like 64x32 will work but may require configuration adjustments)
 - **Power Supply**: 5V power supply with sufficient amperage for your matrix
   - For a 64x64 matrix at full brightness, a 5A supply is recommended
@@ -95,62 +95,25 @@ source python_venv/bin/activate
 Install Python dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirement.txt
 ```
 
-## Step 5: Configure Pixil
-
-Create a configuration file (if one doesn't exist):
-
-```bash
-cp config_example.json config.json
-```
-
-Edit the configuration to match your matrix specifications:
-
-```bash
-nano config.json
-```
-
-### For Adafruit RGB Matrix Bonnet (Recommended)
-
-Use these settings if you're using the Adafruit RGB Matrix Bonnet:
-
-```json
-{
-  "hardware": {
-    "rows": 64,
-    "cols": 64,
-    "chain_length": 1,
-    "parallel": 1,
-    "pwm_bits": 11,
-    "brightness": 50,
-    "hardware_mapping": "adafruit-hat",
-    "gpio_slowdown": 3
-  },
-  "program": {
-    "default_script_path": "scripts/examples",
-    "debug_level": 1
-  }
-}
-```
-
-Important settings:
-- `"hardware_mapping": "adafruit-hat"` - Critical for the bonnet to work correctly
-- `"gpio_slowdown": 3` - Recommended for Raspberry Pi 4 (use 2 for Pi 3, 1 for older models)
-- `"brightness": 50` - Adjust between 0-100 based on your power supply capacity
-
-## Step 6: Test Your Installation
+## Step 5: Test Your Installation
 
 Run one of the example scripts to verify everything is working:
 
 ```bash
-sudo python Pixil.py main/Color_Blend
+sudo python Pixil.py scripts/main/bouncing_ball
 ```
 
 Note: The `.pix` extension is optional when running scripts.
 
 If successful, you should see a bouncing ball animation on your LED matrix.
+
+Other good test scripts:
+- `scripts/main/Starfield` - Classic starfield effect
+- `scripts/main/Color_Blend` - Smooth color blending
+- `scripts/main/Digital_Rain` - Matrix-style rain effect
 
 ## Troubleshooting
 
@@ -159,7 +122,7 @@ If successful, you should see a bouncing ball animation on your LED matrix.
 For the best experience, run Pixil with sudo:
 
 ```bash
-sudo python Pixil.py main/Color_Blend
+sudo python Pixil.py scripts/main/bouncing_ball
 ```
 
 For a more permanent solution, add your user to the required groups:
@@ -174,9 +137,9 @@ sudo usermod -a -G gpio,spi $USER
 If the display looks distorted or flickering:
 
 1. Check your power supply - insufficient power is the most common cause of display issues
-2. Try adjusting the `gpio_slowdown` parameter in your config (increase for Pi 4, decrease for older models)
+2. Try adjusting the `gpio_slowdown` value in `rgb_matrix_lib/api.py` (increase for Pi 4, decrease for older models - default is 3)
 3. Verify all physical connections between the bonnet and matrix
-4. Lower the brightness setting in the config file
+4. Lower the `brightness` value in `rgb_matrix_lib/api.py` (default is 100)
 
 ### Command Queue Backlog
 
@@ -206,7 +169,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/home/pi/pixil-led-matrix
-ExecStart=/home/pi/pixil-led-matrix/python_venv/bin/python Pixil.py scripts/examples/starfield
+ExecStart=/home/pi/pixil-led-matrix/python_venv/bin/python Pixil.py scripts/main/Starfield
 Restart=always
 RestartSec=5
 
@@ -225,9 +188,9 @@ sudo systemctl start pixil.service
 
 ## Next Steps
 
-- Explore the example scripts in the `scripts/examples/` directory
+- Explore the example scripts in the `scripts/main/` directory (125+ animations)
 - Create your own scripts using the Pixil scripting language
-- Read the full language reference in the README.md file
+- Read the full language reference in `docs/Pixil_Scripting_Guide.txt`
 
 For more information, check out the [project documentation](https://github.com/kklasmeier/pixil-led-matrix) and examples.
 
