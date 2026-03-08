@@ -1,93 +1,318 @@
 # ============================================================
-# FLOATING GEOMETRY - Single layer drifting in all directions
+# FLOATING GEOMETRY - Single layer with morphing patterns
 # ============================================================
-# One background layer that wanders fluidly
-# Uses layered sine waves for organic movement in X and Y
-# Sometimes fast, sometimes slow, always smooth
+# Background drifts fluidly in all directions
+# Multiple cels transition between different color/shape schemes
 # ============================================================
 
-throttle(0.05)
+throttle(0)
 
 # ============================================================
-# BACKGROUND: CIRCLES INSIDE SQUARES
-# Cyan/magenta color scheme
+# BACKGROUND: MULTI-CEL PATTERN VARIATIONS
+# Each cel is a different visual theme
 # ============================================================
 define_sprite(geo_pattern, 80, 80)
-    # Row 1
-    draw_rectangle(4, 4, 14, 14, cyan, 50, false)
-    draw_circle(11, 11, 4, magenta, 60, false)
-    plot(11, 11, white, 75)
-    
-    draw_rectangle(24, 4, 14, 14, magenta, 45, false)
-    draw_circle(31, 11, 4, cyan, 55, false)
-    plot(31, 11, white, 70)
-    
-    draw_rectangle(44, 4, 14, 14, cyan, 50, false)
-    draw_circle(51, 11, 4, magenta, 60, false)
-    plot(51, 11, white, 75)
-    
-    draw_rectangle(64, 4, 14, 14, magenta, 45, false)
-    draw_circle(71, 11, 4, cyan, 55, false)
-    plot(71, 11, white, 70)
-    
-    # Row 2
-    draw_rectangle(4, 24, 14, 14, magenta, 45, false)
-    draw_circle(11, 31, 4, cyan, 55, false)
-    plot(11, 31, white, 70)
-    
-    draw_rectangle(24, 24, 14, 14, cyan, 55, false)
-    draw_circle(31, 31, 4, magenta, 65, false)
-    plot(31, 31, yellow, 80)
-    
-    draw_rectangle(44, 24, 14, 14, magenta, 45, false)
-    draw_circle(51, 31, 4, cyan, 55, false)
-    plot(51, 31, white, 70)
-    
-    draw_rectangle(64, 24, 14, 14, cyan, 55, false)
-    draw_circle(71, 31, 4, magenta, 65, false)
-    plot(71, 31, yellow, 80)
-    
-    # Row 3
-    draw_rectangle(4, 44, 14, 14, cyan, 50, false)
-    draw_circle(11, 51, 4, magenta, 60, false)
-    plot(11, 51, white, 75)
-    
-    draw_rectangle(24, 44, 14, 14, magenta, 45, false)
-    draw_circle(31, 51, 4, cyan, 55, false)
-    plot(31, 51, white, 70)
-    
-    draw_rectangle(44, 44, 14, 14, cyan, 50, false)
-    draw_circle(51, 51, 4, magenta, 60, false)
-    plot(51, 51, white, 75)
-    
-    draw_rectangle(64, 44, 14, 14, magenta, 45, false)
-    draw_circle(71, 51, 4, cyan, 55, false)
-    plot(71, 51, white, 70)
-    
-    # Row 4
-    draw_rectangle(4, 64, 14, 14, magenta, 45, false)
-    draw_circle(11, 71, 4, cyan, 55, false)
-    plot(11, 71, white, 70)
-    
-    draw_rectangle(24, 64, 14, 14, cyan, 55, false)
-    draw_circle(31, 71, 4, magenta, 65, false)
-    plot(31, 71, yellow, 80)
-    
-    draw_rectangle(44, 64, 14, 14, magenta, 45, false)
-    draw_circle(51, 71, 4, cyan, 55, false)
-    plot(51, 71, white, 70)
-    
-    draw_rectangle(64, 64, 14, 14, cyan, 55, false)
-    draw_circle(71, 71, 4, magenta, 65, false)
-    plot(71, 71, yellow, 80)
+
+    # ----------------------------------------------------------
+    # CEL 0: CYAN/MAGENTA - Squares with circles
+    # ----------------------------------------------------------
+    sprite_cel(0)
+        draw_rectangle(4, 4, 14, 14, cyan, 50, false)
+        draw_circle(11, 11, 4, magenta, 60, false)
+        plot(11, 11, white, 75)
+        
+        draw_rectangle(24, 4, 14, 14, magenta, 45, false)
+        draw_circle(31, 11, 4, cyan, 55, false)
+        plot(31, 11, white, 70)
+        
+        draw_rectangle(44, 4, 14, 14, cyan, 50, false)
+        draw_circle(51, 11, 4, magenta, 60, false)
+        plot(51, 11, white, 75)
+        
+        draw_rectangle(64, 4, 14, 14, magenta, 45, false)
+        draw_circle(71, 11, 4, cyan, 55, false)
+        plot(71, 11, white, 70)
+        
+        draw_rectangle(4, 24, 14, 14, magenta, 45, false)
+        draw_circle(11, 31, 4, cyan, 55, false)
+        plot(11, 31, white, 70)
+        
+        draw_rectangle(24, 24, 14, 14, cyan, 55, false)
+        draw_circle(31, 31, 4, magenta, 65, false)
+        plot(31, 31, yellow, 80)
+        
+        draw_rectangle(44, 24, 14, 14, magenta, 45, false)
+        draw_circle(51, 31, 4, cyan, 55, false)
+        plot(51, 31, white, 70)
+        
+        draw_rectangle(64, 24, 14, 14, cyan, 55, false)
+        draw_circle(71, 31, 4, magenta, 65, false)
+        plot(71, 31, yellow, 80)
+        
+        draw_rectangle(4, 44, 14, 14, cyan, 50, false)
+        draw_circle(11, 51, 4, magenta, 60, false)
+        plot(11, 51, white, 75)
+        
+        draw_rectangle(24, 44, 14, 14, magenta, 45, false)
+        draw_circle(31, 51, 4, cyan, 55, false)
+        plot(31, 51, white, 70)
+        
+        draw_rectangle(44, 44, 14, 14, cyan, 50, false)
+        draw_circle(51, 51, 4, magenta, 60, false)
+        plot(51, 51, white, 75)
+        
+        draw_rectangle(64, 44, 14, 14, magenta, 45, false)
+        draw_circle(71, 51, 4, cyan, 55, false)
+        plot(71, 51, white, 70)
+        
+        draw_rectangle(4, 64, 14, 14, magenta, 45, false)
+        draw_circle(11, 71, 4, cyan, 55, false)
+        plot(11, 71, white, 70)
+        
+        draw_rectangle(24, 64, 14, 14, cyan, 55, false)
+        draw_circle(31, 71, 4, magenta, 65, false)
+        plot(31, 71, yellow, 80)
+        
+        draw_rectangle(44, 64, 14, 14, magenta, 45, false)
+        draw_circle(51, 71, 4, cyan, 55, false)
+        plot(51, 71, white, 70)
+        
+        draw_rectangle(64, 64, 14, 14, cyan, 55, false)
+        draw_circle(71, 71, 4, magenta, 65, false)
+        plot(71, 71, yellow, 80)
+
+    # ----------------------------------------------------------
+    # CEL 1: GREEN/LIME - Diamonds with dots
+    # ----------------------------------------------------------
+    sprite_cel(1)
+        draw_polygon(11, 11, 7, 4, green, 55, 45, false)
+        draw_polygon(11, 11, 3, 4, lime, 65, 45, true)
+        
+        draw_polygon(31, 11, 7, 4, lime, 50, 45, false)
+        draw_polygon(31, 11, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(51, 11, 7, 4, green, 55, 45, false)
+        draw_polygon(51, 11, 3, 4, lime, 65, 45, true)
+        
+        draw_polygon(71, 11, 7, 4, lime, 50, 45, false)
+        draw_polygon(71, 11, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(11, 31, 7, 4, lime, 50, 45, false)
+        draw_polygon(11, 31, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(31, 31, 7, 4, spring_green, 60, 45, false)
+        draw_polygon(31, 31, 3, 4, white, 75, 45, true)
+        
+        draw_polygon(51, 31, 7, 4, lime, 50, 45, false)
+        draw_polygon(51, 31, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(71, 31, 7, 4, spring_green, 60, 45, false)
+        draw_polygon(71, 31, 3, 4, white, 75, 45, true)
+        
+        draw_polygon(11, 51, 7, 4, green, 55, 45, false)
+        draw_polygon(11, 51, 3, 4, lime, 65, 45, true)
+        
+        draw_polygon(31, 51, 7, 4, lime, 50, 45, false)
+        draw_polygon(31, 51, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(51, 51, 7, 4, green, 55, 45, false)
+        draw_polygon(51, 51, 3, 4, lime, 65, 45, true)
+        
+        draw_polygon(71, 51, 7, 4, lime, 50, 45, false)
+        draw_polygon(71, 51, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(11, 71, 7, 4, lime, 50, 45, false)
+        draw_polygon(11, 71, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(31, 71, 7, 4, spring_green, 60, 45, false)
+        draw_polygon(31, 71, 3, 4, white, 75, 45, true)
+        
+        draw_polygon(51, 71, 7, 4, lime, 50, 45, false)
+        draw_polygon(51, 71, 3, 4, green, 60, 45, true)
+        
+        draw_polygon(71, 71, 7, 4, spring_green, 60, 45, false)
+        draw_polygon(71, 71, 3, 4, white, 75, 45, true)
+
+    # ----------------------------------------------------------
+    # CEL 2: ORANGE/GOLD - Hexagons with centers
+    # ----------------------------------------------------------
+    sprite_cel(2)
+        draw_polygon(11, 11, 7, 6, orange, 55, 0, false)
+        draw_circle(11, 11, 3, gold, 65, true)
+        
+        draw_polygon(31, 11, 7, 6, gold, 50, 30, false)
+        draw_circle(31, 11, 3, orange, 60, true)
+        
+        draw_polygon(51, 11, 7, 6, orange, 55, 0, false)
+        draw_circle(51, 11, 3, gold, 65, true)
+        
+        draw_polygon(71, 11, 7, 6, gold, 50, 30, false)
+        draw_circle(71, 11, 3, orange, 60, true)
+        
+        draw_polygon(11, 31, 7, 6, gold, 50, 30, false)
+        draw_circle(11, 31, 3, orange, 60, true)
+        
+        draw_polygon(31, 31, 7, 6, yellow, 60, 0, false)
+        draw_circle(31, 31, 3, white, 75, true)
+        
+        draw_polygon(51, 31, 7, 6, gold, 50, 30, false)
+        draw_circle(51, 31, 3, orange, 60, true)
+        
+        draw_polygon(71, 31, 7, 6, yellow, 60, 0, false)
+        draw_circle(71, 31, 3, white, 75, true)
+        
+        draw_polygon(11, 51, 7, 6, orange, 55, 0, false)
+        draw_circle(11, 51, 3, gold, 65, true)
+        
+        draw_polygon(31, 51, 7, 6, gold, 50, 30, false)
+        draw_circle(31, 51, 3, orange, 60, true)
+        
+        draw_polygon(51, 51, 7, 6, orange, 55, 0, false)
+        draw_circle(51, 51, 3, gold, 65, true)
+        
+        draw_polygon(71, 51, 7, 6, gold, 50, 30, false)
+        draw_circle(71, 51, 3, orange, 60, true)
+        
+        draw_polygon(11, 71, 7, 6, gold, 50, 30, false)
+        draw_circle(11, 71, 3, orange, 60, true)
+        
+        draw_polygon(31, 71, 7, 6, yellow, 60, 0, false)
+        draw_circle(31, 71, 3, white, 75, true)
+        
+        draw_polygon(51, 71, 7, 6, gold, 50, 30, false)
+        draw_circle(51, 71, 3, orange, 60, true)
+        
+        draw_polygon(71, 71, 7, 6, yellow, 60, 0, false)
+        draw_circle(71, 71, 3, white, 75, true)
+
+    # ----------------------------------------------------------
+    # CEL 3: BLUE/PURPLE - Concentric rings
+    # ----------------------------------------------------------
+    sprite_cel(3)
+        draw_circle(11, 11, 7, blue, 45, false)
+        draw_circle(11, 11, 4, purple, 55, false)
+        plot(11, 11, cyan, 70)
+        
+        draw_circle(31, 11, 7, purple, 40, false)
+        draw_circle(31, 11, 4, blue, 50, false)
+        plot(31, 11, cyan, 65)
+        
+        draw_circle(51, 11, 7, blue, 45, false)
+        draw_circle(51, 11, 4, purple, 55, false)
+        plot(51, 11, cyan, 70)
+        
+        draw_circle(71, 11, 7, purple, 40, false)
+        draw_circle(71, 11, 4, blue, 50, false)
+        plot(71, 11, cyan, 65)
+        
+        draw_circle(11, 31, 7, purple, 40, false)
+        draw_circle(11, 31, 4, blue, 50, false)
+        plot(11, 31, cyan, 65)
+        
+        draw_circle(31, 31, 7, violet, 55, false)
+        draw_circle(31, 31, 4, sky_blue, 65, false)
+        plot(31, 31, white, 80)
+        
+        draw_circle(51, 31, 7, purple, 40, false)
+        draw_circle(51, 31, 4, blue, 50, false)
+        plot(51, 31, cyan, 65)
+        
+        draw_circle(71, 31, 7, violet, 55, false)
+        draw_circle(71, 31, 4, sky_blue, 65, false)
+        plot(71, 31, white, 80)
+        
+        draw_circle(11, 51, 7, blue, 45, false)
+        draw_circle(11, 51, 4, purple, 55, false)
+        plot(11, 51, cyan, 70)
+        
+        draw_circle(31, 51, 7, purple, 40, false)
+        draw_circle(31, 51, 4, blue, 50, false)
+        plot(31, 51, cyan, 65)
+        
+        draw_circle(51, 51, 7, blue, 45, false)
+        draw_circle(51, 51, 4, purple, 55, false)
+        plot(51, 51, cyan, 70)
+        
+        draw_circle(71, 51, 7, purple, 40, false)
+        draw_circle(71, 51, 4, blue, 50, false)
+        plot(71, 51, cyan, 65)
+        
+        draw_circle(11, 71, 7, purple, 40, false)
+        draw_circle(11, 71, 4, blue, 50, false)
+        plot(11, 71, cyan, 65)
+        
+        draw_circle(31, 71, 7, violet, 55, false)
+        draw_circle(31, 71, 4, sky_blue, 65, false)
+        plot(31, 71, white, 80)
+        
+        draw_circle(51, 71, 7, purple, 40, false)
+        draw_circle(51, 71, 4, blue, 50, false)
+        plot(51, 71, cyan, 65)
+        
+        draw_circle(71, 71, 7, violet, 55, false)
+        draw_circle(71, 71, 4, sky_blue, 65, false)
+        plot(71, 71, white, 80)
+
+    # ----------------------------------------------------------
+    # CEL 4: RED/PINK - Triangles
+    # ----------------------------------------------------------
+    sprite_cel(4)
+        draw_polygon(11, 11, 7, 3, red, 50, 0, false)
+        draw_polygon(11, 11, 3, 3, pink, 60, 180, true)
+        
+        draw_polygon(31, 11, 7, 3, pink, 45, 180, false)
+        draw_polygon(31, 11, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(51, 11, 7, 3, red, 50, 0, false)
+        draw_polygon(51, 11, 3, 3, pink, 60, 180, true)
+        
+        draw_polygon(71, 11, 7, 3, pink, 45, 180, false)
+        draw_polygon(71, 11, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(11, 31, 7, 3, pink, 45, 180, false)
+        draw_polygon(11, 31, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(31, 31, 7, 3, coral, 55, 0, false)
+        draw_polygon(31, 31, 3, 3, white, 70, 180, true)
+        
+        draw_polygon(51, 31, 7, 3, pink, 45, 180, false)
+        draw_polygon(51, 31, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(71, 31, 7, 3, coral, 55, 0, false)
+        draw_polygon(71, 31, 3, 3, white, 70, 180, true)
+        
+        draw_polygon(11, 51, 7, 3, red, 50, 0, false)
+        draw_polygon(11, 51, 3, 3, pink, 60, 180, true)
+        
+        draw_polygon(31, 51, 7, 3, pink, 45, 180, false)
+        draw_polygon(31, 51, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(51, 51, 7, 3, red, 50, 0, false)
+        draw_polygon(51, 51, 3, 3, pink, 60, 180, true)
+        
+        draw_polygon(71, 51, 7, 3, pink, 45, 180, false)
+        draw_polygon(71, 51, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(11, 71, 7, 3, pink, 45, 180, false)
+        draw_polygon(11, 71, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(31, 71, 7, 3, coral, 55, 0, false)
+        draw_polygon(31, 71, 3, 3, white, 70, 180, true)
+        
+        draw_polygon(51, 71, 7, 3, pink, 45, 180, false)
+        draw_polygon(51, 71, 3, 3, red, 55, 0, true)
+        
+        draw_polygon(71, 71, 7, 3, coral, 55, 0, false)
+        draw_polygon(71, 71, 3, 3, white, 70, 180, true)
+
 endsprite
 
 sync_queue
 
 # ============================================================
-# ACTIVATE SINGLE BACKGROUND LAYER
+# ACTIVATE BACKGROUND
 # ============================================================
-set_background(geo_pattern, 0)
+set_background(geo_pattern, 0, 0)
 
 sync_queue
 
@@ -96,27 +321,30 @@ sync_queue
 # ============================================================
 v_frame = 0
 
-# Position accumulators (fractional movement)
+# Position accumulators
 v_acc_x = 0.0
 v_acc_y = 0.0
 
 # Phase angles for sine wave movement
-# Different frequencies create organic wandering
 v_phase_x1 = 0.0
 v_phase_x2 = 1.5
 v_phase_y1 = 0.8
 v_phase_y2 = 2.2
 
-# Frequencies (different = more complex pattern)
+# Frequencies
 v_freq_x1 = 0.02
 v_freq_x2 = 0.035
 v_freq_y1 = 0.025
 v_freq_y2 = 0.015
 
-# Speed multipliers
+# Speed
 v_speed_base = 2.5
-v_speed_x_mult = 1.0
-v_speed_y_mult = 1.2
+
+# Cel transition
+v_cel_timer = 0
+v_cel_duration = 300
+v_current_cel = 0
+v_total_cels = 5
 
 # ============================================================
 # MAIN ANIMATION LOOP
@@ -132,7 +360,6 @@ while 1 then
     v_phase_y1 = v_phase_y1 + v_freq_y1
     v_phase_y2 = v_phase_y2 + v_freq_y2
     
-    # Wrap phases to prevent overflow
     if v_phase_x1 > 6.28318 then
         v_phase_x1 = v_phase_x1 - 6.28318
     endif
@@ -147,75 +374,65 @@ while 1 then
     endif
     
     # -----------------------------------------
-    # Calculate velocity using layered sine waves
-    # This creates smooth, organic directional changes
+    # Calculate velocity
     # -----------------------------------------
-    # X velocity: sum of two sine waves at different frequencies
     v_vel_x = sin(v_phase_x1) * 1.5 + sin(v_phase_x2) * 1.0
-    v_vel_x = v_vel_x * v_speed_base * v_speed_x_mult
+    v_vel_x = v_vel_x * v_speed_base
     
-    # Y velocity: sum of two sine waves at different frequencies  
     v_vel_y = sin(v_phase_y1) * 1.2 + sin(v_phase_y2) * 0.8
-    v_vel_y = v_vel_y * v_speed_base * v_speed_y_mult
+    v_vel_y = v_vel_y * v_speed_base
     
     # -----------------------------------------
-    # Accumulate movement
+    # Accumulate and apply scroll
     # -----------------------------------------
     v_acc_x = v_acc_x + v_vel_x
     v_acc_y = v_acc_y + v_vel_y
     
-    # -----------------------------------------
-    # Apply integer scroll when accumulated enough
-    # -----------------------------------------
     v_scroll_x = 0
     v_scroll_y = 0
     
-    # Handle positive X accumulation
     if v_acc_x >= 1 then
         v_scroll_x = int(v_acc_x)
         v_acc_x = v_acc_x - v_scroll_x
     endif
-    
-    # Handle negative X accumulation
     if v_acc_x <= -1 then
         v_scroll_x = int(v_acc_x)
         v_acc_x = v_acc_x - v_scroll_x
     endif
-    
-    # Handle positive Y accumulation
     if v_acc_y >= 1 then
         v_scroll_y = int(v_acc_y)
         v_acc_y = v_acc_y - v_scroll_y
     endif
-    
-    # Handle negative Y accumulation
     if v_acc_y <= -1 then
         v_scroll_y = int(v_acc_y)
         v_acc_y = v_acc_y - v_scroll_y
     endif
     
     # -----------------------------------------
-    # Apply the scroll
+    # Cel transition timer
     # -----------------------------------------
-    if v_scroll_x != 0 or v_scroll_y != 0 then
-        nudge_background(v_scroll_x, v_scroll_y, 0)
+    v_cel_timer = v_cel_timer + 1
+    if v_cel_timer >= v_cel_duration then
+        v_cel_timer = 0
+        v_current_cel = v_current_cel + 1
+        if v_current_cel >= v_total_cels then
+            v_current_cel = 0
+        endif
     endif
     
     # -----------------------------------------
-    # Optional: subtle foreground sparkles
+    # Apply scroll with current cel
     # -----------------------------------------
-    v_sparkle = random(0, 100, 0)
-    if v_sparkle > 95 then
-        v_sx = random(8, 56, 0)
-        v_sy = random(8, 56, 0)
-        plot(v_sx, v_sy, white, 100, 300, fade)
+    if v_scroll_x != 0 or v_scroll_y != 0 then
+        nudge_background(v_scroll_x, v_scroll_y, 0, v_current_cel)
+    else
+        # Still update cel even without movement
+        set_background_offset(0, 0, 0, v_current_cel)
     endif
     
     end_frame
     
-    rest(0.025)
     v_frame = v_frame + 1
-    
     if v_frame > 50000 then
         v_frame = 0
     endif
