@@ -69,22 +69,56 @@ endsprite
 # Green/lime matrix style
 # ============================================================
 define_sprite(diag_grid, 80, 80)
-    # Diagonal lines going one way
-    for v_d in (0, 112, 16)
-        draw_line(v_d, 0, 0, v_d, green, 25)
-    endfor v_d
+    # Diagonal lines going one way (top-left to bottom-right direction)
+    draw_line(0, 0, 0, 0, green, 25)
+    draw_line(16, 0, 0, 16, green, 25)
+    draw_line(32, 0, 0, 32, green, 25)
+    draw_line(48, 0, 0, 48, green, 25)
+    draw_line(64, 0, 0, 64, green, 25)
+    draw_line(79, 0, 0, 79, green, 25)
+    draw_line(79, 15, 15, 79, green, 25)
+    draw_line(79, 31, 31, 79, green, 25)
+    draw_line(79, 47, 47, 79, green, 25)
+    draw_line(79, 63, 63, 79, green, 25)
     
-    # Diagonal lines going other way
-    for v_d in (0, 112, 16)
-        draw_line(0, v_d, v_d, 0, lime, 20)
-    endfor v_d
+    # Diagonal lines going other way (top-right to bottom-left direction)
+    draw_line(0, 0, 0, 0, lime, 20)
+    draw_line(0, 16, 16, 0, lime, 20)
+    draw_line(0, 32, 32, 0, lime, 20)
+    draw_line(0, 48, 48, 0, lime, 20)
+    draw_line(0, 64, 64, 0, lime, 20)
+    draw_line(0, 79, 79, 0, lime, 20)
+    draw_line(16, 79, 79, 16, lime, 20)
+    draw_line(32, 79, 79, 32, lime, 20)
+    draw_line(48, 79, 79, 48, lime, 20)
+    draw_line(64, 79, 79, 64, lime, 20)
     
     # Intersection dots
-    for v_ix in (0, 79, 16)
-        for v_iy in (0, 79, 16)
-            plot(v_ix, v_iy, green, 45)
-        endfor v_iy
-    endfor v_ix
+    plot(0, 0, green, 45)
+    plot(16, 0, green, 45)
+    plot(32, 0, green, 45)
+    plot(48, 0, green, 45)
+    plot(64, 0, green, 45)
+    plot(0, 16, green, 45)
+    plot(16, 16, green, 45)
+    plot(32, 16, green, 45)
+    plot(48, 16, green, 45)
+    plot(64, 16, green, 45)
+    plot(0, 32, green, 45)
+    plot(16, 32, green, 45)
+    plot(32, 32, green, 45)
+    plot(48, 32, green, 45)
+    plot(64, 32, green, 45)
+    plot(0, 48, green, 45)
+    plot(16, 48, green, 45)
+    plot(32, 48, green, 45)
+    plot(48, 48, green, 45)
+    plot(64, 48, green, 45)
+    plot(0, 64, green, 45)
+    plot(16, 64, green, 45)
+    plot(32, 64, green, 45)
+    plot(48, 64, green, 45)
+    plot(64, 64, green, 45)
 endsprite
 
 # ============================================================
