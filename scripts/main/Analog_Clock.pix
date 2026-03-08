@@ -1,0 +1,219 @@
+# Analog Clock with Digital Display
+# A beautiful hybrid clock that shows both analog and digital time
+# Colors change based on time of day
+
+# Clock face parameters
+v_clock_x = 32
+v_clock_y = 22
+v_clock_radius = 18
+
+# Hand lengths
+v_hour_len = 9
+v_minute_len = 14
+v_second_len = 16
+
+# Procedure to draw clock face with hour markers
+def draw_clock_face {
+    # Draw outer ring
+    draw_circle(v_clock_x, v_clock_y, v_clock_radius, v_face_color, 60, false)
+    draw_circle(v_clock_x, v_clock_y, v_clock_radius - 1, v_face_color, 30, false)
+    
+    # Draw hour markers (12 positions)
+    for v_marker in (0, 11, 1)
+        v_marker_angle = v_marker * 30 - 90
+        v_marker_rad = radians(v_marker_angle)
+        
+        # Outer position for marker
+        v_mx = v_clock_x + cos(v_marker_rad) * (v_clock_radius - 3)
+        v_my = v_clock_y + sin(v_marker_rad) * (v_clock_radius - 3)
+        
+        # Draw larger dots at 12, 3, 6, 9
+        v_marker_mod = v_marker % 3
+        if v_marker_mod == 0 then
+            plot(v_mx, v_my, v_face_color, 90)
+        else
+            plot(v_mx, v_my, v_face_color, 50)
+        endif
+    endfor v_marker
+}
+
+# Procedure to draw clock hands
+def draw_hands {
+    # Get current time values
+    v_cur_hour = get_datetime("H")
+    v_cur_min = get_datetime("mi")
+    v_cur_sec = get_datetime("s")
+    
+    # Calculate angles (0 degrees = 12 o'clock, clockwise)
+    # Hour hand: 30 degrees per hour + 0.5 degrees per minute
+    v_hour_12 = v_cur_hour % 12
+    v_hour_angle = (v_hour_12 * 30) + (v_cur_min * 0.5) - 90
+    
+    # Minute hand: 6 degrees per minute + 0.1 degrees per second
+    v_min_angle = (v_cur_min * 6) + (v_cur_sec * 0.1) - 90
+    
+    # Second hand: 6 degrees per second
+    v_sec_angle = (v_cur_sec * 6) - 90
+    
+    # Convert to radians
+    v_hour_rad = radians(v_hour_angle)
+    v_min_rad = radians(v_min_angle)
+    v_sec_rad = radians(v_sec_angle)
+    
+    # Calculate hand endpoints
+    v_hour_x = v_clock_x + cos(v_hour_rad) * v_hour_len
+    v_hour_y = v_clock_y + sin(v_hour_rad) * v_hour_len
+    
+    v_min_x = v_clock_x + cos(v_min_rad) * v_minute_len
+    v_min_y = v_clock_y + sin(v_min_rad) * v_minute_len
+    
+    v_sec_x = v_clock_x + cos(v_sec_rad) * v_second_len
+    v_sec_y = v_clock_y + sin(v_sec_rad) * v_second_len
+    
+    # Draw hour hand (thickest - draw 3 lines)
+    draw_line(v_clock_x, v_clock_y, v_hour_x, v_hour_y, v_hour_color, 100)
+    draw_line(v_clock_x - 1, v_clock_y, v_hour_x - 1, v_hour_y, v_hour_color, 70)
+    draw_line(v_clock_x + 1, v_clock_y, v_hour_x + 1, v_hour_y, v_hour_color, 70)
+    
+    # Draw minute hand (medium thickness - draw 2 lines)
+    draw_line(v_clock_x, v_clock_y, v_min_x, v_min_y, v_minute_color, 100)
+    draw_line(v_clock_x, v_clock_y + 1, v_min_x, v_min_y + 1, v_minute_color, 50)
+    
+    # Draw second hand (thin)
+    draw_line(v_clock_x, v_clock_y, v_sec_x, v_sec_y, v_second_color, 100)
+    
+    # Draw center hub
+    draw_circle(v_clock_x, v_clock_y, 2, v_face_color, 100, true)
+    plot(v_clock_x, v_clock_y, v_second_color, 100)
+}
+
+# Procedure to set colors based on time of day
+def set_time_colors {
+    v_hour_now = get_datetime("H")
+    
+    # Morning (6-12): Warm sunrise colors
+    if v_hour_now >= 6 and v_hour_now < 12 then
+        v_face_color = "gold"
+        v_hour_color = "orange"
+        v_minute_color = "yellow"
+        v_second_color = "red"
+        v_text_color = "orange"
+        v_date_color = "gold"
+    endif
+    
+    # Afternoon (12-17): Bright day colors
+    if v_hour_now >= 12 and v_hour_now < 17 then
+        v_face_color = "cyan"
+        v_hour_color = "white"
+        v_minute_color = "sky_blue"
+        v_second_color = "yellow"
+        v_text_color = "cyan"
+        v_date_color = "sky_blue"
+    endif
+    
+    # Evening (17-21): Sunset colors
+    if v_hour_now >= 17 and v_hour_now < 21 then
+        v_face_color = "coral"
+        v_hour_color = "magenta"
+        v_minute_color = "orange"
+        v_second_color = "red"
+        v_text_color = "coral"
+        v_date_color = "orange"
+    endif
+    
+    # Night (21-6): Cool night colors
+    if v_hour_now >= 21 or v_hour_now < 6 then
+        v_face_color = "purple"
+        v_hour_color = "blue"
+        v_minute_color = "indigo"
+        v_second_color = "cyan"
+        v_text_color = "purple"
+        v_date_color = "indigo"
+    endif
+}
+
+# Procedure to draw digital time
+def draw_digital_time {
+    # Get formatted time string
+    v_time_str = get_datetime("h:mi:s")
+    v_ampm = get_datetime("a")
+    
+    # Draw time - centered around x=32, y=48
+    draw_text(4, 44, v_time_str, tiny64_font, 12, v_text_color, 100)
+    draw_text(50, 44, v_ampm, tiny64_font, 12, v_text_color, 70)
+}
+
+# Procedure to draw date
+def draw_date {
+    v_date_str = get_datetime("ddd mmm d")
+    
+    # Draw date at bottom
+    draw_text(4, 55, v_date_str, tiny64_font, 12, v_date_color, 80)
+}
+
+# Procedure to draw decorative corners
+def draw_corners {
+    # Top left
+    draw_line(0, 0, 6, 0, v_face_color, 40)
+    draw_line(0, 0, 0, 6, v_face_color, 40)
+    
+    # Top right
+    draw_line(63, 0, 57, 0, v_face_color, 40)
+    draw_line(63, 0, 63, 6, v_face_color, 40)
+    
+    # Bottom left
+    draw_line(0, 63, 6, 63, v_face_color, 40)
+    draw_line(0, 63, 0, 57, v_face_color, 40)
+    
+    # Bottom right
+    draw_line(63, 63, 57, 63, v_face_color, 40)
+    draw_line(63, 63, 63, 57, v_face_color, 40)
+}
+
+# Initialize default colors
+v_face_color = "white"
+v_hour_color = "white"
+v_minute_color = "gray"
+v_second_color = "red"
+v_text_color = "white"
+v_date_color = "gray"
+
+# Main loop - runs forever
+v_running = 1
+while v_running == 1 then
+    begin_frame
+    
+    # Clear screen with dark background
+    draw_rectangle(0, 0, 64, 64, black, 100, true)
+    
+    # Update colors based on time of day
+    call set_time_colors
+    
+    # Draw decorative corners
+    call draw_corners
+    
+    # Draw clock face
+    call draw_clock_face
+    
+    # Draw clock hands
+    call draw_hands
+    
+    # Draw digital time
+    call draw_digital_time
+    
+    # Draw date
+    call draw_date
+    
+    # Weekend indicator - subtle glow effect
+    v_is_weekend = get_datetime("isweekend")
+    if v_is_weekend == 1 then
+        draw_circle(v_clock_x, v_clock_y, v_clock_radius + 2, v_second_color, 15, false)
+    endif
+    
+    end_frame
+    sync_queue
+    
+    # Small delay to prevent excessive CPU usage
+    rest(0.05)
+    
+endwhile
