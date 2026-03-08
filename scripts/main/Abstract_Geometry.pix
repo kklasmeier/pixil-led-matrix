@@ -16,63 +16,7 @@
 
 throttle(0.1)
 
-# ============================================================
-# LAYER 0: HORIZONTAL LINES - scrolls RIGHT
-# Warm color gradient lines
-# ============================================================
-define_sprite(h_lines, 64, 64)
-    draw_line(0, 4, 63, 4, red, 40)
-    draw_line(0, 8, 63, 8, orange, 35)
-    draw_line(0, 12, 63, 12, yellow, 30)
-    draw_line(0, 16, 63, 16, orange, 35)
-    draw_line(0, 20, 63, 20, red, 40)
-    draw_line(0, 24, 63, 24, magenta, 35)
-    draw_line(0, 28, 63, 28, red, 30)
-    draw_line(0, 32, 63, 32, orange, 35)
-    draw_line(0, 36, 63, 36, yellow, 40)
-    draw_line(0, 40, 63, 40, orange, 35)
-    draw_line(0, 44, 63, 44, red, 30)
-    draw_line(0, 48, 63, 48, magenta, 35)
-    draw_line(0, 52, 63, 52, red, 40)
-    draw_line(0, 56, 63, 56, orange, 35)
-    draw_line(0, 60, 63, 60, yellow, 30)
-endsprite
 
-# ============================================================
-# LAYER 1: DIAGONAL GRID - scrolls UP-LEFT  
-# Cool color diagonal lines
-# ============================================================
-define_sprite(diag_lines, 64, 64)
-    draw_line(0, 0, 63, 63, cyan, 35)
-    draw_line(16, 0, 63, 47, blue, 30)
-    draw_line(32, 0, 63, 31, purple, 35)
-    draw_line(48, 0, 63, 15, cyan, 30)
-    draw_line(0, 16, 47, 63, blue, 35)
-    draw_line(0, 32, 31, 63, purple, 30)
-    draw_line(0, 48, 15, 63, cyan, 35)
-    draw_line(63, 0, 0, 63, magenta, 30)
-    draw_line(47, 0, 0, 47, violet, 25)
-    draw_line(31, 0, 0, 31, pink, 30)
-    draw_line(15, 0, 0, 15, magenta, 25)
-    draw_line(63, 16, 16, 63, violet, 30)
-    draw_line(63, 32, 32, 63, pink, 25)
-    draw_line(63, 48, 48, 63, magenta, 30)
-    plot(0, 0, white, 50)
-    plot(32, 32, white, 50)
-    plot(63, 63, white, 50)
-    plot(16, 16, cyan, 45)
-    plot(48, 48, cyan, 45)
-endsprite
-
-sync_queue
-
-# ============================================================
-# ACTIVATE BACKGROUND LAYERS
-# ============================================================
-#set_background(h_lines, 0)
-#set_background(diag_lines, 1)
-
-sync_queue
 
 # ============================================================
 # ANIMATION VARIABLES
@@ -120,30 +64,7 @@ v_morph_interval = 180
 # ============================================================
 while 1 then
     begin_frame(true)
-    
-    # -----------------------------------------
-    # Scroll Layer 0 - RIGHT (positive X)
-    # -----------------------------------------
-    v_acc0_x = v_acc0_x + v_speed0
-    if v_acc0_x >= 1 then
-        v_scroll0 = int(v_acc0_x)
-        #nudge_background(v_scroll0, 0, 0)
-        v_acc0_x = v_acc0_x - v_scroll0
-    endif
-    
-    # -----------------------------------------
-    # Scroll Layer 1 - UP-LEFT (negative X, negative Y)
-    # -----------------------------------------
-    v_acc1_x = v_acc1_x + v_speed1
-    v_acc1_y = v_acc1_y + v_speed1 * 0.8
-    if v_acc1_x >= 1 then
-        v_scroll1_x = int(v_acc1_x)
-        v_scroll1_y = int(v_acc1_y)
-        #nudge_background(-v_scroll1_x, -v_scroll1_y, 1)
-        v_acc1_x = v_acc1_x - v_scroll1_x
-        v_acc1_y = v_acc1_y - v_scroll1_y
-    endif
-    
+      
     # -----------------------------------------
     # Calculate shape position (Lissajous curve)
     # -----------------------------------------
