@@ -1,0 +1,462 @@
+# ============================================================
+# Steampunk Airship - Multi-layer cloud parallax with effects
+# ============================================================
+# Background layers:
+#   Layer 0: Sunset/dawn sky gradient (static)
+#   Layer 1: Distant wispy clouds (very slow)
+#   Layer 2: Mid-altitude clouds (medium)
+#   Layer 3: Near clouds/fog wisps (fast)
+#
+# Foreground drawing:
+#   - Steam puffs with fade burnout
+#   - Lightning rod sparks
+#   - Brass gauge with moving needle
+#
+# Sprite:
+#   - Airship with 4-cel propeller animation
+# ============================================================
+
+throttle(0.2)
+
+# ============================================================
+# LAYER 0: SKY GRADIENT (static 64x64)
+# Sunset/dawn colors - warm at horizon, deep blue above
+# ============================================================
+define_sprite(sky_gradient, 64, 64)
+    # Deep navy at top
+    draw_rectangle(0, 0, 64, 10, navy, 90, true)
+    # Royal blue
+    draw_rectangle(0, 10, 64, 8, royal_blue, 75, true)
+    # Indigo transition
+    draw_rectangle(0, 18, 64, 8, indigo, 60, true)
+    # Purple
+    draw_rectangle(0, 26, 64, 8, purple, 55, true)
+    # Magenta horizon glow
+    draw_rectangle(0, 34, 64, 8, magenta, 40, true)
+    # Orange sunset band
+    draw_rectangle(0, 42, 64, 8, orange, 50, true)
+    # Gold near horizon
+    draw_rectangle(0, 50, 64, 8, gold, 45, true)
+    # Pale yellow at bottom
+    draw_rectangle(0, 58, 64, 6, yellow, 30, true)
+    
+    # Sun glow (partially below horizon)
+    draw_circle(50, 58, 10, yellow, 35, true)
+    draw_circle(50, 58, 8, gold, 50, true)
+    draw_circle(50, 58, 5, orange, 40, true)
+endsprite
+
+# ============================================================
+# LAYER 1: DISTANT CLOUDS (128x64) - wispy, dim, slow
+# ============================================================
+define_sprite(far_clouds, 128, 64)
+    # High altitude wisps
+    draw_ellipse(20, 12, 18, 4, light_gray, 18, true, 10)
+    draw_ellipse(28, 10, 10, 3, silver, 14, true, -5)
+    
+    draw_ellipse(70, 15, 22, 5, light_gray, 16, true, -8)
+    draw_ellipse(80, 13, 12, 3, silver, 12, true, 15)
+    
+    draw_ellipse(115, 11, 15, 4, light_gray, 20, true, 5)
+    
+    # Mid-height distant puffs
+    draw_ellipse(15, 28, 14, 5, gray, 22, true, 12)
+    draw_ellipse(55, 32, 18, 6, light_gray, 18, true, -10)
+    draw_ellipse(95, 26, 16, 5, gray, 20, true, 8)
+    
+    # Lower distant clouds (catching sunset color)
+    draw_ellipse(35, 45, 20, 6, coral, 15, true, 5)
+    draw_ellipse(85, 48, 16, 5, peach, 12, true, -8)
+    draw_ellipse(120, 44, 14, 5, coral, 18, true, 10)
+endsprite
+
+# ============================================================
+# LAYER 2: MID CLOUDS (96x64) - fuller, medium speed
+# ============================================================
+define_sprite(mid_clouds, 96, 64)
+    # Substantial cloud formations
+    draw_ellipse(18, 18, 14, 6, silver, 35, true, 8)
+    draw_ellipse(25, 15, 10, 5, white, 28, true, -12)
+    draw_ellipse(12, 20, 8, 4, light_gray, 25, true, 5)
+    
+    draw_ellipse(55, 25, 16, 7, silver, 38, true, -5)
+    draw_ellipse(62, 22, 11, 5, white, 32, true, 10)
+    draw_ellipse(48, 28, 9, 4, light_gray, 28, true, -8)
+    
+    draw_ellipse(82, 20, 12, 5, silver, 34, true, 6)
+    draw_ellipse(88, 18, 8, 4, white, 26, true, -10)
+    
+    # Lower clouds with warm tint
+    draw_ellipse(30, 42, 18, 7, peach, 30, true, 5)
+    draw_ellipse(38, 40, 12, 5, coral, 25, true, -8)
+    
+    draw_ellipse(70, 46, 15, 6, peach, 28, true, -6)
+    draw_ellipse(78, 44, 10, 5, salmon, 22, true, 10)
+endsprite
+
+# ============================================================
+# LAYER 3: NEAR CLOUDS/FOG (80x64) - fast moving wisps
+# ============================================================
+define_sprite(near_clouds, 80, 64)
+    # Fast-moving fog wisps and cloud edges
+    draw_ellipse(12, 8, 10, 3, white, 45, true, 15)
+    draw_ellipse(18, 6, 6, 2, silver, 35, true, -10)
+    
+    draw_ellipse(40, 52, 14, 4, white, 50, true, -8)
+    draw_ellipse(48, 54, 8, 3, light_gray, 40, true, 12)
+    
+    draw_ellipse(65, 12, 12, 4, silver, 42, true, 5)
+    draw_ellipse(72, 10, 7, 3, white, 35, true, -15)
+    
+    # Fog bank at bottom
+    draw_ellipse(20, 58, 18, 5, white, 55, true, 8)
+    draw_ellipse(55, 60, 20, 4, silver, 48, true, -5)
+    
+    # Wisps crossing mid-screen
+    draw_ellipse(8, 30, 8, 2, white, 38, true, 20)
+    draw_ellipse(50, 35, 10, 3, silver, 32, true, -12)
+    draw_ellipse(70, 28, 7, 2, white, 36, true, 8)
+endsprite
+
+# ============================================================
+# AIRSHIP SPRITE - 4 cels for propeller animation
+# Brass/copper steampunk aesthetic
+# ============================================================
+define_sprite(airship, 28, 18)
+    # Cel 0: Propeller position 1
+    sprite_cel(0)
+        # Balloon envelope (top)
+        draw_ellipse(14, 5, 12, 5, bronze, 70, true, 0)
+        draw_ellipse(14, 4, 10, 4, gold, 55, true, 0)
+        draw_ellipse(14, 3, 6, 2, yellow, 40, true, 0)
+        # Rigging lines
+        draw_line(6, 9, 8, 12, standard_brown, 50)
+        draw_line(22, 9, 20, 12, standard_brown, 50)
+        draw_line(14, 10, 14, 12, standard_brown, 55)
+        # Gondola (cabin)
+        draw_rectangle(8, 12, 12, 5, wood_brown, 65, true)
+        draw_rectangle(9, 13, 10, 3, dark_brown, 55, true)
+        # Windows
+        plot(11, 14, cyan, 70)
+        plot(14, 14, cyan, 70)
+        plot(17, 14, cyan, 70)
+        # Rear propeller mount
+        draw_rectangle(20, 13, 4, 3, bronze, 60, true)
+        # Propeller - horizontal
+        draw_line(24, 11, 27, 11, silver, 75)
+        draw_line(24, 17, 27, 17, silver, 75)
+        # Propeller hub
+        plot(24, 14, gold, 80)
+        # Smokestacks
+        draw_rectangle(10, 10, 2, 3, dark_gray, 70, true)
+        draw_rectangle(16, 10, 2, 3, dark_gray, 70, true)
+        # Lightning rod
+        draw_line(14, 0, 14, 2, silver, 80)
+        plot(14, 0, cyan, 60)
+
+    # Cel 1: Propeller position 2 (diagonal)
+    sprite_cel(1)
+        # Balloon envelope
+        draw_ellipse(14, 5, 12, 5, bronze, 70, true, 0)
+        draw_ellipse(14, 4, 10, 4, gold, 55, true, 0)
+        draw_ellipse(14, 3, 6, 2, yellow, 40, true, 0)
+        # Rigging
+        draw_line(6, 9, 8, 12, standard_brown, 50)
+        draw_line(22, 9, 20, 12, standard_brown, 50)
+        draw_line(14, 10, 14, 12, standard_brown, 55)
+        # Gondola
+        draw_rectangle(8, 12, 12, 5, wood_brown, 65, true)
+        draw_rectangle(9, 13, 10, 3, dark_brown, 55, true)
+        plot(11, 14, cyan, 70)
+        plot(14, 14, cyan, 70)
+        plot(17, 14, cyan, 70)
+        # Propeller mount
+        draw_rectangle(20, 13, 4, 3, bronze, 60, true)
+        # Propeller - diagonal /
+        draw_line(25, 10, 27, 12, silver, 75)
+        draw_line(25, 18, 27, 16, silver, 75)
+        plot(24, 14, gold, 80)
+        # Smokestacks
+        draw_rectangle(10, 10, 2, 3, dark_gray, 70, true)
+        draw_rectangle(16, 10, 2, 3, dark_gray, 70, true)
+        # Lightning rod
+        draw_line(14, 0, 14, 2, silver, 80)
+        plot(14, 0, cyan, 60)
+
+    # Cel 2: Propeller position 3 (vertical)
+    sprite_cel(2)
+        # Balloon envelope
+        draw_ellipse(14, 5, 12, 5, bronze, 70, true, 0)
+        draw_ellipse(14, 4, 10, 4, gold, 55, true, 0)
+        draw_ellipse(14, 3, 6, 2, yellow, 40, true, 0)
+        # Rigging
+        draw_line(6, 9, 8, 12, standard_brown, 50)
+        draw_line(22, 9, 20, 12, standard_brown, 50)
+        draw_line(14, 10, 14, 12, standard_brown, 55)
+        # Gondola
+        draw_rectangle(8, 12, 12, 5, wood_brown, 65, true)
+        draw_rectangle(9, 13, 10, 3, dark_brown, 55, true)
+        plot(11, 14, cyan, 70)
+        plot(14, 14, cyan, 70)
+        plot(17, 14, cyan, 70)
+        # Propeller mount
+        draw_rectangle(20, 13, 4, 3, bronze, 60, true)
+        # Propeller - vertical
+        draw_line(26, 10, 26, 12, silver, 75)
+        draw_line(26, 16, 26, 18, silver, 75)
+        plot(24, 14, gold, 80)
+        # Smokestacks
+        draw_rectangle(10, 10, 2, 3, dark_gray, 70, true)
+        draw_rectangle(16, 10, 2, 3, dark_gray, 70, true)
+        # Lightning rod
+        draw_line(14, 0, 14, 2, silver, 80)
+        plot(14, 0, cyan, 60)
+
+    # Cel 3: Propeller position 4 (diagonal \)
+    sprite_cel(3)
+        # Balloon envelope
+        draw_ellipse(14, 5, 12, 5, bronze, 70, true, 0)
+        draw_ellipse(14, 4, 10, 4, gold, 55, true, 0)
+        draw_ellipse(14, 3, 6, 2, yellow, 40, true, 0)
+        # Rigging
+        draw_line(6, 9, 8, 12, standard_brown, 50)
+        draw_line(22, 9, 20, 12, standard_brown, 50)
+        draw_line(14, 10, 14, 12, standard_brown, 55)
+        # Gondola
+        draw_rectangle(8, 12, 12, 5, wood_brown, 65, true)
+        draw_rectangle(9, 13, 10, 3, dark_brown, 55, true)
+        plot(11, 14, cyan, 70)
+        plot(14, 14, cyan, 70)
+        plot(17, 14, cyan, 70)
+        # Propeller mount
+        draw_rectangle(20, 13, 4, 3, bronze, 60, true)
+        # Propeller - diagonal \
+        draw_line(25, 12, 27, 10, silver, 75)
+        draw_line(25, 16, 27, 18, silver, 75)
+        plot(24, 14, gold, 80)
+        # Smokestacks
+        draw_rectangle(10, 10, 2, 3, dark_gray, 70, true)
+        draw_rectangle(16, 10, 2, 3, dark_gray, 70, true)
+        # Lightning rod
+        draw_line(14, 0, 14, 2, silver, 80)
+        plot(14, 0, cyan, 60)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE BACKGROUND LAYERS
+# ============================================================
+set_background(sky_gradient, 0)
+set_background(far_clouds, 1)
+set_background(mid_clouds, 2)
+set_background(near_clouds, 3)
+
+# ============================================================
+# SHOW AIRSHIP
+# ============================================================
+v_ship_x = 18
+v_ship_y = 24
+v_ship_base_y = 24
+show_sprite(airship, v_ship_x, v_ship_y, 0, 10, 0)
+
+sync_queue
+
+# ============================================================
+# ANIMATION VARIABLES
+# ============================================================
+v_frame = 0
+v_bob_angle = 0.0
+v_bob_speed = 0.08
+v_bob_amount = 3
+
+# Steam puff timing
+v_steam_timer = 0
+v_steam_interval = 12
+
+# Lightning spark timing
+v_spark_timer = 0
+v_spark_interval = 80
+v_spark_active = 0
+v_spark_duration = 0
+
+# Cloud scroll accumulators (for fractional movement)
+v_far_acc = 0.0
+v_mid_acc = 0.0
+v_near_acc = 0.0
+
+# ============================================================
+# MAIN ANIMATION LOOP
+# ============================================================
+while 1 then
+    begin_frame(true)
+    
+    # -----------------------------------------
+    # Parallax cloud scrolling
+    # Layer 1 (far): 0.3 px/frame
+    # Layer 2 (mid): 0.8 px/frame  
+    # Layer 3 (near): 2.0 px/frame
+    # -----------------------------------------
+    v_far_acc = v_far_acc + 0.3
+    v_mid_acc = v_mid_acc + 0.8
+    v_near_acc = v_near_acc + 2.0
+    
+    # Apply integer scroll when accumulated
+    if v_far_acc >= 1 then
+        nudge_background(1, 0, 1)
+        v_far_acc = v_far_acc - 1
+    endif
+    
+    if v_mid_acc >= 1 then
+        v_mid_scroll = int(v_mid_acc)
+        nudge_background(v_mid_scroll, 0, 2)
+        v_mid_acc = v_mid_acc - v_mid_scroll
+    endif
+    
+    if v_near_acc >= 1 then
+        v_near_scroll = int(v_near_acc)
+        nudge_background(v_near_scroll, 0, 3)
+        v_near_acc = v_near_acc - v_near_scroll
+    endif
+    
+    # -----------------------------------------
+    # Airship gentle bobbing motion
+    # -----------------------------------------
+    v_bob_offset = sin(v_bob_angle) * v_bob_amount
+    v_ship_y = v_ship_base_y + int(v_bob_offset)
+    v_bob_angle = v_bob_angle + v_bob_speed
+    if v_bob_angle > 6.28318 then
+        v_bob_angle = v_bob_angle - 6.28318
+    endif
+    
+    # Move sprite (auto-advances propeller cel)
+    move_sprite(airship, v_ship_x, v_ship_y, 0)
+    
+    # -----------------------------------------
+    # Steam puffs from smokestacks
+    # Drawn at absolute screen position based on ship location
+    # -----------------------------------------
+    v_steam_timer = v_steam_timer + 1
+    if v_steam_timer >= v_steam_interval then
+        v_steam_timer = 0
+        
+        # Left smokestack steam (ship_x + 10, ship_y + 10)
+        v_steam_x1 = v_ship_x + 10
+        v_steam_y1 = v_ship_y + 8
+        
+        # Right smokestack steam (ship_x + 16, ship_y + 10)
+        v_steam_x2 = v_ship_x + 16
+        v_steam_y2 = v_ship_y + 8
+        
+        # Puff that rises and fades - left stack
+        plot(v_steam_x1, v_steam_y1, white, 60, 600, fade)
+        plot(v_steam_x1 - 1, v_steam_y1 - 1, silver, 50, 700, fade)
+        plot(v_steam_x1, v_steam_y1 - 2, light_gray, 40, 800, fade)
+        plot(v_steam_x1 + 1, v_steam_y1 - 3, gray, 30, 900, fade)
+        
+        # Puff - right stack (slightly offset timing feel)
+        plot(v_steam_x2, v_steam_y2, white, 55, 650, fade)
+        plot(v_steam_x2 + 1, v_steam_y2 - 1, silver, 45, 750, fade)
+        plot(v_steam_x2, v_steam_y2 - 2, light_gray, 35, 850, fade)
+        plot(v_steam_x2 - 1, v_steam_y2 - 3, gray, 28, 950, fade)
+    endif
+    
+    # -----------------------------------------
+    # Lightning rod sparks (occasional)
+    # -----------------------------------------
+    v_spark_timer = v_spark_timer + 1
+    
+    if v_spark_active == 1 then
+        # Draw active spark
+        v_rod_x = v_ship_x + 14
+        v_rod_y = v_ship_y
+        
+        # Bright spark at tip
+        plot(v_rod_x, v_rod_y, white, 100, 80, fade)
+        plot(v_rod_x, v_rod_y - 1, cyan, 90, 100, fade)
+        
+        # Random small arcs
+        v_arc_dir = random(0, 3, 0)
+        if v_arc_dir == 0 then
+            plot(v_rod_x - 1, v_rod_y - 1, cyan, 70, 120, fade)
+            plot(v_rod_x - 2, v_rod_y - 2, sky_blue, 50, 150, fade)
+        endif
+        if v_arc_dir == 1 then
+            plot(v_rod_x + 1, v_rod_y - 1, cyan, 70, 120, fade)
+            plot(v_rod_x + 2, v_rod_y - 2, sky_blue, 50, 150, fade)
+        endif
+        if v_arc_dir == 2 then
+            plot(v_rod_x, v_rod_y - 2, cyan, 75, 100, fade)
+            plot(v_rod_x - 1, v_rod_y - 3, sky_blue, 55, 130, fade)
+        endif
+        if v_arc_dir == 3 then
+            plot(v_rod_x, v_rod_y - 2, cyan, 75, 100, fade)
+            plot(v_rod_x + 1, v_rod_y - 3, sky_blue, 55, 130, fade)
+        endif
+        
+        v_spark_duration = v_spark_duration + 1
+        if v_spark_duration > 8 then
+            v_spark_active = 0
+            v_spark_duration = 0
+        endif
+    endif
+    
+    # Trigger new spark sequence
+    if v_spark_timer >= v_spark_interval then
+        v_spark_timer = 0
+        v_spark_active = 1
+        v_spark_duration = 0
+        # Randomize next interval
+        v_spark_interval = random(60, 120, 0)
+    endif
+    
+    # -----------------------------------------
+    # Occasional birds in distance (rare)
+    # -----------------------------------------
+    if v_frame - floor(v_frame / 200) * 200 == 0 then
+        v_bird_y = random(8, 25, 0)
+        # Small V-shape bird silhouette flying across
+        for v_bx in (0, 6, 1)
+            v_by_offset = 0
+            if v_bx == 0 or v_bx == 6 then
+                v_by_offset = 2
+            endif
+            if v_bx == 1 or v_bx == 5 then
+                v_by_offset = 1
+            endif
+            plot(60 + v_bx, v_bird_y + v_by_offset, dark_gray, 45, 3500, fade)
+        endfor v_bx
+    endif
+    
+    # -----------------------------------------
+    # Brass gauge in corner (pressure indicator)
+    # -----------------------------------------
+    # Gauge background
+    draw_circle(7, 57, 5, bronze, 50, true)
+    draw_circle(7, 57, 4, dark_brown, 70, true)
+    draw_circle(7, 57, 3, black, 90, true)
+    
+    # Gauge markings
+    plot(4, 55, red, 60)
+    plot(10, 55, green, 60)
+    plot(7, 53, yellow, 50)
+    
+    # Needle - oscillates with engine rhythm  
+    v_needle_angle = 0.8 + sin(v_frame * 0.3) * 0.4
+    v_needle_x = 7 + int(cos(v_needle_angle) * 2.5)
+    v_needle_y = 57 - int(sin(v_needle_angle) * 2.5)
+    draw_line(7, 57, v_needle_x, v_needle_y, gold, 90)
+    
+    # Center cap
+    plot(7, 57, bronze, 80)
+    
+    end_frame
+    
+    rest(0.04)
+    v_frame = v_frame + 1
+    
+    # Prevent overflow
+    if v_frame > 10000 then
+        v_frame = 0
+    endif
+endwhile
