@@ -331,19 +331,14 @@ v_phase_x2 = 1.5
 v_phase_y1 = 0.8
 v_phase_y2 = 2.2
 
-# Frequencies (slower for longer periods)
-v_freq_x1 = 0.012
-v_freq_x2 = 0.022
-v_freq_y1 = 0.015
-v_freq_y2 = 0.009
+# Frequencies (slower = longer gentle periods)
+v_freq_x1 = 0.008
+v_freq_x2 = 0.014
+v_freq_y1 = 0.010
+v_freq_y2 = 0.006
 
-# Speed modulation phase (controls fast/slow periods)
-v_speed_mod_phase = 0.0
-v_speed_mod_freq = 0.008
-
-# Speed
-v_speed_base = 1.8
-v_speed_min = 0.3
+# Speed (lower = more time drifting slowly)
+v_speed_base = 1.2
 
 # Cel transition
 v_cel_timer = 0
@@ -379,30 +374,13 @@ while 1 then
     endif
     
     # -----------------------------------------
-    # Calculate speed modulation (longer slow periods)
-    # Uses sin^4 to spend more time near minimum speed
-    # -----------------------------------------
-    v_speed_mod_phase = v_speed_mod_phase + v_speed_mod_freq
-    if v_speed_mod_phase > 6.28318 then
-        v_speed_mod_phase = v_speed_mod_phase - 6.28318
-    endif
-    
-    # sin^4 creates a curve that spends ~70% of time below halfway
-    v_mod_raw = sin(v_speed_mod_phase)
-    v_mod_squared = v_mod_raw * v_mod_raw
-    v_speed_mod = v_mod_squared * v_mod_squared
-    
-    # Map to speed range: mostly slow (0.3) with occasional fast (1.8)
-    v_current_speed = v_speed_min + v_speed_mod * (v_speed_base - v_speed_min)
-    
-    # -----------------------------------------
-    # Calculate velocity direction
+    # Calculate velocity
     # -----------------------------------------
     v_vel_x = sin(v_phase_x1) * 1.5 + sin(v_phase_x2) * 1.0
-    v_vel_x = v_vel_x * v_current_speed
+    v_vel_x = v_vel_x * v_speed_base
     
     v_vel_y = sin(v_phase_y1) * 1.2 + sin(v_phase_y2) * 0.8
-    v_vel_y = v_vel_y * v_current_speed
+    v_vel_y = v_vel_y * v_speed_base
     
     # -----------------------------------------
     # Accumulate and apply scroll
