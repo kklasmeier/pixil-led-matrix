@@ -1166,17 +1166,21 @@ def get_datetime(format_str: str) -> Union[int, float, str]:
     }
     
     result = format_str
-    used_codes = []
+    replacements = {}
     
     codes_by_length = sorted(FORMAT_MAP.keys(), key=len, reverse=True)
     
     for code in codes_by_length:
         if code in result:
-            result = result.replace(code, FORMAT_MAP[code])
-            used_codes.append(code)
+            placeholder = f"\x00{code}\x00"
+            result = result.replace(code, placeholder)
+            replacements[placeholder] = FORMAT_MAP[code]
     
-    if result == format_str:
+    if not replacements:
         raise ValueError(f"Invalid datetime format: '{format_str}' - no recognized format codes found")
+    
+    for placeholder, value in replacements.items():
+        result = result.replace(placeholder, value)
     
     return result
 
