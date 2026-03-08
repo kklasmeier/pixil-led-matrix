@@ -1,0 +1,222 @@
+# ============================================================
+# FLOATING GEOMETRY - Single layer drifting in all directions
+# ============================================================
+# One background layer that wanders fluidly
+# Uses layered sine waves for organic movement in X and Y
+# Sometimes fast, sometimes slow, always smooth
+# ============================================================
+
+throttle(0.05)
+
+# ============================================================
+# BACKGROUND: CIRCLES INSIDE SQUARES
+# Cyan/magenta color scheme
+# ============================================================
+define_sprite(geo_pattern, 80, 80)
+    # Row 1
+    draw_rectangle(4, 4, 14, 14, cyan, 50, false)
+    draw_circle(11, 11, 4, magenta, 60, false)
+    plot(11, 11, white, 75)
+    
+    draw_rectangle(24, 4, 14, 14, magenta, 45, false)
+    draw_circle(31, 11, 4, cyan, 55, false)
+    plot(31, 11, white, 70)
+    
+    draw_rectangle(44, 4, 14, 14, cyan, 50, false)
+    draw_circle(51, 11, 4, magenta, 60, false)
+    plot(51, 11, white, 75)
+    
+    draw_rectangle(64, 4, 14, 14, magenta, 45, false)
+    draw_circle(71, 11, 4, cyan, 55, false)
+    plot(71, 11, white, 70)
+    
+    # Row 2
+    draw_rectangle(4, 24, 14, 14, magenta, 45, false)
+    draw_circle(11, 31, 4, cyan, 55, false)
+    plot(11, 31, white, 70)
+    
+    draw_rectangle(24, 24, 14, 14, cyan, 55, false)
+    draw_circle(31, 31, 4, magenta, 65, false)
+    plot(31, 31, yellow, 80)
+    
+    draw_rectangle(44, 24, 14, 14, magenta, 45, false)
+    draw_circle(51, 31, 4, cyan, 55, false)
+    plot(51, 31, white, 70)
+    
+    draw_rectangle(64, 24, 14, 14, cyan, 55, false)
+    draw_circle(71, 31, 4, magenta, 65, false)
+    plot(71, 31, yellow, 80)
+    
+    # Row 3
+    draw_rectangle(4, 44, 14, 14, cyan, 50, false)
+    draw_circle(11, 51, 4, magenta, 60, false)
+    plot(11, 51, white, 75)
+    
+    draw_rectangle(24, 44, 14, 14, magenta, 45, false)
+    draw_circle(31, 51, 4, cyan, 55, false)
+    plot(31, 51, white, 70)
+    
+    draw_rectangle(44, 44, 14, 14, cyan, 50, false)
+    draw_circle(51, 51, 4, magenta, 60, false)
+    plot(51, 51, white, 75)
+    
+    draw_rectangle(64, 44, 14, 14, magenta, 45, false)
+    draw_circle(71, 51, 4, cyan, 55, false)
+    plot(71, 51, white, 70)
+    
+    # Row 4
+    draw_rectangle(4, 64, 14, 14, magenta, 45, false)
+    draw_circle(11, 71, 4, cyan, 55, false)
+    plot(11, 71, white, 70)
+    
+    draw_rectangle(24, 64, 14, 14, cyan, 55, false)
+    draw_circle(31, 71, 4, magenta, 65, false)
+    plot(31, 71, yellow, 80)
+    
+    draw_rectangle(44, 64, 14, 14, magenta, 45, false)
+    draw_circle(51, 71, 4, cyan, 55, false)
+    plot(51, 71, white, 70)
+    
+    draw_rectangle(64, 64, 14, 14, cyan, 55, false)
+    draw_circle(71, 71, 4, magenta, 65, false)
+    plot(71, 71, yellow, 80)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE SINGLE BACKGROUND LAYER
+# ============================================================
+set_background(geo_pattern, 0)
+
+sync_queue
+
+# ============================================================
+# ANIMATION VARIABLES
+# ============================================================
+v_frame = 0
+
+# Position accumulators (fractional movement)
+v_acc_x = 0.0
+v_acc_y = 0.0
+
+# Phase angles for sine wave movement
+# Different frequencies create organic wandering
+v_phase_x1 = 0.0
+v_phase_x2 = 1.5
+v_phase_y1 = 0.8
+v_phase_y2 = 2.2
+
+# Frequencies (different = more complex pattern)
+v_freq_x1 = 0.02
+v_freq_x2 = 0.035
+v_freq_y1 = 0.025
+v_freq_y2 = 0.015
+
+# Speed multipliers
+v_speed_base = 2.5
+v_speed_x_mult = 1.0
+v_speed_y_mult = 1.2
+
+# ============================================================
+# MAIN ANIMATION LOOP
+# ============================================================
+while 1 then
+    begin_frame(true)
+    
+    # -----------------------------------------
+    # Update phase angles
+    # -----------------------------------------
+    v_phase_x1 = v_phase_x1 + v_freq_x1
+    v_phase_x2 = v_phase_x2 + v_freq_x2
+    v_phase_y1 = v_phase_y1 + v_freq_y1
+    v_phase_y2 = v_phase_y2 + v_freq_y2
+    
+    # Wrap phases to prevent overflow
+    if v_phase_x1 > 6.28318 then
+        v_phase_x1 = v_phase_x1 - 6.28318
+    endif
+    if v_phase_x2 > 6.28318 then
+        v_phase_x2 = v_phase_x2 - 6.28318
+    endif
+    if v_phase_y1 > 6.28318 then
+        v_phase_y1 = v_phase_y1 - 6.28318
+    endif
+    if v_phase_y2 > 6.28318 then
+        v_phase_y2 = v_phase_y2 - 6.28318
+    endif
+    
+    # -----------------------------------------
+    # Calculate velocity using layered sine waves
+    # This creates smooth, organic directional changes
+    # -----------------------------------------
+    # X velocity: sum of two sine waves at different frequencies
+    v_vel_x = sin(v_phase_x1) * 1.5 + sin(v_phase_x2) * 1.0
+    v_vel_x = v_vel_x * v_speed_base * v_speed_x_mult
+    
+    # Y velocity: sum of two sine waves at different frequencies  
+    v_vel_y = sin(v_phase_y1) * 1.2 + sin(v_phase_y2) * 0.8
+    v_vel_y = v_vel_y * v_speed_base * v_speed_y_mult
+    
+    # -----------------------------------------
+    # Accumulate movement
+    # -----------------------------------------
+    v_acc_x = v_acc_x + v_vel_x
+    v_acc_y = v_acc_y + v_vel_y
+    
+    # -----------------------------------------
+    # Apply integer scroll when accumulated enough
+    # -----------------------------------------
+    v_scroll_x = 0
+    v_scroll_y = 0
+    
+    # Handle positive X accumulation
+    if v_acc_x >= 1 then
+        v_scroll_x = int(v_acc_x)
+        v_acc_x = v_acc_x - v_scroll_x
+    endif
+    
+    # Handle negative X accumulation
+    if v_acc_x <= -1 then
+        v_scroll_x = int(v_acc_x)
+        v_acc_x = v_acc_x - v_scroll_x
+    endif
+    
+    # Handle positive Y accumulation
+    if v_acc_y >= 1 then
+        v_scroll_y = int(v_acc_y)
+        v_acc_y = v_acc_y - v_scroll_y
+    endif
+    
+    # Handle negative Y accumulation
+    if v_acc_y <= -1 then
+        v_scroll_y = int(v_acc_y)
+        v_acc_y = v_acc_y - v_scroll_y
+    endif
+    
+    # -----------------------------------------
+    # Apply the scroll
+    # -----------------------------------------
+    if v_scroll_x != 0 or v_scroll_y != 0 then
+        nudge_background(v_scroll_x, v_scroll_y, 0)
+    endif
+    
+    # -----------------------------------------
+    # Optional: subtle foreground sparkles
+    # -----------------------------------------
+    v_sparkle = random(0, 100, 0)
+    if v_sparkle > 95 then
+        v_sx = random(8, 56, 0)
+        v_sy = random(8, 56, 0)
+        plot(v_sx, v_sy, white, 100, 300, fade)
+    endif
+    
+    end_frame
+    
+    rest(0.025)
+    v_frame = v_frame + 1
+    
+    if v_frame > 50000 then
+        v_frame = 0
+    endif
+endwhile
