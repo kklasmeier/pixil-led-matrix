@@ -422,13 +422,9 @@ while 1 then
     
     # -----------------------------------------
     # Apply scroll with current cel
+    # Always nudge (even 0,0) to update cel smoothly
     # -----------------------------------------
-    if v_scroll_x != 0 or v_scroll_y != 0 then
-        nudge_background(v_scroll_x, v_scroll_y, 0, v_current_cel)
-    else
-        # Still update cel even without movement
-        set_background_offset(0, 0, 0, v_current_cel)
-    endif
+    nudge_background(v_scroll_x, v_scroll_y, 0, v_current_cel)
     
     end_frame
     
