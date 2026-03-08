@@ -69,8 +69,8 @@ sync_queue
 # ============================================================
 # ACTIVATE BACKGROUND LAYERS
 # ============================================================
-set_background(h_lines, 0)
-set_background(diag_lines, 1)
+#set_background(h_lines, 0)
+#set_background(diag_lines, 1)
 
 sync_queue
 
@@ -127,7 +127,7 @@ while 1 then
     v_acc0_x = v_acc0_x + v_speed0
     if v_acc0_x >= 1 then
         v_scroll0 = int(v_acc0_x)
-        nudge_background(v_scroll0, 0, 0)
+        #nudge_background(v_scroll0, 0, 0)
         v_acc0_x = v_acc0_x - v_scroll0
     endif
     
@@ -139,7 +139,7 @@ while 1 then
     if v_acc1_x >= 1 then
         v_scroll1_x = int(v_acc1_x)
         v_scroll1_y = int(v_acc1_y)
-        nudge_background(-v_scroll1_x, -v_scroll1_y, 1)
+        #nudge_background(-v_scroll1_x, -v_scroll1_y, 1)
         v_acc1_x = v_acc1_x - v_scroll1_x
         v_acc1_y = v_acc1_y - v_scroll1_y
     endif
