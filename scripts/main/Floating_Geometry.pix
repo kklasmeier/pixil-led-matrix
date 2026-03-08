@@ -358,8 +358,9 @@ v_poly_size = 0.0
 v_poly_max_size = 14
 v_poly_grow_speed = 0.08
 v_poly_state = 0
-v_poly_hidden_timer = 0
-v_poly_hidden_duration = 60
+v_poly_hidden_start = 0
+v_poly_hidden_duration = 5000
+v_poly_color_index = 0
 v_poly_sides = 3
 v_poly_sides_dir = 1
 
@@ -480,7 +481,7 @@ while 1 then
         if v_poly_size <= 0 then
             v_poly_size = 0
             v_poly_state = 2
-            v_poly_hidden_timer = 0
+            v_poly_hidden_start = get_system("runtime")
             # Change sides while hidden
             v_poly_sides = v_poly_sides + v_poly_sides_dir
             if v_poly_sides >= 7 then
@@ -491,13 +492,18 @@ while 1 then
                 v_poly_sides = 3
                 v_poly_sides_dir = 1
             endif
+            # Cycle colors
+            v_poly_color_index = v_poly_color_index + 1
+            if v_poly_color_index > 5 then
+                v_poly_color_index = 0
+            endif
         endif
     endif
     
     if v_poly_state == 2 then
-        # Hidden - wait
-        v_poly_hidden_timer = v_poly_hidden_timer + 1
-        if v_poly_hidden_timer >= v_poly_hidden_duration then
+        # Hidden - wait 5 seconds
+        v_elapsed = get_system("runtime") - v_poly_hidden_start
+        if v_elapsed >= v_poly_hidden_duration then
             v_poly_state = 0
         endif
     endif
@@ -508,13 +514,41 @@ while 1 then
         v_poly_r = int(v_poly_rotation)
         v_poly_sz = int(v_poly_size)
         
-        # Main filled shape (cyan)
-        draw_polygon(32, 32, v_poly_sz, v_poly_s, cyan, 85, v_poly_r, true)
+        # Select colors based on color index
+        v_outer_color = "cyan"
+        v_inner_color = "magenta"
+        if v_poly_color_index == 0 then
+            v_outer_color = "cyan"
+            v_inner_color = "magenta"
+        endif
+        if v_poly_color_index == 1 then
+            v_outer_color = "lime"
+            v_inner_color = "yellow"
+        endif
+        if v_poly_color_index == 2 then
+            v_outer_color = "orange"
+            v_inner_color = "red"
+        endif
+        if v_poly_color_index == 3 then
+            v_outer_color = "violet"
+            v_inner_color = "pink"
+        endif
+        if v_poly_color_index == 4 then
+            v_outer_color = "sky_blue"
+            v_inner_color = "white"
+        endif
+        if v_poly_color_index == 5 then
+            v_outer_color = "gold"
+            v_inner_color = "orange"
+        endif
         
-        # Inner accent (magenta, rotated offset)
+        # Main filled shape
+        draw_polygon(32, 32, v_poly_sz, v_poly_s, v_outer_color, 85, v_poly_r, true)
+        
+        # Inner accent (rotated offset)
         v_inner_sz = int(v_poly_size * 0.4)
         if v_inner_sz > 1 then
-            draw_polygon(32, 32, v_inner_sz, v_poly_s, magenta, 95, v_poly_r + 30, true)
+            draw_polygon(32, 32, v_inner_sz, v_poly_s, v_inner_color, 95, v_poly_r + 30, true)
         endif
         
         # Center dot
