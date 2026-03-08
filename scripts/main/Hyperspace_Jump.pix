@@ -1,0 +1,489 @@
+# ============================================================
+# HYPERSPACE JUMP - Stars stretch into streaking light
+# ============================================================
+# Multi-phase animation:
+#   1. Normal flight - gentle star drift
+#   2. Acceleration - stars stretch, speed ramps up
+#   3. Full hyperspace - maximum velocity, blue shift
+#   4. Sustain - cruise in hyperspace
+#   5. Loop back to normal
+#
+# Background layers scroll horizontally (flying forward)
+# Foreground draws radial streaks from center vanishing point
+# Cockpit frame overlay with flickering instruments
+# ============================================================
+
+throttle(0.1)
+
+# ============================================================
+# LAYER 0: DISTANT STAR FIELD (128x64) - tiny dim stars
+# ============================================================
+define_sprite(far_stars, 128, 64)
+    # Scattered distant points
+    plot(5, 8, white, 40)
+    plot(18, 3, white, 55)
+    plot(32, 15, white, 35)
+    plot(47, 7, white, 60)
+    plot(61, 22, white, 45)
+    plot(78, 11, white, 50)
+    plot(92, 5, white, 40)
+    plot(108, 18, white, 55)
+    plot(122, 9, white, 35)
+    plot(11, 28, white, 50)
+    plot(26, 35, white, 45)
+    plot(43, 42, white, 60)
+    plot(58, 31, white, 40)
+    plot(74, 48, white, 55)
+    plot(89, 38, white, 35)
+    plot(105, 52, white, 50)
+    plot(119, 44, white, 45)
+    plot(8, 55, white, 40)
+    plot(24, 61, white, 55)
+    plot(39, 50, white, 45)
+    plot(55, 58, white, 60)
+    plot(71, 63, white, 35)
+    plot(86, 54, white, 50)
+    plot(102, 60, white, 40)
+    plot(117, 57, white, 55)
+    plot(3, 40, white, 45)
+    plot(66, 25, white, 50)
+    plot(95, 30, white, 40)
+    plot(125, 35, white, 55)
+    plot(14, 47, white, 35)
+    plot(50, 19, white, 60)
+    plot(82, 62, white, 45)
+    plot(112, 42, white, 50)
+endsprite
+
+# ============================================================
+# LAYER 1: MID STAR FIELD (96x64) - medium brightness
+# ============================================================
+define_sprite(mid_stars, 96, 64)
+    # Brighter mid-distance stars
+    plot(7, 5, white, 70)
+    plot(23, 12, white, 65)
+    plot(38, 8, white, 75)
+    plot(54, 18, white, 60)
+    plot(71, 3, white, 70)
+    plot(88, 15, white, 65)
+    plot(12, 28, white, 75)
+    plot(29, 35, white, 60)
+    plot(45, 42, white, 70)
+    plot(62, 30, white, 65)
+    plot(79, 38, white, 75)
+    plot(93, 25, white, 60)
+    plot(5, 48, white, 70)
+    plot(19, 55, white, 65)
+    plot(36, 62, white, 75)
+    plot(52, 50, white, 60)
+    plot(68, 58, white, 70)
+    plot(85, 45, white, 65)
+    plot(33, 22, white, 75)
+    plot(75, 52, white, 70)
+    plot(15, 38, white, 65)
+    plot(58, 8, white, 60)
+    plot(91, 60, white, 75)
+    plot(42, 55, white, 70)
+endsprite
+
+# ============================================================
+# LAYER 2: NEAR STARS (80x64) - bright, will become streaks
+# ============================================================
+define_sprite(near_stars, 80, 64)
+    # Bright close stars - these stretch the most
+    plot(8, 10, white, 90)
+    plot(22, 5, white, 85)
+    plot(38, 18, white, 95)
+    plot(55, 8, white, 85)
+    plot(72, 22, white, 90)
+    plot(12, 32, white, 95)
+    plot(28, 45, white, 85)
+    plot(45, 38, white, 90)
+    plot(62, 52, white, 95)
+    plot(78, 35, white, 85)
+    plot(5, 55, white, 90)
+    plot(18, 62, white, 85)
+    plot(35, 50, white, 95)
+    plot(52, 58, white, 90)
+    plot(68, 42, white, 85)
+    plot(75, 60, white, 95)
+    plot(32, 28, white, 90)
+    plot(48, 15, white, 85)
+    plot(65, 30, white, 95)
+    plot(15, 48, white, 90)
+endsprite
+
+# ============================================================
+# LAYER 3: CLOSEST PARTICLES (64x64) - fastest streaks
+# ============================================================
+define_sprite(close_particles, 64, 64)
+    # Very close bright particles
+    plot(8, 8, white, 100)
+    plot(24, 16, cyan, 95)
+    plot(40, 5, white, 100)
+    plot(56, 20, cyan, 95)
+    plot(12, 35, white, 100)
+    plot(32, 48, cyan, 95)
+    plot(52, 32, white, 100)
+    plot(18, 58, cyan, 95)
+    plot(45, 55, white, 100)
+    plot(60, 42, cyan, 95)
+    plot(5, 25, white, 100)
+    plot(28, 62, cyan, 95)
+    plot(50, 12, white, 100)
+    plot(38, 40, cyan, 95)
+    plot(62, 55, white, 100)
+    plot(15, 45, cyan, 95)
+endsprite
+
+# ============================================================
+# COCKPIT FRAME SPRITE (static overlay feeling)
+# ============================================================
+define_sprite(cockpit, 64, 64)
+    # Top frame
+    draw_rectangle(0, 0, 64, 4, dark_gray, 85, true)
+    draw_line(0, 4, 63, 4, gray, 70)
+    # Bottom frame
+    draw_rectangle(0, 58, 64, 6, dark_gray, 85, true)
+    draw_line(0, 58, 63, 58, gray, 70)
+    # Left frame
+    draw_rectangle(0, 0, 5, 64, dark_gray, 80, true)
+    draw_line(5, 4, 5, 58, gray, 65)
+    # Right frame
+    draw_rectangle(59, 0, 5, 64, dark_gray, 80, true)
+    draw_line(58, 4, 58, 58, gray, 65)
+    # Corner accents
+    draw_rectangle(0, 0, 8, 8, gray, 60, true)
+    draw_rectangle(56, 0, 8, 8, gray, 60, true)
+    draw_rectangle(0, 56, 8, 8, gray, 60, true)
+    draw_rectangle(56, 56, 8, 8, gray, 60, true)
+    # Crosshair / targeting reticle at center
+    plot(32, 32, green, 50)
+    draw_line(28, 32, 30, 32, green, 40)
+    draw_line(34, 32, 36, 32, green, 40)
+    draw_line(32, 28, 32, 30, green, 40)
+    draw_line(32, 34, 32, 36, green, 40)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE BACKGROUND LAYERS
+# ============================================================
+set_background(far_stars, 0)
+set_background(mid_stars, 1)
+set_background(near_stars, 2)
+set_background(close_particles, 3)
+
+sync_queue
+
+# ============================================================
+# ANIMATION VARIABLES
+# ============================================================
+v_frame = 0
+v_phase = 0
+v_phase_timer = 0
+
+# Speed multipliers for each layer (will increase during jump)
+v_speed0 = 0.2
+v_speed1 = 0.5
+v_speed2 = 1.0
+v_speed3 = 2.0
+
+# Scroll accumulators
+v_acc0 = 0.0
+v_acc1 = 0.0
+v_acc2 = 0.0
+v_acc3 = 0.0
+
+# Hyperspace effect intensity
+v_intensity = 0
+v_streak_length = 1
+
+# Phase durations (frames)
+v_normal_duration = 120
+v_accel_duration = 80
+v_hyper_duration = 200
+v_decel_duration = 60
+
+# ============================================================
+# MAIN ANIMATION LOOP
+# ============================================================
+while 1 then
+    begin_frame(true)
+    
+    # -----------------------------------------
+    # PHASE 0: Normal flight - gentle drift
+    # -----------------------------------------
+    if v_phase == 0 then
+        v_speed0 = 0.2
+        v_speed1 = 0.5
+        v_speed2 = 1.0
+        v_speed3 = 1.5
+        v_intensity = 0
+        v_streak_length = 0
+        
+        v_phase_timer = v_phase_timer + 1
+        if v_phase_timer >= v_normal_duration then
+            v_phase = 1
+            v_phase_timer = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # PHASE 1: Acceleration - ramping up
+    # -----------------------------------------
+    if v_phase == 1 then
+        v_progress = v_phase_timer / v_accel_duration
+        
+        # Exponential speed increase
+        v_speed0 = 0.2 + v_progress * 2
+        v_speed1 = 0.5 + v_progress * 4
+        v_speed2 = 1.0 + v_progress * 8
+        v_speed3 = 1.5 + v_progress * 14
+        
+        v_intensity = int(v_progress * 100)
+        v_streak_length = int(v_progress * 20)
+        
+        v_phase_timer = v_phase_timer + 1
+        if v_phase_timer >= v_accel_duration then
+            v_phase = 2
+            v_phase_timer = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # PHASE 2: Full hyperspace - maximum speed
+    # -----------------------------------------
+    if v_phase == 2 then
+        v_speed0 = 2.5
+        v_speed1 = 5.0
+        v_speed2 = 10.0
+        v_speed3 = 16.0
+        v_intensity = 100
+        v_streak_length = 20
+        
+        v_phase_timer = v_phase_timer + 1
+        if v_phase_timer >= v_hyper_duration then
+            v_phase = 3
+            v_phase_timer = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # PHASE 3: Deceleration - slowing down
+    # -----------------------------------------
+    if v_phase == 3 then
+        v_progress = 1.0 - (v_phase_timer / v_decel_duration)
+        
+        v_speed0 = 0.2 + v_progress * 2.3
+        v_speed1 = 0.5 + v_progress * 4.5
+        v_speed2 = 1.0 + v_progress * 9
+        v_speed3 = 1.5 + v_progress * 14.5
+        
+        v_intensity = int(v_progress * 100)
+        v_streak_length = int(v_progress * 20)
+        
+        v_phase_timer = v_phase_timer + 1
+        if v_phase_timer >= v_decel_duration then
+            v_phase = 0
+            v_phase_timer = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Scroll backgrounds based on current speeds
+    # -----------------------------------------
+    v_acc0 = v_acc0 + v_speed0
+    v_acc1 = v_acc1 + v_speed1
+    v_acc2 = v_acc2 + v_speed2
+    v_acc3 = v_acc3 + v_speed3
+    
+    if v_acc0 >= 1 then
+        v_scroll0 = int(v_acc0)
+        nudge_background(v_scroll0, 0, 0)
+        v_acc0 = v_acc0 - v_scroll0
+    endif
+    
+    if v_acc1 >= 1 then
+        v_scroll1 = int(v_acc1)
+        nudge_background(v_scroll1, 0, 1)
+        v_acc1 = v_acc1 - v_scroll1
+    endif
+    
+    if v_acc2 >= 1 then
+        v_scroll2 = int(v_acc2)
+        nudge_background(v_scroll2, 0, 2)
+        v_acc2 = v_acc2 - v_scroll2
+    endif
+    
+    if v_acc3 >= 1 then
+        v_scroll3 = int(v_acc3)
+        nudge_background(v_scroll3, 0, 3)
+        v_acc3 = v_acc3 - v_scroll3
+    endif
+    
+    # -----------------------------------------
+    # Draw radial hyperspace streaks from center
+    # Only during acceleration and hyperspace
+    # -----------------------------------------
+    if v_intensity > 10 then
+        # Streak colors shift toward blue at high speed
+        v_streak_color = "white"
+        if v_intensity > 60 then
+            v_streak_color = "cyan"
+        endif
+        if v_intensity > 85 then
+            v_streak_color = "sky_blue"
+        endif
+        
+        # Draw streaks radiating from center (32, 32)
+        # Multiple streaks at random angles
+        for v_s in (0, 7, 1)
+            v_angle = random(0, 359, 0)
+            v_rad = radians(v_angle)
+            
+            # Start position (near center)
+            v_start_dist = random(5, 15, 0)
+            v_sx = 32 + int(cos(v_rad) * v_start_dist)
+            v_sy = 32 + int(sin(v_rad) * v_start_dist)
+            
+            # End position (extending outward)
+            v_end_dist = v_start_dist + v_streak_length
+            v_ex = 32 + int(cos(v_rad) * v_end_dist)
+            v_ey = 32 + int(sin(v_rad) * v_end_dist)
+            
+            # Clamp to screen
+            if v_sx >= 6 and v_sx <= 57 and v_sy >= 5 and v_sy <= 57 then
+                if v_ex >= 6 and v_ex <= 57 and v_ey >= 5 and v_ey <= 57 then
+                    v_streak_int = random(40, 80, 0)
+                    draw_line(v_sx, v_sy, v_ex, v_ey, v_streak_color, v_streak_int, 120, fade)
+                endif
+            endif
+        endfor v_s
+        
+        # Extra bright center flash during hyperspace
+        if v_intensity > 80 then
+            v_flash = random(0, 10, 0)
+            if v_flash > 7 then
+                draw_circle(32, 32, 3, white, 60, true, 80, fade)
+            endif
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Draw cockpit frame overlay
+    # -----------------------------------------
+    # Top frame
+    draw_rectangle(0, 0, 64, 3, dark_gray, 90, true)
+    draw_line(0, 3, 63, 3, gray, 75)
+    # Bottom frame  
+    draw_rectangle(0, 60, 64, 4, dark_gray, 90, true)
+    draw_line(0, 60, 63, 60, gray, 75)
+    # Side frames
+    draw_rectangle(0, 0, 4, 64, dark_gray, 85, true)
+    draw_rectangle(60, 0, 4, 64, dark_gray, 85, true)
+    
+    # Corner brackets
+    draw_line(0, 8, 8, 8, bronze, 70)
+    draw_line(8, 0, 8, 8, bronze, 70)
+    draw_line(55, 0, 55, 8, bronze, 70)
+    draw_line(55, 8, 63, 8, bronze, 70)
+    draw_line(0, 55, 8, 55, bronze, 70)
+    draw_line(8, 55, 8, 63, bronze, 70)
+    draw_line(55, 55, 55, 63, bronze, 70)
+    draw_line(55, 55, 63, 55, bronze, 70)
+    
+    # Center targeting reticle
+    v_reticle_color = "green"
+    v_reticle_int = 50
+    if v_intensity > 50 then
+        v_reticle_color = "cyan"
+        v_reticle_int = 70
+    endif
+    plot(32, 32, v_reticle_color, v_reticle_int)
+    draw_line(28, 32, 30, 32, v_reticle_color, v_reticle_int - 15)
+    draw_line(34, 32, 36, 32, v_reticle_color, v_reticle_int - 15)
+    draw_line(32, 28, 32, 30, v_reticle_color, v_reticle_int - 15)
+    draw_line(32, 34, 32, 36, v_reticle_color, v_reticle_int - 15)
+    
+    # -----------------------------------------
+    # Cockpit instruments (bottom panel)
+    # -----------------------------------------
+    # Speed indicator bar
+    draw_rectangle(8, 61, 20, 2, black, 100, true)
+    v_speed_bar = int(v_intensity * 0.18)
+    if v_speed_bar > 0 then
+        v_bar_color = "green"
+        if v_intensity > 50 then
+            v_bar_color = "yellow"
+        endif
+        if v_intensity > 80 then
+            v_bar_color = "red"
+        endif
+        draw_rectangle(8, 61, v_speed_bar, 2, v_bar_color, 90, true)
+    endif
+    
+    # Status light - blinks during hyperspace
+    v_status_color = "green"
+    v_status_int = 60
+    if v_phase == 1 then
+        v_status_color = "yellow"
+        v_blink = v_frame - floor(v_frame / 8) * 8
+        if v_blink < 4 then
+            v_status_int = 90
+        else
+            v_status_int = 40
+        endif
+    endif
+    if v_phase == 2 then
+        v_status_color = "cyan"
+        v_status_int = 100
+    endif
+    if v_phase == 3 then
+        v_status_color = "yellow"
+        v_blink = v_frame - floor(v_frame / 6) * 6
+        if v_blink < 3 then
+            v_status_int = 85
+        else
+            v_status_int = 45
+        endif
+    endif
+    plot(55, 62, v_status_color, v_status_int)
+    
+    # Engine power gauge (right side)
+    v_gauge_height = int(v_intensity * 0.4)
+    draw_rectangle(61, 15, 2, 40, black, 80, true)
+    if v_gauge_height > 0 then
+        v_gauge_y = 55 - v_gauge_height
+        v_gauge_color = "blue"
+        if v_intensity > 60 then
+            v_gauge_color = "cyan"
+        endif
+        if v_intensity > 85 then
+            v_gauge_color = "white"
+        endif
+        draw_rectangle(61, v_gauge_y, 2, v_gauge_height, v_gauge_color, 85, true)
+    endif
+    
+    # -----------------------------------------
+    # Screen edge glow during hyperspace
+    # -----------------------------------------
+    if v_intensity > 30 then
+        v_glow_int = int(v_intensity * 0.4)
+        # Subtle blue glow at edges
+        draw_line(5, 5, 5, 58, cyan, v_glow_int, 60, fade)
+        draw_line(58, 5, 58, 58, cyan, v_glow_int, 60, fade)
+        draw_line(5, 5, 58, 5, cyan, v_glow_int, 60, fade)
+        draw_line(5, 58, 58, 58, cyan, v_glow_int, 60, fade)
+    endif
+    
+    end_frame
+    
+    rest(0.025)
+    v_frame = v_frame + 1
+    
+    if v_frame > 50000 then
+        v_frame = 0
+    endif
+endwhile
