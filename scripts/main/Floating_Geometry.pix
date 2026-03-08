@@ -351,6 +351,17 @@ v_cel_duration = 300
 v_current_cel = 0
 v_total_cels = 5
 
+# Center polygon
+v_poly_rotation = 0.0
+v_poly_rot_speed = 0.5
+v_poly_size_phase = 0.0
+v_poly_size_speed = 0.02
+v_poly_min_size = 6
+v_poly_max_size = 14
+v_poly_sides = 3.0
+v_poly_sides_speed = 0.008
+v_poly_sides_dir = 1
+
 # ============================================================
 # MAIN ANIMATION LOOP
 # ============================================================
@@ -442,6 +453,54 @@ while 1 then
     # Always nudge (even 0,0) to update cel smoothly
     # -----------------------------------------
     nudge_background(v_scroll_x, v_scroll_y, 0, v_current_cel)
+    
+    # -----------------------------------------
+    # Center polygon - rotating, pulsing, morphing
+    # -----------------------------------------
+    # Update rotation (slow spin)
+    v_poly_rotation = v_poly_rotation + v_poly_rot_speed
+    if v_poly_rotation >= 360 then
+        v_poly_rotation = v_poly_rotation - 360
+    endif
+    
+    # Update size (pulse)
+    v_poly_size_phase = v_poly_size_phase + v_poly_size_speed
+    if v_poly_size_phase > 6.28318 then
+        v_poly_size_phase = v_poly_size_phase - 6.28318
+    endif
+    v_poly_size_factor = (sin(v_poly_size_phase) + 1) * 0.5
+    v_poly_size = v_poly_min_size + v_poly_size_factor * (v_poly_max_size - v_poly_min_size)
+    
+    # Update sides (3 to 7 to 3)
+    v_poly_sides = v_poly_sides + v_poly_sides_speed * v_poly_sides_dir
+    if v_poly_sides >= 7 then
+        v_poly_sides = 7
+        v_poly_sides_dir = -1
+    endif
+    if v_poly_sides <= 3 then
+        v_poly_sides = 3
+        v_poly_sides_dir = 1
+    endif
+    
+    # Draw the polygon (filled, centered at 32,32)
+    v_poly_s = int(v_poly_sides)
+    v_poly_r = int(v_poly_rotation)
+    v_poly_sz = int(v_poly_size)
+    
+    # Outer glow
+    draw_polygon(32, 32, v_poly_sz + 2, v_poly_s, white, 25, v_poly_r, false)
+    
+    # Main filled shape
+    draw_polygon(32, 32, v_poly_sz, v_poly_s, white, 70, v_poly_r, true)
+    
+    # Inner accent
+    v_inner_sz = int(v_poly_size * 0.4)
+    if v_inner_sz > 1 then
+        draw_polygon(32, 32, v_inner_sz, v_poly_s, yellow, 90, v_poly_r + 30, true)
+    endif
+    
+    # Center dot
+    plot(32, 32, white, 100)
     
     end_frame
     
