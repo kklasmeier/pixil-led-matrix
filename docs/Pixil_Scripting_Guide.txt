@@ -564,6 +564,82 @@ fabs(x)          Floating point absolute value
 remainder(x,y)   IEEE 754 remainder
 fmod(x,y)        Floating point modulo
 
+Date/Time Functions
+-------------------
+get_datetime(format)
+
+Returns current date/time values. Single format codes return numeric values,
+compound formats return strings.
+
+TIME CODES (numeric):
+  H     Hour 24-hour format (0-23)
+  h     Hour 12-hour format (1-12)
+  mi    Minute (0-59)
+  s     Second (0-59)
+  ms    Millisecond (0-999)
+
+TIME CODES (string):
+  a     AM or PM
+
+DATE CODES (numeric):
+  d     Day of month (1-31)
+  m     Month (1-12)
+  yyyy  Full year (2026)
+  yy    Short year (26)
+  w     Weekday number (0=Sunday, 6=Saturday)
+
+DATE CODES (string):
+  ddd   Day abbreviated (Sun, Mon, Tue, ...)
+  dddd  Day full (Sunday, Monday, ...)
+  mmm   Month abbreviated (Jan, Feb, Mar, ...)
+  mmmm  Month full (January, February, ...)
+
+EXTENDED CODES (numeric):
+  ts        Unix timestamp (seconds since 1970)
+  tz        Timezone offset hours (-12 to +14)
+  doy       Day of year (1-366)
+  woy       Week of year (1-53)
+  diy       Days remaining in year
+  q         Quarter (1-4)
+  ispm      Is PM (0 or 1)
+  isweekend Is Saturday or Sunday (0 or 1)
+  isleap    Is leap year (0 or 1)
+  dim       Days in current month (28-31)
+
+EXAMPLES - Single codes (return numbers):
+  set(v_hour, get_datetime("H"))           # v_hour = 14
+  set(v_minute, get_datetime("mi"))        # v_minute = 30
+  set(v_day_of_year, get_datetime("doy"))  # v_day_of_year = 67
+
+EXAMPLES - String codes:
+  set(v_day_name, get_datetime("dddd"))    # v_day_name = "Sunday"
+  set(v_ampm, get_datetime("a"))           # v_ampm = "PM"
+
+EXAMPLES - Compound formats (return strings):
+  get_datetime("H:mi:s")         -> "14:30:45"
+  get_datetime("m/d/yyyy")       -> "3/8/2026"
+  get_datetime("dddd, mmmm d")   -> "Sunday, March 8"
+  get_datetime("h:mi a")         -> "2:30 PM"
+
+EXAMPLES - Using in commands:
+  # Display current time
+  draw_text(10, 20, get_datetime("H:mi:s"), tiny64_font, 12, green, 100)
+  
+  # Draw hour hand on clock
+  set(v_angle, get_datetime("H") * 30)
+  
+  # Conditional based on time
+  if(get_datetime("ispm") == 1)
+      # afternoon/evening colors
+  endif
+  
+  # Weekend special animation
+  if(get_datetime("isweekend") == 1)
+      # party mode
+  endif
+
+Note: Format strings must be passed as literals (in quotes), not variables.
+
 ================================================================================
 9. PROCEDURES
 ================================================================================

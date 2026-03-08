@@ -1,0 +1,171 @@
+# test_datetime.pix - Test the get_datetime() function
+# Tests various format codes and usage patterns
+
+clear
+
+# ============================================
+# Test 1: Single numeric codes
+# ============================================
+print("=== Test 1: Single Numeric Codes ===")
+
+set(v_hour24, get_datetime("H"))
+set(v_hour12, get_datetime("h"))
+set(v_minute, get_datetime("mi"))
+set(v_second, get_datetime("s"))
+set(v_ms, get_datetime("ms"))
+set(v_day, get_datetime("d"))
+set(v_month, get_datetime("m"))
+set(v_year, get_datetime("yyyy"))
+set(v_year_short, get_datetime("yy"))
+set(v_weekday, get_datetime("w"))
+
+print(f"Hour (24h): {v_hour24}")
+print(f"Hour (12h): {v_hour12}")
+print(f"Minute: {v_minute}")
+print(f"Second: {v_second}")
+print(f"Millisecond: {v_ms}")
+print(f"Day: {v_day}")
+print(f"Month: {v_month}")
+print(f"Year: {v_year}")
+print(f"Year short: {v_year_short}")
+print(f"Weekday (0=Sun): {v_weekday}")
+
+rest(1)
+
+# ============================================
+# Test 2: Extended numeric codes
+# ============================================
+print("=== Test 2: Extended Numeric Codes ===")
+
+set(v_timestamp, get_datetime("ts"))
+set(v_timezone, get_datetime("tz"))
+set(v_day_of_year, get_datetime("doy"))
+set(v_week_of_year, get_datetime("woy"))
+set(v_days_left, get_datetime("diy"))
+set(v_quarter, get_datetime("q"))
+set(v_ispm, get_datetime("ispm"))
+set(v_isweekend, get_datetime("isweekend"))
+set(v_isleap, get_datetime("isleap"))
+set(v_days_in_month, get_datetime("dim"))
+
+print(f"Unix timestamp: {v_timestamp}")
+print(f"Timezone offset: {v_timezone}")
+print(f"Day of year: {v_day_of_year}")
+print(f"Week of year: {v_week_of_year}")
+print(f"Days remaining: {v_days_left}")
+print(f"Quarter: {v_quarter}")
+print(f"Is PM: {v_ispm}")
+print(f"Is weekend: {v_isweekend}")
+print(f"Is leap year: {v_isleap}")
+print(f"Days in month: {v_days_in_month}")
+
+rest(1)
+
+# ============================================
+# Test 3: String codes
+# ============================================
+print("=== Test 3: String Codes ===")
+
+set(v_ampm, get_datetime("a"))
+set(v_day_abbr, get_datetime("ddd"))
+set(v_day_full, get_datetime("dddd"))
+set(v_month_abbr, get_datetime("mmm"))
+set(v_month_full, get_datetime("mmmm"))
+
+print(f"AM/PM: {v_ampm}")
+print(f"Day abbreviated: {v_day_abbr}")
+print(f"Day full: {v_day_full}")
+print(f"Month abbreviated: {v_month_abbr}")
+print(f"Month full: {v_month_full}")
+
+rest(1)
+
+# ============================================
+# Test 4: Compound format strings
+# ============================================
+print("=== Test 4: Compound Formats ===")
+
+set(v_time, get_datetime("H:mi:s"))
+set(v_time12, get_datetime("h:mi a"))
+set(v_date_us, get_datetime("m/d/yyyy"))
+set(v_date_full, get_datetime("dddd, mmmm d, yyyy"))
+set(v_date_short, get_datetime("ddd m/d"))
+
+print(f"Time 24h: {v_time}")
+print(f"Time 12h: {v_time12}")
+print(f"Date US: {v_date_us}")
+print(f"Date full: {v_date_full}")
+print(f"Date short: {v_date_short}")
+
+rest(1)
+
+# ============================================
+# Test 5: Using in drawing commands
+# ============================================
+print("=== Test 5: In Drawing Commands ===")
+
+clear
+
+# Display current time on the matrix
+draw_text(5, 10, get_datetime("H:mi:s"), tiny64_font, 12, green, 100)
+draw_text(5, 25, get_datetime("ddd, mmm d"), tiny64_font, 12, cyan, 100)
+draw_text(5, 40, get_datetime("h:mi a"), tiny64_font, 12, yellow, 100)
+
+rest(2)
+
+# ============================================
+# Test 6: Using in conditionals
+# ============================================
+print("=== Test 6: Conditionals ===")
+
+if(get_datetime("ispm") == 1)
+    print("It is currently PM (afternoon/evening)")
+else
+    print("It is currently AM (morning)")
+endif
+
+if(get_datetime("isweekend") == 1)
+    print("It's the weekend!")
+else
+    print("It's a weekday")
+endif
+
+if(get_datetime("q") == 4)
+    print("Q4 - Holiday season!")
+endif
+
+rest(1)
+
+# ============================================
+# Test 7: Using in math expressions
+# ============================================
+print("=== Test 7: Math Expressions ===")
+
+# Calculate angle for clock hand
+set(v_hour_angle, get_datetime("H") * 30)
+set(v_minute_angle, get_datetime("mi") * 6)
+set(v_second_angle, get_datetime("s") * 6)
+
+print(f"Hour hand angle: {v_hour_angle} degrees")
+print(f"Minute hand angle: {v_minute_angle} degrees")
+print(f"Second hand angle: {v_second_angle} degrees")
+
+# Year progress percentage
+set(v_progress, get_datetime("doy") / 365 * 100)
+print(f"Year progress: {v_progress}%")
+
+rest(1)
+
+# ============================================
+# Test 8: Live clock display
+# ============================================
+print("=== Test 8: Live Clock (5 seconds) ===")
+
+for(v_i, 1, 50)
+    clear
+    draw_text(8, 25, get_datetime("H:mi:s"), tiny64_font, 12, white, 100)
+    sync_queue
+    rest(0.1)
+endfor
+
+print("=== All get_datetime tests complete ===")

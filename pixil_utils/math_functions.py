@@ -1016,6 +1016,170 @@ def evaluate_string_concatenation(expr: str, variables: Union[Dict[str, Any], Va
         debug_print(f"Final concatenated result: {result}", DEBUG_VERBOSE)
     return result
 
+def get_datetime(format_str: str) -> Union[int, float, str]:
+    """
+    Get current date/time value based on format string.
+    
+    Single codes return numeric values, compound formats return strings.
+    
+    Time codes:
+        H    - Hour 24h (0-23)
+        h    - Hour 12h (1-12)
+        mi   - Minute (0-59)
+        s    - Second (0-59)
+        ms   - Millisecond (0-999)
+        a    - AM/PM (string)
+    
+    Date codes:
+        d    - Day of month (1-31)
+        m    - Month (1-12)
+        yyyy - Full year (2026)
+        yy   - Short year (26)
+        w    - Weekday number (0=Sunday, 6=Saturday)
+        ddd  - Day name abbreviated (Sun, Mon, ...)
+        dddd - Day name full (Sunday, Monday, ...)
+        mmm  - Month name abbreviated (Jan, Feb, ...)
+        mmmm - Month name full (January, February, ...)
+    
+    Extended codes:
+        ts        - Unix timestamp
+        tz        - Timezone offset hours
+        doy       - Day of year (1-366)
+        woy       - Week of year (1-53)
+        diy       - Days remaining in year
+        q         - Quarter (1-4)
+        ispm      - Is PM (0 or 1)
+        isweekend - Is Saturday/Sunday (0 or 1)
+        isleap    - Is leap year (0 or 1)
+        dim       - Days in current month (28-31)
+    
+    Args:
+        format_str: Format code or compound format string
+        
+    Returns:
+        Numeric value for single codes, formatted string for compound formats
+        
+    Raises:
+        ValueError: If format string is empty or contains invalid codes
+    """
+    from datetime import datetime
+    import calendar
+    
+    if not isinstance(format_str, str):
+        raise ValueError(f"get_datetime format must be a string, got {type(format_str).__name__}")
+    
+    if not format_str:
+        raise ValueError("get_datetime format string cannot be empty")
+    
+    now = datetime.now()
+    
+    DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    DAY_NAMES_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    MONTH_NAMES_FULL = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December']
+    MONTH_NAMES_ABBR = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    weekday_sunday_start = (now.weekday() + 1) % 7
+    hour_12 = now.hour % 12
+    if hour_12 == 0:
+        hour_12 = 12
+    
+    day_of_year = now.timetuple().tm_yday
+    days_in_year = 366 if calendar.isleap(now.year) else 365
+    days_remaining = days_in_year - day_of_year
+    week_of_year = now.isocalendar()[1]
+    quarter = (now.month - 1) // 3 + 1
+    is_weekend = 1 if now.weekday() >= 5 else 0
+    is_leap = 1 if calendar.isleap(now.year) else 0
+    is_pm = 1 if now.hour >= 12 else 0
+    days_in_month = calendar.monthrange(now.year, now.month)[1]
+    
+    try:
+        tz_offset = int(now.astimezone().utcoffset().total_seconds() // 3600)
+    except:
+        tz_offset = 0
+    
+    SINGLE_CODES_NUMERIC = {
+        'H': now.hour,
+        'h': hour_12,
+        'mi': now.minute,
+        's': now.second,
+        'ms': now.microsecond // 1000,
+        'd': now.day,
+        'm': now.month,
+        'yyyy': now.year,
+        'yy': now.year % 100,
+        'w': weekday_sunday_start,
+        'ts': int(now.timestamp()),
+        'tz': tz_offset,
+        'doy': day_of_year,
+        'woy': week_of_year,
+        'diy': days_remaining,
+        'q': quarter,
+        'ispm': is_pm,
+        'isweekend': is_weekend,
+        'isleap': is_leap,
+        'dim': days_in_month,
+    }
+    
+    SINGLE_CODES_STRING = {
+        'a': 'PM' if is_pm else 'AM',
+        'dddd': DAY_NAMES_FULL[weekday_sunday_start],
+        'ddd': DAY_NAMES_ABBR[weekday_sunday_start],
+        'mmmm': MONTH_NAMES_FULL[now.month],
+        'mmm': MONTH_NAMES_ABBR[now.month],
+    }
+    
+    if format_str in SINGLE_CODES_NUMERIC:
+        return SINGLE_CODES_NUMERIC[format_str]
+    
+    if format_str in SINGLE_CODES_STRING:
+        return SINGLE_CODES_STRING[format_str]
+    
+    FORMAT_MAP = {
+        'yyyy': str(now.year),
+        'yy': str(now.year % 100).zfill(2),
+        'mmmm': MONTH_NAMES_FULL[now.month],
+        'mmm': MONTH_NAMES_ABBR[now.month],
+        'dddd': DAY_NAMES_FULL[weekday_sunday_start],
+        'ddd': DAY_NAMES_ABBR[weekday_sunday_start],
+        'mi': str(now.minute).zfill(2),
+        'ms': str(now.microsecond // 1000).zfill(3),
+        'ts': str(int(now.timestamp())),
+        'tz': str(tz_offset),
+        'doy': str(day_of_year),
+        'woy': str(week_of_year),
+        'diy': str(days_remaining),
+        'ispm': str(is_pm),
+        'isweekend': str(is_weekend),
+        'isleap': str(is_leap),
+        'dim': str(days_in_month),
+        'H': str(now.hour).zfill(2),
+        'h': str(hour_12),
+        'd': str(now.day),
+        'm': str(now.month),
+        'q': str(quarter),
+        'w': str(weekday_sunday_start),
+        's': str(now.second).zfill(2),
+        'a': 'PM' if is_pm else 'AM',
+    }
+    
+    result = format_str
+    used_codes = []
+    
+    codes_by_length = sorted(FORMAT_MAP.keys(), key=len, reverse=True)
+    
+    for code in codes_by_length:
+        if code in result:
+            result = result.replace(code, FORMAT_MAP[code])
+            used_codes.append(code)
+    
+    if result == format_str:
+        raise ValueError(f"Invalid datetime format: '{format_str}' - no recognized format codes found")
+    
+    return result
+
 # Math function dictionary containing all allowed mathematical operations
 MATH_FUNCTIONS = {
     # Basic Math
@@ -1059,8 +1223,9 @@ MATH_FUNCTIONS = {
     'remainder': math.remainder,
     'fmod': math.fmod,
 
-    # Custom built funtion
-    'random': random_float
+    # Custom built functions
+    'random': random_float,
+    'get_datetime': get_datetime
 }
 
 def clear_all_math_caches():
@@ -1073,6 +1238,7 @@ def clear_all_math_caches():
 __all__ = [
     'MATH_FUNCTIONS',
     'random_float',
+    'get_datetime',
     'has_math_expression',
     'substitute_variables',
     'evaluate_math_expression',
