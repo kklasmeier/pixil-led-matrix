@@ -1,0 +1,460 @@
+# ============================================================
+# SKI DOWNHILL - Racing down a snowy mountain
+# ============================================================
+# First-person view skiing downhill at high speed
+#
+# Background layers:
+#   Layer 0: Distant mountains and sky (slowest)
+#   Layer 1: Mid-distance pine trees (medium)
+#   Layer 2: Near trees and course markers (fast)
+#   Layer 3: Closest poles/gates streaking past (fastest)
+#
+# Foreground:
+#   - Ski tips at bottom
+#   - Snow spray particles
+#   - Slalom gates to pass through
+#   - Speed lines
+#   - Timer display
+# ============================================================
+
+throttle(0.15)
+
+# ============================================================
+# LAYER 0: DISTANT MOUNTAINS & SKY (128x64)
+# ============================================================
+define_sprite(mountains, 128, 64)
+    # Sky gradient - bright blue
+    draw_rectangle(0, 0, 128, 25, sky_blue, 70, true)
+    draw_rectangle(0, 25, 128, 10, azure, 55, true)
+    
+    # Sun
+    draw_circle(100, 12, 6, yellow, 60, true)
+    draw_circle(100, 12, 4, white, 50, true)
+    
+    # Distant mountain silhouettes
+    draw_polygon(20, 32, 18, 3, white, 45, 0, true)
+    draw_polygon(50, 28, 22, 3, silver, 50, 0, true)
+    draw_polygon(85, 30, 20, 3, white, 48, 0, true)
+    draw_polygon(115, 33, 15, 3, silver, 45, 0, true)
+    
+    # Snow on peaks
+    draw_polygon(50, 22, 8, 3, white, 70, 0, true)
+    draw_polygon(85, 24, 7, 3, white, 65, 0, true)
+    
+    # Snow field base
+    draw_rectangle(0, 40, 128, 24, white, 60, true)
+    
+    # Subtle snow texture
+    draw_line(10, 45, 25, 45, silver, 25)
+    draw_line(50, 48, 70, 48, silver, 22)
+    draw_line(90, 44, 110, 44, silver, 28)
+    draw_line(30, 52, 45, 52, silver, 20)
+    draw_line(75, 55, 95, 55, silver, 25)
+endsprite
+
+# ============================================================
+# LAYER 1: MID TREES (96x64)
+# Pine tree silhouettes at medium distance
+# ============================================================
+define_sprite(mid_trees, 96, 64)
+    # Snow ground
+    draw_rectangle(0, 45, 96, 19, white, 55, true)
+    
+    # Tree 1
+    draw_polygon(12, 28, 10, 3, forest_green, 70, 0, true)
+    draw_polygon(12, 35, 8, 3, forest_green, 65, 0, true)
+    draw_polygon(12, 40, 6, 3, forest_green, 60, 0, true)
+    draw_rectangle(11, 43, 2, 4, standard_brown, 60, true)
+    # Snow on tree
+    plot(12, 24, white, 70)
+    plot(10, 30, white, 55)
+    plot(14, 30, white, 55)
+    
+    # Tree 2
+    draw_polygon(38, 30, 9, 3, forest_green, 68, 0, true)
+    draw_polygon(38, 36, 7, 3, forest_green, 63, 0, true)
+    draw_polygon(38, 41, 5, 3, forest_green, 58, 0, true)
+    draw_rectangle(37, 44, 2, 3, standard_brown, 58, true)
+    plot(38, 26, white, 65)
+    
+    # Tree 3
+    draw_polygon(65, 26, 11, 3, forest_green, 72, 0, true)
+    draw_polygon(65, 34, 9, 3, forest_green, 67, 0, true)
+    draw_polygon(65, 40, 7, 3, forest_green, 62, 0, true)
+    draw_rectangle(64, 44, 2, 4, standard_brown, 60, true)
+    plot(65, 22, white, 70)
+    plot(63, 28, white, 50)
+    plot(67, 28, white, 50)
+    
+    # Tree 4
+    draw_polygon(88, 32, 8, 3, forest_green, 65, 0, true)
+    draw_polygon(88, 38, 6, 3, forest_green, 60, 0, true)
+    draw_polygon(88, 42, 4, 3, forest_green, 55, 0, true)
+    draw_rectangle(87, 44, 2, 3, standard_brown, 55, true)
+    plot(88, 28, white, 60)
+    
+    # Snow mounds
+    draw_ellipse(25, 50, 8, 3, white, 65, true, 0)
+    draw_ellipse(55, 52, 10, 4, white, 60, true, 0)
+    draw_ellipse(80, 48, 7, 3, white, 62, true, 0)
+endsprite
+
+# ============================================================
+# LAYER 2: NEAR TREES & MARKERS (80x64)
+# Close trees and course boundary markers
+# ============================================================
+define_sprite(near_trees, 80, 64)
+    # Snow ground
+    draw_rectangle(0, 40, 80, 24, white, 50, true)
+    
+    # Large close tree 1 (left side)
+    draw_polygon(8, 18, 14, 3, green, 85, 0, true)
+    draw_polygon(8, 28, 12, 3, green, 80, 0, true)
+    draw_polygon(8, 36, 10, 3, green, 75, 0, true)
+    draw_rectangle(6, 42, 4, 6, standard_brown, 75, true)
+    # Snow clumps
+    plot(8, 12, white, 85)
+    plot(5, 20, white, 70)
+    plot(11, 20, white, 70)
+    plot(4, 28, white, 60)
+    plot(12, 28, white, 60)
+    
+    # Course marker pole (orange)
+    draw_rectangle(35, 25, 2, 22, orange, 90, true)
+    draw_circle(36, 23, 2, orange, 85, true)
+    
+    # Large close tree 2 (right side)
+    draw_polygon(60, 20, 13, 3, green, 82, 0, true)
+    draw_polygon(60, 29, 11, 3, green, 77, 0, true)
+    draw_polygon(60, 37, 9, 3, green, 72, 0, true)
+    draw_rectangle(58, 43, 4, 5, standard_brown, 72, true)
+    plot(60, 14, white, 80)
+    plot(57, 22, white, 65)
+    plot(63, 22, white, 65)
+    
+    # Course marker pole 2
+    draw_rectangle(75, 28, 2, 20, cyan, 88, true)
+    draw_circle(76, 26, 2, cyan, 82, true)
+    
+    # Ski track marks in snow
+    draw_line(25, 50, 30, 58, silver, 30)
+    draw_line(45, 48, 50, 56, silver, 28)
+endsprite
+
+# ============================================================
+# LAYER 3: CLOSEST - SLALOM GATES (64x64)
+# Gates that whoosh past, alternating red/blue
+# ============================================================
+define_sprite(gates, 64, 64)
+    # Snow
+    draw_rectangle(0, 35, 64, 29, white, 45, true)
+    
+    # Slalom gate 1 - RED (left gate of pair)
+    draw_rectangle(10, 10, 3, 35, red, 95, true)
+    # Flag/panel
+    draw_rectangle(8, 12, 7, 12, red, 90, true)
+    draw_line(8, 12, 14, 12, white, 70)
+    draw_line(8, 23, 14, 23, white, 70)
+    # Base in snow
+    draw_ellipse(11, 46, 4, 2, silver, 50, true, 0)
+    
+    # Slalom gate 2 - BLUE (right gate of pair)
+    draw_rectangle(45, 12, 3, 33, blue, 95, true)
+    # Flag/panel
+    draw_rectangle(43, 14, 7, 12, blue, 90, true)
+    draw_line(43, 14, 49, 14, white, 70)
+    draw_line(43, 25, 49, 25, white, 70)
+    # Base
+    draw_ellipse(46, 46, 4, 2, silver, 50, true, 0)
+    
+    # Snow spray suggestion
+    plot(20, 55, white, 60)
+    plot(22, 57, white, 50)
+    plot(38, 54, white, 55)
+    plot(40, 58, white, 45)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE BACKGROUND LAYERS
+# ============================================================
+set_background(mountains, 0)
+set_background(mid_trees, 1)
+set_background(near_trees, 2)
+set_background(gates, 3)
+
+sync_queue
+
+# ============================================================
+# ANIMATION VARIABLES
+# ============================================================
+v_frame = 0
+
+# Layer speeds (downhill = scrolling up, but we scroll left for parallax feel)
+v_speed0 = 0.8
+v_speed1 = 2.5
+v_speed2 = 5.0
+v_speed3 = 9.0
+
+# Scroll accumulators
+v_acc0 = 0.0
+v_acc1 = 0.0
+v_acc2 = 0.0
+v_acc3 = 0.0
+
+# Skier sway (leaning left/right)
+v_sway_angle = 0.0
+v_sway_speed = 0.12
+
+# Speed variation (simulating terrain)
+v_speed_var = 0.0
+v_speed_var_dir = 1
+
+# Timer
+v_timer_seconds = 0
+v_timer_frames = 0
+
+# Mogul bump effect
+v_bump_timer = 0
+v_bump_active = 0
+v_bump_offset = 0
+
+# ============================================================
+# MAIN ANIMATION LOOP
+# ============================================================
+while 1 then
+    begin_frame(true)
+    
+    # -----------------------------------------
+    # Update timer
+    # -----------------------------------------
+    v_timer_frames = v_timer_frames + 1
+    if v_timer_frames >= 30 then
+        v_timer_frames = 0
+        v_timer_seconds = v_timer_seconds + 1
+        if v_timer_seconds >= 999 then
+            v_timer_seconds = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Speed variation (terrain changes)
+    # -----------------------------------------
+    v_speed_var = v_speed_var + 0.02 * v_speed_var_dir
+    if v_speed_var > 1.5 then
+        v_speed_var_dir = -1
+    endif
+    if v_speed_var < -0.5 then
+        v_speed_var_dir = 1
+    endif
+    
+    v_cur_speed0 = v_speed0 + v_speed_var * 0.2
+    v_cur_speed1 = v_speed1 + v_speed_var * 0.5
+    v_cur_speed2 = v_speed2 + v_speed_var * 1.0
+    v_cur_speed3 = v_speed3 + v_speed_var * 1.5
+    
+    # -----------------------------------------
+    # Mogul bump check
+    # -----------------------------------------
+    v_bump_timer = v_bump_timer + 1
+    if v_bump_timer > 120 and v_bump_active == 0 then
+        v_bump_chance = random(0, 100, 0)
+        if v_bump_chance > 70 then
+            v_bump_active = 1
+            v_bump_offset = 0
+            v_bump_timer = 0
+        endif
+    endif
+    
+    if v_bump_active == 1 then
+        v_bump_offset = v_bump_offset + 1
+        if v_bump_offset > 12 then
+            v_bump_active = 0
+            v_bump_timer = 0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Scroll backgrounds
+    # -----------------------------------------
+    v_acc0 = v_acc0 + v_cur_speed0
+    v_acc1 = v_acc1 + v_cur_speed1
+    v_acc2 = v_acc2 + v_cur_speed2
+    v_acc3 = v_acc3 + v_cur_speed3
+    
+    if v_acc0 >= 1 then
+        v_scroll0 = int(v_acc0)
+        nudge_background(v_scroll0, 0, 0)
+        v_acc0 = v_acc0 - v_scroll0
+    endif
+    
+    if v_acc1 >= 1 then
+        v_scroll1 = int(v_acc1)
+        nudge_background(v_scroll1, 0, 1)
+        v_acc1 = v_acc1 - v_scroll1
+    endif
+    
+    if v_acc2 >= 1 then
+        v_scroll2 = int(v_acc2)
+        nudge_background(v_scroll2, 0, 2)
+        v_acc2 = v_acc2 - v_scroll2
+    endif
+    
+    if v_acc3 >= 1 then
+        v_scroll3 = int(v_acc3)
+        nudge_background(v_scroll3, 0, 3)
+        v_acc3 = v_acc3 - v_scroll3
+    endif
+    
+    # -----------------------------------------
+    # Skier sway calculation
+    # -----------------------------------------
+    v_sway = sin(v_sway_angle) * 3
+    v_sway_angle = v_sway_angle + v_sway_speed
+    if v_sway_angle > 6.28318 then
+        v_sway_angle = v_sway_angle - 6.28318
+    endif
+    
+    # Bump effect on sway
+    v_bump_y = 0
+    if v_bump_active == 1 then
+        if v_bump_offset < 6 then
+            v_bump_y = -v_bump_offset
+        else
+            v_bump_y = -(12 - v_bump_offset)
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Draw ski tips at bottom
+    # -----------------------------------------
+    v_ski_center = 32 + int(v_sway)
+    v_ski_y = 58 + v_bump_y
+    
+    # Left ski
+    v_left_ski_x = v_ski_center - 8
+    draw_line(v_left_ski_x, v_ski_y + 4, v_left_ski_x + 3, v_ski_y, white, 95)
+    draw_line(v_left_ski_x + 1, v_ski_y + 4, v_left_ski_x + 4, v_ski_y, silver, 80)
+    # Ski tip curve
+    plot(v_left_ski_x + 3, v_ski_y - 1, silver, 70)
+    
+    # Right ski
+    v_right_ski_x = v_ski_center + 5
+    draw_line(v_right_ski_x, v_ski_y + 4, v_right_ski_x + 3, v_ski_y, white, 95)
+    draw_line(v_right_ski_x + 1, v_ski_y + 4, v_right_ski_x + 4, v_ski_y, silver, 80)
+    plot(v_right_ski_x + 3, v_ski_y - 1, silver, 70)
+    
+    # Ski pole tips (occasionally visible)
+    if v_frame - floor(v_frame / 40) * 40 < 10 then
+        v_pole_x = v_ski_center - 15 + int(v_sway * 0.5)
+        plot(v_pole_x, 50 + v_bump_y, gray, 60)
+        plot(v_pole_x, 51 + v_bump_y, silver, 50)
+    endif
+    
+    # -----------------------------------------
+    # Snow spray particles
+    # -----------------------------------------
+    for v_p in (0, 5, 1)
+        v_spray_x = v_ski_center + random(-12, 12, 0)
+        v_spray_y = 54 + random(0, 8, 0) + v_bump_y
+        v_spray_int = random(40, 80, 0)
+        v_spray_life = random(80, 200, 0)
+        
+        if v_spray_y < 63 and v_spray_y > 45 then
+            plot(v_spray_x, v_spray_y, white, v_spray_int, v_spray_life, fade)
+        endif
+    endfor v_p
+    
+    # Extra spray during bump landing
+    if v_bump_active == 1 and v_bump_offset > 8 then
+        for v_sp in (0, 8, 1)
+            v_bspray_x = v_ski_center + random(-15, 15, 0)
+            v_bspray_y = 52 + random(0, 10, 0)
+            plot(v_bspray_x, v_bspray_y, white, random(50, 90, 0), random(100, 250, 0), fade)
+        endfor v_sp
+    endif
+    
+    # -----------------------------------------
+    # Speed lines (blur effect at edges)
+    # -----------------------------------------
+    v_speed_intensity = int(40 + v_speed_var * 15)
+    
+    # Left edge speed lines
+    for v_sl in (0, 2, 1)
+        v_line_y = random(10, 50, 0)
+        draw_line(0, v_line_y, 5, v_line_y + 2, white, v_speed_intensity, 100, fade)
+    endfor v_sl
+    
+    # Right edge speed lines
+    for v_sr in (0, 2, 1)
+        v_line_y = random(10, 50, 0)
+        draw_line(63, v_line_y, 58, v_line_y + 2, white, v_speed_intensity, 100, fade)
+    endfor v_sr
+    
+    # -----------------------------------------
+    # Goggles frame overlay
+    # -----------------------------------------
+    # Top tint
+    draw_rectangle(0, 0, 64, 4, black, 60, true)
+    draw_line(0, 4, 63, 4, dark_gray, 40)
+    
+    # Bottom tint  
+    draw_rectangle(0, 60, 64, 4, black, 50, true)
+    
+    # Side vignette
+    draw_line(0, 5, 0, 59, black, 45)
+    draw_line(1, 5, 1, 59, black, 30)
+    draw_line(63, 5, 63, 59, black, 45)
+    draw_line(62, 5, 62, 59, black, 30)
+    
+    # Goggle reflection hint
+    draw_line(5, 8, 15, 6, white, 20)
+    draw_line(55, 7, 60, 9, white, 18)
+    
+    # -----------------------------------------
+    # Timer display (top right)
+    # -----------------------------------------
+    draw_rectangle(45, 1, 17, 7, black, 70, true)
+    
+    # Simple numeric display using plots
+    v_min = int(v_timer_seconds / 60)
+    v_sec = v_timer_seconds - (v_min * 60)
+    
+    # Colon blink
+    if v_timer_frames < 15 then
+        plot(53, 3, green, 80)
+        plot(53, 5, green, 80)
+    endif
+    
+    # Draw simplified time (just indicator bar)
+    v_time_bar = int((v_timer_seconds / 120.0) * 14)
+    if v_time_bar > 14 then
+        v_time_bar = 14
+    endif
+    draw_rectangle(47, 3, v_time_bar, 3, green, 75, true)
+    
+    # -----------------------------------------
+    # Speed indicator (simple bar)
+    # -----------------------------------------
+    v_speed_display = int((v_cur_speed3 / 12.0) * 10)
+    draw_rectangle(2, 2, 12, 4, black, 60, true)
+    
+    v_speed_color = "green"
+    if v_speed_display > 6 then
+        v_speed_color = "yellow"
+    endif
+    if v_speed_display > 8 then
+        v_speed_color = "red"
+    endif
+    draw_rectangle(3, 3, v_speed_display, 2, v_speed_color, 85, true)
+    
+    end_frame
+    
+    rest(0.028)
+    v_frame = v_frame + 1
+    
+    if v_frame > 50000 then
+        v_frame = 0
+    endif
+endwhile
