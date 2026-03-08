@@ -1,0 +1,26 @@
+# Test script for font auto-trim feature
+# Tests that tiny64_font characters render with proper spacing
+# and that spaces are preserved correctly
+
+clear
+
+# Test 1: Numbers and colons (clock format)
+draw_text(2, 2, "11:11", tiny64_font, 5, white, 100)
+draw_text(2, 10, "12:34", tiny64_font, 5, cyan, 100)
+
+# Test 2: Time with AM/PM
+draw_text(2, 18, "9:30AM", tiny64_font, 5, green, 100)
+draw_text(2, 26, "10:45PM", tiny64_font, 5, yellow, 100)
+
+# Test 3: Spacing test - spaces should be preserved
+draw_text(2, 34, "A B C", tiny64_font, 5, magenta, 100)
+
+# Test 4: Mixed characters
+draw_text(2, 42, "Hi 123", tiny64_font, 5, orange, 100)
+
+# Test 5: Live clock using get_datetime
+v_time = get_datetime("h:mi:s a")
+draw_text(2, 50, v_time, tiny64_font, 5, red, 100)
+
+# Display for 10 seconds
+rest(10)

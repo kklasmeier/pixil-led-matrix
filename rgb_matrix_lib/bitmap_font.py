@@ -100,8 +100,47 @@ class BitmapFontManager:
         
         return (width, height)
     
+    def _get_trim_info(self, bitmap: List[str]) -> Tuple[int, int]:
+        """
+        Calculate leading and trailing trimmable columns.
+        
+        Trimmable columns are those where ALL rows have '0' (not '1' or '2').
+        '2' marks intentional whitespace that should not be trimmed.
+        
+        Args:
+            bitmap: List of row strings for a character
+            
+        Returns:
+            Tuple of (leading_trimmable, trailing_trimmable) column counts
+        """
+        if not bitmap:
+            return (0, 0)
+        
+        width = len(bitmap[0])
+        height = len(bitmap)
+        
+        # Count leading trimmable columns (from left)
+        leading = 0
+        for col in range(width):
+            is_trimmable = all(bitmap[row][col] == '0' for row in range(height))
+            if is_trimmable:
+                leading += 1
+            else:
+                break
+        
+        # Count trailing trimmable columns (from right)
+        trailing = 0
+        for col in range(width - 1, -1, -1):
+            is_trimmable = all(bitmap[row][col] == '0' for row in range(height))
+            if is_trimmable:
+                trailing += 1
+            else:
+                break
+        
+        return (leading, trailing)
+    
     def get_text_dimensions(self, text: str) -> Tuple[int, int]:
-        """Calculate the dimensions of a complete text string"""
+        """Calculate the dimensions of a complete text string (with auto-trim)"""
         if not text or not self.ensure_font_loaded():
             return (0, 0)
             
@@ -109,9 +148,24 @@ class BitmapFontManager:
         max_height = 5  # Default height
         
         for i, char in enumerate(text):
-            width, height = self.get_char_dimensions(char)
-            total_width += width
-            max_height = max(max_height, height)
+            bitmap = self.get_char_bitmap(char)
+            if not bitmap:
+                # Default for unknown characters
+                total_width += 2
+                max_height = max(max_height, 5)
+            else:
+                orig_width = len(bitmap[0])
+                height = len(bitmap)
+                
+                # Calculate trimmed width
+                leading, trailing = self._get_trim_info(bitmap)
+                trimmed_width = orig_width - leading - trailing
+                
+                # Ensure at least 1 pixel width
+                trimmed_width = max(1, trimmed_width)
+                
+                total_width += trimmed_width
+                max_height = max(max_height, height)
             
             # Add spacing between characters (except after the last one)
             if i < len(text) - 1:
@@ -120,7 +174,7 @@ class BitmapFontManager:
         return (total_width, max_height)
     
     def create_text_image(self, text: str) -> Optional[Image.Image]:
-        """Create a PIL Image from the bitmap font data for the given text"""
+        """Create a PIL Image from the bitmap font data for the given text (with auto-trim)"""
         if not text or not self.ensure_font_loaded():
             return None
             
@@ -139,25 +193,31 @@ class BitmapFontManager:
             bitmap = self.get_char_bitmap(char)
             if not bitmap:
                 # Skip unknown characters
-                x_pos += 2  # Default width + spacing
+                x_pos += 3  # Default width (2) + spacing (1)
                 continue
                 
-            char_width = len(bitmap[0])  # Use actual width from bitmap
+            orig_width = len(bitmap[0])
             char_height = len(bitmap)
+            
+            # Calculate trim info
+            leading, trailing = self._get_trim_info(bitmap)
+            trimmed_width = orig_width - leading - trailing
+            trimmed_width = max(1, trimmed_width)
             
             # Determine vertical position (handle descenders)
             y_offset = 0
             if char in self.descenders:
                 y_offset = 0  # Descenders start at the top but extend lower
             
-            # Draw the character
+            # Draw only the non-trimmed portion of the character
             for y, row in enumerate(bitmap):
-                for x, pixel in enumerate(row):
+                for x in range(leading, orig_width - trailing):
+                    pixel = row[x]
                     if pixel == '1':
-                        img.putpixel((x_pos + x, y_offset + y), (255, 255, 255))
+                        img.putpixel((x_pos + (x - leading), y_offset + y), (255, 255, 255))
             
-            # Move to the next character position
-            x_pos += char_width + 1  # Add spacing
+            # Move to the next character position (trimmed width + spacing)
+            x_pos += trimmed_width + 1
         
         return img   
      
