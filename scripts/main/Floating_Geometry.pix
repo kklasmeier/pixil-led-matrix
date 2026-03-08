@@ -354,13 +354,14 @@ v_total_cels = 5
 # Center polygon
 v_poly_rotation = 0.0
 v_poly_rot_speed = 0.5
-v_poly_size_phase = 0.0
-v_poly_size_speed = 0.01
-v_poly_min_size = 6
+v_poly_size = 0.0
 v_poly_max_size = 14
+v_poly_grow_speed = 0.08
+v_poly_state = 0
+v_poly_hidden_timer = 0
+v_poly_hidden_duration = 60
 v_poly_sides = 3
 v_poly_sides_dir = 1
-v_poly_at_min = 0
 
 # ============================================================
 # MAIN ANIMATION LOOP
@@ -463,18 +464,24 @@ while 1 then
         v_poly_rotation = v_poly_rotation - 360
     endif
     
-    # Update size (pulse)
-    v_poly_size_phase = v_poly_size_phase + v_poly_size_speed
-    if v_poly_size_phase > 6.28318 then
-        v_poly_size_phase = v_poly_size_phase - 6.28318
+    # Update size with states: 0=growing, 1=shrinking, 2=hidden
+    if v_poly_state == 0 then
+        # Growing
+        v_poly_size = v_poly_size + v_poly_grow_speed
+        if v_poly_size >= v_poly_max_size then
+            v_poly_size = v_poly_max_size
+            v_poly_state = 1
+        endif
     endif
-    v_poly_size_factor = (sin(v_poly_size_phase) + 1) * 0.5
-    v_poly_size = v_poly_min_size + v_poly_size_factor * (v_poly_max_size - v_poly_min_size)
     
-    # Update sides only ONCE when hitting minimum size (so change isn't visible)
-    if v_poly_size <= v_poly_min_size + 0.3 then
-        if v_poly_at_min == 0 then
-            v_poly_at_min = 1
+    if v_poly_state == 1 then
+        # Shrinking
+        v_poly_size = v_poly_size - v_poly_grow_speed
+        if v_poly_size <= 0 then
+            v_poly_size = 0
+            v_poly_state = 2
+            v_poly_hidden_timer = 0
+            # Change sides while hidden
             v_poly_sides = v_poly_sides + v_poly_sides_dir
             if v_poly_sides >= 7 then
                 v_poly_sides = 7
@@ -485,26 +492,34 @@ while 1 then
                 v_poly_sides_dir = 1
             endif
         endif
-    else
-        v_poly_at_min = 0
     endif
     
-    # Draw the polygon (filled, centered at 32,32)
-    v_poly_s = int(v_poly_sides)
-    v_poly_r = int(v_poly_rotation)
-    v_poly_sz = int(v_poly_size)
-    
-    # Main filled shape (cyan)
-    draw_polygon(32, 32, v_poly_sz, v_poly_s, cyan, 85, v_poly_r, true)
-    
-    # Inner accent (magenta, rotated offset)
-    v_inner_sz = int(v_poly_size * 0.4)
-    if v_inner_sz > 1 then
-        draw_polygon(32, 32, v_inner_sz, v_poly_s, magenta, 95, v_poly_r + 30, true)
+    if v_poly_state == 2 then
+        # Hidden - wait
+        v_poly_hidden_timer = v_poly_hidden_timer + 1
+        if v_poly_hidden_timer >= v_poly_hidden_duration then
+            v_poly_state = 0
+        endif
     endif
     
-    # Center dot
-    plot(32, 32, white, 100)
+    # Draw the polygon only when visible (size > 0)
+    if v_poly_size > 0.5 then
+        v_poly_s = int(v_poly_sides)
+        v_poly_r = int(v_poly_rotation)
+        v_poly_sz = int(v_poly_size)
+        
+        # Main filled shape (cyan)
+        draw_polygon(32, 32, v_poly_sz, v_poly_s, cyan, 85, v_poly_r, true)
+        
+        # Inner accent (magenta, rotated offset)
+        v_inner_sz = int(v_poly_size * 0.4)
+        if v_inner_sz > 1 then
+            draw_polygon(32, 32, v_inner_sz, v_poly_s, magenta, 95, v_poly_r + 30, true)
+        endif
+        
+        # Center dot
+        plot(32, 32, white, 100)
+    endif
     
     end_frame
     
