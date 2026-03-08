@@ -1,0 +1,464 @@
+# ============================================================
+# SUBWAY TUNNEL - Racing through underground darkness
+# ============================================================
+# View from front of train car speeding through tunnel
+#
+# Background layers:
+#   Layer 0: Far tunnel ceiling lights (slow)
+#   Layer 1: Mid tunnel walls, pipes, cables (medium)
+#   Layer 2: Near wall details, graffiti tags (fast)
+#   Layer 3: Support pillars/beams streaking past (fastest)
+#
+# Foreground:
+#   - Train window frame
+#   - Converging track lines
+#   - Swaying handrails
+#   - Occasional station platform flash
+#   - Flickering interior lights
+# ============================================================
+
+throttle(0.15)
+
+# ============================================================
+# LAYER 0: FAR TUNNEL - ceiling lights (128x64)
+# Orange sodium lamps in the distance
+# ============================================================
+define_sprite(tunnel_far, 128, 64)
+    # Dark ceiling
+    draw_rectangle(0, 0, 128, 20, black, 100, true)
+    
+    # Ceiling lights - orange sodium lamps
+    draw_ellipse(16, 8, 4, 2, orange, 50, true, 0)
+    plot(16, 8, yellow, 70)
+    draw_ellipse(48, 8, 4, 2, orange, 45, true, 0)
+    plot(48, 8, yellow, 65)
+    draw_ellipse(80, 8, 4, 2, orange, 50, true, 0)
+    plot(80, 8, yellow, 70)
+    draw_ellipse(112, 8, 4, 2, orange, 45, true, 0)
+    plot(112, 8, yellow, 65)
+    
+    # Light glow on ceiling
+    draw_line(12, 12, 20, 12, orange, 20)
+    draw_line(44, 12, 52, 12, orange, 18)
+    draw_line(76, 12, 84, 12, orange, 20)
+    draw_line(108, 12, 116, 12, orange, 18)
+    
+    # Distant wall hint
+    draw_rectangle(0, 50, 128, 14, dark_gray, 25, true)
+    
+    # Track bed glow from lights
+    draw_line(0, 58, 127, 58, orange, 12)
+endsprite
+
+# ============================================================
+# LAYER 1: MID TUNNEL - pipes, cables, wall texture (96x64)
+# ============================================================
+define_sprite(tunnel_mid, 96, 64)
+    # Upper wall pipes
+    draw_line(0, 18, 95, 18, gray, 45)
+    draw_line(0, 20, 95, 20, dark_gray, 55)
+    draw_line(0, 22, 95, 22, gray, 40)
+    
+    # Cable bundles
+    draw_line(0, 25, 95, 25, black, 70)
+    draw_line(0, 26, 95, 26, dark_gray, 50)
+    
+    # Vertical pipe joints
+    draw_rectangle(15, 18, 2, 10, gray, 50, true)
+    draw_rectangle(47, 18, 2, 10, gray, 45, true)
+    draw_rectangle(79, 18, 2, 10, gray, 50, true)
+    
+    # Wall surface - grimy tiles
+    draw_rectangle(0, 30, 96, 20, dark_gray, 35, true)
+    # Tile lines
+    draw_line(0, 35, 95, 35, gray, 20)
+    draw_line(0, 40, 95, 40, gray, 18)
+    draw_line(0, 45, 95, 45, gray, 20)
+    
+    # Grime streaks
+    draw_line(10, 30, 12, 50, black, 30)
+    draw_line(35, 32, 36, 48, black, 25)
+    draw_line(60, 31, 62, 49, black, 28)
+    draw_line(85, 30, 87, 50, black, 30)
+    
+    # Bottom wall/track area
+    draw_rectangle(0, 52, 96, 12, black, 90, true)
+    draw_line(0, 52, 95, 52, gray, 30)
+endsprite
+
+# ============================================================
+# LAYER 2: NEAR WALL - graffiti, details (80x64)
+# ============================================================
+define_sprite(tunnel_near, 80, 64)
+    # Wall section
+    draw_rectangle(0, 25, 80, 28, dark_gray, 45, true)
+    
+    # Graffiti tag 1 - cyan
+    draw_line(8, 32, 12, 28, cyan, 65)
+    draw_line(12, 28, 16, 35, cyan, 60)
+    draw_line(16, 35, 20, 30, cyan, 65)
+    plot(10, 30, cyan, 70)
+    plot(18, 32, cyan, 70)
+    
+    # Graffiti tag 2 - magenta  
+    draw_line(35, 38, 42, 34, magenta, 60)
+    draw_line(42, 34, 45, 40, magenta, 55)
+    draw_rectangle(38, 36, 4, 3, magenta, 50, true)
+    
+    # Graffiti tag 3 - lime
+    draw_line(58, 30, 65, 30, lime, 55)
+    draw_line(65, 30, 68, 36, lime, 60)
+    draw_line(58, 30, 60, 38, lime, 55)
+    plot(62, 33, lime, 65)
+    
+    # Graffiti tag 4 - orange
+    draw_rectangle(72, 35, 6, 5, orange, 50, true)
+    plot(75, 37, yellow, 60)
+    
+    # Emergency light (red)
+    plot(25, 28, red, 80)
+    plot(55, 28, red, 75)
+    
+    # Bottom darkness
+    draw_rectangle(0, 53, 80, 11, black, 100, true)
+    
+    # Rail reflection
+    draw_line(0, 56, 79, 56, orange, 15)
+endsprite
+
+# ============================================================
+# LAYER 3: PILLARS/BEAMS - fastest streaking (64x64)
+# Support columns that whoosh past
+# ============================================================
+define_sprite(pillars, 64, 64)
+    # Pillar 1
+    draw_rectangle(8, 15, 4, 42, gray, 70, true)
+    draw_line(8, 15, 8, 57, dark_gray, 80)
+    draw_line(11, 15, 11, 57, light_gray, 50)
+    # Base
+    draw_rectangle(6, 54, 8, 4, dark_gray, 75, true)
+    
+    # Pillar 2
+    draw_rectangle(36, 15, 4, 42, gray, 65, true)
+    draw_line(36, 15, 36, 57, dark_gray, 75)
+    draw_line(39, 15, 39, 57, light_gray, 45)
+    # Base
+    draw_rectangle(34, 54, 8, 4, dark_gray, 70, true)
+    
+    # Signal light on pillar 1
+    plot(10, 20, green, 85)
+    
+    # Signal light on pillar 2
+    plot(38, 22, red, 80)
+endsprite
+
+sync_queue
+
+# ============================================================
+# ACTIVATE BACKGROUND LAYERS
+# ============================================================
+set_background(tunnel_far, 0)
+set_background(tunnel_mid, 1)
+set_background(tunnel_near, 2)
+set_background(pillars, 3)
+
+sync_queue
+
+# ============================================================
+# ANIMATION VARIABLES
+# ============================================================
+v_frame = 0
+
+# Layer speeds
+v_speed0 = 1.5
+v_speed1 = 3.0
+v_speed2 = 6.0
+v_speed3 = 12.0
+
+# Scroll accumulators
+v_acc0 = 0.0
+v_acc1 = 0.0
+v_acc2 = 0.0
+v_acc3 = 0.0
+
+# Handrail sway
+v_sway_angle = 0.0
+v_sway_speed = 0.15
+
+# Station approach timer
+v_station_timer = 0
+v_station_interval = 350
+v_at_station = 0
+v_station_duration = 0
+
+# Light flicker
+v_flicker_timer = 0
+
+# ============================================================
+# MAIN ANIMATION LOOP
+# ============================================================
+while 1 then
+    begin_frame(true)
+    
+    # -----------------------------------------
+    # Check for station approach
+    # -----------------------------------------
+    v_station_timer = v_station_timer + 1
+    if v_station_timer >= v_station_interval and v_at_station == 0 then
+        v_at_station = 1
+        v_station_duration = 0
+    endif
+    
+    # -----------------------------------------
+    # Adjust speeds (slow down at station)
+    # -----------------------------------------
+    if v_at_station == 1 then
+        v_station_duration = v_station_duration + 1
+        
+        # Slow down
+        if v_station_duration < 40 then
+            v_slowdown = 1.0 - (v_station_duration / 40.0) * 0.7
+            v_speed0 = 1.5 * v_slowdown
+            v_speed1 = 3.0 * v_slowdown
+            v_speed2 = 6.0 * v_slowdown
+            v_speed3 = 12.0 * v_slowdown
+        endif
+        
+        # Stopped at station
+        if v_station_duration >= 40 and v_station_duration < 100 then
+            v_speed0 = 0.3
+            v_speed1 = 0.5
+            v_speed2 = 1.0
+            v_speed3 = 2.0
+        endif
+        
+        # Speed up again
+        if v_station_duration >= 100 and v_station_duration < 150 then
+            v_accel = (v_station_duration - 100) / 50.0
+            v_speed0 = 0.3 + 1.2 * v_accel
+            v_speed1 = 0.5 + 2.5 * v_accel
+            v_speed2 = 1.0 + 5.0 * v_accel
+            v_speed3 = 2.0 + 10.0 * v_accel
+        endif
+        
+        # Back to full speed
+        if v_station_duration >= 150 then
+            v_at_station = 0
+            v_station_timer = 0
+            v_speed0 = 1.5
+            v_speed1 = 3.0
+            v_speed2 = 6.0
+            v_speed3 = 12.0
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Scroll backgrounds
+    # -----------------------------------------
+    v_acc0 = v_acc0 + v_speed0
+    v_acc1 = v_acc1 + v_speed1
+    v_acc2 = v_acc2 + v_speed2
+    v_acc3 = v_acc3 + v_speed3
+    
+    if v_acc0 >= 1 then
+        v_scroll0 = int(v_acc0)
+        nudge_background(v_scroll0, 0, 0)
+        v_acc0 = v_acc0 - v_scroll0
+    endif
+    
+    if v_acc1 >= 1 then
+        v_scroll1 = int(v_acc1)
+        nudge_background(v_scroll1, 0, 1)
+        v_acc1 = v_acc1 - v_scroll1
+    endif
+    
+    if v_acc2 >= 1 then
+        v_scroll2 = int(v_acc2)
+        nudge_background(v_scroll2, 0, 2)
+        v_acc2 = v_acc2 - v_scroll2
+    endif
+    
+    if v_acc3 >= 1 then
+        v_scroll3 = int(v_acc3)
+        nudge_background(v_scroll3, 0, 3)
+        v_acc3 = v_acc3 - v_scroll3
+    endif
+    
+    # -----------------------------------------
+    # Draw converging track lines (perspective)
+    # -----------------------------------------
+    # Vanishing point at center (32, 28)
+    # Left rail
+    draw_line(32, 28, 5, 63, gray, 55)
+    draw_line(32, 28, 8, 63, dark_gray, 45)
+    # Right rail
+    draw_line(32, 28, 59, 63, gray, 55)
+    draw_line(32, 28, 56, 63, dark_gray, 45)
+    # Center (third rail glow)
+    draw_line(32, 35, 32, 63, orange, 25)
+    
+    # Track bed
+    draw_rectangle(10, 58, 44, 6, black, 85, true)
+    
+    # Rail highlights
+    draw_line(12, 60, 20, 63, silver, 40)
+    draw_line(44, 60, 52, 63, silver, 40)
+    
+    # -----------------------------------------
+    # Station platform flash effect
+    # -----------------------------------------
+    if v_at_station == 1 and v_station_duration >= 30 and v_station_duration < 110 then
+        # Bright platform lights on sides
+        v_platform_int = 60
+        if v_station_duration < 50 then
+            v_platform_int = 30 + (v_station_duration - 30)
+        endif
+        if v_station_duration > 90 then
+            v_platform_int = 60 - (v_station_duration - 90) * 3
+        endif
+        
+        # Platform on right side
+        draw_rectangle(55, 25, 8, 30, yellow, v_platform_int, true, 100, fade)
+        draw_rectangle(57, 28, 4, 24, white, v_platform_int - 20, true, 100, fade)
+        
+        # Waiting passengers silhouettes
+        if v_station_duration > 45 and v_station_duration < 95 then
+            plot(58, 35, dark_gray, 70)
+            plot(58, 36, dark_gray, 65)
+            plot(60, 34, dark_gray, 70)
+            plot(60, 35, dark_gray, 65)
+            plot(60, 36, dark_gray, 60)
+        endif
+        
+        # Station sign flash
+        draw_rectangle(45, 8, 14, 5, white, v_platform_int - 10, true, 80, fade)
+    endif
+    
+    # -----------------------------------------
+    # Train window frame
+    # -----------------------------------------
+    # Top frame (thick)
+    draw_rectangle(0, 0, 64, 6, dark_gray, 95, true)
+    draw_line(0, 6, 63, 6, gray, 70)
+    
+    # Bottom frame
+    draw_rectangle(0, 58, 64, 6, dark_gray, 95, true)
+    draw_line(0, 58, 63, 58, gray, 70)
+    
+    # Side frames
+    draw_rectangle(0, 0, 6, 64, dark_gray, 90, true)
+    draw_rectangle(58, 0, 6, 64, dark_gray, 90, true)
+    draw_line(6, 6, 6, 58, gray, 65)
+    draw_line(57, 6, 57, 58, gray, 65)
+    
+    # Window frame corners (rounded feel)
+    draw_rectangle(0, 0, 10, 10, dark_gray, 95, true)
+    draw_rectangle(54, 0, 10, 10, dark_gray, 95, true)
+    draw_rectangle(0, 54, 10, 10, dark_gray, 95, true)
+    draw_rectangle(54, 54, 10, 10, dark_gray, 95, true)
+    
+    # Inner window edge
+    draw_line(8, 8, 55, 8, black, 80)
+    draw_line(8, 55, 55, 55, black, 80)
+    draw_line(8, 8, 8, 55, black, 75)
+    draw_line(55, 8, 55, 55, black, 75)
+    
+    # -----------------------------------------
+    # Swaying handrails/grab handles
+    # -----------------------------------------
+    v_sway_offset = sin(v_sway_angle) * 2
+    v_sway_angle = v_sway_angle + v_sway_speed
+    if v_sway_angle > 6.28318 then
+        v_sway_angle = v_sway_angle - 6.28318
+    endif
+    
+    # Left handrail
+    v_handle_x1 = 12 + int(v_sway_offset)
+    draw_line(15, 0, v_handle_x1, 12, silver, 70)
+    draw_circle(v_handle_x1, 13, 2, silver, 65, false)
+    
+    # Right handrail
+    v_handle_x2 = 52 + int(v_sway_offset)
+    draw_line(49, 0, v_handle_x2, 12, silver, 70)
+    draw_circle(v_handle_x2, 13, 2, silver, 65, false)
+    
+    # Center strap
+    v_strap_x = 32 + int(v_sway_offset * 0.5)
+    draw_line(32, 0, v_strap_x, 10, dark_gray, 60)
+    draw_rectangle(v_strap_x - 2, 10, 4, 3, orange, 55, true)
+    
+    # -----------------------------------------
+    # Interior lights (with occasional flicker)
+    # -----------------------------------------
+    v_flicker_timer = v_flicker_timer + 1
+    v_light_int = 45
+    
+    # Random flicker
+    if v_flicker_timer > 80 then
+        v_flick = random(0, 100, 0)
+        if v_flick > 92 then
+            v_light_int = random(15, 35, 0)
+        endif
+        if v_flicker_timer > 90 then
+            v_flicker_timer = 0
+        endif
+    endif
+    
+    # Ceiling lights reflected on frame
+    draw_line(8, 4, 20, 4, yellow, v_light_int)
+    draw_line(44, 4, 56, 4, yellow, v_light_int)
+    
+    # -----------------------------------------
+    # Speed indicator lights (door area)
+    # -----------------------------------------
+    # Door indicator
+    v_door_color = "green"
+    if v_at_station == 1 and v_station_duration >= 40 and v_station_duration < 100 then
+        v_door_color = "red"
+        # Door chime blink
+        v_chime = v_frame - floor(v_frame / 15) * 15
+        if v_chime < 8 then
+            plot(3, 30, yellow, 80)
+        endif
+    endif
+    plot(3, 32, v_door_color, 70)
+    plot(60, 32, v_door_color, 70)
+    
+    # -----------------------------------------
+    # Tunnel light streaks (drawn effect)
+    # -----------------------------------------
+    if v_at_station == 0 then
+        # Occasional bright light streak
+        v_streak_chance = random(0, 100, 0)
+        if v_streak_chance > 85 then
+            v_streak_y = random(15, 50, 0)
+            v_streak_side = random(0, 1, 0)
+            if v_streak_side == 0 then
+                draw_line(7, v_streak_y, 20, v_streak_y, orange, 60, 150, fade)
+            else
+                draw_line(44, v_streak_y, 56, v_streak_y, orange, 60, 150, fade)
+            endif
+        endif
+    endif
+    
+    # -----------------------------------------
+    # Sparks from third rail (occasional)
+    # -----------------------------------------
+    v_spark_chance = random(0, 100, 0)
+    if v_spark_chance > 94 and v_at_station == 0 then
+        v_spark_x = random(28, 36, 0)
+        v_spark_y = random(50, 56, 0)
+        plot(v_spark_x, v_spark_y, white, 100, 80, fade)
+        plot(v_spark_x + 1, v_spark_y - 1, yellow, 85, 100, fade)
+        plot(v_spark_x - 1, v_spark_y + 1, orange, 70, 120, fade)
+    endif
+    
+    end_frame
+    
+    rest(0.028)
+    v_frame = v_frame + 1
+    
+    if v_frame > 50000 then
+        v_frame = 0
+    endif
+endwhile
