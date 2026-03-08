@@ -358,9 +358,9 @@ v_poly_size_phase = 0.0
 v_poly_size_speed = 0.01
 v_poly_min_size = 6
 v_poly_max_size = 14
-v_poly_sides = 3.0
-v_poly_sides_speed = 0.008
+v_poly_sides = 3
 v_poly_sides_dir = 1
+v_poly_at_min = 0
 
 # ============================================================
 # MAIN ANIMATION LOOP
@@ -471,17 +471,22 @@ while 1 then
     v_poly_size_factor = (sin(v_poly_size_phase) + 1) * 0.5
     v_poly_size = v_poly_min_size + v_poly_size_factor * (v_poly_max_size - v_poly_min_size)
     
-    # Update sides only at minimum size (so change isn't visible)
-    if v_poly_size <= v_poly_min_size + 0.5 then
-        v_poly_sides = v_poly_sides + v_poly_sides_speed * v_poly_sides_dir * 50
-        if v_poly_sides >= 7 then
-            v_poly_sides = 7
-            v_poly_sides_dir = -1
+    # Update sides only ONCE when hitting minimum size (so change isn't visible)
+    if v_poly_size <= v_poly_min_size + 0.3 then
+        if v_poly_at_min == 0 then
+            v_poly_at_min = 1
+            v_poly_sides = v_poly_sides + v_poly_sides_dir
+            if v_poly_sides >= 7 then
+                v_poly_sides = 7
+                v_poly_sides_dir = -1
+            endif
+            if v_poly_sides <= 3 then
+                v_poly_sides = 3
+                v_poly_sides_dir = 1
+            endif
         endif
-        if v_poly_sides <= 3 then
-            v_poly_sides = 3
-            v_poly_sides_dir = 1
-        endif
+    else
+        v_poly_at_min = 0
     endif
     
     # Draw the polygon (filled, centered at 32,32)
