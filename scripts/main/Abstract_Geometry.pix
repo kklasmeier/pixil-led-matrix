@@ -4,13 +4,11 @@
 # Mesmerizing abstract art piece
 #
 # Background layers moving in different directions:
-#   Layer 0: Horizontal lines scrolling RIGHT
-#   Layer 1: Vertical lines scrolling DOWN
-#   Layer 2: Diagonal grid scrolling UP-LEFT
-#   Layer 3: Circles/dots scrolling LEFT
+#   Layer 0: Horizontal warm lines scrolling RIGHT
+#   Layer 1: Diagonal cool lines scrolling UP-LEFT
 #
 # Foreground:
-#   - Central rotating polygon that morphs (sides change)
+#   - Central rotating polygon that morphs
 #   - Shape moves in Lissajous curve pattern
 #   - Pulsing size and color cycling
 #   - Trail effect with burnout
@@ -23,7 +21,6 @@ throttle(0.1)
 # Warm color gradient lines
 # ============================================================
 define_sprite(h_lines, 64, 64)
-    # Horizontal stripes with color gradient
     draw_line(0, 4, 63, 4, red, 40)
     draw_line(0, 8, 63, 8, orange, 35)
     draw_line(0, 12, 63, 12, yellow, 30)
@@ -42,107 +39,29 @@ define_sprite(h_lines, 64, 64)
 endsprite
 
 # ============================================================
-# LAYER 1: VERTICAL LINES - scrolls DOWN
-# Cool color gradient lines
+# LAYER 1: DIAGONAL GRID - scrolls UP-LEFT  
+# Cool color diagonal lines
 # ============================================================
-define_sprite(v_lines, 64, 64)
-    # Vertical stripes
-    draw_line(4, 0, 4, 63, cyan, 35)
-    draw_line(8, 0, 8, 63, blue, 30)
-    draw_line(12, 0, 12, 63, purple, 35)
-    draw_line(16, 0, 16, 63, blue, 40)
-    draw_line(20, 0, 20, 63, cyan, 35)
-    draw_line(24, 0, 24, 63, sky_blue, 30)
-    draw_line(28, 0, 28, 63, blue, 35)
-    draw_line(32, 0, 32, 63, purple, 40)
-    draw_line(36, 0, 36, 63, blue, 35)
-    draw_line(40, 0, 40, 63, cyan, 30)
-    draw_line(44, 0, 44, 63, sky_blue, 35)
-    draw_line(48, 0, 48, 63, blue, 40)
-    draw_line(52, 0, 52, 63, purple, 35)
-    draw_line(56, 0, 56, 63, cyan, 30)
-    draw_line(60, 0, 60, 63, blue, 35)
-endsprite
-
-# ============================================================
-# LAYER 2: DIAGONAL GRID - scrolls UP-LEFT
-# Green/lime matrix style
-# ============================================================
-define_sprite(diag_grid, 80, 80)
-    # Diagonal lines going one way (top-left to bottom-right direction)
-    draw_line(0, 0, 0, 0, green, 25)
-    draw_line(16, 0, 0, 16, green, 25)
-    draw_line(32, 0, 0, 32, green, 25)
-    draw_line(48, 0, 0, 48, green, 25)
-    draw_line(64, 0, 0, 64, green, 25)
-    draw_line(79, 0, 0, 79, green, 25)
-    draw_line(79, 15, 15, 79, green, 25)
-    draw_line(79, 31, 31, 79, green, 25)
-    draw_line(79, 47, 47, 79, green, 25)
-    draw_line(79, 63, 63, 79, green, 25)
-    
-    # Diagonal lines going other way (top-right to bottom-left direction)
-    draw_line(0, 0, 0, 0, lime, 20)
-    draw_line(0, 16, 16, 0, lime, 20)
-    draw_line(0, 32, 32, 0, lime, 20)
-    draw_line(0, 48, 48, 0, lime, 20)
-    draw_line(0, 64, 64, 0, lime, 20)
-    draw_line(0, 79, 79, 0, lime, 20)
-    draw_line(16, 79, 79, 16, lime, 20)
-    draw_line(32, 79, 79, 32, lime, 20)
-    draw_line(48, 79, 79, 48, lime, 20)
-    draw_line(64, 79, 79, 64, lime, 20)
-    
-    # Intersection dots
-    plot(0, 0, green, 45)
-    plot(16, 0, green, 45)
-    plot(32, 0, green, 45)
-    plot(48, 0, green, 45)
-    plot(64, 0, green, 45)
-    plot(0, 16, green, 45)
-    plot(16, 16, green, 45)
-    plot(32, 16, green, 45)
-    plot(48, 16, green, 45)
-    plot(64, 16, green, 45)
-    plot(0, 32, green, 45)
-    plot(16, 32, green, 45)
-    plot(32, 32, green, 45)
-    plot(48, 32, green, 45)
-    plot(64, 32, green, 45)
-    plot(0, 48, green, 45)
-    plot(16, 48, green, 45)
-    plot(32, 48, green, 45)
-    plot(48, 48, green, 45)
-    plot(64, 48, green, 45)
-    plot(0, 64, green, 45)
-    plot(16, 64, green, 45)
-    plot(32, 64, green, 45)
-    plot(48, 64, green, 45)
-    plot(64, 64, green, 45)
-endsprite
-
-# ============================================================
-# LAYER 3: FLOATING CIRCLES - scrolls LEFT
-# Various sized circles
-# ============================================================
-define_sprite(circles, 96, 64)
-    # Large circles
-    draw_circle(16, 16, 8, magenta, 30, false)
-    draw_circle(56, 40, 10, violet, 25, false)
-    draw_circle(88, 20, 7, purple, 28, false)
-    
-    # Medium circles
-    draw_circle(32, 48, 5, pink, 35, false)
-    draw_circle(72, 12, 6, magenta, 30, false)
-    draw_circle(8, 52, 4, violet, 32, false)
-    
-    # Small circles/dots
-    draw_circle(48, 28, 3, pink, 40, true)
-    draw_circle(80, 56, 3, magenta, 38, true)
-    draw_circle(24, 8, 2, violet, 42, true)
-    draw_circle(64, 60, 2, purple, 40, true)
-    draw_circle(40, 4, 2, pink, 38, true)
-    draw_circle(92, 44, 3, magenta, 35, true)
+define_sprite(diag_lines, 64, 64)
+    draw_line(0, 0, 63, 63, cyan, 35)
+    draw_line(16, 0, 63, 47, blue, 30)
+    draw_line(32, 0, 63, 31, purple, 35)
+    draw_line(48, 0, 63, 15, cyan, 30)
+    draw_line(0, 16, 47, 63, blue, 35)
+    draw_line(0, 32, 31, 63, purple, 30)
+    draw_line(0, 48, 15, 63, cyan, 35)
+    draw_line(63, 0, 0, 63, magenta, 30)
+    draw_line(47, 0, 0, 47, violet, 25)
+    draw_line(31, 0, 0, 31, pink, 30)
+    draw_line(15, 0, 0, 15, magenta, 25)
+    draw_line(63, 16, 16, 63, violet, 30)
+    draw_line(63, 32, 32, 63, pink, 25)
+    draw_line(63, 48, 48, 63, magenta, 30)
+    plot(0, 0, white, 50)
+    plot(32, 32, white, 50)
+    plot(63, 63, white, 50)
+    plot(16, 16, cyan, 45)
+    plot(48, 48, cyan, 45)
 endsprite
 
 sync_queue
@@ -151,9 +70,7 @@ sync_queue
 # ACTIVATE BACKGROUND LAYERS
 # ============================================================
 set_background(h_lines, 0)
-set_background(v_lines, 1)
-set_background(diag_grid, 2)
-set_background(circles, 3)
+set_background(diag_lines, 1)
 
 sync_queue
 
@@ -163,17 +80,13 @@ sync_queue
 v_frame = 0
 
 # Layer scroll accumulators
-v_acc0 = 0.0
-v_acc1 = 0.0
-v_acc2_x = 0.0
-v_acc2_y = 0.0
-v_acc3 = 0.0
+v_acc0_x = 0.0
+v_acc1_x = 0.0
+v_acc1_y = 0.0
 
 # Layer speeds
-v_speed0 = 1.0
-v_speed1 = 0.8
-v_speed2 = 1.2
-v_speed3 = 1.5
+v_speed0 = 1.2
+v_speed1 = 1.0
 
 # Central shape parameters
 v_shape_x = 32.0
@@ -202,9 +115,6 @@ v_color_index = 0
 v_morph_timer = 0
 v_morph_interval = 180
 
-# Trail toggle
-v_trail_on = 1
-
 # ============================================================
 # MAIN ANIMATION LOOP
 # ============================================================
@@ -214,44 +124,24 @@ while 1 then
     # -----------------------------------------
     # Scroll Layer 0 - RIGHT (positive X)
     # -----------------------------------------
-    v_acc0 = v_acc0 + v_speed0
-    if v_acc0 >= 1 then
-        v_scroll0 = int(v_acc0)
+    v_acc0_x = v_acc0_x + v_speed0
+    if v_acc0_x >= 1 then
+        v_scroll0 = int(v_acc0_x)
         nudge_background(v_scroll0, 0, 0)
-        v_acc0 = v_acc0 - v_scroll0
+        v_acc0_x = v_acc0_x - v_scroll0
     endif
     
     # -----------------------------------------
-    # Scroll Layer 1 - DOWN (positive Y)
+    # Scroll Layer 1 - UP-LEFT (negative X, negative Y)
     # -----------------------------------------
-    v_acc1 = v_acc1 + v_speed1
-    if v_acc1 >= 1 then
-        v_scroll1 = int(v_acc1)
-        nudge_background(0, v_scroll1, 1)
-        v_acc1 = v_acc1 - v_scroll1
-    endif
-    
-    # -----------------------------------------
-    # Scroll Layer 2 - UP-LEFT (negative X, negative Y)
-    # -----------------------------------------
-    v_acc2_x = v_acc2_x + v_speed2
-    v_acc2_y = v_acc2_y + v_speed2 * 0.7
-    if v_acc2_x >= 1 then
-        v_scroll2_x = int(v_acc2_x)
-        v_scroll2_y = int(v_acc2_y)
-        nudge_background(-v_scroll2_x, -v_scroll2_y, 2)
-        v_acc2_x = v_acc2_x - v_scroll2_x
-        v_acc2_y = v_acc2_y - v_scroll2_y
-    endif
-    
-    # -----------------------------------------
-    # Scroll Layer 3 - LEFT (negative X)
-    # -----------------------------------------
-    v_acc3 = v_acc3 + v_speed3
-    if v_acc3 >= 1 then
-        v_scroll3 = int(v_acc3)
-        nudge_background(-v_scroll3, 0, 3)
-        v_acc3 = v_acc3 - v_scroll3
+    v_acc1_x = v_acc1_x + v_speed1
+    v_acc1_y = v_acc1_y + v_speed1 * 0.8
+    if v_acc1_x >= 1 then
+        v_scroll1_x = int(v_acc1_x)
+        v_scroll1_y = int(v_acc1_y)
+        nudge_background(-v_scroll1_x, -v_scroll1_y, 1)
+        v_acc1_x = v_acc1_x - v_scroll1_x
+        v_acc1_y = v_acc1_y - v_scroll1_y
     endif
     
     # -----------------------------------------
@@ -262,7 +152,6 @@ while 1 then
         v_liss_phase = v_liss_phase - 6.28318
     endif
     
-    # Lissajous: x = A*sin(a*t), y = B*sin(b*t + phase)
     v_shape_x = 32 + sin(v_liss_a * v_liss_phase) * 18
     v_shape_y = 32 + sin(v_liss_b * v_liss_phase + 1.57) * 18
     
@@ -307,7 +196,6 @@ while 1 then
         endif
     endif
     
-    # Select color based on index
     v_shape_color = "cyan"
     if v_color_index == 0 then
         v_shape_color = "cyan"
@@ -334,7 +222,6 @@ while 1 then
         v_shape_color = "violet"
     endif
     
-    # Secondary color (complement)
     v_shape_color2 = "orange"
     if v_color_index == 0 then
         v_shape_color2 = "orange"
@@ -362,13 +249,10 @@ while 1 then
     endif
     
     # -----------------------------------------
-    # Draw trail (previous positions with burnout)
+    # Draw trail (previous position with burnout)
     # -----------------------------------------
-    if v_trail_on == 1 then
-        # Trail polygon (slightly behind, fading)
-        v_trail_size = v_shape_size * 0.8
-        draw_polygon(int(v_shape_x), int(v_shape_y), int(v_trail_size), v_shape_sides, v_shape_color2, 40, v_shape_rotation - 15, false, 250, fade)
-    endif
+    v_trail_size = v_shape_size * 0.8
+    draw_polygon(int(v_shape_x), int(v_shape_y), int(v_trail_size), v_shape_sides, v_shape_color2, 40, v_shape_rotation - 15, false, 250, fade)
     
     # -----------------------------------------
     # Draw main rotating polygon
@@ -392,15 +276,11 @@ while 1 then
     plot(v_px, v_py, white, 100)
     
     # -----------------------------------------
-    # Corner accent shapes (static, frame the view)
+    # Corner accent shapes
     # -----------------------------------------
-    # Top-left
     draw_polygon(8, 8, 5, 4, v_shape_color, 35, v_pr * 0.5, false)
-    # Top-right
     draw_polygon(56, 8, 5, 4, v_shape_color2, 35, -v_pr * 0.5, false)
-    # Bottom-left
     draw_polygon(8, 56, 5, 4, v_shape_color2, 35, -v_pr * 0.5, false)
-    # Bottom-right
     draw_polygon(56, 56, 5, 4, v_shape_color, 35, v_pr * 0.5, false)
     
     # -----------------------------------------
@@ -422,7 +302,7 @@ while 1 then
     endif
     
     # -----------------------------------------
-    # Connecting lines to corners (dynamic)
+    # Connecting lines to corners
     # -----------------------------------------
     v_line_int = int(30 + sin(v_pulse_angle) * 15)
     draw_line(v_px, v_py, 8, 8, v_shape_color, v_line_int, 60, fade)
