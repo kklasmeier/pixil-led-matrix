@@ -366,7 +366,7 @@ v_poly_sides_dir = 1
 # MAIN ANIMATION LOOP
 # ============================================================
 while 1 then
-    begin_frame(true)
+    begin_frame(false)
     
     # -----------------------------------------
     # Update phase angles
