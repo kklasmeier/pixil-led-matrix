@@ -1,7 +1,7 @@
 # Matrix Digital Rain
 # Classic falling green code effect
 
-v_num_drops = 50
+v_num_drops = 45
 
 create_array(v_drop_x, v_num_drops)
 create_array(v_drop_y, v_num_drops)
@@ -10,8 +10,8 @@ create_array(v_drop_speed, v_num_drops)
 # Initialize drops at random positions, staggered vertically
 for v_i in (0, v_num_drops - 1, 1)
     v_drop_x[v_i] = random(0, 63, 0)
-    v_drop_y[v_i] = random(-20, 63, 0)
-    v_drop_speed[v_i] = random(1, 3, 0)
+    v_drop_y[v_i] = random(-30, 63, 0)
+    v_drop_speed[v_i] = random(1, 2, 0)
 endfor v_i
 
 # Main animation loop
@@ -21,15 +21,12 @@ while 1 then
         v_y = int(v_drop_y[v_i])
         v_spd = v_drop_speed[v_i]
         
-        # Trail duration - slower drops need longer fade to match visual length
-        v_trail_time = 1500 / v_spd
-        
         # Only draw if on screen
         if v_y >= 0 and v_y < 64 then
-            # Bright white head - short duration so it stands out
-            plot(v_x, v_y, white, 100, 60, fade)
-            # Green trail pixel at same spot - longer fade creates the trail
-            plot(v_x, v_y, lime, 80, v_trail_time, fade)
+            # Bright white head
+            plot(v_x, v_y, white, 100, 150, fade)
+            # Green trail - long fade creates the streaming effect
+            plot(v_x, v_y, lime, 70, 800, fade)
         endif
         
         # Move drop DOWN (increasing y)
@@ -38,10 +35,10 @@ while 1 then
         # Reset when off bottom of screen
         if v_y > 63 then
             v_drop_x[v_i] = random(0, 63, 0)
-            v_drop_y[v_i] = random(-25, -1, 0)
-            v_drop_speed[v_i] = random(1, 3, 0)
+            v_drop_y[v_i] = random(-30, -1, 0)
+            v_drop_speed[v_i] = random(1, 2, 0)
         endif
     endfor v_i
     
-    rest(0.335)
+    rest(0.08)
 endwhile
