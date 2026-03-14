@@ -1729,14 +1729,6 @@ def process_script(filename, execute_func=None):
             queue.wait_until_empty()
             queue.last_command_time = time.time() * 1000
     finally:
-        stats = variables.get_performance_stats()
-        print(f"\n=== Variable Performance Stats ===")
-        print(f"Variables registered: {stats['total_variables']}")
-        print(f"Variable accesses: {stats['total_accesses']:,}")
-        print(f"Average access time: {stats['avg_access_time_us']:.2f} μs")
-        print(f"Total variable access time: {stats['total_access_time']:.4f}s")
-        print(f"Estimated time saved vs dict: {stats['estimated_time_saved']:.4f}s")
-        print("=================================")
         debug_print("\n1. Starting cleanup sequence...", DEBUG_CONCISE)
         
         # Get initial queue size

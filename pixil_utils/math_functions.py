@@ -20,6 +20,8 @@ from .regex_patterns import (
     SIMPLE_ADD_PATTERN, SIMPLE_SUB_PATTERN, SIMPLE_MUL_PATTERN,
     SIMPLE_DIV_PATTERN, SIMPLE_MOD_PATTERN, SIMPLE_ARRAY_ACCESS_PATTERN,
     NUMBER_PATTERN, VAR_ADD_VAR_PATTERN, VAR_MUL_VAR_PATTERN,
+    VAR_SUB_VAR_PATTERN, VAR_DIV_VAR_PATTERN,
+    NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
     MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
     ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN
 )
@@ -432,6 +434,88 @@ def try_fast_arithmetic(expr: str, variables: Union[Dict[str, Any], VariableRegi
                     debug_print(f"Fast var mul: {var1} * {var2} = {result}", DEBUG_VERBOSE)
                 return result
             except (ValueError, TypeError):
+                pass
+
+    # Two variables: var1 - var2 (NEW)
+    match = VAR_SUB_VAR_PATTERN.match(expr)
+    if match:
+        var1, var2 = match.groups()
+        if var1 in variables and var2 in variables:
+            try:
+                result = float(variables[var1]) - float(variables[var2])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast var sub: {var1} - {var2} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+
+    # Two variables: var1 / var2 (NEW)
+    match = VAR_DIV_VAR_PATTERN.match(expr)
+    if match:
+        var1, var2 = match.groups()
+        if var1 in variables and var2 in variables:
+            try:
+                divisor = float(variables[var2])
+                if divisor != 0:
+                    result = float(variables[var1]) / divisor
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast var div: {var1} / {var2} = {result}", DEBUG_VERBOSE)
+                    return result
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+
+    # Number + variable (reversed): 5 + v_x (NEW)
+    match = NUM_PLUS_VAR_PATTERN.match(expr)
+    if match:
+        number, var_name = match.groups()
+        if var_name in variables:
+            try:
+                result = float(number) + float(variables[var_name])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast num add: {number} + {var_name} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+
+    # Number - variable (reversed): 5 - v_x, 1 - v_toggle (NEW)
+    match = NUM_SUB_VAR_PATTERN.match(expr)
+    if match:
+        number, var_name = match.groups()
+        if var_name in variables:
+            try:
+                result = float(number) - float(variables[var_name])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast num sub: {number} - {var_name} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+
+    # Number * variable (reversed): 2 * v_x (NEW)
+    match = NUM_MUL_VAR_PATTERN.match(expr)
+    if match:
+        number, var_name = match.groups()
+        if var_name in variables:
+            try:
+                result = float(number) * float(variables[var_name])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast num mul: {number} * {var_name} = {result}", DEBUG_VERBOSE)
+                return result
+            except (ValueError, TypeError):
+                pass
+
+    # Number / variable (reversed): 100 / v_divisor (NEW)
+    match = NUM_DIV_VAR_PATTERN.match(expr)
+    if match:
+        number, var_name = match.groups()
+        if var_name in variables:
+            try:
+                divisor = float(variables[var_name])
+                if divisor != 0:
+                    result = float(number) / divisor
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast num div: {number} / {var_name} = {result}", DEBUG_VERBOSE)
+                    return result
+            except (ValueError, TypeError, ZeroDivisionError):
                 pass
 
 def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Union[int, float, str]:

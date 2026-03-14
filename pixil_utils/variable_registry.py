@@ -11,7 +11,7 @@ from pathlib import Path
 class VariableRegistry:
     """
     Optimized variable storage using indexed arrays instead of string dictionaries.
-    Provides ~16x faster variable access by eliminating string hashing and dictionary lookups.
+    Provides faster variable access by eliminating string hashing overhead.
     """
     
     def __init__(self):
@@ -19,10 +19,6 @@ class VariableRegistry:
         self.name_to_index: Dict[str, int] = {}  # "v_x" → 0
         self.values: List[Any] = []              # [32.0, array_obj, ...]
         self.next_index: int = 0
-        
-        # Performance tracking
-        self.access_count = 0
-        self.total_access_time = 0.0
         
     def scan_and_register(self, script_lines: List[str]) -> None:
         """
@@ -78,20 +74,11 @@ class VariableRegistry:
         Raises:
             KeyError: If variable not found (matches current Pixil behavior)
         """
-        start_time = time.perf_counter()
-        
         try:
             index = self.name_to_index[var_name]
-            value = self.values[index]
+            return self.values[index]
         except KeyError:
-            # Match current Pixil error behavior
             raise KeyError(f"Variable '{var_name}' not found")
-        
-        # Track performance
-        self.access_count += 1
-        self.total_access_time += time.perf_counter() - start_time
-        
-        return value
     
     def set(self, var_name: str, value: Any) -> None:
         """
@@ -162,30 +149,9 @@ class VariableRegistry:
         for name, index in self.name_to_index.items():
             yield name, self.values[index]
     
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """
-        Get performance statistics for variable access.
-        
-        Returns:
-            Dictionary with performance metrics
-        """
-        if self.access_count == 0:
-            avg_access_time = 0
-        else:
-            avg_access_time = self.total_access_time / self.access_count
-            
-        return {
-            'total_variables': len(self.name_to_index),
-            'total_accesses': self.access_count,
-            'total_access_time': self.total_access_time,
-            'avg_access_time_us': avg_access_time * 1_000_000,  # microseconds
-            'estimated_time_saved': self.access_count * 30e-6,  # vs dict lookup
-        }
-    
-    def reset_performance_stats(self) -> None:
-        """Reset performance tracking counters."""
-        self.access_count = 0
-        self.total_access_time = 0.0
+    def get_variable_count(self) -> int:
+        """Return the number of registered variables."""
+        return len(self.name_to_index)
 
 
 def load_script_lines(script_path: str) -> List[str]:

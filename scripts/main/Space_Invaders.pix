@@ -202,7 +202,7 @@ def init_player {
 # Procedure to move the player
 def move_player {
     # Increment move counter
-    sync_queue
+    #sync_queue
     v_player_move_count = v_player_move_count + 1
     
     # Check if we need to possibly change direction
@@ -859,7 +859,7 @@ def main {
         show_sprite(invader3, 55, 1, 201)
         show_sprite(invader2, -8, 27, 244)
         rest(3)
-        sync_queue
+        #sync_queue
         v_mode = 0
         for v_xx in (-8, 57, 1) then
             begin_frame(true)
@@ -881,7 +881,7 @@ def main {
         hide_sprite(invader2, 244)
         hide_sprite(invader2_alt, 245)
         clear()
-        sync_queue
+        #sync_queue
         # Initialize the game
         call init_game
         
@@ -894,4 +894,3 @@ def main {
 }
 
 call main
-sync_queue

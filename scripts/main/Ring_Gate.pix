@@ -103,7 +103,7 @@ while 1 == 1 then
             v_final_intensity = 100
         endif
         
-        plot(v_star_x[v_i], v_star_y[v_i], white, v_final_intensity)
+        mplot(v_star_x[v_i], v_star_y[v_i], white, v_final_intensity)
     endfor v_i
     
     # Draw the main ring structure with depth

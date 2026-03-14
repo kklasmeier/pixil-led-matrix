@@ -35,6 +35,24 @@ FAST_VAR_ADD_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(v_\w+)$')
 # Variable * variable arithmetic: v_width * v_scale, v_a * v_b
 FAST_VAR_MUL_VAR_PATTERN = re.compile(r'^(v_\w+)\s*\*\s*(v_\w+)$')
 
+# Variable - variable arithmetic: v_x - v_y, v_a - v_b (NEW)
+FAST_VAR_SUB_VAR_PATTERN = re.compile(r'^(v_\w+)\s*-\s*(v_\w+)$')
+
+# Variable / variable arithmetic: v_x / v_y, v_a / v_b (NEW)
+FAST_VAR_DIV_VAR_PATTERN = re.compile(r'^(v_\w+)\s*/\s*(v_\w+)$')
+
+# Number + variable (reversed): 5 + v_x, 2.5 + v_offset (NEW)
+FAST_NUM_PLUS_VAR_PATTERN = re.compile(r'^(-?\d*\.?\d+)\s*\+\s*(v_\w+)$')
+
+# Number - variable (reversed): 5 - v_x, 1 - v_toggle (NEW)
+FAST_NUM_SUB_VAR_PATTERN = re.compile(r'^(-?\d*\.?\d+)\s*-\s*(v_\w+)$')
+
+# Number * variable (reversed): 2 * v_x, 0.5 * v_scale (NEW)
+FAST_NUM_MUL_VAR_PATTERN = re.compile(r'^(-?\d*\.?\d+)\s*\*\s*(v_\w+)$')
+
+# Number / variable (reversed): 100 / v_divisor (NEW)
+FAST_NUM_DIV_VAR_PATTERN = re.compile(r'^(-?\d*\.?\d+)\s*/\s*(v_\w+)$')
+
 # =============================================================================
 # MATH FUNCTIONS PATTERNS (used in evaluate_math_expression optimization)
 # =============================================================================
@@ -55,6 +73,14 @@ SIMPLE_ARRAY_ACCESS_PATTERN = FAST_SIMPLE_ARRAY_PATTERN  # Reuse compiled patter
 # Variable combinations (same as Fast Path)
 VAR_ADD_VAR_PATTERN = FAST_VAR_ADD_VAR_PATTERN     # Reuse compiled pattern
 VAR_MUL_VAR_PATTERN = FAST_VAR_MUL_VAR_PATTERN     # Reuse compiled pattern
+VAR_SUB_VAR_PATTERN = FAST_VAR_SUB_VAR_PATTERN     # Reuse compiled pattern (NEW)
+VAR_DIV_VAR_PATTERN = FAST_VAR_DIV_VAR_PATTERN     # Reuse compiled pattern (NEW)
+
+# Number-first patterns (reversed order)
+NUM_PLUS_VAR_PATTERN = FAST_NUM_PLUS_VAR_PATTERN   # Reuse compiled pattern (NEW)
+NUM_SUB_VAR_PATTERN = FAST_NUM_SUB_VAR_PATTERN     # Reuse compiled pattern (NEW)
+NUM_MUL_VAR_PATTERN = FAST_NUM_MUL_VAR_PATTERN     # Reuse compiled pattern (NEW)
+NUM_DIV_VAR_PATTERN = FAST_NUM_DIV_VAR_PATTERN     # Reuse compiled pattern (NEW)
 
 # Number detection pattern
 NUMBER_PATTERN = re.compile(r'^-?\d*\.?\d+$')
@@ -106,10 +132,17 @@ Fast Path Patterns (parse_value):
 - FAST_VAR_MOD_NUM_PATTERN
 - FAST_VAR_ADD_VAR_PATTERN
 - FAST_VAR_MUL_VAR_PATTERN
+- FAST_VAR_SUB_VAR_PATTERN (NEW)
+- FAST_VAR_DIV_VAR_PATTERN (NEW)
+- FAST_NUM_PLUS_VAR_PATTERN (NEW)
+- FAST_NUM_SUB_VAR_PATTERN (NEW)
+- FAST_NUM_MUL_VAR_PATTERN (NEW)
+- FAST_NUM_DIV_VAR_PATTERN (NEW)
 
 Math Functions Patterns (evaluate_math_expression):
 - All SIMPLE_* patterns (aliases to FAST_* patterns)
 - VAR_*_VAR_PATTERN (aliases to FAST_* patterns)
+- NUM_*_VAR_PATTERN (number-first patterns)
 - NUMBER_PATTERN
 
 Legacy Patterns (main Pixil.py parsing):
