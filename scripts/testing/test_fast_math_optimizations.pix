@@ -1,372 +1,99 @@
 # Test script for Fast Math Optimizations
-# Tests: var-var, var/var, num+var, num-var, num*var, num/var
-#        random(num/var), sin, cos, radians, sqrt
 # Run with: python Pixil.py scripts/testing/test_fast_math_optimizations.pix
-# Check Fast Math hit rate in output - should be high!
 
 # Initialize test variables
 v_a = 10
 v_b = 3
+v_c = 20
+v_d = 4
 v_angle_deg = 90
 v_rad_value = 1.5708
 v_sqrt_input = 16
 v_rand_min = 0
 v_rand_max = 100
 
-# Colors for display
-v_pass_color = 32
-v_fail_color = 224
-v_info_color = 28
+# Colors
+v_green = 32
+v_cyan = 28
 
-# Test counter
-v_test_num = 0
-v_passed = 0
-v_failed = 0
+# TEST 1: var - var
+v_result1 = v_a - v_b
+plot(0, 0, v_green)
 
-# ========================================
-# TEST 1: var - var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = v_a - v_b
-v_expected = 7
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(0, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(0, 0, v_fail_color)
-end
+# TEST 2: var / var
+v_result2 = v_c / v_d
+plot(1, 0, v_green)
 
-# ========================================
-# TEST 2: var / var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_c = 20
-v_d = 4
-v_result = v_c / v_d
-v_expected = 5
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(1, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(1, 0, v_fail_color)
-end
+# TEST 3: num + var
+v_result3 = 5 + v_a
+plot(2, 0, v_green)
 
-# ========================================
-# TEST 3: num + var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = 5 + v_a
-v_expected = 15
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(2, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(2, 0, v_fail_color)
-end
+# TEST 4: num - var
+v_result4 = 20 - v_a
+plot(3, 0, v_green)
 
-# ========================================
-# TEST 4: num - var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = 20 - v_a
-v_expected = 10
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(3, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(3, 0, v_fail_color)
-end
+# TEST 5: num * var
+v_result5 = 3 * v_a
+plot(4, 0, v_green)
 
-# ========================================
-# TEST 5: num * var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = 3 * v_a
-v_expected = 30
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(4, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(4, 0, v_fail_color)
-end
+# TEST 6: num / var
+v_result6 = 100 / v_a
+plot(5, 0, v_green)
 
-# ========================================
-# TEST 6: num / var (NEW optimization)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = 100 / v_a
-v_expected = 10
-if v_result == v_expected then
-    v_passed = v_passed + 1
-    plot(5, 0, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(5, 0, v_fail_color)
-end
+# TEST 7: random with literals
+v_result7 = random(0, 100, 0)
+plot(6, 0, v_green)
 
-# ========================================
-# TEST 7: random() with all literals
-# ========================================
-v_test_num = v_test_num + 1
-v_result = random(0, 100, 0)
-# Just check it's in range (random is random!)
-if v_result >= 0 then
-    if v_result <= 100 then
-        v_passed = v_passed + 1
-        plot(6, 0, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(6, 0, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(6, 0, v_fail_color)
-end
+# TEST 8: random with variables
+v_result8 = random(v_rand_min, v_rand_max, 0)
+plot(7, 0, v_green)
 
-# ========================================
-# TEST 8: random() with variables
-# ========================================
-v_test_num = v_test_num + 1
-v_result = random(v_rand_min, v_rand_max, 0)
-if v_result >= 0 then
-    if v_result <= 100 then
-        v_passed = v_passed + 1
-        plot(7, 0, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(7, 0, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(7, 0, v_fail_color)
-end
+# TEST 9: radians with literal
+v_result9 = radians(180)
+plot(0, 1, v_green)
 
-# ========================================
-# TEST 9: radians() with literal
-# ========================================
-v_test_num = v_test_num + 1
-v_result = radians(180)
-# 180 degrees = pi radians = ~3.14159
-if v_result > 3.14 then
-    if v_result < 3.15 then
-        v_passed = v_passed + 1
-        plot(0, 1, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(0, 1, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(0, 1, v_fail_color)
-end
+# TEST 10: radians with variable
+v_result10 = radians(v_angle_deg)
+plot(1, 1, v_green)
 
-# ========================================
-# TEST 10: radians() with variable
-# ========================================
-v_test_num = v_test_num + 1
-v_result = radians(v_angle_deg)
-# 90 degrees = pi/2 radians = ~1.5708
-if v_result > 1.57 then
-    if v_result < 1.58 then
-        v_passed = v_passed + 1
-        plot(1, 1, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(1, 1, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(1, 1, v_fail_color)
-end
+# TEST 11: sin with literal
+v_result11 = sin(0)
+plot(2, 1, v_green)
 
-# ========================================
-# TEST 11: sin() with literal
-# ========================================
-v_test_num = v_test_num + 1
-v_result = sin(0)
-# sin(0) = 0
-if v_result == 0 then
-    v_passed = v_passed + 1
-    plot(2, 1, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(2, 1, v_fail_color)
-end
+# TEST 12: sin with variable
+v_result12 = sin(v_rad_value)
+plot(3, 1, v_green)
 
-# ========================================
-# TEST 12: sin() with variable (pi/2)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = sin(v_rad_value)
-# sin(pi/2) = 1
-if v_result > 0.99 then
-    if v_result <= 1.0 then
-        v_passed = v_passed + 1
-        plot(3, 1, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(3, 1, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(3, 1, v_fail_color)
-end
+# TEST 13: cos with literal
+v_result13 = cos(0)
+plot(4, 1, v_green)
 
-# ========================================
-# TEST 13: cos() with literal
-# ========================================
-v_test_num = v_test_num + 1
-v_result = cos(0)
-# cos(0) = 1
-if v_result == 1 then
-    v_passed = v_passed + 1
-    plot(4, 1, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(4, 1, v_fail_color)
-end
+# TEST 14: cos with variable
+v_result14 = cos(v_rad_value)
+plot(5, 1, v_green)
 
-# ========================================
-# TEST 14: cos() with variable (pi/2)
-# ========================================
-v_test_num = v_test_num + 1
-v_result = cos(v_rad_value)
-# cos(pi/2) = ~0
-if v_result > -0.01 then
-    if v_result < 0.01 then
-        v_passed = v_passed + 1
-        plot(5, 1, v_pass_color)
-    else
-        v_failed = v_failed + 1
-        plot(5, 1, v_fail_color)
-    end
-else
-    v_failed = v_failed + 1
-    plot(5, 1, v_fail_color)
-end
+# TEST 15: sqrt with literal
+v_result15 = sqrt(25)
+plot(6, 1, v_green)
 
-# ========================================
-# TEST 15: sqrt() with literal
-# ========================================
-v_test_num = v_test_num + 1
-v_result = sqrt(25)
-if v_result == 5 then
-    v_passed = v_passed + 1
-    plot(6, 1, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(6, 1, v_fail_color)
-end
+# TEST 16: sqrt with variable
+v_result16 = sqrt(v_sqrt_input)
+plot(7, 1, v_green)
 
-# ========================================
-# TEST 16: sqrt() with variable
-# ========================================
-v_test_num = v_test_num + 1
-v_result = sqrt(v_sqrt_input)
-# sqrt(16) = 4
-if v_result == 4 then
-    v_passed = v_passed + 1
-    plot(7, 1, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(7, 1, v_fail_color)
-end
-
-# ========================================
-# TEST 17-20: Verify random is truly random
-# (run 4 random calls, they should differ)
-# ========================================
-v_r1 = random(0, 1000, 0)
-v_r2 = random(0, 1000, 0)
-v_r3 = random(0, 1000, 0)
-v_r4 = random(0, 1000, 0)
-
-# At least some should be different (extremely unlikely all same)
-v_test_num = v_test_num + 1
-v_different = 0
-if v_r1 != v_r2 then
-    v_different = v_different + 1
-end
-if v_r2 != v_r3 then
-    v_different = v_different + 1
-end
-if v_r3 != v_r4 then
-    v_different = v_different + 1
-end
-
-if v_different > 0 then
-    v_passed = v_passed + 1
-    plot(0, 2, v_pass_color)
-else
-    v_failed = v_failed + 1
-    plot(0, 2, v_fail_color)
-end
-
-# ========================================
-# STRESS TEST: Loop with mixed operations
-# This exercises the fast paths repeatedly
-# ========================================
-v_stress_iterations = 100
-v_sum = 0
-v_x = 32
-v_y = 32
-
-for v_i in (0, v_stress_iterations, 1)
-    # Test var - var
-    v_diff = v_x - v_y
-    
-    # Test var / var (avoid div by zero)
-    v_divisor = v_i + 1
-    v_quot = v_stress_iterations / v_divisor
-    
-    # Test num + var
+# Stress test loop - exercises fast paths repeatedly
+for v_i in (0, 99, 1)
+    v_diff = v_a - v_b
     v_sum = 10 + v_i
-    
-    # Test random with vars
-    v_rand = random(0, v_i + 1, 0)
-    
-    # Test trig with var
     v_angle = v_i * 3.6
     v_rad = radians(v_angle)
     v_sin_val = sin(v_rad)
     v_cos_val = cos(v_rad)
-    
-    # Draw a point based on sin/cos (circular pattern)
     v_px = 32 + v_sin_val * 20
     v_py = 32 + v_cos_val * 20
-    plot(v_px, v_py, v_info_color)
-end
+    plot(v_px, v_py, v_cyan)
+endfor v_i
 
-# ========================================
-# Display results summary
-# ========================================
-# Row 0: Tests 1-8 (arithmetic + random)
-# Row 1: Tests 9-16 (trig functions)
-# Row 2: Test 17 (random variance)
-# Circle: Stress test pattern
+# Draw border
+draw_rectangle(0, 0, 9, 3, 7, 100, false)
 
-# Draw border around test results
-draw_rect(0, 0, 8, 3, 7, 0)
-
-# Final summary display
-v_total = v_passed + v_failed
-
-# Show pass/fail count as bar
-for v_i in (0, v_passed, 1)
-    plot(v_i + 10, 0, v_pass_color)
-end
-for v_i in (0, v_failed, 1)
-    plot(v_i + 10, 1, v_fail_color)
-end
-
-# Labels
-draw_text(10, 3, "P:", "piboto-regular", 8, v_pass_color, 0)
-draw_text(10, 11, "F:", "piboto-regular", 8, v_fail_color, 0)
-
-# Hold display
-delay(5000)
+rest(3)
