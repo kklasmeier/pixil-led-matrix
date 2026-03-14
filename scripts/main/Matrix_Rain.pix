@@ -22,7 +22,7 @@ while 1 then
         v_spd = v_drop_speed[v_i]
         
         # Trail duration - slower drops need longer fade to match visual length
-        v_trail_time = 500 / v_spd
+        v_trail_time = 1500 / v_spd
         
         # Only draw if on screen
         if v_y >= 0 and v_y < 64 then
