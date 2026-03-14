@@ -23,7 +23,7 @@ from .regex_patterns import (
     VAR_SUB_VAR_PATTERN, VAR_DIV_VAR_PATTERN,
     NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
     MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
-    ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN
+    ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN
 )
 
 _EXPR_CACHE = OrderedDict()
@@ -518,6 +518,48 @@ def try_fast_arithmetic(expr: str, variables: Union[Dict[str, Any], VariableRegi
             except (ValueError, TypeError, ZeroDivisionError):
                 pass
 
+def try_fast_random(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[Union[int, float]]:
+    """
+    Fast path for random(min, max, decimals) with literal numbers or simple variables.
+    Bypasses eval() by directly calling random_float.
+    
+    Handles:
+    - random(0, 63, 0) - all literals
+    - random(v_min, v_max, 0) - variables
+    - random(0, v_max, v_precision) - mixed
+    """
+    match = RANDOM_WITH_VARS_PATTERN.match(expr)
+    if match:
+        try:
+            arg1, arg2, arg3 = match.groups()
+            
+            # Resolve each argument (number or variable)
+            if arg1.startswith('v_'):
+                if variables is None or arg1 not in variables:
+                    return None
+                min_val = float(variables[arg1])
+            else:
+                min_val = float(arg1)
+            
+            if arg2.startswith('v_'):
+                if variables is None or arg2 not in variables:
+                    return None
+                max_val = float(variables[arg2])
+            else:
+                max_val = float(arg2)
+            
+            if arg3.startswith('v_'):
+                if variables is None or arg3 not in variables:
+                    return None
+                precision = int(variables[arg3])
+            else:
+                precision = int(arg3)
+            
+            return random_float(min_val, max_val, precision)
+        except (ValueError, TypeError, KeyError):
+            pass
+    return None
+
 def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Union[int, float, str]:
     """
     Evaluate a mathematical or string expression with variable substitution.
@@ -564,6 +606,15 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Fast arithmetic hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
+        
+        # Try random(min, max, decimals) with literals or simple variables (NEW)
+        if 'random' in expr:
+            fast_result = try_fast_random(expr, variables)
+            if fast_result is not None:
+                _FAST_MATH_HITS += 1
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast random hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                return fast_result
     # ===== END PHASE 2 OPTIMIZATION =====
 
     # Parse variables early so we can check for random in both original and parsed expressions

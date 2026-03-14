@@ -103,6 +103,10 @@ WHILE_LOOP_PATTERN = re.compile(r'while (.+?) then')
 IF_PATTERN = re.compile(r'if (.+?) then')
 RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
 
+# Random with simple variables: random(num_or_var, num_or_var, num_or_var)
+# Captures each argument which can be a number (-?\d*\.?\d+) or a variable (v_\w+)
+RANDOM_WITH_VARS_PATTERN = re.compile(r'^random\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(\d+|v_\w+)\s*\)$')
+
 # =============================================================================
 # Other
 # =============================================================================
