@@ -19,6 +19,7 @@ COMMANDS:
   interactive   Run Pixil in the FOREGROUND (stays attached to terminal).
   start         Run Pixil in the BACKGROUND (sudo + nohup + &), logs to pixil.log.
   bg            Alias for start.
+  info          Show current script and last 10 scripts run (from log).
   status        Show running Pixil processes (PID + command).
   stop          Stop Pixil processes (TERM first, then KILL if needed).
   killpython    Big hammer: kill Pixil python processes, then optionally ALL python.
@@ -35,7 +36,8 @@ EXAMPLES (background):
 ./run start -- main/* -t 60:00
 ./run bg main/* -t 60:00 
 
-STATUS / STOP:
+INFO / STATUS / STOP:
+./run info
 ./run status
 ./run stop
 
@@ -139,7 +141,7 @@ guard_against_bare_star() {
 # ------------------------------------------------------------
 COMMAND=""
 case "${1:-}" in
-  help|status|stop|killpython|interactive|start|bg)
+  help|info|status|stop|killpython|interactive|start|bg)
     COMMAND="$1"
     shift
     ;;
@@ -166,6 +168,35 @@ fi
 case "$COMMAND" in
   help)
     usage
+    ;;
+
+  info)
+    show_pixil_procs || true
+    echo
+    if [[ -f "$LOG_FILE" ]]; then
+      # Extract last 10 "Current script:" entries
+      SCRIPTS=$(grep "Current script:" "$LOG_FILE" | tail -10)
+      if [[ -n "$SCRIPTS" ]]; then
+        TOTAL=$(echo "$SCRIPTS" | wc -l)
+        echo "=== Recent scripts (last $TOTAL) ==="
+        COUNT=1
+        while IFS= read -r line; do
+          # Extract just the script name from the path
+          SCRIPT_PATH=$(echo "$line" | sed 's/Current script: //' | sed 's/\.\.\.$//')
+          SCRIPT_NAME=$(basename "$SCRIPT_PATH")
+          if [[ $COUNT -eq $TOTAL ]]; then
+            echo "  ▶ $SCRIPT_NAME  [RUNNING]"
+          else
+            echo "    $SCRIPT_NAME"
+          fi
+          ((COUNT++))
+        done <<< "$SCRIPTS"
+      else
+        echo "No script history found in log."
+      fi
+    else
+      echo "No log file found ($LOG_FILE)"
+    fi
     ;;
 
   status)
