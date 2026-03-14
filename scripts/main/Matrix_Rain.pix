@@ -43,5 +43,5 @@ while 1 then
         endif
     endfor v_i
     
-    rest(0.035)
+    rest(0.135)
 endwhile
