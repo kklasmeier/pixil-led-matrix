@@ -1,0 +1,66 @@
+# Matrix Digital Rain
+# Classic falling green code effect
+
+v_num_drops = 40
+
+create_array(v_drop_x, v_num_drops)
+create_array(v_drop_y, v_num_drops)
+create_array(v_drop_speed, v_num_drops)
+create_array(v_drop_length, v_num_drops)
+
+# Initialize drops at random positions, staggered vertically
+for v_i in (0, v_num_drops - 1, 1)
+    v_drop_x[v_i] = random(0, 63, 0)
+    v_drop_y[v_i] = random(-40, 63, 0)
+    v_drop_speed[v_i] = random(1, 3, 0)
+    v_drop_length[v_i] = random(6, 16, 0)
+endfor v_i
+
+# Main animation loop
+while 1 then
+    for v_i in (0, v_num_drops - 1, 1)
+        v_x = v_drop_x[v_i]
+        v_y = int(v_drop_y[v_i])
+        v_len = v_drop_length[v_i]
+        v_spd = v_drop_speed[v_i]
+        
+        # Calculate fade duration based on speed (slower = longer trail)
+        v_fade_time = 400 / v_spd
+        
+        # Draw the head (bright white/green)
+        if v_y >= 0 and v_y < 64 then
+            plot(v_x, v_y, white, 100, 80, fade)
+        endif
+        
+        # Draw trail segments with decreasing intensity
+        for v_t in (1, v_len, 1)
+            v_trail_y = v_y - v_t
+            if v_trail_y >= 0 and v_trail_y < 64 then
+                v_intensity = 90 - (v_t * 5)
+                if v_intensity > 15 then
+                    # Vary the green shade - brighter near head
+                    if v_t < 3 then
+                        plot(v_x, v_trail_y, lime, v_intensity, v_fade_time, fade)
+                    elseif v_t < 7 then
+                        plot(v_x, v_trail_y, green, v_intensity, v_fade_time, fade)
+                    else
+                        plot(v_x, v_trail_y, forest_green, v_intensity, v_fade_time, fade)
+                    endif
+                endif
+            endif
+        endfor v_t
+        
+        # Move drop down
+        v_drop_y[v_i] = v_drop_y[v_i] + v_spd
+        
+        # Reset when drop is fully off screen
+        if v_y > 63 + v_len then
+            v_drop_x[v_i] = random(0, 63, 0)
+            v_drop_y[v_i] = random(-30, -5, 0)
+            v_drop_speed[v_i] = random(1, 3, 0)
+            v_drop_length[v_i] = random(6, 16, 0)
+        endif
+    endfor v_i
+    
+    rest(0.04)
+endwhile
