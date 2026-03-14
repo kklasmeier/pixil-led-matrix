@@ -14,8 +14,8 @@ v_rand_min = 0
 v_rand_max = 100
 
 # Colors for display
-v_pass_color = 32
-v_fail_color = 225
+v_pass_color = "green"
+v_fail_color = "red"
 v_info_color = 28
 
 # Test counter
