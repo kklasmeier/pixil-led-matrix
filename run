@@ -23,7 +23,7 @@ COMMANDS:
   status        Show running Pixil processes (PID + command).
   stop          Stop Pixil processes (TERM first, then KILL if needed).
   killpython    Big hammer: kill Pixil python processes, then optionally ALL python.
-  help          Show this help.
+  help          Show this help..
 
 DEFAULT PIXIL ARGS (when omitted for interactive/start):
   main/* -t 60:00
