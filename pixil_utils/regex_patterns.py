@@ -107,6 +107,12 @@ RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*
 # Captures each argument which can be a number (-?\d*\.?\d+) or a variable (v_\w+)
 RANDOM_WITH_VARS_PATTERN = re.compile(r'^random\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(\d+|v_\w+)\s*\)$')
 
+# Single-argument math functions with number or variable: sin(x), cos(x), radians(x), sqrt(x)
+FAST_SIN_PATTERN = re.compile(r'^sin\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+FAST_COS_PATTERN = re.compile(r'^cos\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+FAST_RADIANS_PATTERN = re.compile(r'^radians\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+FAST_SQRT_PATTERN = re.compile(r'^sqrt\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+
 # =============================================================================
 # Other
 # =============================================================================

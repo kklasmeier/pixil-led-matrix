@@ -23,7 +23,8 @@ from .regex_patterns import (
     VAR_SUB_VAR_PATTERN, VAR_DIV_VAR_PATTERN,
     NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
     MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
-    ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN
+    ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN,
+    FAST_SIN_PATTERN, FAST_COS_PATTERN, FAST_RADIANS_PATTERN, FAST_SQRT_PATTERN
 )
 
 _EXPR_CACHE = OrderedDict()
@@ -560,6 +561,68 @@ def try_fast_random(expr: str, variables: Union[Dict[str, Any], VariableRegistry
             pass
     return None
 
+def _resolve_arg(arg: str, variables: Union[Dict[str, Any], VariableRegistry, None]) -> Optional[float]:
+    """Helper to resolve a number or variable argument to a float value."""
+    if arg.startswith('v_'):
+        if variables is None or arg not in variables:
+            return None
+        return float(variables[arg])
+    else:
+        return float(arg)
+
+def try_fast_trig(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[float]:
+    """
+    Fast path for single-argument trig/math functions: sin, cos, radians, sqrt.
+    Bypasses eval() by directly calling math functions.
+    
+    Handles:
+    - sin(v_rad), sin(1.5708)
+    - cos(v_rad), cos(0)
+    - radians(v_angle), radians(90)
+    - sqrt(v_value), sqrt(2)
+    """
+    # Try sin(x)
+    match = FAST_SIN_PATTERN.match(expr)
+    if match:
+        try:
+            val = _resolve_arg(match.group(1), variables)
+            if val is not None:
+                return math.sin(val)
+        except (ValueError, TypeError, KeyError):
+            pass
+    
+    # Try cos(x)
+    match = FAST_COS_PATTERN.match(expr)
+    if match:
+        try:
+            val = _resolve_arg(match.group(1), variables)
+            if val is not None:
+                return math.cos(val)
+        except (ValueError, TypeError, KeyError):
+            pass
+    
+    # Try radians(x)
+    match = FAST_RADIANS_PATTERN.match(expr)
+    if match:
+        try:
+            val = _resolve_arg(match.group(1), variables)
+            if val is not None:
+                return math.radians(val)
+        except (ValueError, TypeError, KeyError):
+            pass
+    
+    # Try sqrt(x)
+    match = FAST_SQRT_PATTERN.match(expr)
+    if match:
+        try:
+            val = _resolve_arg(match.group(1), variables)
+            if val is not None and val >= 0:
+                return math.sqrt(val)
+        except (ValueError, TypeError, KeyError):
+            pass
+    
+    return None
+
 def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> Union[int, float, str]:
     """
     Evaluate a mathematical or string expression with variable substitution.
@@ -614,6 +677,15 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
                 _FAST_MATH_HITS += 1
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast random hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                return fast_result
+        
+        # Try single-arg math functions: sin, cos, radians, sqrt (NEW)
+        if any(fn in expr for fn in ('sin(', 'cos(', 'radians(', 'sqrt(')):
+            fast_result = try_fast_trig(expr, variables)
+            if fast_result is not None:
+                _FAST_MATH_HITS += 1
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast trig hit: {expr} = {fast_result}", DEBUG_VERBOSE)
                 return fast_result
     # ===== END PHASE 2 OPTIMIZATION =====
 
