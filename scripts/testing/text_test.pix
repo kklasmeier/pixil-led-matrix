@@ -1,10 +1,9 @@
 # Text rendering test script
 # Testing different fonts, sizes, and positions
 
-begin_frame
-    # Display game over message
-    draw_text(-2, 25, "GAME OVER", piboto-regular, 12, red, 100, TYPE, SLOW)
-end_frame
+
+# Display game over message
+draw_text(-2, 25, "GAME OVER", piboto-regular, 12, blue, 100, TYPE, SLOW)
 rest(3)
 sync_queue
 
