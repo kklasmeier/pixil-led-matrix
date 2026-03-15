@@ -349,7 +349,7 @@ def move_invaders {
     v_move_down = 0
     v_leftmost = 64
     v_rightmost = 0
-    begin_frame
+
     # Find boundaries
     for v_i in (0, 29, 1)
         if v_inv_alive[v_i] == 1 then
@@ -394,7 +394,7 @@ def move_invaders {
             endif
         endif
     endfor v_i
-    end_frame
+
 }
 
 # =============================================================================
@@ -561,7 +561,7 @@ def hide_all_sprites {
 def game_loop {
     while v_game_running == 1 then
         v_frame = v_frame + 1
-        
+        begin_frame(true)
         # Player bullet - fastest (every frame)
         if v_frame % v_bullet_interval == 0 then
             call update_bullet
@@ -597,7 +597,7 @@ def game_loop {
         if v_inv_shoot_timer > 0 then
             v_inv_shoot_timer = v_inv_shoot_timer - 1
         endif
-        
+        end_frame
         # Check game state
         call check_game_over
         
