@@ -601,7 +601,7 @@ def game_loop {
         call check_game_over
         
         # Frame delay (~30 fps)
-        rest(0.033)
+        #rest(0.033)
     endwhile
 }
 
@@ -624,7 +624,7 @@ def show_title {
     # Animate invader dropping down
     for v_yy in (-8, 57, 2)
         move_sprite(invader2, 27, v_yy, 202)
-        rest(0.05)
+        #rest(0.05)
     endfor v_yy
     
     rest(2)
