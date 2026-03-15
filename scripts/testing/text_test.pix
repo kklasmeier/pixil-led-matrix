@@ -6,11 +6,11 @@
 draw_text(-2, 10, "GAME OVER", piboto-regular, 8, red, 100, TYPE, SLOW)
 rest(3)
 clear
-#draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
-#draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
+draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
 rest(3)
 clear
-#draw_text(4, 20, "GAME", piboto-regular, 12, red, 100, TYPE, SLOW)
-#draw_text(4, 36, "OVER", piboto-regular, 12, red, 100, TYPE, SLOW)
+draw_text(4, 20, "GAME", piboto-regular, 12, red, 100, TYPE, SLOW)
+draw_text(4, 36, "OVER", piboto-regular, 12, red, 100, TYPE, SLOW)
 rest(3)
 clear
