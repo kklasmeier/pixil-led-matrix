@@ -375,16 +375,9 @@ class ConditionTemplate:
         if 'random(' in self.original:
             return False  # Cannot handle function calls
         
-        # Parenthesized and negated conditions can handle complex expressions
-        if self.template_type in ['parenthesized', 'negated']:
-            return True
-        
-        # For non-parenthesized compound conditions, limit complexity
-        if self.template_type == 'compound':
-            if self.original.count(' and ') >= 2 and self.original.count(' or ') == 0:
-                return False  # Triple+ AND without OR - use parentheses for clarity
-        
-        return self.template_type in ['simple', 'compound', 'boolean']
+        # All supported template types can use fast evaluation
+        # (Triple+ ANDs are handled correctly by _evaluate_compound with short-circuit)
+        return self.template_type in ['simple', 'compound', 'boolean', 'parenthesized', 'negated']
     
     def evaluate_fast(self, variables) -> bool:
         """Fast evaluation without string parsing."""

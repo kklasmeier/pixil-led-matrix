@@ -560,6 +560,95 @@ else
 endif
 
 print("")
+print("--- TRIPLE+ COMPOUND TESTS ---")
+print("")
+
+# ============================================
+# TRIPLE 1: Three ANDs (all true)
+# v_x > 5 and v_y < 10 and v_z == 15
+# Expected: true and true and true = true
+# ============================================
+print("TRIPLE 1: v_x > 5 and v_y < 10 and v_z == 15 (all true)")
+v_triple1_passed = 0
+if v_x > 5 and v_y < 10 and v_z == 15 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_triple1_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TRIPLE 2: Three ANDs (one false)
+# v_x > 5 and v_y > 100 and v_z == 15
+# Expected: true and false and true = false
+# ============================================
+print("TRIPLE 2: v_x > 5 and v_y > 100 and v_z == 15 (one false)")
+v_triple2_passed = 0
+if v_x > 5 and v_y > 100 and v_z == 15 then
+    print("  FAIL: Condition evaluated to TRUE (unexpected)")
+else
+    print("  PASS: Condition evaluated to FALSE (expected)")
+    v_triple2_passed = 1
+endif
+
+# ============================================
+# TRIPLE 3: Four ANDs
+# v_x > 5 and v_y < 10 and v_z == 15 and v_a == 1
+# Expected: true and true and true and true = true
+# ============================================
+print("TRIPLE 3: v_x > 5 and v_y < 10 and v_z == 15 and v_a == 1 (four ANDs)")
+v_triple3_passed = 0
+if v_x > 5 and v_y < 10 and v_z == 15 and v_a == 1 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_triple3_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TRIPLE 4: Three ORs (all false except one)
+# v_x > 100 or v_y > 100 or v_z == 15
+# Expected: false or false or true = true
+# ============================================
+print("TRIPLE 4: v_x > 100 or v_y > 100 or v_z == 15 (three ORs)")
+v_triple4_passed = 0
+if v_x > 100 or v_y > 100 or v_z == 15 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_triple4_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TRIPLE 5: Four ORs (all false)
+# v_x > 100 or v_y > 100 or v_z == 0 or v_a == 99
+# Expected: false or false or false or false = false
+# ============================================
+print("TRIPLE 5: v_x > 100 or v_y > 100 or v_z == 0 or v_a == 99 (four ORs, all false)")
+v_triple5_passed = 0
+if v_x > 100 or v_y > 100 or v_z == 0 or v_a == 99 then
+    print("  FAIL: Condition evaluated to TRUE (unexpected)")
+else
+    print("  PASS: Condition evaluated to FALSE (expected)")
+    v_triple5_passed = 1
+endif
+
+# ============================================
+# TRIPLE 6: Mixed triple+ with AND and OR
+# v_x > 5 and v_y < 10 or v_z == 0 and v_a == 99
+# Precedence: (v_x > 5 and v_y < 10) or (v_z == 0 and v_a == 99)
+# Expected: (true and true) or (false and false) = true or false = true
+# ============================================
+print("TRIPLE 6: v_x > 5 and v_y < 10 or v_z == 0 and v_a == 99 (mixed)")
+v_triple6_passed = 0
+if v_x > 5 and v_y < 10 or v_z == 0 and v_a == 99 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_triple6_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+print("")
 print("--- NEW FEATURE TESTS (Parentheses) ---")
 print("")
 
@@ -713,18 +802,22 @@ print(f"Elseif tests: {v_elseif_passed} / 7")
 v_not_passed = v_not1_passed + v_not2_passed + v_not3_passed + v_not4_passed + v_not5_passed + v_not6_passed + v_not7_passed + v_not8_passed + v_not9_passed + v_not10_passed + v_not11_passed + v_not12_passed
 print(f"NOT operator tests: {v_not_passed} / 12")
 
+# Triple+ compound tests
+v_triple_passed = v_triple1_passed + v_triple2_passed + v_triple3_passed + v_triple4_passed + v_triple5_passed + v_triple6_passed
+print(f"Triple+ compound tests: {v_triple_passed} / 6")
+
 # Parentheses feature tests
 v_paren_passed = v_test1_passed + v_test2_passed + v_test3_passed + v_test4_passed + v_test5_passed + v_test6_passed + v_test7_passed + v_test8_passed + v_test9_passed
 print(f"Parentheses feature tests: {v_paren_passed} / 9")
 
 # Total
 v_legacy_total = v_legacy_basic_passed + v_string_passed + v_elseif_passed
-v_new_features_total = v_not_passed + v_paren_passed
+v_new_features_total = v_not_passed + v_triple_passed + v_paren_passed
 v_total_passed = v_legacy_total + v_new_features_total
-v_total_tests = 46
+v_total_tests = 52
 print("")
 print(f"Total legacy/regression: {v_legacy_total} / 25")
-print(f"Total new features: {v_new_features_total} / 21")
+print(f"Total new features: {v_new_features_total} / 27")
 print(f"TOTAL TESTS PASSED: {v_total_passed} / {v_total_tests}")
 
 print("")
@@ -743,6 +836,9 @@ else
     endif
     if v_not_passed != 12 then
         print("WARNING: NOT operator tests failed!")
+    endif
+    if v_triple_passed != 6 then
+        print("WARNING: Triple+ compound tests failed!")
     endif
     if v_paren_passed != 9 then
         print("WARNING: Parentheses tests failed!")
