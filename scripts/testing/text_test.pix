@@ -28,7 +28,7 @@ rest(3)
 # Test 4: Try with TYPE effect like in game
 clear()
 draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
-draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+#draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
 rest(3)
 
 # Test 5: Try tiny64_font instead
