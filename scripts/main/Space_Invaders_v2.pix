@@ -349,7 +349,7 @@ def move_invaders {
     v_move_down = 0
     v_leftmost = 64
     v_rightmost = 0
-    
+    begin_frame
     # Find boundaries
     for v_i in (0, 29, 1)
         if v_inv_alive[v_i] == 1 then
@@ -394,6 +394,7 @@ def move_invaders {
             endif
         endif
     endfor v_i
+    end_frame
 }
 
 # =============================================================================
