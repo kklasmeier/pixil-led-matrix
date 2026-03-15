@@ -405,7 +405,7 @@ class TextRenderer:
                 # Draw directly in the new frame
                 temp_img = Image.new('RGB', (int(char_width), int(text_height)), color=(0, 0, 0))
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.text((0, 0), current_text, font=font, fill=(255, 255, 255))
+                temp_draw.text((-bbox[0], -bbox[1]), current_text, font=font, fill=(255, 255, 255))
                 pixels = temp_img.load()
                 
                 for py in range(int(text_height)):
@@ -422,7 +422,7 @@ class TextRenderer:
                 
                 temp_img = Image.new('RGB', (int(char_width), int(text_height)), color=(0, 0, 0))
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.text((0, 0), current_text, font=font, fill=(255, 255, 255))
+                temp_draw.text((-bbox[0], -bbox[1]), current_text, font=font, fill=(255, 255, 255))
                 pixels = temp_img.load()
                 
                 for py in range(int(text_height)):
