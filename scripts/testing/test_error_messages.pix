@@ -11,8 +11,8 @@ v_numbers[0] = 1
 v_numbers[1] = 2
 v_numbers[2] = 3
 
-display_text("Error Message Tests - uncomment one test at a time")
-display_text("All tests should show helpful error messages")
+print("Error Message Tests - uncomment one test at a time")
+print("All tests should show helpful error messages")
 
 ; =====================================================
 ; TEST 1: Undefined variable (typo)
@@ -21,7 +21,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_xx > 5 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -39,7 +39,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_x > 5 and then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -49,7 +49,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_x = 10 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -59,7 +59,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_color > "blue" then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -69,7 +69,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if (v_x > 5 and v_y < 10 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -79,7 +79,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_x > 5) and v_y < 10 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -89,7 +89,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_undefined_array[0] == 5 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -99,7 +99,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_numbers[10] == 5 then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -108,7 +108,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if not v_undefined then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -118,7 +118,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test:
 ; if v_color == "red then
-;   display_text("This should not execute")
+;   print("This should not execute")
 ; endif
 
 ; =====================================================
@@ -129,7 +129,7 @@ display_text("All tests should show helpful error messages")
 ; =====================================================
 ; Uncomment to test (may work due to type coercion):
 ; if v_x == "10" then
-;   display_text("Type coercion may make this work")
+;   print("Type coercion may make this work")
 ; endif
 
 ; =====================================================
@@ -137,49 +137,49 @@ display_text("All tests should show helpful error messages")
 ; Run this to confirm error handling doesn't break
 ; normal functionality
 ; =====================================================
-display_text("Running validation test...")
+print("Running validation test...")
 
 v_pass_count = 0
 
 ; Test valid condition
 if v_x > 5 then
     v_pass_count = v_pass_count + 1
-    display_text("PASS: Basic condition works")
+    print("PASS: Basic condition works")
 endif
 
 ; Test compound condition
 if v_x > 5 and v_y < 10 then
     v_pass_count = v_pass_count + 1
-    display_text("PASS: Compound condition works")
+    print("PASS: Compound condition works")
 endif
 
 ; Test NOT condition
 if not v_y > 100 then
     v_pass_count = v_pass_count + 1
-    display_text("PASS: NOT condition works")
+    print("PASS: NOT condition works")
 endif
 
 ; Test parentheses
 if (v_x > 5 or v_y > 100) and v_color == "red" then
     v_pass_count = v_pass_count + 1
-    display_text("PASS: Parenthesized condition works")
+    print("PASS: Parenthesized condition works")
 endif
 
 ; Test array access
 if v_numbers[0] == 1 then
     v_pass_count = v_pass_count + 1
-    display_text("PASS: Array access in condition works")
+    print("PASS: Array access in condition works")
 endif
 
-display_text("=== VALIDATION COMPLETE ===")
-display_text("Passed: " & v_pass_count & " / 5")
+print("=== VALIDATION COMPLETE ===")
+print("Passed: " & v_pass_count & " / 5")
 
 if v_pass_count == 5 then
-    display_text("All validation tests passed!")
-    display_text("Error messages are ready for testing.")
-    display_text("Uncomment individual error tests above.")
+    print("All validation tests passed!")
+    print("Error messages are ready for testing.")
+    print("Uncomment individual error tests above.")
 else
-    display_text("WARNING: Some validation tests failed!")
+    print("WARNING: Some validation tests failed!")
 endif
 
 delay(5000)
