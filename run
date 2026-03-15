@@ -23,7 +23,7 @@ COMMANDS:
   status        Show running Pixil processes (PID + command).
   stop          Stop Pixil processes (TERM first, then KILL if needed).
   killpython    Big hammer: kill Pixil python processes, then optionally ALL python.
-  help          Show this help..
+  help          Show this help.
 
 DEFAULT PIXIL ARGS (when omitted for interactive/start):
   main/* -t 60:00
@@ -224,8 +224,8 @@ case "$COMMAND" in
 
   start|bg)
     echo "Starting Pixil in background..."
-    echo "Command: sudo nohup python3 Pixil.py ${PASS_ARGS[*]} > $LOG_FILE 2>&1 &"
-    sudo nohup python3 Pixil.py "${PASS_ARGS[@]}" > "$LOG_FILE" 2>&1 &
+    echo "Command: sudo nohup python3 -u Pixil.py ${PASS_ARGS[*]} > $LOG_FILE 2>&1 &"
+    sudo nohup python3 -u Pixil.py "${PASS_ARGS[@]}" > "$LOG_FILE" 2>&1 &
     sleep 1
     show_pixil_procs || true
     echo "Log: $LOG_FILE"
