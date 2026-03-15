@@ -379,14 +379,41 @@ endif
 
 Operator Precedence:
 - AND has higher precedence than OR
-- Use nested if statements to override precedence (parentheses NOT supported)
+- Use parentheses to override default precedence
 
-# To implement "(v_x > 5 or v_y < 10) and v_z == 15":
-if v_z == 15 then
-    if v_x > 5 or v_y < 10 then
-        # Commands here
-    endif
+Parentheses Support:
+Parentheses can be used to group conditions and override operator precedence.
+Multiple non-nested parentheses groups are supported.
+
+Examples with Parentheses:
+# Override precedence - evaluate OR first, then AND with result
+if (v_x > 5 or v_y < 10) and v_z == 15 then
+    # Executes if: (v_x > 5 OR v_y < 10) is true AND v_z == 15
 endif
+
+# Multiple parenthesized groups
+if (v_x > 5 and v_y < 10) or (v_z == 15) then
+    # Executes if: either group is true
+endif
+
+# Mixed: simple condition with parenthesized group
+if v_a == 1 and (v_x > 5 or v_y > 100) then
+    # Executes if: v_a == 1 AND (v_x > 5 OR v_y > 100)
+endif
+
+# Three groups
+if (v_x > 5) or (v_y > 100) or (v_z == 15) then
+    # Any group being true makes the whole condition true
+endif
+
+# Complex compound conditions inside parentheses
+if (v_x > 5 and v_y < 10) or (v_z > 10 and v_a == 1) then
+    # Each group is evaluated separately, then combined with OR
+endif
+
+Note: Nested parentheses are NOT supported. For example:
+# NOT supported: ((v_x > 5 or v_y < 10) and v_z == 15) or v_a == 1
+# Use multiple if statements for complex nested logic instead
 
 FOR LOOPS
 ---------

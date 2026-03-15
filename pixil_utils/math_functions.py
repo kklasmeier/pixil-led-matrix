@@ -953,6 +953,103 @@ def split_outside_quotes(text, delimiter):
     
     return result
 
+# Pre-compiled pattern for parenthesized groups (non-nested)
+import re
+_PAREN_GROUP_PATTERN = re.compile(r'\([^()]+\)')
+
+def _evaluate_parenthesized_condition(condition: str, variables) -> Optional[bool]:
+    """
+    Evaluate conditions with parentheses (Level 2 - non-nested).
+    
+    Supports:
+    - (v_x > 5 or v_y < 10) and v_z == 15
+    - (v_x > 5 and v_y < 10) or (v_z == 15)
+    - v_a == 1 and (v_x > 5 or v_y < 10)
+    
+    Returns None if parsing fails (caller should use fallback).
+    """
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Evaluating parenthesized condition: {condition}", DEBUG_VERBOSE)
+    
+    # Check for nested parentheses - not supported
+    depth = 0
+    for char in condition:
+        if char == '(':
+            depth += 1
+            if depth > 1:
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Nested parentheses not supported, falling back", DEBUG_VERBOSE)
+                return None
+        elif char == ')':
+            depth -= 1
+    
+    # Find all parenthesized groups
+    paren_groups = _PAREN_GROUP_PATTERN.findall(condition)
+    if not paren_groups:
+        return None
+    
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Found parenthesized groups: {paren_groups}", DEBUG_VERBOSE)
+    
+    # Replace each parenthesized group with a placeholder and evaluate
+    temp_condition = condition
+    group_results = {}  # placeholder -> evaluated result
+    
+    for i, group in enumerate(paren_groups):
+        placeholder = f"__PAREN_{i}__"
+        inner_content = group[1:-1]  # Remove outer parentheses
+        
+        # Recursively evaluate the inner condition
+        try:
+            inner_result = evaluate_condition(inner_content, variables)
+            group_results[placeholder] = inner_result
+            temp_condition = temp_condition.replace(group, placeholder, 1)
+            
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Group '{inner_content}' evaluated to {inner_result}", DEBUG_VERBOSE)
+        except Exception as e:
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Failed to evaluate group '{inner_content}': {e}", DEBUG_VERBOSE)
+            return None
+    
+    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+        debug_print(f"Condition with placeholders: {temp_condition}", DEBUG_VERBOSE)
+    
+    # Now evaluate the condition with placeholders replaced by results
+    # Split by 'or' first (lower precedence), then 'and'
+    try:
+        or_parts = split_outside_quotes(temp_condition, " or ")
+        
+        for or_part in or_parts:
+            and_parts = split_outside_quotes(or_part, " and ")
+            
+            and_result = True
+            for and_part in and_parts:
+                and_part = and_part.strip()
+                
+                if and_part.startswith('__PAREN_') and and_part.endswith('__'):
+                    # This is a placeholder - use pre-evaluated result
+                    part_result = group_results.get(and_part)
+                    if part_result is None:
+                        return None
+                else:
+                    # This is a simple condition
+                    part_result = evaluate_simple_condition(and_part, variables)
+                
+                and_result = and_result and part_result
+                if not and_result:
+                    break  # Short-circuit AND
+            
+            if and_result:
+                return True  # Short-circuit OR
+        
+        return False
+        
+    except Exception as e:
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Error in parenthesized evaluation: {e}", DEBUG_VERBOSE)
+        return None
+
 def evaluate_simple_condition(condition, variables):
     """Evaluate a simple condition with a single comparison operator."""
     condition = condition.strip()
@@ -1099,6 +1196,7 @@ def evaluate_condition(condition, variables):
     # Check if this is a compound condition
     has_and = " and " in condition
     has_or = " or " in condition
+    has_parens = '(' in condition and ')' in condition
     
     if not (has_and or has_or):
         # Simple condition (no compound operators)
@@ -1106,7 +1204,12 @@ def evaluate_condition(condition, variables):
             debug_print(f"No compound operators found, evaluating as simple condition", DEBUG_VERBOSE)
         return evaluate_simple_condition(condition, variables)
     
-    # TODO: Future enhancement - Support for explicit parentheses
+    # Handle parenthesized conditions (Level 2 - non-nested)
+    if has_parens:
+        result = _evaluate_parenthesized_condition(condition, variables)
+        if result is not None:
+            return result
+        # If parentheses parsing failed, fall through to standard evaluation
     
     try:
         # Split by 'or' operators first (lower precedence)

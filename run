@@ -171,7 +171,14 @@ case "$COMMAND" in
     ;;
 
   info)
-    show_pixil_procs || true
+    # Check if Pixil is actually running
+    PIXIL_RUNNING=false
+    if pixil_is_running; then
+      PIXIL_RUNNING=true
+      show_pixil_procs
+    else
+      echo "No Pixil processes running."
+    fi
     echo
     if [[ -f "$LOG_FILE" ]]; then
       # Extract last 10 "Current script:" entries
@@ -185,7 +192,11 @@ case "$COMMAND" in
           SCRIPT_PATH=$(echo "$line" | sed 's/Current script: //' | sed 's/\.\.\.$//')
           SCRIPT_NAME=$(basename "$SCRIPT_PATH")
           if [[ $COUNT -eq $TOTAL ]]; then
-            echo "  ▶ $SCRIPT_NAME  [RUNNING]"
+            if [[ "$PIXIL_RUNNING" == "true" ]]; then
+              echo "  ▶ $SCRIPT_NAME  [RUNNING]"
+            else
+              echo "  ▶ $SCRIPT_NAME  [LAST]"
+            fi
           else
             echo "    $SCRIPT_NAME"
           fi

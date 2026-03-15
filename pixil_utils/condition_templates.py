@@ -1,6 +1,14 @@
 """
 Condition template system for fast boolean evaluation.
 Eliminates expensive string parsing for repetitive condition checks.
+
+Supports:
+- Simple conditions: v_x > 5
+- Compound conditions: v_x > 5 and v_y < 10
+- Parenthesized conditions (Level 2): 
+  - (v_x > 5 or v_y < 10) and v_z == 15
+  - (v_x > 5 and v_y < 10) or (v_z == 15)
+  - Multiple non-nested parentheses groups
 """
 
 import re
@@ -10,6 +18,8 @@ from .debug import debug_print, DEBUG_VERBOSE
 # Pre-compiled regex patterns for condition parsing
 SIMPLE_CONDITION_PATTERN = re.compile(r'^\s*(v_\w+(?:\[[^\]]+\])?)\s*(>=|<=|==|!=|>|<)\s*(.+)\s*$')
 COMPOUND_CONDITION_PATTERN = re.compile(r'\s+(and|or)\s+')
+# Pattern to find top-level parenthesized groups (non-nested)
+PAREN_GROUP_PATTERN = re.compile(r'\([^()]+\)')
 
 # Operator function lookup table for fast comparisons
 OPERATOR_FUNCTIONS = {
@@ -26,7 +36,7 @@ class ConditionTemplate:
     
     def __init__(self, original_condition: str):
         self.original = original_condition.strip()
-        self.template_type = None      # 'simple', 'compound', 'unsupported'
+        self.template_type = None      # 'simple', 'compound', 'parenthesized', 'unsupported'
         self.left_var = None           # Variable name (e.g., "v_x")
         self.operator = None           # Comparison operator (e.g., ">=")
         self.right_value = None        # Right side value or variable
@@ -38,16 +48,26 @@ class ConditionTemplate:
         self.is_array_access = False     # Pre-determined
         self.array_name = None           # For array access
         self.index_var = None            # For array access
+        # New fields for parenthesized conditions
+        self.paren_parts = []            # List of (type, data) tuples: ('group', ConditionTemplate) or ('simple', ConditionTemplate)
+        self.paren_operators = []        # Operators between parenthesized parts
 
     def parse(self):
         """Parse condition into template format."""
         if self.is_parsed:
             return
+        
+        # Try parenthesized condition parsing FIRST (if has parentheses)
+        if '(' in self.original and ')' in self.original:
+            if self._parse_parenthesized_condition():
+                self.template_type = 'parenthesized'
+                self.is_parsed = True
+                return
             
-        # NEW: Try compound condition parsing FIRST
+        # Try compound condition parsing
         if self._parse_compound_condition():
             self.template_type = 'compound'
-        # THEN try simple condition parsing
+        # Then try simple condition parsing
         elif self._parse_simple_condition():
             self.template_type = 'simple'
             # Pre-parse operands for optimization
@@ -68,6 +88,120 @@ class ConditionTemplate:
             if debug_print and DEBUG_VERBOSE:
                 debug_print(f"Simple condition: {self.left_var} {self.operator} {self.right_value}", DEBUG_VERBOSE)
             return True
+        return False
+    
+    def _parse_parenthesized_condition(self) -> bool:
+        """
+        Parse conditions with parentheses (Level 2 - non-nested).
+        
+        Supports:
+        - (v_x > 5 or v_y < 10) and v_z == 15
+        - (v_x > 5 and v_y < 10) or (v_z == 15)
+        - v_a == 1 and (v_x > 5 or v_y < 10)
+        
+        Does NOT support nested parentheses like:
+        - ((v_x > 5 or v_y < 10) and v_z == 15) or v_a == 1
+        """
+        condition = self.original
+        
+        # Check for nested parentheses - not supported in Level 2
+        depth = 0
+        for char in condition:
+            if char == '(':
+                depth += 1
+                if depth > 1:
+                    if debug_print and DEBUG_VERBOSE:
+                        debug_print(f"Nested parentheses detected, not supported: {condition}", DEBUG_VERBOSE)
+                    return False  # Nested parentheses not supported
+            elif char == ')':
+                depth -= 1
+        
+        # Find all parenthesized groups
+        paren_groups = PAREN_GROUP_PATTERN.findall(condition)
+        if not paren_groups:
+            return False  # No valid parentheses found
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Found parenthesized groups: {paren_groups}", DEBUG_VERBOSE)
+        
+        # Replace each parenthesized group with a placeholder
+        temp_condition = condition
+        group_map = {}  # placeholder -> group content
+        for i, group in enumerate(paren_groups):
+            placeholder = f"__PAREN_GROUP_{i}__"
+            group_map[placeholder] = group[1:-1]  # Remove outer parentheses
+            temp_condition = temp_condition.replace(group, placeholder, 1)
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Condition with placeholders: {temp_condition}", DEBUG_VERBOSE)
+            debug_print(f"Group map: {group_map}", DEBUG_VERBOSE)
+        
+        # Now split the modified condition by 'and' and 'or'
+        parts = COMPOUND_CONDITION_PATTERN.split(temp_condition)
+        
+        if len(parts) < 3:
+            # Could be a single parenthesized group - evaluate as compound
+            if len(paren_groups) == 1 and temp_condition.strip().startswith('__PAREN_GROUP_'):
+                # Single parenthesized expression - parse its contents
+                inner_content = group_map[temp_condition.strip()]
+                inner_template = ConditionTemplate(inner_content)
+                inner_template.parse()
+                if inner_template.template_type in ['simple', 'compound']:
+                    self.paren_parts = [('group', inner_template)]
+                    self.paren_operators = []
+                    return True
+            return False
+        
+        # Extract parts and operators
+        parsed_parts = []
+        operators = []
+        
+        for i, part in enumerate(parts):
+            if i % 2 == 0:  # Even indices are conditions/placeholders
+                part = part.strip()
+                if not part:
+                    continue
+                    
+                if part.startswith('__PAREN_GROUP_'):
+                    # This is a parenthesized group
+                    inner_content = group_map.get(part)
+                    if inner_content is None:
+                        return False
+                    
+                    inner_template = ConditionTemplate(inner_content)
+                    inner_template.parse()
+                    
+                    if inner_template.template_type == 'unsupported':
+                        return False
+                    
+                    parsed_parts.append(('group', inner_template))
+                    if debug_print and DEBUG_VERBOSE:
+                        debug_print(f"Parsed parenthesized group: {inner_content} -> {inner_template.template_type}", DEBUG_VERBOSE)
+                else:
+                    # This is a simple or compound condition without parentheses
+                    part_template = ConditionTemplate(part)
+                    part_template.parse()
+                    
+                    if part_template.template_type == 'unsupported':
+                        return False
+                    
+                    parsed_parts.append(('simple', part_template))
+                    if debug_print and DEBUG_VERBOSE:
+                        debug_print(f"Parsed non-parenthesized part: {part} -> {part_template.template_type}", DEBUG_VERBOSE)
+            else:  # Odd indices are operators
+                operator = part.strip().lower()
+                if operator in ['and', 'or']:
+                    operators.append(operator)
+                else:
+                    return False
+        
+        if len(parsed_parts) >= 2 and len(operators) == len(parsed_parts) - 1:
+            self.paren_parts = parsed_parts
+            self.paren_operators = operators
+            if debug_print and DEBUG_VERBOSE:
+                debug_print(f"Successfully parsed parenthesized condition with {len(parsed_parts)} parts", DEBUG_VERBOSE)
+            return True
+        
         return False
     
     def _parse_compound_condition(self) -> bool:
@@ -161,8 +295,15 @@ class ConditionTemplate:
         # Add checks for problematic patterns
         if 'random(' in self.original:
             return False  # Cannot handle function calls
-        if self.original.count(' and ') >= 2:
-            return False  # Cannot handle triple+ compound conditions reliably
+        
+        # Parenthesized conditions can handle complex expressions
+        if self.template_type == 'parenthesized':
+            return True
+        
+        # For non-parenthesized compound conditions, limit complexity
+        if self.template_type == 'compound':
+            if self.original.count(' and ') >= 2 and self.original.count(' or ') == 0:
+                return False  # Triple+ AND without OR - use parentheses for clarity
         
         return self.template_type in ['simple', 'compound']
     
@@ -175,6 +316,8 @@ class ConditionTemplate:
             return self._evaluate_simple(variables)
         elif self.template_type == 'compound':
             return self._evaluate_compound(variables)
+        elif self.template_type == 'parenthesized':
+            return self._evaluate_parenthesized(variables)
         else:
             raise ValueError(f"Cannot fast evaluate condition type: {self.template_type}")
 
@@ -194,6 +337,71 @@ class ConditionTemplate:
             else:
                 raise ValueError(f"Unsupported compound operator: {operator}")
         return result
+    
+    def _evaluate_parenthesized(self, variables) -> bool:
+        """
+        Evaluate parenthesized conditions with proper precedence.
+        
+        Each part in self.paren_parts is a tuple: ('group', template) or ('simple', template)
+        Parts are combined using operators in self.paren_operators.
+        
+        This respects operator precedence: AND binds tighter than OR.
+        """
+        if not self.paren_parts:
+            raise ValueError("Parenthesized condition not properly parsed")
+        
+        # If only one part (single parenthesized expression), evaluate it directly
+        if len(self.paren_parts) == 1:
+            part_type, template = self.paren_parts[0]
+            return template.evaluate_fast(variables)
+        
+        # Evaluate with proper precedence: AND > OR
+        # First, evaluate all parts
+        part_results = []
+        for part_type, template in self.paren_parts:
+            result = template.evaluate_fast(variables)
+            part_results.append(result)
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Parenthesized part results: {part_results}", DEBUG_VERBOSE)
+            debug_print(f"Operators: {self.paren_operators}", DEBUG_VERBOSE)
+        
+        # Apply precedence: process AND first, then OR
+        # Group consecutive ANDs together, then combine with ORs
+        
+        # Build list of (result, next_operator) pairs for easier processing
+        # Then evaluate respecting precedence
+        
+        # Simple approach: split by OR first (lower precedence), then AND within each group
+        # Since we already have flat parts + operators, we process left-to-right
+        # but AND takes precedence
+        
+        # Create groups connected by AND
+        or_groups = []  # Each element is a list of (result, and_operator) tuples
+        current_group = [part_results[0]]
+        
+        for i, op in enumerate(self.paren_operators):
+            if op == 'and':
+                # Continue building current AND group
+                current_group.append(part_results[i + 1])
+            else:  # op == 'or'
+                # Save current group and start new one
+                or_groups.append(current_group)
+                current_group = [part_results[i + 1]]
+        
+        # Don't forget the last group
+        or_groups.append(current_group)
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"OR groups for AND evaluation: {or_groups}", DEBUG_VERBOSE)
+        
+        # Evaluate each AND group (all must be true), then OR the groups (any must be true)
+        for and_group in or_groups:
+            group_result = all(and_group)  # AND: all must be true
+            if group_result:
+                return True  # Short-circuit OR: one true group is enough
+        
+        return False  # No OR group was true
     
     def _evaluate_simple(self, variables) -> bool:
         """Optimized simple evaluation with pre-parsed data."""

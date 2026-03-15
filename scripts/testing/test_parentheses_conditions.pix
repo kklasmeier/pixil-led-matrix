@@ -1,0 +1,157 @@
+# Test script for Level 2 Parentheses Support in Conditions
+# Tests various parentheses combinations in if/then/else statements
+
+print("=== Testing Parentheses in Conditions ===")
+print("")
+
+# Setup test variables
+v_x = 10
+v_y = 5
+v_z = 15
+v_a = 1
+v_b = 0
+
+# ============================================
+# TEST 1: Single parenthesized group with OR, combined with AND
+# (v_x > 5 or v_y < 2) and v_z == 15
+# Expected: (true or false) and true = true and true = true
+# ============================================
+print("TEST 1: (v_x > 5 or v_y < 2) and v_z == 15")
+v_test1_passed = 0
+if (v_x > 5 or v_y < 2) and v_z == 15 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test1_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 2: Single parenthesized group with AND, combined with OR
+# (v_x > 20 and v_y < 2) or v_z == 15
+# Expected: (false and false) or true = false or true = true
+# ============================================
+print("TEST 2: (v_x > 20 and v_y < 2) or v_z == 15")
+v_test2_passed = 0
+if (v_x > 20 and v_y < 2) or v_z == 15 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test2_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 3: Two parenthesized groups with OR
+# (v_x > 5 and v_y < 10) or (v_z == 0)
+# Expected: (true and true) or false = true or false = true
+# ============================================
+print("TEST 3: (v_x > 5 and v_y < 10) or (v_z == 0)")
+v_test3_passed = 0
+if (v_x > 5 and v_y < 10) or (v_z == 0) then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test3_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 4: Two parenthesized groups with AND
+# (v_x > 5) and (v_z == 15)
+# Expected: true and true = true
+# ============================================
+print("TEST 4: (v_x > 5) and (v_z == 15)")
+v_test4_passed = 0
+if (v_x > 5) and (v_z == 15) then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test4_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 5: Parentheses changing precedence
+# Without parens: v_a == 1 or v_b == 1 and v_z == 0
+# Would be: v_a == 1 or (v_b == 1 and v_z == 0) = true or false = true
+# With parens: (v_a == 1 or v_b == 1) and v_z == 0
+# Expected: (true or false) and false = true and false = false
+# ============================================
+print("TEST 5: (v_a == 1 or v_b == 1) and v_z == 0")
+v_test5_passed = 0
+if (v_a == 1 or v_b == 1) and v_z == 0 then
+    print("  FAIL: Condition evaluated to TRUE (unexpected)")
+else
+    print("  PASS: Condition evaluated to FALSE (expected)")
+    v_test5_passed = 1
+endif
+
+# ============================================
+# TEST 6: Three parenthesized groups
+# (v_x > 5) or (v_y > 100) or (v_z == 15)
+# Expected: true or false or true = true
+# ============================================
+print("TEST 6: (v_x > 5) or (v_y > 100) or (v_z == 15)")
+v_test6_passed = 0
+if (v_x > 5) or (v_y > 100) or (v_z == 15) then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test6_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 7: Mixed - simple condition AND parenthesized group
+# v_a == 1 and (v_x > 5 or v_y > 100)
+# Expected: true and (true or false) = true and true = true
+# ============================================
+print("TEST 7: v_a == 1 and (v_x > 5 or v_y > 100)")
+v_test7_passed = 0
+if v_a == 1 and (v_x > 5 or v_y > 100) then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test7_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 8: Complex - two groups with compound conditions
+# (v_x > 5 and v_y < 10) or (v_z > 10 and v_a == 1)
+# Expected: (true and true) or (true and true) = true or true = true
+# ============================================
+print("TEST 8: (v_x > 5 and v_y < 10) or (v_z > 10 and v_a == 1)")
+v_test8_passed = 0
+if (v_x > 5 and v_y < 10) or (v_z > 10 and v_a == 1) then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_test8_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# TEST 9: Verify FALSE case works too
+# (v_x > 100) and (v_y > 100)
+# Expected: false and false = false
+# ============================================
+print("TEST 9: (v_x > 100) and (v_y > 100)")
+v_test9_passed = 0
+if (v_x > 100) and (v_y > 100) then
+    print("  FAIL: Condition evaluated to TRUE (unexpected)")
+else
+    print("  PASS: Condition evaluated to FALSE (expected)")
+    v_test9_passed = 1
+endif
+
+# ============================================
+# SUMMARY
+# ============================================
+print("")
+print("=== TEST SUMMARY ===")
+v_total_passed = v_test1_passed + v_test2_passed + v_test3_passed + v_test4_passed + v_test5_passed + v_test6_passed + v_test7_passed + v_test8_passed + v_test9_passed
+print(f"Tests passed: {v_total_passed} / 9")
+
+if v_total_passed == 9 then
+    print("ALL TESTS PASSED!")
+else
+    print("SOME TESTS FAILED - review output above")
+endif
+
+print("")
+print("=== End of Parentheses Tests ===")
