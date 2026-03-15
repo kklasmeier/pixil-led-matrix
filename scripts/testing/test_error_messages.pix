@@ -13,7 +13,7 @@ v_numbers[2] = 3
 
 print("Error Message Tests - uncomment one test at a time")
 print("All tests should show helpful error messages")
-
+print("********************************************")
 # =====================================================
 # TEST 1: Undefined variable (typo)
 # Expected error: Variable 'v_xx' not found
@@ -140,6 +140,8 @@ endif
 # Run this to confirm error handling doesn't break
 # normal functionality
 # =====================================================
+print("********************************************")
+
 print("Running validation test...")
 
 v_pass_count = 0
