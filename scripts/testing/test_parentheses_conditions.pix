@@ -780,6 +780,281 @@ else
     v_test9_passed = 1
 endif
 
+print("")
+print("--- NESTED IF STATEMENT TESTS ---")
+print("")
+
+# Reset variables for nested tests
+v_outer = 1
+v_inner = 1
+v_level = 5
+
+# ============================================
+# NESTED 1: Simple nested if (both true)
+# ============================================
+print("NESTED 1: Simple nested if - both conditions true")
+v_nested1_passed = 0
+v_nested1_result = 0
+if v_outer == 1 then
+    if v_inner == 1 then
+        v_nested1_result = 1
+    endif
+endif
+if v_nested1_result == 1 then
+    print("  PASS: Inner block executed (expected)")
+    v_nested1_passed = 1
+else
+    print("  FAIL: Inner block not executed (unexpected)")
+endif
+
+# ============================================
+# NESTED 2: Nested if (outer true, inner false)
+# ============================================
+print("NESTED 2: Nested if - outer true, inner false")
+v_nested2_passed = 0
+v_nested2_result = 0
+if v_outer == 1 then
+    if v_inner == 99 then
+        v_nested2_result = 1
+    endif
+endif
+if v_nested2_result == 0 then
+    print("  PASS: Inner block not executed (expected)")
+    v_nested2_passed = 1
+else
+    print("  FAIL: Inner block executed (unexpected)")
+endif
+
+# ============================================
+# NESTED 3: Nested if with else
+# ============================================
+print("NESTED 3: Nested if with else in inner")
+v_nested3_passed = 0
+v_nested3_result = 0
+if v_outer == 1 then
+    if v_inner == 99 then
+        v_nested3_result = 1
+    else
+        v_nested3_result = 2
+    endif
+endif
+if v_nested3_result == 2 then
+    print("  PASS: Inner else block executed (expected)")
+    v_nested3_passed = 1
+else
+    print("  FAIL: Wrong branch taken (unexpected)")
+endif
+
+# ============================================
+# NESTED 4: Nested if inside elseif
+# ============================================
+print("NESTED 4: Nested if inside elseif branch")
+v_nested4_passed = 0
+v_nested4_result = 0
+if v_level == 10 then
+    v_nested4_result = 1
+elseif v_level == 5 then
+    if v_inner == 1 then
+        v_nested4_result = 2
+    else
+        v_nested4_result = 3
+    endif
+else
+    v_nested4_result = 4
+endif
+if v_nested4_result == 2 then
+    print("  PASS: Nested if in elseif executed correctly (expected)")
+    v_nested4_passed = 1
+else
+    print("  FAIL: Wrong result (unexpected)")
+endif
+
+# ============================================
+# NESTED 5: Multiple nested ifs in same block
+# ============================================
+print("NESTED 5: Multiple nested ifs in same block")
+v_nested5_passed = 0
+v_nested5_a = 0
+v_nested5_b = 0
+if v_outer == 1 then
+    if v_inner == 1 then
+        v_nested5_a = 1
+    endif
+    if v_level == 5 then
+        v_nested5_b = 1
+    endif
+endif
+if v_nested5_a == 1 and v_nested5_b == 1 then
+    print("  PASS: Both nested ifs executed (expected)")
+    v_nested5_passed = 1
+else
+    print("  FAIL: Not all nested ifs executed (unexpected)")
+endif
+
+# ============================================
+# NESTED 6: Nested if inside else
+# ============================================
+print("NESTED 6: Nested if inside else branch")
+v_nested6_passed = 0
+v_nested6_result = 0
+if v_outer == 99 then
+    v_nested6_result = 1
+else
+    if v_inner == 1 then
+        v_nested6_result = 2
+    else
+        v_nested6_result = 3
+    endif
+endif
+if v_nested6_result == 2 then
+    print("  PASS: Nested if in else executed correctly (expected)")
+    v_nested6_passed = 1
+else
+    print("  FAIL: Wrong result (unexpected)")
+endif
+
+# ============================================
+# NESTED 7: Three levels deep
+# ============================================
+print("NESTED 7: Three levels of nesting")
+v_nested7_passed = 0
+v_nested7_result = 0
+if v_outer == 1 then
+    if v_inner == 1 then
+        if v_level == 5 then
+            v_nested7_result = 1
+        endif
+    endif
+endif
+if v_nested7_result == 1 then
+    print("  PASS: Three levels executed correctly (expected)")
+    v_nested7_passed = 1
+else
+    print("  FAIL: Deep nesting failed (unexpected)")
+endif
+
+# ============================================
+# NESTED 8: Complex structure with elseif and nested ifs
+# ============================================
+print("NESTED 8: Complex elseif with multiple nested ifs")
+v_nested8_passed = 0
+v_nested8_result = 0
+v_nested8_extra = 0
+if v_level == 10 then
+    v_nested8_result = 1
+elseif v_level == 5 then
+    if v_outer == 1 then
+        v_nested8_result = 2
+    else
+        v_nested8_result = 3
+    endif
+    v_nested8_extra = 10
+    if v_inner == 1 then
+        v_nested8_extra = 20
+    endif
+else
+    v_nested8_result = 4
+endif
+if v_nested8_result == 2 and v_nested8_extra == 20 then
+    print("  PASS: Complex structure executed correctly (expected)")
+    v_nested8_passed = 1
+else
+    print("  FAIL: Complex structure failed (unexpected)")
+endif
+
+# ============================================
+# NESTED 9: Nested with compound conditions
+# ============================================
+print("NESTED 9: Nested if with compound conditions")
+v_nested9_passed = 0
+v_nested9_result = 0
+if v_outer == 1 and v_level > 0 then
+    if v_inner == 1 or v_level == 5 then
+        v_nested9_result = 1
+    endif
+endif
+if v_nested9_result == 1 then
+    print("  PASS: Nested with compounds worked (expected)")
+    v_nested9_passed = 1
+else
+    print("  FAIL: Nested with compounds failed (unexpected)")
+endif
+
+# ============================================
+# NESTED 10: Nested with parentheses
+# ============================================
+print("NESTED 10: Nested if with parenthesized conditions")
+v_nested10_passed = 0
+v_nested10_result = 0
+if (v_outer == 1 or v_outer == 2) and v_level == 5 then
+    if not (v_inner == 99) then
+        v_nested10_result = 1
+    endif
+endif
+if v_nested10_result == 1 then
+    print("  PASS: Nested with parentheses and NOT worked (expected)")
+    v_nested10_passed = 1
+else
+    print("  FAIL: Nested with parentheses failed (unexpected)")
+endif
+
+# ============================================
+# NESTED 11: Elseif chain with nested structures
+# ============================================
+print("NESTED 11: Full elseif chain with nested ifs in each branch")
+v_nested11_passed = 0
+v_nested11_result = 0
+v_test_mode = 2
+if v_test_mode == 1 then
+    if v_inner == 1 then
+        v_nested11_result = 11
+    else
+        v_nested11_result = 12
+    endif
+elseif v_test_mode == 2 then
+    if v_outer == 1 then
+        v_nested11_result = 21
+    else
+        v_nested11_result = 22
+    endif
+elseif v_test_mode == 3 then
+    if v_level == 5 then
+        v_nested11_result = 31
+    else
+        v_nested11_result = 32
+    endif
+else
+    v_nested11_result = 99
+endif
+if v_nested11_result == 21 then
+    print("  PASS: Correct elseif branch and nested if (expected)")
+    v_nested11_passed = 1
+else
+    print("  FAIL: Wrong result (unexpected)")
+endif
+
+# ============================================
+# NESTED 12: Deeply nested with mixed conditions
+# ============================================
+print("NESTED 12: Four levels deep with mixed conditions")
+v_nested12_passed = 0
+v_nested12_result = 0
+if v_outer == 1 then
+    if v_inner == 1 then
+        if v_level > 0 then
+            if not v_b then
+                v_nested12_result = 1
+            endif
+        endif
+    endif
+endif
+if v_nested12_result == 1 then
+    print("  PASS: Four levels with NOT worked (expected)")
+    v_nested12_passed = 1
+else
+    print("  FAIL: Deep nesting with NOT failed (unexpected)")
+endif
+
 # ============================================
 # SUMMARY
 # ============================================
@@ -810,14 +1085,18 @@ print(f"Triple+ compound tests: {v_triple_passed} / 6")
 v_paren_passed = v_test1_passed + v_test2_passed + v_test3_passed + v_test4_passed + v_test5_passed + v_test6_passed + v_test7_passed + v_test8_passed + v_test9_passed
 print(f"Parentheses feature tests: {v_paren_passed} / 9")
 
+# Nested if statement tests
+v_nested_passed = v_nested1_passed + v_nested2_passed + v_nested3_passed + v_nested4_passed + v_nested5_passed + v_nested6_passed + v_nested7_passed + v_nested8_passed + v_nested9_passed + v_nested10_passed + v_nested11_passed + v_nested12_passed
+print(f"Nested if statement tests: {v_nested_passed} / 12")
+
 # Total
 v_legacy_total = v_legacy_basic_passed + v_string_passed + v_elseif_passed
-v_new_features_total = v_not_passed + v_triple_passed + v_paren_passed
+v_new_features_total = v_not_passed + v_triple_passed + v_paren_passed + v_nested_passed
 v_total_passed = v_legacy_total + v_new_features_total
-v_total_tests = 52
+v_total_tests = 64
 print("")
 print(f"Total legacy/regression: {v_legacy_total} / 25")
-print(f"Total new features: {v_new_features_total} / 27")
+print(f"Total new features: {v_new_features_total} / 39")
 print(f"TOTAL TESTS PASSED: {v_total_passed} / {v_total_tests}")
 
 print("")
@@ -842,6 +1121,9 @@ else
     endif
     if v_paren_passed != 9 then
         print("WARNING: Parentheses tests failed!")
+    endif
+    if v_nested_passed != 12 then
+        print("WARNING: Nested if statement tests failed!")
     endif
 endif
 
