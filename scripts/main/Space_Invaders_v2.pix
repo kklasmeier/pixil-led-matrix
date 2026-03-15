@@ -662,8 +662,8 @@ def show_game_over {
     clear()
     sync_queue
     # Draw text at safe positions - using smaller font that fits better
-    draw_text(17, 24, "GAME", piboto-regular, 11, red, 100, TYPE, SLOW)
-    draw_text(17, 38, "OVER", piboto-regular, 11, red, 100, TYPE, SLOW)
+    draw_text(17, 24, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
+    draw_text(17, 38, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
     sync_queue
     rest(3)
 }1111
@@ -672,8 +672,8 @@ def show_victory {
     call hide_all_sprites
     clear()
     sync_queue
-    draw_text(14, 24, "EARTH", piboto-regular, 11, green, 100, TYPE, SLOW)
-    draw_text(12, 38, "SAVED!", piboto-regular, 11, green, 100, TYPE, SLOW)
+    draw_text(14, 24, "EARTH", piboto-regular, 14, green, 100, TYPE, SLOW)
+    draw_text(12, 38, "SAVED!", piboto-regular, 14, green, 100, TYPE, SLOW)
     sync_queue
     rest(3)
 }
@@ -776,7 +776,7 @@ def show_title {
     # Animate invader dropping down
     for v_yy in (-8, 57, 2)
         move_sprite(invader2, 27, v_yy, 202)
-        #rest(0.05)
+        rest(0.03)
     endfor v_yy
     
     rest(2)
