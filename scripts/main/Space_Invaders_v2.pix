@@ -639,7 +639,7 @@ def check_game_over {
         call show_victory
     endif
 }
-
+ 
 def player_hit {
     # End current frame buffer first so explosion shows
     end_frame
