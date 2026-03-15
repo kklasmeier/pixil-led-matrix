@@ -1,0 +1,75 @@
+# Text rendering test script
+# Testing different fonts, sizes, and positions
+
+# Test 1: Basic text at different Y positions
+clear()
+draw_text(0, 5, "Y=5", piboto-regular, 10, white, 100)
+draw_text(0, 15, "Y=15", piboto-regular, 10, white, 100)
+draw_text(0, 25, "Y=25", piboto-regular, 10, white, 100)
+draw_text(0, 35, "Y=35", piboto-regular, 10, white, 100)
+draw_text(0, 45, "Y=45", piboto-regular, 10, white, 100)
+draw_text(0, 55, "Y=55", piboto-regular, 10, white, 100)
+rest(3)
+
+# Test 2: Different font sizes
+clear()
+draw_text(0, 10, "Size 8", piboto-regular, 8, yellow, 100)
+draw_text(0, 22, "Size 10", piboto-regular, 10, yellow, 100)
+draw_text(0, 36, "Size 12", piboto-regular, 12, yellow, 100)
+draw_text(0, 52, "Size 14", piboto-regular, 14, yellow, 100)
+rest(3)
+
+# Test 3: The actual game over text we want
+clear()
+draw_text(4, 20, "GAME", piboto-regular, 14, red, 100)
+draw_text(4, 36, "OVER", piboto-regular, 14, red, 100)
+rest(3)
+
+# Test 4: Try with TYPE effect like in game
+clear()
+draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
+draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+rest(3)
+
+# Test 5: Try tiny64_font instead
+clear()
+draw_text(8, 20, "GAME", tiny64_font, 12, red, 100, TYPE, SLOW)
+draw_text(8, 36, "OVER", tiny64_font, 12, red, 100, TYPE, SLOW)
+rest(3)
+
+# Test 6: Simulate what happens after hide_all_sprites
+# Define a dummy sprite
+define_sprite(test_sprite, 10, 10)
+    sprite_cel(0)
+        draw_circle(5, 5, 4, blue, 100, true)
+endsprite
+
+# Show sprites all over the screen
+show_sprite(test_sprite, 10, 10, 0)
+show_sprite(test_sprite, 30, 30, 1)
+show_sprite(test_sprite, 50, 20, 2)
+rest(1)
+
+# Now hide them and show text (mimicking game over)
+hide_sprite(test_sprite, 0)
+hide_sprite(test_sprite, 1)
+hide_sprite(test_sprite, 2)
+clear()
+sync_queue
+draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
+draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+rest(3)
+
+# Test 7: Try without any effects
+clear()
+draw_text(4, 24, "GAME", piboto-regular, 11, green, 100)
+draw_text(4, 38, "OVER", piboto-regular, 11, green, 100)
+rest(3)
+
+# Test 8: Center aligned
+clear()
+draw_text(32, 24, "GAME", piboto-regular, 12, cyan, 100, NORMAL, CENTER)
+draw_text(32, 40, "OVER", piboto-regular, 12, cyan, 100, NORMAL, CENTER)
+rest(3)
+
+print("Text test complete")
