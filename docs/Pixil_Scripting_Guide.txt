@@ -490,7 +490,9 @@ endwhile
 
 Note: There is no break statement to exit while loops early.
 
-Examples:
+While loops support all condition features: compound conditions, parentheses, and NOT.
+
+Basic Examples:
 v_x = 0
 while v_x < 64 then
     plot(v_x, 32, red, 100)
@@ -504,6 +506,48 @@ while v_running then
     if v_x > 63 then
         v_running = 0
     endif
+endwhile
+
+Compound Conditions:
+# With AND - both conditions must be true
+while v_x < 64 and v_active == 1 then
+    plot(v_x, 32, green, 100)
+    v_x = v_x + 1
+endwhile
+
+# With OR - either condition can be true
+while v_x < 32 or v_y < 32 then
+    v_x = v_x + 1
+    v_y = v_y + 1
+endwhile
+
+With NOT Operator:
+# Loop while v_done is false (0)
+while not v_done then
+    # do work
+    if v_count >= 10 then
+        v_done = 1
+    endif
+    v_count = v_count + 1
+endwhile
+
+# Combined with AND
+while v_x < 64 and not v_stopped then
+    plot(v_x, 32, blue, 100)
+    v_x = v_x + 1
+endwhile
+
+With Parentheses:
+# Group conditions for proper precedence
+while (v_x < 32 or v_y < 32) and v_active then
+    v_x = v_x + 1
+    v_y = v_y + 1
+endwhile
+
+# NOT with parenthesized group
+while not (v_x > 60 and v_y > 60) then
+    v_x = v_x + 1
+    v_y = v_y + 1
 endwhile
 
 Nesting:
