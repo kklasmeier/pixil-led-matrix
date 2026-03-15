@@ -20,9 +20,9 @@ print("All tests should show helpful error messages")
 # Hint: Did you mean: v_x?
 # =====================================================
 # Uncomment to test:
-# if v_xx > 5 then
-#  print("This should not execute")
-# endif
+if v_xx > 5 then
+  print("This should not execute")
+endif
 
 # =====================================================
 # TEST 2: Empty condition
@@ -31,9 +31,9 @@ print("All tests should show helpful error messages")
 # =====================================================
 # Note: This would be a syntax error at parse time
 # Uncomment to test:
-if then
-  print("This should not execute")
-endif
+# if then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 3: Incomplete compound condition
@@ -41,9 +41,9 @@ endif
 # Hint: Add a condition after 'and'
 # =====================================================
 # Uncomment to test:
-if v_x > 5 and then
-  print("This should not execute")
-endif
+# if v_x > 5 and then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 4: Using = instead of ==
@@ -51,9 +51,9 @@ endif
 # Hint: Did you mean '==' instead of '='?
 # =====================================================
 # Uncomment to test:
-if v_x = 10 then
-  print("This should not execute")
-endif
+# if v_x = 10 then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 5: String comparison with > operator
@@ -61,9 +61,9 @@ endif
 # Hint: Use '==' or '!=' for string comparison
 # =====================================================
 # Uncomment to test:
-if v_color > "blue" then
-  print("This should not execute")
-endif
+# if v_color > "blue" then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 6: Unbalanced parentheses (missing close)
@@ -71,9 +71,9 @@ endif
 # Hint: You have 1 unclosed '('
 # =====================================================
 # Uncomment to test:
-if (v_x > 5 and v_y < 10 then
-  print("This should not execute")
-endif
+# if (v_x > 5 and v_y < 10 then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 7: Unbalanced parentheses (extra close)
@@ -81,9 +81,9 @@ endif
 # Hint: Found ')' without matching '('
 # =====================================================
 # Uncomment to test:
-if v_x > 5) and v_y < 10 then
-  print("This should not execute")
-endif
+# if v_x > 5) and v_y < 10 then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 8: Undefined array
@@ -91,9 +91,9 @@ endif
 # Hint: Make sure the array is created with create_array()
 # =====================================================
 # Uncomment to test:
-if v_undefined_array[0] == 5 then
-  print("This should not execute")
-endif
+# if v_undefined_array[0] == 5 then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 9: Array index out of bounds
@@ -101,18 +101,18 @@ endif
 # Hint: Array size is 3, valid indices are 0 to 2
 # =====================================================
 # Uncomment to test:
-if v_numbers[10] == 5 then
-  print("This should not execute")
-endif
+# if v_numbers[10] == 5 then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 10: Invalid NOT expression
 # Expected error: Variable 'v_undefined' not found
 # =====================================================
 # Uncomment to test:
-if not v_undefined then
-  print("This should not execute")
-endif
+# if not v_undefined then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 11: Unterminated string
@@ -120,9 +120,9 @@ endif
 # Hint: Make sure all strings have matching quotes
 # =====================================================
 # Uncomment to test:
-if v_color == "red then
-  print("This should not execute")
-endif
+# if v_color == "red then
+#   print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 12: Type mismatch in comparison
@@ -131,9 +131,9 @@ endif
 # test is here for documentation purposes
 # =====================================================
 # Uncomment to test (may work due to type coercion):
-if v_x == "10" then
-  print("Type coercion may make this work")
-endif
+# if v_x == "10" then
+#   print("Type coercion may make this work")
+# endif
 
 # =====================================================
 # VALIDATION TEST - This should PASS
