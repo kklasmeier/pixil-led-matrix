@@ -187,6 +187,201 @@ else
     print("  FAIL: Condition evaluated to FALSE (unexpected)")
 endif
 
+# ============================================
+# LEGACY 13: String comparison with direct strings
+# v_color == "red" (where v_color is not set, testing literal)
+# ============================================
+v_color = "red"
+print("LEGACY 13: v_color == \"red\" (direct string)")
+v_legacy13_passed = 0
+if v_color == "red" then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_legacy13_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# LEGACY 14: String comparison not equal
+# v_color != "blue"
+# Expected: true
+# ============================================
+print("LEGACY 14: v_color != \"blue\"")
+v_legacy14_passed = 0
+if v_color != "blue" then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_legacy14_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# LEGACY 15: String variable comparison
+# v_color == v_expected_color
+# ============================================
+v_expected_color = "red"
+print("LEGACY 15: v_color == v_expected_color (variable to variable)")
+v_legacy15_passed = 0
+if v_color == v_expected_color then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_legacy15_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# LEGACY 16: String comparison FALSE case
+# v_color == "green"
+# Expected: false
+# ============================================
+print("LEGACY 16: v_color == \"green\" (should be FALSE)")
+v_legacy16_passed = 0
+if v_color == "green" then
+    print("  FAIL: Condition evaluated to TRUE (unexpected)")
+else
+    print("  PASS: Condition evaluated to FALSE (expected)")
+    v_legacy16_passed = 1
+endif
+
+# ============================================
+# LEGACY 17: String with AND compound
+# v_color == "red" and v_x > 5
+# Expected: true and true = true
+# ============================================
+print("LEGACY 17: v_color == \"red\" and v_x > 5")
+v_legacy17_passed = 0
+if v_color == "red" and v_x > 5 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_legacy17_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+# ============================================
+# LEGACY 18: String with OR compound
+# v_color == "blue" or v_x > 5
+# Expected: false or true = true
+# ============================================
+print("LEGACY 18: v_color == \"blue\" or v_x > 5")
+v_legacy18_passed = 0
+if v_color == "blue" or v_x > 5 then
+    print("  PASS: Condition evaluated to TRUE (expected)")
+    v_legacy18_passed = 1
+else
+    print("  FAIL: Condition evaluated to FALSE (unexpected)")
+endif
+
+print("")
+print("--- ELSEIF TESTS ---")
+print("")
+
+# ============================================
+# ELSEIF 1: Basic elseif - first condition true
+# ============================================
+v_test_val = 5
+print("ELSEIF 1: Basic elseif - first condition matches (v_test_val == 5)")
+v_elseif1_passed = 0
+if v_test_val == 5 then
+    print("  PASS: First branch taken (expected)")
+    v_elseif1_passed = 1
+elseif v_test_val == 10 then
+    print("  FAIL: Second branch taken (unexpected)")
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
+# ============================================
+# ELSEIF 2: Basic elseif - second condition true
+# ============================================
+v_test_val = 10
+print("ELSEIF 2: Basic elseif - second condition matches (v_test_val == 10)")
+v_elseif2_passed = 0
+if v_test_val == 5 then
+    print("  FAIL: First branch taken (unexpected)")
+elseif v_test_val == 10 then
+    print("  PASS: Second branch taken (expected)")
+    v_elseif2_passed = 1
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
+# ============================================
+# ELSEIF 3: Basic elseif - else branch
+# ============================================
+v_test_val = 99
+print("ELSEIF 3: Basic elseif - no condition matches (v_test_val == 99)")
+v_elseif3_passed = 0
+if v_test_val == 5 then
+    print("  FAIL: First branch taken (unexpected)")
+elseif v_test_val == 10 then
+    print("  FAIL: Second branch taken (unexpected)")
+else
+    print("  PASS: Else branch taken (expected)")
+    v_elseif3_passed = 1
+endif
+
+# ============================================
+# ELSEIF 4: Multiple elseif branches
+# ============================================
+v_test_val = 30
+print("ELSEIF 4: Multiple elseif - third condition matches (v_test_val == 30)")
+v_elseif4_passed = 0
+if v_test_val == 10 then
+    print("  FAIL: First branch taken (unexpected)")
+elseif v_test_val == 20 then
+    print("  FAIL: Second branch taken (unexpected)")
+elseif v_test_val == 30 then
+    print("  PASS: Third branch taken (expected)")
+    v_elseif4_passed = 1
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
+# ============================================
+# ELSEIF 5: Elseif with compound conditions
+# ============================================
+v_test_val = 15
+print("ELSEIF 5: Elseif with compound condition (v_test_val > 10 and v_test_val < 20)")
+v_elseif5_passed = 0
+if v_test_val < 10 then
+    print("  FAIL: First branch taken (unexpected)")
+elseif v_test_val > 10 and v_test_val < 20 then
+    print("  PASS: Second branch taken (expected)")
+    v_elseif5_passed = 1
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
+# ============================================
+# ELSEIF 6: Elseif with parentheses
+# ============================================
+v_test_val = 25
+print("ELSEIF 6: Elseif with parentheses ((v_test_val > 20 and v_test_val < 30) or v_test_val == 100)")
+v_elseif6_passed = 0
+if v_test_val < 10 then
+    print("  FAIL: First branch taken (unexpected)")
+elseif (v_test_val > 20 and v_test_val < 30) or v_test_val == 100 then
+    print("  PASS: Second branch taken (expected)")
+    v_elseif6_passed = 1
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
+# ============================================
+# ELSEIF 7: Elseif with string comparison
+# ============================================
+v_status = "active"
+print("ELSEIF 7: Elseif with string comparison (v_status == \"active\")")
+v_elseif7_passed = 0
+if v_status == "pending" then
+    print("  FAIL: First branch taken (unexpected)")
+elseif v_status == "active" then
+    print("  PASS: Second branch taken (expected)")
+    v_elseif7_passed = 1
+else
+    print("  FAIL: Else branch taken (unexpected)")
+endif
+
 print("")
 print("--- NEW FEATURE TESTS (Parentheses) ---")
 print("")
@@ -325,26 +520,47 @@ endif
 print("")
 print("=== TEST SUMMARY ===")
 
-# Legacy regression tests
-v_legacy_passed = v_legacy1_passed + v_legacy2_passed + v_legacy3_passed + v_legacy4_passed + v_legacy5_passed + v_legacy6_passed + v_legacy7_passed + v_legacy8_passed + v_legacy9_passed + v_legacy10_passed + v_legacy11_passed + v_legacy12_passed
-print(f"Legacy regression tests: {v_legacy_passed} / 12")
+# Legacy regression tests (basic operators and compound)
+v_legacy_basic_passed = v_legacy1_passed + v_legacy2_passed + v_legacy3_passed + v_legacy4_passed + v_legacy5_passed + v_legacy6_passed + v_legacy7_passed + v_legacy8_passed + v_legacy9_passed + v_legacy10_passed + v_legacy11_passed + v_legacy12_passed
+print(f"Legacy basic tests: {v_legacy_basic_passed} / 12")
+
+# String comparison tests
+v_string_passed = v_legacy13_passed + v_legacy14_passed + v_legacy15_passed + v_legacy16_passed + v_legacy17_passed + v_legacy18_passed
+print(f"String comparison tests: {v_string_passed} / 6")
+
+# Elseif tests
+v_elseif_passed = v_elseif1_passed + v_elseif2_passed + v_elseif3_passed + v_elseif4_passed + v_elseif5_passed + v_elseif6_passed + v_elseif7_passed
+print(f"Elseif tests: {v_elseif_passed} / 7")
 
 # New parentheses feature tests
 v_paren_passed = v_test1_passed + v_test2_passed + v_test3_passed + v_test4_passed + v_test5_passed + v_test6_passed + v_test7_passed + v_test8_passed + v_test9_passed
 print(f"Parentheses feature tests: {v_paren_passed} / 9")
 
 # Total
-v_total_passed = v_legacy_passed + v_paren_passed
-v_total_tests = 21
-print(f"Total tests passed: {v_total_passed} / {v_total_tests}")
+v_legacy_total = v_legacy_basic_passed + v_string_passed + v_elseif_passed
+v_total_passed = v_legacy_total + v_paren_passed
+v_total_tests = 34
+print("")
+print(f"Total legacy/regression: {v_legacy_total} / 25")
+print(f"Total new features: {v_paren_passed} / 9")
+print(f"TOTAL TESTS PASSED: {v_total_passed} / {v_total_tests}")
 
 print("")
 if v_total_passed == v_total_tests then
     print("ALL TESTS PASSED!")
 else
     print("SOME TESTS FAILED - review output above")
-    if v_legacy_passed != 12 then
-        print("WARNING: Legacy regression tests failed - existing functionality may be broken!")
+    if v_legacy_basic_passed != 12 then
+        print("WARNING: Basic legacy tests failed!")
+    endif
+    if v_string_passed != 6 then
+        print("WARNING: String comparison tests failed!")
+    endif
+    if v_elseif_passed != 7 then
+        print("WARNING: Elseif tests failed!")
+    endif
+    if v_paren_passed != 9 then
+        print("WARNING: Parentheses tests failed!")
     endif
 endif
 
