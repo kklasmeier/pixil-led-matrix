@@ -1056,6 +1056,175 @@ else
 endif
 
 # ============================================
+# WHILE LOOP CONDITION TESTS
+# ============================================
+print("")
+print("--- WHILE LOOP CONDITION TESTS ---")
+
+# ============================================
+# WHILE 1: Basic while condition
+# ============================================
+print("WHILE 1: Basic while condition (v_count < 3)")
+v_while1_passed = 0
+v_count = 0
+while v_count < 3 then
+    v_count = v_count + 1
+endwhile
+if v_count == 3 then
+    print("  PASS: Basic while loop worked (expected)")
+    v_while1_passed = 1
+else
+    print("  FAIL: Basic while loop failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 2: While with compound AND
+# ============================================
+print("WHILE 2: While with compound AND (v_i < 5 and v_flag == 1)")
+v_while2_passed = 0
+v_i = 0
+v_flag = 1
+while v_i < 5 and v_flag == 1 then
+    v_i = v_i + 1
+    if v_i >= 3 then
+        v_flag = 0
+    endif
+endwhile
+if v_i == 3 then
+    print("  PASS: While with AND worked (expected)")
+    v_while2_passed = 1
+else
+    print("  FAIL: While with AND failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 3: While with compound OR
+# ============================================
+print("WHILE 3: While with compound OR (v_j < 2 or v_k < 2)")
+v_while3_passed = 0
+v_j = 0
+v_k = 0
+v_iterations = 0
+while v_j < 2 or v_k < 2 then
+    v_iterations = v_iterations + 1
+    if v_j < 2 then
+        v_j = v_j + 1
+    endif
+    if v_k < 2 then
+        v_k = v_k + 1
+    endif
+endwhile
+if v_iterations == 2 then
+    print("  PASS: While with OR worked (expected)")
+    v_while3_passed = 1
+else
+    print("  FAIL: While with OR failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 4: While with NOT
+# ============================================
+print("WHILE 4: While with NOT (not v_done)")
+v_while4_passed = 0
+v_done = 0
+v_loop_count = 0
+while not v_done then
+    v_loop_count = v_loop_count + 1
+    if v_loop_count >= 3 then
+        v_done = 1
+    endif
+endwhile
+if v_loop_count == 3 then
+    print("  PASS: While with NOT worked (expected)")
+    v_while4_passed = 1
+else
+    print("  FAIL: While with NOT failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 5: While with parentheses
+# ============================================
+print("WHILE 5: While with parentheses ((v_p < 3 or v_q < 3) and v_r < 5)")
+v_while5_passed = 0
+v_p = 0
+v_q = 0
+v_r = 0
+while (v_p < 3 or v_q < 3) and v_r < 5 then
+    v_p = v_p + 1
+    v_q = v_q + 1
+    v_r = v_r + 1
+endwhile
+if v_r == 3 then
+    print("  PASS: While with parentheses worked (expected)")
+    v_while5_passed = 1
+else
+    print("  FAIL: While with parentheses failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 6: While with NOT and compound
+# ============================================
+print("WHILE 6: While with NOT and compound (v_m < 4 and not v_stop)")
+v_while6_passed = 0
+v_m = 0
+v_stop = 0
+while v_m < 4 and not v_stop then
+    v_m = v_m + 1
+    if v_m == 2 then
+        v_stop = 1
+    endif
+endwhile
+if v_m == 2 then
+    print("  PASS: While with NOT and compound worked (expected)")
+    v_while6_passed = 1
+else
+    print("  FAIL: While with NOT and compound failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 7: While with multiple parentheses groups
+# ============================================
+print("WHILE 7: While with multiple paren groups ((v_aa < 2) or (v_bb < 2))")
+v_while7_passed = 0
+v_aa = 0
+v_bb = 0
+v_while7_count = 0
+while (v_aa < 2) or (v_bb < 2) then
+    v_while7_count = v_while7_count + 1
+    v_aa = v_aa + 1
+    v_bb = v_bb + 1
+endwhile
+if v_while7_count == 2 then
+    print("  PASS: While with multiple paren groups worked (expected)")
+    v_while7_passed = 1
+else
+    print("  FAIL: While with multiple paren groups failed (unexpected)")
+endif
+
+# ============================================
+# WHILE 8: While with NOT on parenthesized group
+# ============================================
+print("WHILE 8: While with NOT on paren group (not (v_cc > 2 and v_dd > 2))")
+v_while8_passed = 0
+v_cc = 0
+v_dd = 0
+while not (v_cc > 2 and v_dd > 2) then
+    v_cc = v_cc + 1
+    v_dd = v_dd + 1
+    if v_cc > 5 then
+        # Safety break to prevent infinite loop
+        v_cc = 10
+        v_dd = 10
+    endif
+endwhile
+if v_cc == 3 then
+    print("  PASS: While with NOT on paren group worked (expected)")
+    v_while8_passed = 1
+else
+    print("  FAIL: While with NOT on paren group failed (unexpected)")
+endif
+
+# ============================================
 # SUMMARY
 # ============================================
 print("")
@@ -1089,14 +1258,18 @@ print(f"Parentheses feature tests: {v_paren_passed} / 9")
 v_nested_passed = v_nested1_passed + v_nested2_passed + v_nested3_passed + v_nested4_passed + v_nested5_passed + v_nested6_passed + v_nested7_passed + v_nested8_passed + v_nested9_passed + v_nested10_passed + v_nested11_passed + v_nested12_passed
 print(f"Nested if statement tests: {v_nested_passed} / 12")
 
+# While loop condition tests
+v_while_passed = v_while1_passed + v_while2_passed + v_while3_passed + v_while4_passed + v_while5_passed + v_while6_passed + v_while7_passed + v_while8_passed
+print(f"While loop condition tests: {v_while_passed} / 8")
+
 # Total
 v_legacy_total = v_legacy_basic_passed + v_string_passed + v_elseif_passed
-v_new_features_total = v_not_passed + v_triple_passed + v_paren_passed + v_nested_passed
+v_new_features_total = v_not_passed + v_triple_passed + v_paren_passed + v_nested_passed + v_while_passed
 v_total_passed = v_legacy_total + v_new_features_total
-v_total_tests = 64
+v_total_tests = 72
 print("")
 print(f"Total legacy/regression: {v_legacy_total} / 25")
-print(f"Total new features: {v_new_features_total} / 39")
+print(f"Total new features: {v_new_features_total} / 47")
 print(f"TOTAL TESTS PASSED: {v_total_passed} / {v_total_tests}")
 
 print("")
@@ -1124,6 +1297,9 @@ else
     endif
     if v_nested_passed != 12 then
         print("WARNING: Nested if statement tests failed!")
+    endif
+    if v_while_passed != 8 then
+        print("WARNING: While loop condition tests failed!")
     endif
 endif
 
