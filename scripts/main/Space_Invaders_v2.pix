@@ -154,6 +154,9 @@ v_shoot_cooldown = 0
 v_inv_shoot_timer = 0
 v_inv_shoot_delay = 40
 
+# Frame state tracking
+v_frame_ended = 0
+
 # =============================================================================
 # INITIALIZATION PROCEDURES
 # =============================================================================
@@ -638,26 +641,40 @@ def check_game_over {
 }
 
 def player_hit {
+    # End current frame buffer first so explosion shows
+    end_frame
+    v_frame_ended = 1
+    
+    # Hide player and show explosion
     hide_sprite(player, 99)
-    draw_circle(v_player_x + 4, v_player_y + 2, 4, red, 100, true, 500, fade)
-    v_game_running = 0
+    draw_circle(v_player_x + 4, v_player_y + 2, 5, yellow, 100, true, 300, fade)
+    draw_circle(v_player_x + 4, v_player_y + 2, 3, red, 100, true, 500, fade)
+    
+    # Let explosion play out
     rest(1)
+    
+    v_game_running = 0
     call show_game_over
 }
 
 def show_game_over {
     call hide_all_sprites
     clear()
-    draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
-    draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+    sync_queue
+    # Draw text at safe positions - using smaller font that fits better
+    draw_text(8, 24, "GAME", piboto-regular, 11, red, 100, TYPE, SLOW)
+    draw_text(8, 38, "OVER", piboto-regular, 11, red, 100, TYPE, SLOW)
+    sync_queue
     rest(3)
 }
 
 def show_victory {
     call hide_all_sprites
     clear()
-    draw_text(15, 20, "EARTH", piboto-regular, 12, green, 100, TYPE, SLOW)
-    draw_text(13, 30, "SAVED!", piboto-regular, 12, green, 100, TYPE, SLOW)
+    sync_queue
+    draw_text(10, 24, "EARTH", piboto-regular, 11, green, 100, TYPE, SLOW)
+    draw_text(8, 38, "SAVED!", piboto-regular, 11, green, 100, TYPE, SLOW)
+    sync_queue
     rest(3)
 }
 
@@ -685,7 +702,9 @@ def hide_all_sprites {
 def game_loop {
     while v_game_running == 1 then
         v_frame = v_frame + 1
+        v_frame_ended = 0
         begin_frame(true)
+        
         # Player bullet - fastest (every frame)
         if v_frame % v_bullet_interval == 0 then
             call update_bullet
@@ -724,7 +743,12 @@ def game_loop {
         if v_inv_shoot_timer > 0 then
             v_inv_shoot_timer = v_inv_shoot_timer - 1
         endif
-        end_frame
+        
+        # Only end frame if not already ended (player_hit ends early)
+        if v_frame_ended == 0 then
+            end_frame
+        endif
+        
         # Check game state
         call check_game_over
         
