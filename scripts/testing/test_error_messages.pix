@@ -20,9 +20,9 @@ print("All tests should show helpful error messages")
 # Hint: Did you mean: v_x?
 # =====================================================
 # Uncomment to test:
-if v_xx > 5 then
-  print("This should not execute")
-endif
+# if v_xx > 5 then
+#  print("This should not execute")
+# endif
 
 # =====================================================
 # TEST 2: Empty condition
