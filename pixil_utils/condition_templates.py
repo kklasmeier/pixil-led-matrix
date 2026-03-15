@@ -770,8 +770,13 @@ def evaluate_condition_fast(condition: str, variables) -> Optional[bool]:
             return result
         else:
             return None  # Fall back to slow path
-    except Exception as e:
-        return None  # Fall back to slow path
+    except ValueError as e:
+        # Re-raise user-facing errors (undefined variables, type mismatches, etc.)
+        # These have helpful messages that should be shown to the user
+        raise
+    except (KeyError, AttributeError, TypeError) as e:
+        # These indicate the fast path can't handle this - fall back to slow path
+        return None
 
 def get_condition_template_stats() -> Dict[str, Any]:
     """Get condition template performance statistics."""
