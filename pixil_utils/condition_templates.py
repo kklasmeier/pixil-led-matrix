@@ -20,6 +20,44 @@ import re
 from typing import Dict, List, Tuple, Any, Optional, Union
 from .debug import debug_print, DEBUG_VERBOSE
 
+
+def _find_similar_variables(var_name: str, variables) -> List[str]:
+    """Find variable names similar to the given name for suggestions."""
+    if not var_name.startswith('v_'):
+        return []
+    
+    suggestions = []
+    var_lower = var_name.lower()
+    
+    for existing_var in variables.keys():
+        if not isinstance(existing_var, str) or not existing_var.startswith('v_'):
+            continue
+        
+        existing_lower = existing_var.lower()
+        
+        # Exact match (case difference)
+        if var_lower == existing_lower and var_name != existing_var:
+            suggestions.insert(0, existing_var)  # Priority for case issues
+            continue
+        
+        # Check for common typos (missing/extra character, swapped chars)
+        if abs(len(var_name) - len(existing_var)) <= 2:
+            # Simple similarity check
+            matches = sum(1 for a, b in zip(var_lower, existing_lower) if a == b)
+            if matches >= len(var_lower) - 2:
+                suggestions.append(existing_var)
+    
+    return suggestions[:3]  # Return top 3 suggestions
+
+
+def _format_condition_error(message: str, condition: str, hint: str = None) -> str:
+    """Format a helpful error message for condition evaluation."""
+    error_parts = [message]
+    error_parts.append(f"  Condition: {condition}")
+    if hint:
+        error_parts.append(f"  Hint: {hint}")
+    return "\n".join(error_parts)
+
 # Pre-compiled regex patterns for condition parsing
 SIMPLE_CONDITION_PATTERN = re.compile(r'^\s*(v_\w+(?:\[[^\]]+\])?)\s*(>=|<=|==|!=|>|<)\s*(.+)\s*$')
 COMPOUND_CONDITION_PATTERN = re.compile(r'\s+(and|or)\s+')
@@ -400,9 +438,18 @@ class ConditionTemplate:
     def _evaluate_negated(self, variables) -> bool:
         """Evaluate negated condition."""
         if self.inner_template is None:
-            raise ValueError("Negated condition has no inner template")
+            raise ValueError(_format_condition_error(
+                "Invalid 'not' expression - nothing to negate",
+                self.original,
+                "Use 'not' followed by a variable or condition, e.g., 'not v_flag' or 'not (v_x > 5)'."
+            ))
         
-        inner_result = self.inner_template.evaluate_fast(variables)
+        try:
+            inner_result = self.inner_template.evaluate_fast(variables)
+        except ValueError as e:
+            # Re-raise with context about the negation
+            raise ValueError(f"Error in negated condition: {str(e)}")
+        
         result = not inner_result
         
         if debug_print and DEBUG_VERBOSE:
@@ -417,7 +464,16 @@ class ConditionTemplate:
         
         value = variables.get(self.boolean_var)
         if value is None:
-            raise ValueError(f"Variable '{self.boolean_var}' not found")
+            suggestions = _find_similar_variables(self.boolean_var, variables)
+            if suggestions:
+                hint = f"Did you mean: {', '.join(suggestions)}?"
+            else:
+                hint = "Make sure the variable is initialized before use."
+            raise ValueError(_format_condition_error(
+                f"Variable '{self.boolean_var}' not found",
+                self.original,
+                hint
+            ))
         
         result = bool(value)
         
@@ -429,10 +485,18 @@ class ConditionTemplate:
     def _evaluate_compound(self, variables) -> bool:
         """Evaluate compound conditions with 'and'/'or'."""
         if not self.compound_parts or not self.compound_operators:
-            raise ValueError("Compound condition not properly parsed")
+            raise ValueError(_format_condition_error(
+                "Compound condition not properly parsed",
+                self.original,
+                "Use 'and' or 'or' to combine conditions, e.g., 'v_x > 5 and v_y < 10'."
+            ))
         
         # Evaluate first condition using evaluate_fast (handles all types)
-        result = self.compound_parts[0].evaluate_fast(variables)
+        try:
+            result = self.compound_parts[0].evaluate_fast(variables)
+        except ValueError as e:
+            part_str = self.compound_parts[0].original if hasattr(self.compound_parts[0], 'original') else str(self.compound_parts[0])
+            raise ValueError(f"Error in first part of compound condition '{part_str}': {str(e)}")
         
         # Sequentially apply operators and next conditions
         for i, operator in enumerate(self.compound_operators):
@@ -442,14 +506,22 @@ class ConditionTemplate:
             if operator == 'or' and result:
                 return True  # No need to evaluate further
             
-            next_result = self.compound_parts[i + 1].evaluate_fast(variables)
+            try:
+                next_result = self.compound_parts[i + 1].evaluate_fast(variables)
+            except ValueError as e:
+                part_str = self.compound_parts[i + 1].original if hasattr(self.compound_parts[i + 1], 'original') else str(self.compound_parts[i + 1])
+                raise ValueError(f"Error in part {i + 2} of compound condition '{part_str}': {str(e)}")
             
             if operator == 'and':
                 result = result and next_result
             elif operator == 'or':
                 result = result or next_result
             else:
-                raise ValueError(f"Unsupported compound operator: {operator}")
+                raise ValueError(_format_condition_error(
+                    f"Unknown operator '{operator}'",
+                    self.original,
+                    "Valid operators are 'and' or 'or'."
+                ))
         
         return result
     
@@ -524,24 +596,66 @@ class ConditionTemplate:
         # Fast array access path using pre-parsed data
         if self.is_array_access:
             array_obj = variables.get(self.array_name)
+            if array_obj is None:
+                suggestions = _find_similar_variables(self.array_name, variables)
+                hint = f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Make sure the array is created with create_array() before use."
+                raise ValueError(_format_condition_error(
+                    f"Array '{self.array_name}' not found",
+                    self.original,
+                    hint
+                ))
+            
             index_val = variables.get(self.index_var)
-            left_value = array_obj[int(index_val)]
+            if index_val is None:
+                suggestions = _find_similar_variables(self.index_var, variables)
+                hint = f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Make sure the index variable is initialized."
+                raise ValueError(_format_condition_error(
+                    f"Index variable '{self.index_var}' not found",
+                    self.original,
+                    hint
+                ))
+            
+            try:
+                left_value = array_obj[int(index_val)]
+            except IndexError:
+                raise ValueError(_format_condition_error(
+                    f"Array index out of bounds: {self.array_name}[{int(index_val)}]",
+                    self.original,
+                    f"Array size is {len(array_obj)}, valid indices are 0 to {len(array_obj)-1}."
+                ))
         else:
             # Simple variable access
             left_value = variables.get(self.left_var)
             if left_value is None:
-                raise ValueError(f"Variable '{self.left_var}' not found")
+                suggestions = _find_similar_variables(self.left_var, variables)
+                hint = f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Make sure the variable is initialized before use."
+                raise ValueError(_format_condition_error(
+                    f"Variable '{self.left_var}' not found",
+                    self.original,
+                    hint
+                ))
         
         # Fast right side evaluation using pre-parsed data
         if self.right_value_parsed is None:
-            raise ValueError("Right value could not be parsed")
+            raise ValueError(_format_condition_error(
+                "Could not parse right side of condition",
+                self.original,
+                "Check that the value after the operator is valid (number, variable, or quoted string)."
+            ))
+        
         value_type, value_data = self.right_value_parsed
         if value_type == 'number':
             right_value = value_data
         elif value_type == 'variable':
             right_value = variables.get(value_data)
             if right_value is None:
-                raise ValueError(f"Variable '{value_data}' not found")
+                suggestions = _find_similar_variables(value_data, variables)
+                hint = f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Make sure the variable is initialized before use."
+                raise ValueError(_format_condition_error(
+                    f"Variable '{value_data}' not found",
+                    self.original,
+                    hint
+                ))
         elif value_type == 'string':
             right_value = value_data
         else:
@@ -549,8 +663,23 @@ class ConditionTemplate:
         
         # Fast comparison using lookup table
         if self.operator is None:
-            raise ValueError("Operator is None and cannot be used for comparison")
-        return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
+            raise ValueError(_format_condition_error(
+                "Missing comparison operator",
+                self.original,
+                "Use one of: ==, !=, >, <, >=, <="
+            ))
+        
+        # Type mismatch check for better error messages
+        try:
+            return OPERATOR_FUNCTIONS[self.operator](left_value, right_value)
+        except TypeError as e:
+            left_type = type(left_value).__name__
+            right_type = type(right_value).__name__
+            raise ValueError(_format_condition_error(
+                f"Cannot compare {left_type} with {right_type} using '{self.operator}'",
+                self.original,
+                "Make sure both sides are the same type (both numbers or both strings)."
+            ))
     
     def _evaluate_array_access(self, array_expr: str, variables) -> Any:
         """Evaluate array access like v_array[v_i]."""

@@ -926,7 +926,7 @@ def split_outside_quotes(text, delimiter):
         elif text[i] == ')':
             paren_level -= 1
             if paren_level < 0:
-                raise ValueError(f"Unbalanced parentheses in condition: '{text}'")
+                raise ValueError(f"Unbalanced parentheses in condition: '{text}'\n  Hint: Found ')' without matching '(' - check your parentheses placement.")
             current += text[i]
         elif (not in_quotes and paren_level == 0 and 
               text[i:i+len(delimiter)] == delimiter):
@@ -939,11 +939,11 @@ def split_outside_quotes(text, delimiter):
     
     # Check for unterminated quotes
     if in_quotes:
-        raise ValueError(f"Unterminated quotes in condition: '{text}'")
+        raise ValueError(f"Unterminated string in condition: '{text}'\n  Hint: Make sure all strings have matching opening and closing quotes.")
     
     # Check for unbalanced parentheses
     if paren_level > 0:
-        raise ValueError(f"Unbalanced parentheses in condition: '{text}'")
+        raise ValueError(f"Unbalanced parentheses in condition: '{text}'\n  Hint: You have {paren_level} unclosed '(' - make sure each '(' has a matching ')'.")
         
     if current:
         result.append(current)
@@ -1079,13 +1079,27 @@ def evaluate_simple_condition(condition, variables):
             debug_print(f"Simple condition is variable '{condition}' = {result}", DEBUG_VERBOSE)
         return result
     
+    # Check for single variable that doesn't exist
+    if condition.startswith('v_') and ' ' not in condition and condition not in variables:
+        # Find similar variable names for suggestions
+        suggestions = []
+        var_lower = condition.lower()
+        for existing_var in variables.keys():
+            if isinstance(existing_var, str) and existing_var.startswith('v_'):
+                if var_lower == existing_var.lower() and condition != existing_var:
+                    suggestions.insert(0, existing_var)
+                elif abs(len(condition) - len(existing_var)) <= 2:
+                    suggestions.append(existing_var)
+        hint = f"Did you mean: {', '.join(suggestions[:3])}?" if suggestions else "Make sure the variable is initialized before use."
+        raise ValueError(f"Variable '{condition}' not found\n  Condition: {condition}\n  Hint: {hint}")
+    
     # Check for common comparison operators
     operators = ['>=', '<=', '==', '!=', '>', '<']  # Order matters for parsing
     for op in operators:
         if op in condition:
             parts = condition.split(op, 1)  # Split on first occurrence only
             if len(parts) != 2:
-                raise ValueError(f"Invalid condition format: '{condition}'")
+                raise ValueError(f"Invalid condition format: '{condition}'\n  Hint: A comparison needs both sides, e.g., 'v_x > 5' not just 'v_x >'")
                 
             left, right = parts
             left = left.strip()
@@ -1113,7 +1127,7 @@ def evaluate_simple_condition(condition, variables):
                     elif op == '!=': 
                         result = left_str != right_str
                     elif op in ['>', '<', '>=', '<=']: 
-                        raise ValueError(f"Operator {op} not supported for string comparison")
+                        raise ValueError(f"Operator '{op}' not supported for string comparison\n  Condition: {condition}\n  Hint: Use '==' or '!=' for string comparison. Strings cannot be compared with {op}.")
                     
                     if DEBUG_LEVEL >= DEBUG_VERBOSE:
                         debug_print(f"String comparison result: {result}", DEBUG_VERBOSE)
@@ -1131,8 +1145,14 @@ def evaluate_simple_condition(condition, variables):
                     debug_print(f"Numeric comparison result: {result}", DEBUG_VERBOSE)
                 return result
                 
+            except KeyError as e:
+                var_name = str(e).strip("'\"")
+                raise ValueError(f"Variable '{var_name}' not found\n  Condition: {condition}\n  Hint: Make sure the variable is initialized before use.")
             except Exception as e:
-                raise ValueError(f"Error evaluating condition '{condition}': {str(e)}")
+                error_str = str(e)
+                if "not found" in error_str.lower():
+                    raise ValueError(error_str)
+                raise ValueError(f"Error evaluating condition: {error_str}\n  Condition: {condition}")
     
     # No comparison operator found, evaluate as boolean
     try:
@@ -1140,8 +1160,11 @@ def evaluate_simple_condition(condition, variables):
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Boolean expression result: {bool(result)}", DEBUG_VERBOSE)
         return bool(result)
+    except KeyError as e:
+        var_name = str(e).strip("'\"")
+        raise ValueError(f"Variable '{var_name}' not found\n  Condition: {condition}\n  Hint: Make sure the variable is initialized before use.")
     except Exception as e:
-        raise ValueError(f"Error evaluating boolean expression '{condition}': {str(e)}")
+        raise ValueError(f"Error evaluating boolean expression: {str(e)}\n  Condition: {condition}\n  Hint: Check that the expression is valid.")
     
 def evaluate_condition(condition, variables):
     """
@@ -1178,11 +1201,15 @@ def evaluate_condition(condition, variables):
     # Validate condition format
     condition = condition.strip()
     if not condition:
-        raise ValueError("Empty condition")
+        raise ValueError("Empty condition\n  Hint: Add a condition after 'if' or 'elseif', e.g., 'if v_x > 5 then'")
     
     # Check for common syntax errors
     if condition.endswith(" and") or condition.endswith(" or"):
-        raise ValueError(f"Incomplete compound condition: '{condition}'")
+        raise ValueError(f"Incomplete compound condition: '{condition}'\n  Hint: Add a condition after '{condition.split()[-1]}', e.g., '{condition} v_y < 10'")
+    
+    # Check for single = instead of ==
+    if ' = ' in condition and ' == ' not in condition and ' != ' not in condition and ' >= ' not in condition and ' <= ' not in condition:
+        raise ValueError(f"Invalid condition syntax: '{condition}'\n  Hint: Did you mean '==' instead of '='? Use '==' for comparison, '=' is for assignment.")
     
     # Handle simple cases first
     condition_lower = condition.lower()
@@ -1287,8 +1314,11 @@ def evaluate_condition(condition, variables):
             debug_print(f"All OR parts are false, whole condition is false", DEBUG_VERBOSE)
         return False
         
+    except ValueError:
+        raise  # Re-raise ValueError with original helpful message
     except Exception as e:
-        raise ValueError(f"Error evaluating compound condition '{condition}': {str(e)}")
+        error_str = str(e)
+        raise ValueError(f"Error evaluating compound condition: {error_str}\n  Condition: {condition}")
 
 def evaluate_string_concatenation(expr: str, variables: Union[Dict[str, Any], VariableRegistry]) -> str:
     """
@@ -1319,7 +1349,7 @@ def evaluate_string_concatenation(expr: str, variables: Union[Dict[str, Any], Va
             
             try:
                 if array_name not in variables:
-                    raise ValueError(f"Array '{array_name}' not found")
+                    raise ValueError(f"Array '{array_name}' not found\n  Hint: Make sure the array is created with create_array() before use.")
                 array = variables.get(array_name)
                 
                 # Evaluate index

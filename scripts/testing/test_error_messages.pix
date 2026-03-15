@@ -1,0 +1,185 @@
+; Test script for improved error messages
+; This script intentionally triggers errors to verify the error messages
+; Run each test individually by uncommenting the test you want to run
+
+; === SETUP ===
+v_x = 10
+v_y = 5
+v_color = "red"
+create_array(v_numbers, 3)
+v_numbers[0] = 1
+v_numbers[1] = 2
+v_numbers[2] = 3
+
+display_text("Error Message Tests - uncomment one test at a time")
+display_text("All tests should show helpful error messages")
+
+; =====================================================
+; TEST 1: Undefined variable (typo)
+; Expected error: Variable 'v_xx' not found
+; Hint: Did you mean: v_x?
+; =====================================================
+; Uncomment to test:
+; if v_xx > 5 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 2: Empty condition
+; Expected error: Empty condition
+; Hint: Add a condition after 'if' or 'elseif'
+; =====================================================
+; Uncomment to test:
+; Note: This would be a syntax error at parse time
+
+; =====================================================
+; TEST 3: Incomplete compound condition
+; Expected error: Incomplete compound condition
+; Hint: Add a condition after 'and'
+; =====================================================
+; Uncomment to test:
+; if v_x > 5 and then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 4: Using = instead of ==
+; Expected error: Invalid condition syntax
+; Hint: Did you mean '==' instead of '='?
+; =====================================================
+; Uncomment to test:
+; if v_x = 10 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 5: String comparison with > operator
+; Expected error: Operator '>' not supported for string comparison
+; Hint: Use '==' or '!=' for string comparison
+; =====================================================
+; Uncomment to test:
+; if v_color > "blue" then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 6: Unbalanced parentheses (missing close)
+; Expected error: Unbalanced parentheses
+; Hint: You have 1 unclosed '('
+; =====================================================
+; Uncomment to test:
+; if (v_x > 5 and v_y < 10 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 7: Unbalanced parentheses (extra close)
+; Expected error: Unbalanced parentheses
+; Hint: Found ')' without matching '('
+; =====================================================
+; Uncomment to test:
+; if v_x > 5) and v_y < 10 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 8: Undefined array
+; Expected error: Array 'v_undefined_array' not found
+; Hint: Make sure the array is created with create_array()
+; =====================================================
+; Uncomment to test:
+; if v_undefined_array[0] == 5 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 9: Array index out of bounds
+; Expected error: Array index out of bounds
+; Hint: Array size is 3, valid indices are 0 to 2
+; =====================================================
+; Uncomment to test:
+; if v_numbers[10] == 5 then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 10: Invalid NOT expression
+; Expected error: Variable 'v_undefined' not found
+; =====================================================
+; Uncomment to test:
+; if not v_undefined then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 11: Unterminated string
+; Expected error: Unterminated string in condition
+; Hint: Make sure all strings have matching quotes
+; =====================================================
+; Uncomment to test:
+; if v_color == "red then
+;   display_text("This should not execute")
+; endif
+
+; =====================================================
+; TEST 12: Type mismatch in comparison
+; This test compares a number with a string
+; Note: The system handles type coercion, but this
+; test is here for documentation purposes
+; =====================================================
+; Uncomment to test (may work due to type coercion):
+; if v_x == "10" then
+;   display_text("Type coercion may make this work")
+; endif
+
+; =====================================================
+; VALIDATION TEST - This should PASS
+; Run this to confirm error handling doesn't break
+; normal functionality
+; =====================================================
+display_text("Running validation test...")
+
+v_pass_count = 0
+
+; Test valid condition
+if v_x > 5 then
+    v_pass_count = v_pass_count + 1
+    display_text("PASS: Basic condition works")
+endif
+
+; Test compound condition
+if v_x > 5 and v_y < 10 then
+    v_pass_count = v_pass_count + 1
+    display_text("PASS: Compound condition works")
+endif
+
+; Test NOT condition
+if not v_y > 100 then
+    v_pass_count = v_pass_count + 1
+    display_text("PASS: NOT condition works")
+endif
+
+; Test parentheses
+if (v_x > 5 or v_y > 100) and v_color == "red" then
+    v_pass_count = v_pass_count + 1
+    display_text("PASS: Parenthesized condition works")
+endif
+
+; Test array access
+if v_numbers[0] == 1 then
+    v_pass_count = v_pass_count + 1
+    display_text("PASS: Array access in condition works")
+endif
+
+display_text("=== VALIDATION COMPLETE ===")
+display_text("Passed: " & v_pass_count & " / 5")
+
+if v_pass_count == 5 then
+    display_text("All validation tests passed!")
+    display_text("Error messages are ready for testing.")
+    display_text("Uncomment individual error tests above.")
+else
+    display_text("WARNING: Some validation tests failed!")
+endif
+
+delay(5000)

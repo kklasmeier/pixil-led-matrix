@@ -31,8 +31,9 @@ TABLE OF CONTENTS
 14. Background Layers
 15. Performance Commands
 16. Debugging
-17. Performance Tips
-18. Script Examples
+17. Common Errors and Troubleshooting
+18. Performance Tips
+19. Script Examples
 
 ================================================================================
 1. QUICK REFERENCE
@@ -1224,7 +1225,104 @@ Use sync_queue before print when:
 - Any time the print should reflect what's on screen
 
 ================================================================================
-17. PERFORMANCE TIPS
+17. COMMON ERRORS AND TROUBLESHOOTING
+================================================================================
+
+Pixil provides helpful error messages when conditions are invalid. Here are common
+errors and how to fix them:
+
+VARIABLE NOT FOUND
+------------------
+Error: Variable 'v_xx' not found
+  Condition: v_xx > 5
+  Hint: Did you mean: v_x?
+
+Cause: The variable name has a typo or hasn't been initialized.
+Fix: Check spelling, or initialize the variable before using it:
+  v_x = 10
+  if v_x > 5 then ...
+
+USING = INSTEAD OF ==
+---------------------
+Error: Invalid condition syntax
+  Condition: v_x = 10
+  Hint: Did you mean '==' instead of '='? Use '==' for comparison.
+
+Cause: Single = is for assignment, == is for comparison.
+Fix: Use == in conditions:
+  if v_x == 10 then  ; Correct (comparison)
+  v_x = 10           ; This is assignment, not comparison
+
+INCOMPLETE CONDITION
+--------------------
+Error: Incomplete compound condition
+  Condition: v_x > 5 and
+  Hint: Add a condition after 'and'
+
+Cause: Missing condition after 'and' or 'or' operator.
+Fix: Add the complete condition:
+  if v_x > 5 and v_y < 10 then
+
+UNBALANCED PARENTHESES
+----------------------
+Error: Unbalanced parentheses in condition
+  Condition: (v_x > 5 and v_y < 10
+  Hint: You have 1 unclosed '(' - make sure each '(' has a matching ')'.
+
+Cause: Missing opening or closing parenthesis.
+Fix: Match all parentheses:
+  if (v_x > 5 and v_y < 10) then  ; Correct
+
+UNTERMINATED STRING
+-------------------
+Error: Unterminated string in condition
+  Condition: v_color == "red
+  Hint: Make sure all strings have matching opening and closing quotes.
+
+Cause: Missing closing quote on a string.
+Fix: Add the closing quote:
+  if v_color == "red" then  ; Correct
+
+STRING COMPARISON WITH > OR <
+-----------------------------
+Error: Operator '>' not supported for string comparison
+  Condition: v_name > "bob"
+  Hint: Use '==' or '!=' for string comparison. Strings cannot be compared with >.
+
+Cause: Attempting to use >, <, >=, <= with strings.
+Fix: Use == or != for strings:
+  if v_name == "bob" then  ; Correct
+  if v_name != "bob" then  ; Correct
+
+ARRAY NOT FOUND
+---------------
+Error: Array 'v_data' not found
+  Hint: Make sure the array is created with create_array() before use.
+
+Cause: Trying to use an array before creating it.
+Fix: Create the array first:
+  create_array(v_data, 10)
+  if v_data[0] == 5 then ...
+
+ARRAY INDEX OUT OF BOUNDS
+-------------------------
+Error: Array index out of bounds: v_numbers[10]
+  Hint: Array size is 3, valid indices are 0 to 2.
+
+Cause: Trying to access an array element beyond its size.
+Fix: Use an index within the valid range:
+  create_array(v_numbers, 3)  ; Creates indices 0, 1, 2
+  if v_numbers[2] == 5 then   ; Index 2 is the last valid index
+
+TYPE MISMATCH
+-------------
+Error: Cannot compare str with int using '>'
+
+Cause: Trying to compare incompatible types.
+Fix: Make sure both sides of the comparison are the same type.
+
+================================================================================
+18. PERFORMANCE TIPS
 ================================================================================
 
 The Raspberry Pi 4 has limited CPU power. Follow these tips for smooth animations:
@@ -1289,7 +1387,7 @@ for v_i in (0, 60, 1)
 endfor v_i
 
 ================================================================================
-18. SCRIPT EXAMPLES
+19. SCRIPT EXAMPLES
 ================================================================================
 
 SIMPLE BOUNCING BALL
