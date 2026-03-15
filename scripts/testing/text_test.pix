@@ -3,7 +3,7 @@
 
 
 # Display game over message
-draw_text(-2, 10, "GAME OVER", piboto-regular, 12, blue, 100, TYPE, SLOW)
+draw_text(-2, 10, "GAME OVER", piboto-regular, 8, blue, 100, TYPE, SLOW)
 rest(3)
 sync_queue
 

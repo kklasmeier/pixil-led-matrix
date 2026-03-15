@@ -511,7 +511,7 @@ def check_game_over {
         if v_invader_alive[v_i] == 1 then
             if v_invader_y[v_i] >= 55 then  # Close to base line
                 v_game_running = 0
-                call game_over
+                call game_overd
             endif
         endif
     endfor v_i
