@@ -5,6 +5,8 @@ begin_frame
     # Display game over message
     draw_text(-2, 25, "GAME OVER", piboto-regular, 12, red, 100, TYPE, SLOW)
 end_frame
+rest(3)
+sync_queue
 
 # Test 1: Basic text at different Y positions
 clear()
