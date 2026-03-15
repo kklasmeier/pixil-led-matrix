@@ -9,6 +9,11 @@ Supports:
   - (v_x > 5 or v_y < 10) and v_z == 15
   - (v_x > 5 and v_y < 10) or (v_z == 15)
   - Multiple non-nested parentheses groups
+- NOT operator:
+  - not v_flag
+  - not v_x > 5 (same as not (v_x > 5))
+  - not (v_x > 5 and v_y < 10)
+  - v_x > 5 and not v_flag
 """
 
 import re
@@ -20,6 +25,8 @@ SIMPLE_CONDITION_PATTERN = re.compile(r'^\s*(v_\w+(?:\[[^\]]+\])?)\s*(>=|<=|==|!
 COMPOUND_CONDITION_PATTERN = re.compile(r'\s+(and|or)\s+')
 # Pattern to find top-level parenthesized groups (non-nested)
 PAREN_GROUP_PATTERN = re.compile(r'\([^()]+\)')
+# Pattern to detect 'not' prefix (must be followed by space)
+NOT_PREFIX_PATTERN = re.compile(r'^not\s+(.+)$', re.IGNORECASE)
 
 # Operator function lookup table for fast comparisons
 OPERATOR_FUNCTIONS = {
@@ -36,7 +43,7 @@ class ConditionTemplate:
     
     def __init__(self, original_condition: str):
         self.original = original_condition.strip()
-        self.template_type = None      # 'simple', 'compound', 'parenthesized', 'unsupported'
+        self.template_type = None      # 'simple', 'compound', 'parenthesized', 'negated', 'boolean', 'unsupported'
         self.left_var = None           # Variable name (e.g., "v_x")
         self.operator = None           # Comparison operator (e.g., ">=")
         self.right_value = None        # Right side value or variable
@@ -49,22 +56,33 @@ class ConditionTemplate:
         self.array_name = None           # For array access
         self.index_var = None            # For array access
         # New fields for parenthesized conditions
-        self.paren_parts = []            # List of (type, data) tuples: ('group', ConditionTemplate) or ('simple', ConditionTemplate)
+        self.paren_parts = []            # List of (type, data, negated) tuples
         self.paren_operators = []        # Operators between parenthesized parts
+        # New fields for NOT operator
+        self.is_negated = False          # Whether this condition is negated
+        self.inner_template = None       # For negated conditions, the inner condition
+        self.boolean_var = None          # For simple boolean variable conditions (e.g., "v_flag")
 
     def parse(self):
         """Parse condition into template format."""
         if self.is_parsed:
             return
         
-        # Try parenthesized condition parsing FIRST (if has parentheses)
+        # Check for NOT prefix FIRST
+        if self.original.lower().startswith('not '):
+            if self._parse_negated_condition():
+                self.template_type = 'negated'
+                self.is_parsed = True
+                return
+        
+        # Try parenthesized condition parsing (if has parentheses)
         if '(' in self.original and ')' in self.original:
             if self._parse_parenthesized_condition():
                 self.template_type = 'parenthesized'
                 self.is_parsed = True
                 return
             
-        # Try compound condition parsing
+        # Try compound condition parsing (check for 'not' within compound)
         if self._parse_compound_condition():
             self.template_type = 'compound'
         # Then try simple condition parsing
@@ -72,10 +90,47 @@ class ConditionTemplate:
             self.template_type = 'simple'
             # Pre-parse operands for optimization
             self._preparse_operands()
+        # Try as simple boolean variable (e.g., "v_flag")
+        elif self._parse_boolean_variable():
+            self.template_type = 'boolean'
         else:
             self.template_type = 'unsupported'
             
         self.is_parsed = True
+    
+    def _parse_negated_condition(self) -> bool:
+        """Parse conditions starting with 'not'."""
+        match = NOT_PREFIX_PATTERN.match(self.original)
+        if not match:
+            return False
+        
+        inner_condition = match.group(1).strip()
+        if not inner_condition:
+            return False
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Parsing negated condition: not ({inner_condition})", DEBUG_VERBOSE)
+        
+        # Create inner template for the condition after 'not'
+        self.inner_template = ConditionTemplate(inner_condition)
+        self.inner_template.parse()
+        
+        # Check if inner condition was parsed successfully
+        if self.inner_template.template_type == 'unsupported':
+            return False
+        
+        self.is_negated = True
+        return True
+    
+    def _parse_boolean_variable(self) -> bool:
+        """Parse simple boolean variable like 'v_flag'."""
+        # Must start with v_ and contain only word characters
+        if re.match(r'^v_\w+$', self.original):
+            self.boolean_var = self.original
+            if debug_print and DEBUG_VERBOSE:
+                debug_print(f"Parsed boolean variable: {self.boolean_var}", DEBUG_VERBOSE)
+            return True
+        return False
         
     def _parse_simple_condition(self) -> bool:
         """Parse simple conditions like 'v_x > 5' or 'v_array[v_i] == 0'."""
@@ -161,6 +216,12 @@ class ConditionTemplate:
                 part = part.strip()
                 if not part:
                     continue
+                
+                # Check for 'not' prefix on this part
+                is_part_negated = False
+                if part.lower().startswith('not '):
+                    is_part_negated = True
+                    part = part[4:].strip()  # Remove 'not ' prefix
                     
                 if part.startswith('__PAREN_GROUP_'):
                     # This is a parenthesized group
@@ -174,20 +235,40 @@ class ConditionTemplate:
                     if inner_template.template_type == 'unsupported':
                         return False
                     
-                    parsed_parts.append(('group', inner_template))
+                    # If negated, wrap in a negated template
+                    if is_part_negated:
+                        negated_template = ConditionTemplate(f"not ({inner_content})")
+                        negated_template.is_negated = True
+                        negated_template.inner_template = inner_template
+                        negated_template.template_type = 'negated'
+                        negated_template.is_parsed = True
+                        parsed_parts.append(('group', negated_template))
+                    else:
+                        parsed_parts.append(('group', inner_template))
+                    
                     if debug_print and DEBUG_VERBOSE:
-                        debug_print(f"Parsed parenthesized group: {inner_content} -> {inner_template.template_type}", DEBUG_VERBOSE)
+                        debug_print(f"Parsed parenthesized group: {inner_content} -> {inner_template.template_type}, negated={is_part_negated}", DEBUG_VERBOSE)
                 else:
-                    # This is a simple or compound condition without parentheses
+                    # This is a simple, boolean, or negated condition without parentheses
                     part_template = ConditionTemplate(part)
                     part_template.parse()
                     
                     if part_template.template_type == 'unsupported':
                         return False
                     
-                    parsed_parts.append(('simple', part_template))
+                    # If negated, wrap in a negated template
+                    if is_part_negated:
+                        negated_template = ConditionTemplate(f"not {part}")
+                        negated_template.is_negated = True
+                        negated_template.inner_template = part_template
+                        negated_template.template_type = 'negated'
+                        negated_template.is_parsed = True
+                        parsed_parts.append(('simple', negated_template))
+                    else:
+                        parsed_parts.append(('simple', part_template))
+                    
                     if debug_print and DEBUG_VERBOSE:
-                        debug_print(f"Parsed non-parenthesized part: {part} -> {part_template.template_type}", DEBUG_VERBOSE)
+                        debug_print(f"Parsed non-parenthesized part: {part} -> {part_template.template_type}, negated={is_part_negated}", DEBUG_VERBOSE)
             else:  # Odd indices are operators
                 operator = part.strip().lower()
                 if operator in ['and', 'or']:
@@ -205,12 +286,7 @@ class ConditionTemplate:
         return False
     
     def _parse_compound_condition(self) -> bool:
-        """Parse compound conditions with 'and'/'or'."""
-        # Split by 'and' and 'or' while preserving the operators
-        parts = COMPOUND_CONDITION_PATTERN.split(self.original)
-        
-        if len(parts) < 3:
-            return False  # Not a compound condition
+        """Parse compound conditions with 'and'/'or', including 'not' support."""
         # Split by 'and' and 'or' while preserving the operators
         parts = COMPOUND_CONDITION_PATTERN.split(self.original)
         
@@ -225,9 +301,12 @@ class ConditionTemplate:
             if i % 2 == 0:  # Even indices are conditions
                 condition_text = parts[i].strip()
                 if condition_text:
-                    # Try to parse each part as a simple condition
+                    # Create template for this part (handles 'not', simple conditions, boolean vars)
                     temp_template = ConditionTemplate(condition_text)
-                    if temp_template._parse_simple_condition():
+                    temp_template.parse()
+                    
+                    # Accept simple, negated, or boolean types for compound parts
+                    if temp_template.template_type in ['simple', 'negated', 'boolean']:
                         conditions.append(temp_template)
                     else:
                         return False  # Can't parse a part
@@ -296,8 +375,8 @@ class ConditionTemplate:
         if 'random(' in self.original:
             return False  # Cannot handle function calls
         
-        # Parenthesized conditions can handle complex expressions
-        if self.template_type == 'parenthesized':
+        # Parenthesized and negated conditions can handle complex expressions
+        if self.template_type in ['parenthesized', 'negated']:
             return True
         
         # For non-parenthesized compound conditions, limit complexity
@@ -305,7 +384,7 @@ class ConditionTemplate:
             if self.original.count(' and ') >= 2 and self.original.count(' or ') == 0:
                 return False  # Triple+ AND without OR - use parentheses for clarity
         
-        return self.template_type in ['simple', 'compound']
+        return self.template_type in ['simple', 'compound', 'boolean']
     
     def evaluate_fast(self, variables) -> bool:
         """Fast evaluation without string parsing."""
@@ -318,24 +397,67 @@ class ConditionTemplate:
             return self._evaluate_compound(variables)
         elif self.template_type == 'parenthesized':
             return self._evaluate_parenthesized(variables)
+        elif self.template_type == 'negated':
+            return self._evaluate_negated(variables)
+        elif self.template_type == 'boolean':
+            return self._evaluate_boolean(variables)
         else:
             raise ValueError(f"Cannot fast evaluate condition type: {self.template_type}")
+    
+    def _evaluate_negated(self, variables) -> bool:
+        """Evaluate negated condition."""
+        if self.inner_template is None:
+            raise ValueError("Negated condition has no inner template")
+        
+        inner_result = self.inner_template.evaluate_fast(variables)
+        result = not inner_result
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Negated evaluation: not {inner_result} = {result}", DEBUG_VERBOSE)
+        
+        return result
+    
+    def _evaluate_boolean(self, variables) -> bool:
+        """Evaluate simple boolean variable."""
+        if self.boolean_var is None:
+            raise ValueError("Boolean variable not set")
+        
+        value = variables.get(self.boolean_var)
+        if value is None:
+            raise ValueError(f"Variable '{self.boolean_var}' not found")
+        
+        result = bool(value)
+        
+        if debug_print and DEBUG_VERBOSE:
+            debug_print(f"Boolean evaluation: {self.boolean_var} = {value} -> {result}", DEBUG_VERBOSE)
+        
+        return result
 
     def _evaluate_compound(self, variables) -> bool:
         """Evaluate compound conditions with 'and'/'or'."""
         if not self.compound_parts or not self.compound_operators:
             raise ValueError("Compound condition not properly parsed")
-        # Evaluate first condition
-        result = self.compound_parts[0]._evaluate_simple(variables)
+        
+        # Evaluate first condition using evaluate_fast (handles all types)
+        result = self.compound_parts[0].evaluate_fast(variables)
+        
         # Sequentially apply operators and next conditions
         for i, operator in enumerate(self.compound_operators):
-            next_result = self.compound_parts[i + 1]._evaluate_simple(variables)
+            # Short-circuit evaluation
+            if operator == 'and' and not result:
+                return False  # No need to evaluate further
+            if operator == 'or' and result:
+                return True  # No need to evaluate further
+            
+            next_result = self.compound_parts[i + 1].evaluate_fast(variables)
+            
             if operator == 'and':
                 result = result and next_result
             elif operator == 'or':
                 result = result or next_result
             else:
                 raise ValueError(f"Unsupported compound operator: {operator}")
+        
         return result
     
     def _evaluate_parenthesized(self, variables) -> bool:

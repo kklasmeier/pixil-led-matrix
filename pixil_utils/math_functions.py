@@ -1193,10 +1193,19 @@ def evaluate_condition(condition, variables):
     if condition.startswith('v_') and condition in variables:
         return bool(variables.get(condition))
     
+    # Handle NOT prefix (before compound checks)
+    if condition_lower.startswith('not '):
+        inner_condition = condition[4:].strip()
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Evaluating NOT condition: not ({inner_condition})", DEBUG_VERBOSE)
+        inner_result = evaluate_condition(inner_condition, variables)
+        return not inner_result
+    
     # Check if this is a compound condition
     has_and = " and " in condition
     has_or = " or " in condition
     has_parens = '(' in condition and ')' in condition
+    has_not = ' not ' in condition.lower()  # Check for 'not' within compound
     
     if not (has_and or has_or):
         # Simple condition (no compound operators)
@@ -1232,13 +1241,31 @@ def evaluate_condition(condition, variables):
             # Evaluate 'and' parts (true if all parts are true)
             and_result = True
             for j, and_part in enumerate(and_parts):
+                and_part = and_part.strip()
+                
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Evaluating AND part {j+1}/{len(and_parts)}: '{and_part}'", DEBUG_VERBOSE)
                 
-                part_result = evaluate_simple_condition(and_part.strip(), variables)
+                # Check for 'not' prefix on this part
+                is_negated = False
+                if and_part.lower().startswith('not '):
+                    is_negated = True
+                    and_part = and_part[4:].strip()
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Part is negated, inner: '{and_part}'", DEBUG_VERBOSE)
+                
+                # Handle boolean variable (just v_xxx without comparison)
+                if and_part.startswith('v_') and and_part in variables and not any(op in and_part for op in ['>', '<', '=', '!']):
+                    part_result = bool(variables.get(and_part))
+                else:
+                    part_result = evaluate_simple_condition(and_part, variables)
+                
+                # Apply negation if needed
+                if is_negated:
+                    part_result = not part_result
                 
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"AND part result: {part_result}", DEBUG_VERBOSE)
+                    debug_print(f"AND part result: {part_result} (negated={is_negated})", DEBUG_VERBOSE)
                 
                 and_result = and_result and part_result
                 if not and_result:

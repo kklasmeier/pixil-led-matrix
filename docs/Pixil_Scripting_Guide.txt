@@ -348,6 +348,7 @@ Comparison Operators:
 Logical Operators:
 and   Both conditions must be true
 or    At least one condition must be true
+not   Negates the following condition
 
 Examples:
 if v_x > 10 then
@@ -414,6 +415,45 @@ endif
 Note: Nested parentheses are NOT supported. For example:
 # NOT supported: ((v_x > 5 or v_y < 10) and v_z == 15) or v_a == 1
 # Use multiple if statements for complex nested logic instead
+
+NOT Operator:
+The 'not' operator negates a condition. It has higher precedence than 'and' and 'or'.
+
+Examples with NOT:
+# Negate a boolean variable
+if not v_flag then
+    # Executes if v_flag is false (0 or falsy)
+endif
+
+# Negate a comparison
+if not v_x > 5 then
+    # Same as: v_x <= 5
+endif
+
+# Negate a parenthesized group
+if not (v_x > 5 and v_y < 10) then
+    # Executes if the group is false
+endif
+
+# Combined with AND
+if v_a == 1 and not v_flag then
+    # v_a must be 1 AND v_flag must be false
+endif
+
+# Combined with OR
+if v_x > 100 or not v_active then
+    # True if v_x > 100 OR v_active is false
+endif
+
+# Multiple NOT operators
+if not v_flag and not v_disabled then
+    # Both flags must be false
+endif
+
+# NOT with parenthesized group in compound
+if (v_x > 5) and not (v_y < 10 or v_z == 0) then
+    # v_x > 5 AND the parenthesized group must be false
+endif
 
 FOR LOOPS
 ---------
