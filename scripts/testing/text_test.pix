@@ -10,6 +10,10 @@ draw_text(4, 20, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
 draw_text(4, 36, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
 rest(3)
 clear
+draw_text(4, 20, "GAME", tiny64_font, 14, red, 100, TYPE, SLOW)
+draw_text(4, 36, "OVER", tiny64_font, 14, red, 100, TYPE, SLOW)
+rest(3)
+clear
 draw_text(4, 20, "GAME", piboto-regular, 12, red, 100, TYPE, SLOW)
 draw_text(4, 36, "OVER", piboto-regular, 12, red, 100, TYPE, SLOW)
 rest(3)
