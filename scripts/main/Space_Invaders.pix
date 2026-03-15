@@ -662,8 +662,8 @@ def show_game_over {
     clear()
     sync_queue
     # Draw text at safe positions - using smaller font that fits better
-    draw_text(17, 24, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
-    draw_text(17, 38, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
+    draw_text(14, 24, "GAME", piboto-regular, 14, red, 100, TYPE, SLOW)
+    draw_text(14, 38, "OVER", piboto-regular, 14, red, 100, TYPE, SLOW)
     sync_queue
     rest(3)
 }1111
