@@ -72,11 +72,12 @@ def display_random_vertical {
     v_bottom_margin = v_text_size
     v_max_y = 59 - v_bottom_margin
     for v_i in (0, v_word_count - 1, 1)
-        clear()
+        begin_frame
         call display_prayer_name
         v_x = 1
         v_y = random(0, v_max_y, 0)
         draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
