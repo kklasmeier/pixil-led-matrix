@@ -32,7 +32,7 @@ def get_random_color {
 def display_virtually_centered {
     v_y = 32  # Exact center of 64-pixel display
     
-    for v_i in (0, v_word_count - 1, 1) then
+    for v_i in (0, v_word_count - 1, 1)
         clear()
         v_x = 1  # Left align
         draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
@@ -42,14 +42,13 @@ def display_virtually_centered {
 }
 
 def display_random_vertical {
-    # Only need bottom margin to prevent text cutoff
     v_bottom_margin = v_text_size
+    v_max_y = 59 - v_bottom_margin
     
-    for v_i in (0, v_word_count - 1, 1) then
+    for v_i in (0, v_word_count - 1, 1)
         clear()
         v_x = 1  # Left align
-        # Random y position from top (0) to bottom margin
-        v_y = random(0, 59 - v_bottom_margin, 0)
+        v_y = random(0, v_max_y, 0)
         draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
         rest(v_delays[v_i])
         sync_queue
@@ -57,17 +56,16 @@ def display_random_vertical {
 }
 
 def display_top_to_bottom {
-    v_step = 1  # Move down 1 pixel each time
-    v_bottom_margin = v_text_size  # Bottom margin for readability
-    v_y = 0  # Start at very top
+    v_step = 1
+    v_bottom_margin = v_text_size
+    v_max_y = 59 - v_bottom_margin
+    v_y = 0
     
-    for v_i in (0, v_word_count - 1, 1) then
+    for v_i in (0, v_word_count - 1, 1)
         clear()
         v_x = 1  # Left align
-        # Move down the screen
         v_y = v_y + v_step
-        # Reset if we reach bottom
-        if v_y > 59 - v_bottom_margin then
+        if v_y > v_max_y then
             v_y = 0
         endif
         draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
@@ -77,17 +75,16 @@ def display_top_to_bottom {
 }
 
 def display_quarter_drops {
-    v_quarter = 16  # One quarter of screen height (64/4)
-    v_bottom_margin = v_text_size  # Bottom margin for readability
-    v_y = 0  # Start at very top
+    v_quarter = 16
+    v_bottom_margin = v_text_size
+    v_max_y = 59 - v_bottom_margin
+    v_y = 0
     
-    for v_i in (0, v_word_count - 1, 1) then
+    for v_i in (0, v_word_count - 1, 1)
         clear()
         v_x = 1  # Left align
-        # Move down by quarter screen
         v_y = v_y + v_quarter
-        # Reset if we reach bottom
-        if v_y > 59 - v_bottom_margin then
+        if v_y > v_max_y then
             v_y = 0
         endif
         draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
@@ -267,11 +264,12 @@ def our_father {
 
 
 # Main program
-# Main program
 clear()
 call setup_colors
 
-# Display each prayer
-call our_father
-rest(2)
-clear()
+# Run forever
+while 1 then
+    call our_father
+    rest(2)
+    clear()
+endwhile
