@@ -5,9 +5,24 @@
 # DEBUG SETTINGS
 # ============================================================================
 # Set to -1 for random prayer selection
-# Set to 0 = Our Father, 1 = Glory Be, 2 = Hail Mary, 3 = Nicene Creed
+# Set to 0-12 to force a specific prayer (see list below)
 v_debug_prayer = -1
-v_num_prayers = 4
+v_num_prayers = 13
+
+# Prayer Index:
+#  0 = Our Father
+#  1 = Glory Be
+#  2 = Hail Mary
+#  3 = Nicene Creed
+#  4 = Act of Contrition
+#  5 = Angel of God
+#  6 = Grace Before Meals
+#  7 = St. Michael Prayer
+#  8 = Apostles' Creed
+#  9 = Fatima Prayer
+# 10 = Gloria
+# 11 = Confiteor
+# 12 = Divine Mercy Chaplet
 
 # ============================================================================
 # INITIALIZATION
@@ -21,6 +36,15 @@ v_prayer_names[0] = "Our Father"
 v_prayer_names[1] = "Glory Be"
 v_prayer_names[2] = "Hail Mary"
 v_prayer_names[3] = "Nicene Creed"
+v_prayer_names[4] = "Act of Contrition"
+v_prayer_names[5] = "Angel of God"
+v_prayer_names[6] = "Grace Before Meals"
+v_prayer_names[7] = "St. Michael"
+v_prayer_names[8] = "Apostles' Creed"
+v_prayer_names[9] = "Fatima Prayer"
+v_prayer_names[10] = "Gloria"
+v_prayer_names[11] = "Confiteor"
+v_prayer_names[12] = "Divine Mercy"
 
 # ============================================================================
 # COLOR SETUP
@@ -59,10 +83,14 @@ def display_prayer_name {
 def display_virtually_centered {
     v_y = 32
     for v_i in (0, v_word_count - 1, 1)
-        clear()
+        begin_frame
         call display_prayer_name
-        v_x = 1
-        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        if v_center_align == 1 then
+            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+        else
+            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        endif
+        end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
@@ -74,9 +102,12 @@ def display_random_vertical {
     for v_i in (0, v_word_count - 1, 1)
         begin_frame
         call display_prayer_name
-        v_x = 1
         v_y = random(0, v_max_y, 0)
-        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        if v_center_align == 1 then
+            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+        else
+            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        endif
         end_frame
         rest(v_delays[v_i])
         sync_queue
@@ -89,14 +120,18 @@ def display_top_to_bottom {
     v_max_y = 59 - v_bottom_margin
     v_y = 0
     for v_i in (0, v_word_count - 1, 1)
-        clear()
+        begin_frame
         call display_prayer_name
-        v_x = 1
         v_y = v_y + v_step
         if v_y > v_max_y then
             v_y = 0
         endif
-        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        if v_center_align == 1 then
+            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+        else
+            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        endif
+        end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
@@ -108,14 +143,18 @@ def display_quarter_drops {
     v_max_y = 59 - v_bottom_margin
     v_y = 0
     for v_i in (0, v_word_count - 1, 1)
-        clear()
+        begin_frame
         call display_prayer_name
-        v_x = 1
         v_y = v_y + v_quarter
         if v_y > v_max_y then
             v_y = 0
         endif
-        draw_text(v_x, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        if v_center_align == 1 then
+            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+        else
+            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+        endif
+        end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
@@ -123,6 +162,7 @@ def display_quarter_drops {
 
 def display_prayer {
     v_style = random(0, 3, 0)
+    v_center_align = random(0, 1, 0)
     call get_random_color
     
     if v_style == 0 then
@@ -1229,6 +1269,1857 @@ def setup_nicene_creed {
 }
 
 # ============================================================================
+# ACT OF CONTRITION
+# ============================================================================
+def setup_act_of_contrition {
+    v_prayer_name = v_prayer_names[4]
+    v_text_size = 14
+
+    v_words[0] = "O"
+    v_delays[0] = 0.20
+
+    v_words[1] = "my"
+    v_delays[1] = 0.25
+
+    v_words[2] = "God,"
+    v_delays[2] = 0.65
+
+    v_words[3] = "I"
+    v_delays[3] = 0.20
+
+    v_words[4] = "am"
+    v_delays[4] = 0.20
+
+    v_words[5] = "heartily"
+    v_delays[5] = 0.45
+
+    v_words[6] = "sorry"
+    v_delays[6] = 0.45
+
+    v_words[7] = "for"
+    v_delays[7] = 0.20
+
+    v_words[8] = "having"
+    v_delays[8] = 0.35
+
+    v_words[9] = "offended"
+    v_delays[9] = 0.50
+
+    v_words[10] = "Thee,"
+    v_delays[10] = 0.65
+
+    v_words[11] = "and"
+    v_delays[11] = 0.20
+
+    v_words[12] = "I"
+    v_delays[12] = 0.20
+
+    v_words[13] = "detest"
+    v_delays[13] = 0.45
+
+    v_words[14] = "all"
+    v_delays[14] = 0.25
+
+    v_words[15] = "my"
+    v_delays[15] = 0.25
+
+    v_words[16] = "sins"
+    v_delays[16] = 0.50
+
+    v_words[17] = "because"
+    v_delays[17] = 0.40
+
+    v_words[18] = "I"
+    v_delays[18] = 0.20
+
+    v_words[19] = "dread"
+    v_delays[19] = 0.40
+
+    v_words[20] = "the"
+    v_delays[20] = 0.15
+
+    v_words[21] = "loss"
+    v_delays[21] = 0.40
+
+    v_words[22] = "of"
+    v_delays[22] = 0.15
+
+    v_words[23] = "heaven"
+    v_delays[23] = 0.50
+
+    v_words[24] = "and"
+    v_delays[24] = 0.20
+
+    v_words[25] = "the"
+    v_delays[25] = 0.15
+
+    v_words[26] = "pains"
+    v_delays[26] = 0.40
+
+    v_words[27] = "of"
+    v_delays[27] = 0.15
+
+    v_words[28] = "hell,"
+    v_delays[28] = 0.70
+
+    v_words[29] = "but"
+    v_delays[29] = 0.25
+
+    v_words[30] = "most"
+    v_delays[30] = 0.35
+
+    v_words[31] = "of"
+    v_delays[31] = 0.15
+
+    v_words[32] = "all"
+    v_delays[32] = 0.30
+
+    v_words[33] = "because"
+    v_delays[33] = 0.40
+
+    v_words[34] = "they"
+    v_delays[34] = 0.25
+
+    v_words[35] = "offend"
+    v_delays[35] = 0.45
+
+    v_words[36] = "Thee,"
+    v_delays[36] = 0.60
+
+    v_words[37] = "my"
+    v_delays[37] = 0.25
+
+    v_words[38] = "God,"
+    v_delays[38] = 0.65
+
+    v_words[39] = "Who"
+    v_delays[39] = 0.25
+
+    v_words[40] = "art"
+    v_delays[40] = 0.25
+
+    v_words[41] = "all"
+    v_delays[41] = 0.30
+
+    v_words[42] = "good"
+    v_delays[42] = 0.45
+
+    v_words[43] = "and"
+    v_delays[43] = 0.20
+
+    v_words[44] = "deserving"
+    v_delays[44] = 0.50
+
+    v_words[45] = "of"
+    v_delays[45] = 0.15
+
+    v_words[46] = "all"
+    v_delays[46] = 0.30
+
+    v_words[47] = "my"
+    v_delays[47] = 0.25
+
+    v_words[48] = "love."
+    v_delays[48] = 0.90
+
+    v_words[49] = "I"
+    v_delays[49] = 0.20
+
+    v_words[50] = "firmly"
+    v_delays[50] = 0.45
+
+    v_words[51] = "resolve,"
+    v_delays[51] = 0.65
+
+    v_words[52] = "with"
+    v_delays[52] = 0.20
+
+    v_words[53] = "the"
+    v_delays[53] = 0.15
+
+    v_words[54] = "help"
+    v_delays[54] = 0.35
+
+    v_words[55] = "of"
+    v_delays[55] = 0.15
+
+    v_words[56] = "Thy"
+    v_delays[56] = 0.30
+
+    v_words[57] = "grace,"
+    v_delays[57] = 0.65
+
+    v_words[58] = "to"
+    v_delays[58] = 0.15
+
+    v_words[59] = "confess"
+    v_delays[59] = 0.50
+
+    v_words[60] = "my"
+    v_delays[60] = 0.25
+
+    v_words[61] = "sins,"
+    v_delays[61] = 0.60
+
+    v_words[62] = "to"
+    v_delays[62] = 0.15
+
+    v_words[63] = "do"
+    v_delays[63] = 0.25
+
+    v_words[64] = "penance,"
+    v_delays[64] = 0.60
+
+    v_words[65] = "and"
+    v_delays[65] = 0.20
+
+    v_words[66] = "to"
+    v_delays[66] = 0.15
+
+    v_words[67] = "amend"
+    v_delays[67] = 0.45
+
+    v_words[68] = "my"
+    v_delays[68] = 0.25
+
+    v_words[69] = "life."
+    v_delays[69] = 0.90
+
+    v_words[70] = "Amen."
+    v_delays[70] = 1.20
+
+    v_word_count = 71
+}
+
+# ============================================================================
+# ANGEL OF GOD
+# ============================================================================
+def setup_angel_of_god {
+    v_prayer_name = v_prayer_names[5]
+    v_text_size = 14
+
+    v_words[0] = "Angel"
+    v_delays[0] = 0.45
+
+    v_words[1] = "of"
+    v_delays[1] = 0.15
+
+    v_words[2] = "God,"
+    v_delays[2] = 0.65
+
+    v_words[3] = "my"
+    v_delays[3] = 0.25
+
+    v_words[4] = "guardian"
+    v_delays[4] = 0.50
+
+    v_words[5] = "dear,"
+    v_delays[5] = 0.65
+
+    v_words[6] = "to"
+    v_delays[6] = 0.15
+
+    v_words[7] = "whom"
+    v_delays[7] = 0.30
+
+    v_words[8] = "God's"
+    v_delays[8] = 0.40
+
+    v_words[9] = "love"
+    v_delays[9] = 0.40
+
+    v_words[10] = "commits"
+    v_delays[10] = 0.50
+
+    v_words[11] = "me"
+    v_delays[11] = 0.25
+
+    v_words[12] = "here,"
+    v_delays[12] = 0.70
+
+    v_words[13] = "ever"
+    v_delays[13] = 0.40
+
+    v_words[14] = "this"
+    v_delays[14] = 0.30
+
+    v_words[15] = "day"
+    v_delays[15] = 0.40
+
+    v_words[16] = "be"
+    v_delays[16] = 0.25
+
+    v_words[17] = "at"
+    v_delays[17] = 0.20
+
+    v_words[18] = "my"
+    v_delays[18] = 0.25
+
+    v_words[19] = "side,"
+    v_delays[19] = 0.65
+
+    v_words[20] = "to"
+    v_delays[20] = 0.15
+
+    v_words[21] = "light"
+    v_delays[21] = 0.40
+
+    v_words[22] = "and"
+    v_delays[22] = 0.20
+
+    v_words[23] = "guard,"
+    v_delays[23] = 0.55
+
+    v_words[24] = "to"
+    v_delays[24] = 0.15
+
+    v_words[25] = "rule"
+    v_delays[25] = 0.40
+
+    v_words[26] = "and"
+    v_delays[26] = 0.20
+
+    v_words[27] = "guide."
+    v_delays[27] = 0.80
+
+    v_words[28] = "Amen."
+    v_delays[28] = 1.20
+
+    v_word_count = 29
+}
+
+# ============================================================================
+# GRACE BEFORE MEALS
+# ============================================================================
+def setup_grace_before_meals {
+    v_prayer_name = v_prayer_names[6]
+    v_text_size = 14
+
+    v_words[0] = "Bless"
+    v_delays[0] = 0.45
+
+    v_words[1] = "us,"
+    v_delays[1] = 0.55
+
+    v_words[2] = "O"
+    v_delays[2] = 0.20
+
+    v_words[3] = "Lord,"
+    v_delays[3] = 0.60
+
+    v_words[4] = "and"
+    v_delays[4] = 0.20
+
+    v_words[5] = "these"
+    v_delays[5] = 0.35
+
+    v_words[6] = "Thy"
+    v_delays[6] = 0.30
+
+    v_words[7] = "gifts,"
+    v_delays[7] = 0.60
+
+    v_words[8] = "which"
+    v_delays[8] = 0.30
+
+    v_words[9] = "we"
+    v_delays[9] = 0.25
+
+    v_words[10] = "are"
+    v_delays[10] = 0.20
+
+    v_words[11] = "about"
+    v_delays[11] = 0.35
+
+    v_words[12] = "to"
+    v_delays[12] = 0.15
+
+    v_words[13] = "receive"
+    v_delays[13] = 0.50
+
+    v_words[14] = "from"
+    v_delays[14] = 0.25
+
+    v_words[15] = "Thy"
+    v_delays[15] = 0.30
+
+    v_words[16] = "bounty,"
+    v_delays[16] = 0.65
+
+    v_words[17] = "through"
+    v_delays[17] = 0.35
+
+    v_words[18] = "Christ"
+    v_delays[18] = 0.45
+
+    v_words[19] = "our"
+    v_delays[19] = 0.25
+
+    v_words[20] = "Lord."
+    v_delays[20] = 0.80
+
+    v_words[21] = "Amen."
+    v_delays[21] = 1.20
+
+    v_word_count = 22
+}
+
+# ============================================================================
+# ST. MICHAEL PRAYER
+# ============================================================================
+def setup_st_michael {
+    v_prayer_name = v_prayer_names[7]
+    v_text_size = 14
+
+    v_words[0] = "Saint"
+    v_delays[0] = 0.40
+
+    v_words[1] = "Michael"
+    v_delays[1] = 0.50
+
+    v_words[2] = "the"
+    v_delays[2] = 0.15
+
+    v_words[3] = "Archangel,"
+    v_delays[3] = 0.70
+
+    v_words[4] = "defend"
+    v_delays[4] = 0.45
+
+    v_words[5] = "us"
+    v_delays[5] = 0.25
+
+    v_words[6] = "in"
+    v_delays[6] = 0.15
+
+    v_words[7] = "battle."
+    v_delays[7] = 0.80
+
+    v_words[8] = "Be"
+    v_delays[8] = 0.25
+
+    v_words[9] = "our"
+    v_delays[9] = 0.25
+
+    v_words[10] = "protection"
+    v_delays[10] = 0.55
+
+    v_words[11] = "against"
+    v_delays[11] = 0.40
+
+    v_words[12] = "the"
+    v_delays[12] = 0.15
+
+    v_words[13] = "wickedness"
+    v_delays[13] = 0.55
+
+    v_words[14] = "and"
+    v_delays[14] = 0.20
+
+    v_words[15] = "snares"
+    v_delays[15] = 0.45
+
+    v_words[16] = "of"
+    v_delays[16] = 0.15
+
+    v_words[17] = "the"
+    v_delays[17] = 0.15
+
+    v_words[18] = "devil."
+    v_delays[18] = 0.80
+
+    v_words[19] = "May"
+    v_delays[19] = 0.30
+
+    v_words[20] = "God"
+    v_delays[20] = 0.40
+
+    v_words[21] = "rebuke"
+    v_delays[21] = 0.50
+
+    v_words[22] = "him,"
+    v_delays[22] = 0.55
+
+    v_words[23] = "we"
+    v_delays[23] = 0.25
+
+    v_words[24] = "humbly"
+    v_delays[24] = 0.45
+
+    v_words[25] = "pray,"
+    v_delays[25] = 0.65
+
+    v_words[26] = "and"
+    v_delays[26] = 0.20
+
+    v_words[27] = "do"
+    v_delays[27] = 0.25
+
+    v_words[28] = "thou,"
+    v_delays[28] = 0.50
+
+    v_words[29] = "O"
+    v_delays[29] = 0.20
+
+    v_words[30] = "Prince"
+    v_delays[30] = 0.45
+
+    v_words[31] = "of"
+    v_delays[31] = 0.15
+
+    v_words[32] = "the"
+    v_delays[32] = 0.15
+
+    v_words[33] = "heavenly"
+    v_delays[33] = 0.50
+
+    v_words[34] = "hosts,"
+    v_delays[34] = 0.65
+
+    v_words[35] = "by"
+    v_delays[35] = 0.20
+
+    v_words[36] = "the"
+    v_delays[36] = 0.15
+
+    v_words[37] = "power"
+    v_delays[37] = 0.45
+
+    v_words[38] = "of"
+    v_delays[38] = 0.15
+
+    v_words[39] = "God,"
+    v_delays[39] = 0.65
+
+    v_words[40] = "cast"
+    v_delays[40] = 0.40
+
+    v_words[41] = "into"
+    v_delays[41] = 0.30
+
+    v_words[42] = "hell"
+    v_delays[42] = 0.50
+
+    v_words[43] = "Satan,"
+    v_delays[43] = 0.65
+
+    v_words[44] = "and"
+    v_delays[44] = 0.20
+
+    v_words[45] = "all"
+    v_delays[45] = 0.30
+
+    v_words[46] = "the"
+    v_delays[46] = 0.15
+
+    v_words[47] = "evil"
+    v_delays[47] = 0.45
+
+    v_words[48] = "spirits,"
+    v_delays[48] = 0.65
+
+    v_words[49] = "who"
+    v_delays[49] = 0.25
+
+    v_words[50] = "prowl"
+    v_delays[50] = 0.45
+
+    v_words[51] = "about"
+    v_delays[51] = 0.35
+
+    v_words[52] = "the"
+    v_delays[52] = 0.15
+
+    v_words[53] = "world"
+    v_delays[53] = 0.45
+
+    v_words[54] = "seeking"
+    v_delays[54] = 0.50
+
+    v_words[55] = "the"
+    v_delays[55] = 0.15
+
+    v_words[56] = "ruin"
+    v_delays[56] = 0.45
+
+    v_words[57] = "of"
+    v_delays[57] = 0.15
+
+    v_words[58] = "souls."
+    v_delays[58] = 0.90
+
+    v_words[59] = "Amen."
+    v_delays[59] = 1.20
+
+    v_word_count = 60
+}
+
+# ============================================================================
+# APOSTLES' CREED
+# ============================================================================
+def setup_apostles_creed {
+    v_prayer_name = v_prayer_names[8]
+    v_text_size = 14
+
+    v_words[0] = "I"
+    v_delays[0] = 0.20
+
+    v_words[1] = "believe"
+    v_delays[1] = 0.45
+
+    v_words[2] = "in"
+    v_delays[2] = 0.15
+
+    v_words[3] = "God,"
+    v_delays[3] = 0.65
+
+    v_words[4] = "the"
+    v_delays[4] = 0.15
+
+    v_words[5] = "Father"
+    v_delays[5] = 0.45
+
+    v_words[6] = "almighty,"
+    v_delays[6] = 0.70
+
+    v_words[7] = "Creator"
+    v_delays[7] = 0.50
+
+    v_words[8] = "of"
+    v_delays[8] = 0.15
+
+    v_words[9] = "heaven"
+    v_delays[9] = 0.45
+
+    v_words[10] = "and"
+    v_delays[10] = 0.20
+
+    v_words[11] = "earth,"
+    v_delays[11] = 0.70
+
+    v_words[12] = "and"
+    v_delays[12] = 0.20
+
+    v_words[13] = "in"
+    v_delays[13] = 0.15
+
+    v_words[14] = "Jesus"
+    v_delays[14] = 0.45
+
+    v_words[15] = "Christ,"
+    v_delays[15] = 0.65
+
+    v_words[16] = "His"
+    v_delays[16] = 0.25
+
+    v_words[17] = "only"
+    v_delays[17] = 0.35
+
+    v_words[18] = "Son,"
+    v_delays[18] = 0.60
+
+    v_words[19] = "our"
+    v_delays[19] = 0.25
+
+    v_words[20] = "Lord,"
+    v_delays[20] = 0.70
+
+    v_words[21] = "who"
+    v_delays[21] = 0.25
+
+    v_words[22] = "was"
+    v_delays[22] = 0.25
+
+    v_words[23] = "conceived"
+    v_delays[23] = 0.55
+
+    v_words[24] = "by"
+    v_delays[24] = 0.20
+
+    v_words[25] = "the"
+    v_delays[25] = 0.15
+
+    v_words[26] = "Holy"
+    v_delays[26] = 0.40
+
+    v_words[27] = "Spirit,"
+    v_delays[27] = 0.65
+
+    v_words[28] = "born"
+    v_delays[28] = 0.40
+
+    v_words[29] = "of"
+    v_delays[29] = 0.15
+
+    v_words[30] = "the"
+    v_delays[30] = 0.15
+
+    v_words[31] = "Virgin"
+    v_delays[31] = 0.45
+
+    v_words[32] = "Mary,"
+    v_delays[32] = 0.65
+
+    v_words[33] = "suffered"
+    v_delays[33] = 0.50
+
+    v_words[34] = "under"
+    v_delays[34] = 0.30
+
+    v_words[35] = "Pontius"
+    v_delays[35] = 0.50
+
+    v_words[36] = "Pilate,"
+    v_delays[36] = 0.65
+
+    v_words[37] = "was"
+    v_delays[37] = 0.25
+
+    v_words[38] = "crucified,"
+    v_delays[38] = 0.65
+
+    v_words[39] = "died"
+    v_delays[39] = 0.45
+
+    v_words[40] = "and"
+    v_delays[40] = 0.20
+
+    v_words[41] = "was"
+    v_delays[41] = 0.25
+
+    v_words[42] = "buried;"
+    v_delays[42] = 0.75
+
+    v_words[43] = "He"
+    v_delays[43] = 0.25
+
+    v_words[44] = "descended"
+    v_delays[44] = 0.55
+
+    v_words[45] = "into"
+    v_delays[45] = 0.25
+
+    v_words[46] = "hell;"
+    v_delays[46] = 0.80
+
+    v_words[47] = "on"
+    v_delays[47] = 0.20
+
+    v_words[48] = "the"
+    v_delays[48] = 0.15
+
+    v_words[49] = "third"
+    v_delays[49] = 0.40
+
+    v_words[50] = "day"
+    v_delays[50] = 0.40
+
+    v_words[51] = "He"
+    v_delays[51] = 0.25
+
+    v_words[52] = "rose"
+    v_delays[52] = 0.40
+
+    v_words[53] = "again"
+    v_delays[53] = 0.40
+
+    v_words[54] = "from"
+    v_delays[54] = 0.25
+
+    v_words[55] = "the"
+    v_delays[55] = 0.15
+
+    v_words[56] = "dead;"
+    v_delays[56] = 0.80
+
+    v_words[57] = "He"
+    v_delays[57] = 0.25
+
+    v_words[58] = "ascended"
+    v_delays[58] = 0.55
+
+    v_words[59] = "into"
+    v_delays[59] = 0.25
+
+    v_words[60] = "heaven,"
+    v_delays[60] = 0.70
+
+    v_words[61] = "and"
+    v_delays[61] = 0.20
+
+    v_words[62] = "is"
+    v_delays[62] = 0.20
+
+    v_words[63] = "seated"
+    v_delays[63] = 0.45
+
+    v_words[64] = "at"
+    v_delays[64] = 0.15
+
+    v_words[65] = "the"
+    v_delays[65] = 0.15
+
+    v_words[66] = "right"
+    v_delays[66] = 0.35
+
+    v_words[67] = "hand"
+    v_delays[67] = 0.35
+
+    v_words[68] = "of"
+    v_delays[68] = 0.15
+
+    v_words[69] = "God"
+    v_delays[69] = 0.40
+
+    v_words[70] = "the"
+    v_delays[70] = 0.15
+
+    v_words[71] = "Father"
+    v_delays[71] = 0.45
+
+    v_words[72] = "almighty;"
+    v_delays[72] = 0.80
+
+    v_words[73] = "from"
+    v_delays[73] = 0.25
+
+    v_words[74] = "there"
+    v_delays[74] = 0.30
+
+    v_words[75] = "He"
+    v_delays[75] = 0.25
+
+    v_words[76] = "will"
+    v_delays[76] = 0.30
+
+    v_words[77] = "come"
+    v_delays[77] = 0.35
+
+    v_words[78] = "to"
+    v_delays[78] = 0.15
+
+    v_words[79] = "judge"
+    v_delays[79] = 0.45
+
+    v_words[80] = "the"
+    v_delays[80] = 0.15
+
+    v_words[81] = "living"
+    v_delays[81] = 0.45
+
+    v_words[82] = "and"
+    v_delays[82] = 0.20
+
+    v_words[83] = "the"
+    v_delays[83] = 0.15
+
+    v_words[84] = "dead."
+    v_delays[84] = 0.90
+
+    v_words[85] = "I"
+    v_delays[85] = 0.20
+
+    v_words[86] = "believe"
+    v_delays[86] = 0.45
+
+    v_words[87] = "in"
+    v_delays[87] = 0.15
+
+    v_words[88] = "the"
+    v_delays[88] = 0.15
+
+    v_words[89] = "Holy"
+    v_delays[89] = 0.40
+
+    v_words[90] = "Spirit,"
+    v_delays[90] = 0.65
+
+    v_words[91] = "the"
+    v_delays[91] = 0.15
+
+    v_words[92] = "holy"
+    v_delays[92] = 0.40
+
+    v_words[93] = "catholic"
+    v_delays[93] = 0.50
+
+    v_words[94] = "Church,"
+    v_delays[94] = 0.65
+
+    v_words[95] = "the"
+    v_delays[95] = 0.15
+
+    v_words[96] = "communion"
+    v_delays[96] = 0.55
+
+    v_words[97] = "of"
+    v_delays[97] = 0.15
+
+    v_words[98] = "saints,"
+    v_delays[98] = 0.65
+
+    v_words[99] = "the"
+    v_delays[99] = 0.15
+
+    v_words[100] = "forgiveness"
+    v_delays[100] = 0.55
+
+    v_words[101] = "of"
+    v_delays[101] = 0.15
+
+    v_words[102] = "sins,"
+    v_delays[102] = 0.65
+
+    v_words[103] = "the"
+    v_delays[103] = 0.15
+
+    v_words[104] = "resurrection"
+    v_delays[104] = 0.60
+
+    v_words[105] = "of"
+    v_delays[105] = 0.15
+
+    v_words[106] = "the"
+    v_delays[106] = 0.15
+
+    v_words[107] = "body,"
+    v_delays[107] = 0.60
+
+    v_words[108] = "and"
+    v_delays[108] = 0.20
+
+    v_words[109] = "life"
+    v_delays[109] = 0.45
+
+    v_words[110] = "everlasting."
+    v_delays[110] = 0.90
+
+    v_words[111] = "Amen."
+    v_delays[111] = 1.20
+
+    v_word_count = 112
+}
+
+# ============================================================================
+# FATIMA PRAYER
+# ============================================================================
+def setup_fatima_prayer {
+    v_prayer_name = v_prayer_names[9]
+    v_text_size = 14
+
+    v_words[0] = "O"
+    v_delays[0] = 0.20
+
+    v_words[1] = "my"
+    v_delays[1] = 0.25
+
+    v_words[2] = "Jesus,"
+    v_delays[2] = 0.65
+
+    v_words[3] = "forgive"
+    v_delays[3] = 0.50
+
+    v_words[4] = "us"
+    v_delays[4] = 0.25
+
+    v_words[5] = "our"
+    v_delays[5] = 0.25
+
+    v_words[6] = "sins,"
+    v_delays[6] = 0.65
+
+    v_words[7] = "save"
+    v_delays[7] = 0.40
+
+    v_words[8] = "us"
+    v_delays[8] = 0.25
+
+    v_words[9] = "from"
+    v_delays[9] = 0.25
+
+    v_words[10] = "the"
+    v_delays[10] = 0.15
+
+    v_words[11] = "fires"
+    v_delays[11] = 0.45
+
+    v_words[12] = "of"
+    v_delays[12] = 0.15
+
+    v_words[13] = "hell,"
+    v_delays[13] = 0.70
+
+    v_words[14] = "lead"
+    v_delays[14] = 0.35
+
+    v_words[15] = "all"
+    v_delays[15] = 0.30
+
+    v_words[16] = "souls"
+    v_delays[16] = 0.45
+
+    v_words[17] = "to"
+    v_delays[17] = 0.15
+
+    v_words[18] = "Heaven,"
+    v_delays[18] = 0.70
+
+    v_words[19] = "especially"
+    v_delays[19] = 0.55
+
+    v_words[20] = "those"
+    v_delays[20] = 0.35
+
+    v_words[21] = "most"
+    v_delays[21] = 0.35
+
+    v_words[22] = "in"
+    v_delays[22] = 0.15
+
+    v_words[23] = "need"
+    v_delays[23] = 0.40
+
+    v_words[24] = "of"
+    v_delays[24] = 0.15
+
+    v_words[25] = "Thy"
+    v_delays[25] = 0.30
+
+    v_words[26] = "mercy."
+    v_delays[26] = 1.20
+
+    v_word_count = 27
+}
+
+# ============================================================================
+# GLORIA
+# ============================================================================
+def setup_gloria {
+    v_prayer_name = v_prayer_names[10]
+    v_text_size = 12
+
+    v_words[0] = "Glory"
+    v_delays[0] = 0.45
+
+    v_words[1] = "to"
+    v_delays[1] = 0.15
+
+    v_words[2] = "God"
+    v_delays[2] = 0.40
+
+    v_words[3] = "in"
+    v_delays[3] = 0.15
+
+    v_words[4] = "the"
+    v_delays[4] = 0.15
+
+    v_words[5] = "highest,"
+    v_delays[5] = 0.70
+
+    v_words[6] = "and"
+    v_delays[6] = 0.20
+
+    v_words[7] = "on"
+    v_delays[7] = 0.20
+
+    v_words[8] = "earth"
+    v_delays[8] = 0.40
+
+    v_words[9] = "peace"
+    v_delays[9] = 0.45
+
+    v_words[10] = "to"
+    v_delays[10] = 0.15
+
+    v_words[11] = "people"
+    v_delays[11] = 0.40
+
+    v_words[12] = "of"
+    v_delays[12] = 0.15
+
+    v_words[13] = "good"
+    v_delays[13] = 0.35
+
+    v_words[14] = "will."
+    v_delays[14] = 0.80
+
+    v_words[15] = "We"
+    v_delays[15] = 0.25
+
+    v_words[16] = "praise"
+    v_delays[16] = 0.45
+
+    v_words[17] = "you,"
+    v_delays[17] = 0.50
+
+    v_words[18] = "we"
+    v_delays[18] = 0.25
+
+    v_words[19] = "bless"
+    v_delays[19] = 0.45
+
+    v_words[20] = "you,"
+    v_delays[20] = 0.50
+
+    v_words[21] = "we"
+    v_delays[21] = 0.25
+
+    v_words[22] = "adore"
+    v_delays[22] = 0.50
+
+    v_words[23] = "you,"
+    v_delays[23] = 0.50
+
+    v_words[24] = "we"
+    v_delays[24] = 0.25
+
+    v_words[25] = "glorify"
+    v_delays[25] = 0.55
+
+    v_words[26] = "you,"
+    v_delays[26] = 0.50
+
+    v_words[27] = "we"
+    v_delays[27] = 0.25
+
+    v_words[28] = "give"
+    v_delays[28] = 0.35
+
+    v_words[29] = "you"
+    v_delays[29] = 0.25
+
+    v_words[30] = "thanks"
+    v_delays[30] = 0.45
+
+    v_words[31] = "for"
+    v_delays[31] = 0.20
+
+    v_words[32] = "your"
+    v_delays[32] = 0.25
+
+    v_words[33] = "great"
+    v_delays[33] = 0.40
+
+    v_words[34] = "glory,"
+    v_delays[34] = 0.70
+
+    v_words[35] = "Lord"
+    v_delays[35] = 0.40
+
+    v_words[36] = "God,"
+    v_delays[36] = 0.55
+
+    v_words[37] = "heavenly"
+    v_delays[37] = 0.50
+
+    v_words[38] = "King,"
+    v_delays[38] = 0.60
+
+    v_words[39] = "O"
+    v_delays[39] = 0.20
+
+    v_words[40] = "God,"
+    v_delays[40] = 0.55
+
+    v_words[41] = "almighty"
+    v_delays[41] = 0.55
+
+    v_words[42] = "Father."
+    v_delays[42] = 0.90
+
+    v_words[43] = "Lord"
+    v_delays[43] = 0.40
+
+    v_words[44] = "Jesus"
+    v_delays[44] = 0.45
+
+    v_words[45] = "Christ,"
+    v_delays[45] = 0.65
+
+    v_words[46] = "Only"
+    v_delays[46] = 0.40
+
+    v_words[47] = "Begotten"
+    v_delays[47] = 0.55
+
+    v_words[48] = "Son,"
+    v_delays[48] = 0.60
+
+    v_words[49] = "Lord"
+    v_delays[49] = 0.40
+
+    v_words[50] = "God,"
+    v_delays[50] = 0.55
+
+    v_words[51] = "Lamb"
+    v_delays[51] = 0.45
+
+    v_words[52] = "of"
+    v_delays[52] = 0.15
+
+    v_words[53] = "God,"
+    v_delays[53] = 0.55
+
+    v_words[54] = "Son"
+    v_delays[54] = 0.40
+
+    v_words[55] = "of"
+    v_delays[55] = 0.15
+
+    v_words[56] = "the"
+    v_delays[56] = 0.15
+
+    v_words[57] = "Father,"
+    v_delays[57] = 0.70
+
+    v_words[58] = "you"
+    v_delays[58] = 0.25
+
+    v_words[59] = "take"
+    v_delays[59] = 0.35
+
+    v_words[60] = "away"
+    v_delays[60] = 0.35
+
+    v_words[61] = "the"
+    v_delays[61] = 0.15
+
+    v_words[62] = "sins"
+    v_delays[62] = 0.40
+
+    v_words[63] = "of"
+    v_delays[63] = 0.15
+
+    v_words[64] = "the"
+    v_delays[64] = 0.15
+
+    v_words[65] = "world,"
+    v_delays[65] = 0.60
+
+    v_words[66] = "have"
+    v_delays[66] = 0.30
+
+    v_words[67] = "mercy"
+    v_delays[67] = 0.45
+
+    v_words[68] = "on"
+    v_delays[68] = 0.20
+
+    v_words[69] = "us;"
+    v_delays[69] = 0.70
+
+    v_words[70] = "you"
+    v_delays[70] = 0.25
+
+    v_words[71] = "take"
+    v_delays[71] = 0.35
+
+    v_words[72] = "away"
+    v_delays[72] = 0.35
+
+    v_words[73] = "the"
+    v_delays[73] = 0.15
+
+    v_words[74] = "sins"
+    v_delays[74] = 0.40
+
+    v_words[75] = "of"
+    v_delays[75] = 0.15
+
+    v_words[76] = "the"
+    v_delays[76] = 0.15
+
+    v_words[77] = "world,"
+    v_delays[77] = 0.60
+
+    v_words[78] = "receive"
+    v_delays[78] = 0.50
+
+    v_words[79] = "our"
+    v_delays[79] = 0.25
+
+    v_words[80] = "prayer;"
+    v_delays[80] = 0.75
+
+    v_words[81] = "you"
+    v_delays[81] = 0.25
+
+    v_words[82] = "are"
+    v_delays[82] = 0.20
+
+    v_words[83] = "seated"
+    v_delays[83] = 0.45
+
+    v_words[84] = "at"
+    v_delays[84] = 0.15
+
+    v_words[85] = "the"
+    v_delays[85] = 0.15
+
+    v_words[86] = "right"
+    v_delays[86] = 0.35
+
+    v_words[87] = "hand"
+    v_delays[87] = 0.35
+
+    v_words[88] = "of"
+    v_delays[88] = 0.15
+
+    v_words[89] = "the"
+    v_delays[89] = 0.15
+
+    v_words[90] = "Father,"
+    v_delays[90] = 0.65
+
+    v_words[91] = "have"
+    v_delays[91] = 0.30
+
+    v_words[92] = "mercy"
+    v_delays[92] = 0.45
+
+    v_words[93] = "on"
+    v_delays[93] = 0.20
+
+    v_words[94] = "us."
+    v_delays[94] = 0.80
+
+    v_words[95] = "For"
+    v_delays[95] = 0.25
+
+    v_words[96] = "you"
+    v_delays[96] = 0.25
+
+    v_words[97] = "alone"
+    v_delays[97] = 0.40
+
+    v_words[98] = "are"
+    v_delays[98] = 0.20
+
+    v_words[99] = "the"
+    v_delays[99] = 0.15
+
+    v_words[100] = "Holy"
+    v_delays[100] = 0.45
+
+    v_words[101] = "One,"
+    v_delays[101] = 0.60
+
+    v_words[102] = "you"
+    v_delays[102] = 0.25
+
+    v_words[103] = "alone"
+    v_delays[103] = 0.40
+
+    v_words[104] = "are"
+    v_delays[104] = 0.20
+
+    v_words[105] = "the"
+    v_delays[105] = 0.15
+
+    v_words[106] = "Lord,"
+    v_delays[106] = 0.60
+
+    v_words[107] = "you"
+    v_delays[107] = 0.25
+
+    v_words[108] = "alone"
+    v_delays[108] = 0.40
+
+    v_words[109] = "are"
+    v_delays[109] = 0.20
+
+    v_words[110] = "the"
+    v_delays[110] = 0.15
+
+    v_words[111] = "Most"
+    v_delays[111] = 0.40
+
+    v_words[112] = "High,"
+    v_delays[112] = 0.60
+
+    v_words[113] = "Jesus"
+    v_delays[113] = 0.45
+
+    v_words[114] = "Christ,"
+    v_delays[114] = 0.65
+
+    v_words[115] = "with"
+    v_delays[115] = 0.20
+
+    v_words[116] = "the"
+    v_delays[116] = 0.15
+
+    v_words[117] = "Holy"
+    v_delays[117] = 0.40
+
+    v_words[118] = "Spirit,"
+    v_delays[118] = 0.65
+
+    v_words[119] = "in"
+    v_delays[119] = 0.15
+
+    v_words[120] = "the"
+    v_delays[120] = 0.15
+
+    v_words[121] = "glory"
+    v_delays[121] = 0.45
+
+    v_words[122] = "of"
+    v_delays[122] = 0.15
+
+    v_words[123] = "God"
+    v_delays[123] = 0.40
+
+    v_words[124] = "the"
+    v_delays[124] = 0.15
+
+    v_words[125] = "Father."
+    v_delays[125] = 0.90
+
+    v_words[126] = "Amen."
+    v_delays[126] = 1.20
+
+    v_word_count = 127
+}
+
+# ============================================================================
+# CONFITEOR
+# ============================================================================
+def setup_confiteor {
+    v_prayer_name = v_prayer_names[11]
+    v_text_size = 12
+
+    v_words[0] = "I"
+    v_delays[0] = 0.20
+
+    v_words[1] = "confess"
+    v_delays[1] = 0.50
+
+    v_words[2] = "to"
+    v_delays[2] = 0.15
+
+    v_words[3] = "almighty"
+    v_delays[3] = 0.55
+
+    v_words[4] = "God"
+    v_delays[4] = 0.45
+
+    v_words[5] = "and"
+    v_delays[5] = 0.20
+
+    v_words[6] = "to"
+    v_delays[6] = 0.15
+
+    v_words[7] = "you,"
+    v_delays[7] = 0.50
+
+    v_words[8] = "my"
+    v_delays[8] = 0.25
+
+    v_words[9] = "brothers"
+    v_delays[9] = 0.50
+
+    v_words[10] = "and"
+    v_delays[10] = 0.20
+
+    v_words[11] = "sisters,"
+    v_delays[11] = 0.65
+
+    v_words[12] = "that"
+    v_delays[12] = 0.25
+
+    v_words[13] = "I"
+    v_delays[13] = 0.20
+
+    v_words[14] = "have"
+    v_delays[14] = 0.30
+
+    v_words[15] = "greatly"
+    v_delays[15] = 0.50
+
+    v_words[16] = "sinned,"
+    v_delays[16] = 0.70
+
+    v_words[17] = "in"
+    v_delays[17] = 0.15
+
+    v_words[18] = "my"
+    v_delays[18] = 0.25
+
+    v_words[19] = "thoughts"
+    v_delays[19] = 0.50
+
+    v_words[20] = "and"
+    v_delays[20] = 0.20
+
+    v_words[21] = "in"
+    v_delays[21] = 0.15
+
+    v_words[22] = "my"
+    v_delays[22] = 0.25
+
+    v_words[23] = "words,"
+    v_delays[23] = 0.60
+
+    v_words[24] = "in"
+    v_delays[24] = 0.15
+
+    v_words[25] = "what"
+    v_delays[25] = 0.30
+
+    v_words[26] = "I"
+    v_delays[26] = 0.20
+
+    v_words[27] = "have"
+    v_delays[27] = 0.30
+
+    v_words[28] = "done"
+    v_delays[28] = 0.45
+
+    v_words[29] = "and"
+    v_delays[29] = 0.20
+
+    v_words[30] = "in"
+    v_delays[30] = 0.15
+
+    v_words[31] = "what"
+    v_delays[31] = 0.30
+
+    v_words[32] = "I"
+    v_delays[32] = 0.20
+
+    v_words[33] = "have"
+    v_delays[33] = 0.30
+
+    v_words[34] = "failed"
+    v_delays[34] = 0.45
+
+    v_words[35] = "to"
+    v_delays[35] = 0.15
+
+    v_words[36] = "do,"
+    v_delays[36] = 0.60
+
+    v_words[37] = "through"
+    v_delays[37] = 0.35
+
+    v_words[38] = "my"
+    v_delays[38] = 0.25
+
+    v_words[39] = "fault,"
+    v_delays[39] = 0.60
+
+    v_words[40] = "through"
+    v_delays[40] = 0.35
+
+    v_words[41] = "my"
+    v_delays[41] = 0.25
+
+    v_words[42] = "fault,"
+    v_delays[42] = 0.60
+
+    v_words[43] = "through"
+    v_delays[43] = 0.35
+
+    v_words[44] = "my"
+    v_delays[44] = 0.25
+
+    v_words[45] = "most"
+    v_delays[45] = 0.35
+
+    v_words[46] = "grievous"
+    v_delays[46] = 0.55
+
+    v_words[47] = "fault;"
+    v_delays[47] = 0.80
+
+    v_words[48] = "therefore"
+    v_delays[48] = 0.50
+
+    v_words[49] = "I"
+    v_delays[49] = 0.20
+
+    v_words[50] = "ask"
+    v_delays[50] = 0.35
+
+    v_words[51] = "blessed"
+    v_delays[51] = 0.50
+
+    v_words[52] = "Mary"
+    v_delays[52] = 0.45
+
+    v_words[53] = "ever-Virgin,"
+    v_delays[53] = 0.70
+
+    v_words[54] = "all"
+    v_delays[54] = 0.30
+
+    v_words[55] = "the"
+    v_delays[55] = 0.15
+
+    v_words[56] = "Angels"
+    v_delays[56] = 0.50
+
+    v_words[57] = "and"
+    v_delays[57] = 0.20
+
+    v_words[58] = "Saints,"
+    v_delays[58] = 0.60
+
+    v_words[59] = "and"
+    v_delays[59] = 0.20
+
+    v_words[60] = "you,"
+    v_delays[60] = 0.50
+
+    v_words[61] = "my"
+    v_delays[61] = 0.25
+
+    v_words[62] = "brothers"
+    v_delays[62] = 0.50
+
+    v_words[63] = "and"
+    v_delays[63] = 0.20
+
+    v_words[64] = "sisters,"
+    v_delays[64] = 0.65
+
+    v_words[65] = "to"
+    v_delays[65] = 0.15
+
+    v_words[66] = "pray"
+    v_delays[66] = 0.45
+
+    v_words[67] = "for"
+    v_delays[67] = 0.20
+
+    v_words[68] = "me"
+    v_delays[68] = 0.30
+
+    v_words[69] = "to"
+    v_delays[69] = 0.15
+
+    v_words[70] = "the"
+    v_delays[70] = 0.15
+
+    v_words[71] = "Lord"
+    v_delays[71] = 0.45
+
+    v_words[72] = "our"
+    v_delays[72] = 0.25
+
+    v_words[73] = "God."
+    v_delays[73] = 1.20
+
+    v_word_count = 74
+}
+
+# ============================================================================
+# DIVINE MERCY CHAPLET
+# ============================================================================
+def setup_divine_mercy {
+    v_prayer_name = v_prayer_names[12]
+    v_text_size = 12
+
+    v_words[0] = "Eternal"
+    v_delays[0] = 0.50
+
+    v_words[1] = "Father,"
+    v_delays[1] = 0.65
+
+    v_words[2] = "I"
+    v_delays[2] = 0.20
+
+    v_words[3] = "offer"
+    v_delays[3] = 0.40
+
+    v_words[4] = "you"
+    v_delays[4] = 0.25
+
+    v_words[5] = "the"
+    v_delays[5] = 0.15
+
+    v_words[6] = "Body"
+    v_delays[6] = 0.45
+
+    v_words[7] = "and"
+    v_delays[7] = 0.20
+
+    v_words[8] = "Blood,"
+    v_delays[8] = 0.55
+
+    v_words[9] = "Soul"
+    v_delays[9] = 0.45
+
+    v_words[10] = "and"
+    v_delays[10] = 0.20
+
+    v_words[11] = "Divinity"
+    v_delays[11] = 0.55
+
+    v_words[12] = "of"
+    v_delays[12] = 0.15
+
+    v_words[13] = "Your"
+    v_delays[13] = 0.30
+
+    v_words[14] = "Dearly"
+    v_delays[14] = 0.45
+
+    v_words[15] = "Beloved"
+    v_delays[15] = 0.50
+
+    v_words[16] = "Son,"
+    v_delays[16] = 0.60
+
+    v_words[17] = "Our"
+    v_delays[17] = 0.30
+
+    v_words[18] = "Lord,"
+    v_delays[18] = 0.55
+
+    v_words[19] = "Jesus"
+    v_delays[19] = 0.45
+
+    v_words[20] = "Christ,"
+    v_delays[20] = 0.65
+
+    v_words[21] = "in"
+    v_delays[21] = 0.15
+
+    v_words[22] = "atonement"
+    v_delays[22] = 0.55
+
+    v_words[23] = "for"
+    v_delays[23] = 0.20
+
+    v_words[24] = "our"
+    v_delays[24] = 0.25
+
+    v_words[25] = "sins"
+    v_delays[25] = 0.45
+
+    v_words[26] = "and"
+    v_delays[26] = 0.20
+
+    v_words[27] = "those"
+    v_delays[27] = 0.35
+
+    v_words[28] = "of"
+    v_delays[28] = 0.15
+
+    v_words[29] = "the"
+    v_delays[29] = 0.15
+
+    v_words[30] = "whole"
+    v_delays[30] = 0.40
+
+    v_words[31] = "world."
+    v_delays[31] = 1.00
+
+    v_words[32] = "For"
+    v_delays[32] = 0.30
+
+    v_words[33] = "the"
+    v_delays[33] = 0.15
+
+    v_words[34] = "sake"
+    v_delays[34] = 0.40
+
+    v_words[35] = "of"
+    v_delays[35] = 0.15
+
+    v_words[36] = "His"
+    v_delays[36] = 0.30
+
+    v_words[37] = "sorrowful"
+    v_delays[37] = 0.55
+
+    v_words[38] = "Passion,"
+    v_delays[38] = 0.70
+
+    v_words[39] = "have"
+    v_delays[39] = 0.35
+
+    v_words[40] = "mercy"
+    v_delays[40] = 0.50
+
+    v_words[41] = "on"
+    v_delays[41] = 0.20
+
+    v_words[42] = "us"
+    v_delays[42] = 0.35
+
+    v_words[43] = "and"
+    v_delays[43] = 0.20
+
+    v_words[44] = "on"
+    v_delays[44] = 0.20
+
+    v_words[45] = "the"
+    v_delays[45] = 0.15
+
+    v_words[46] = "whole"
+    v_delays[46] = 0.40
+
+    v_words[47] = "world."
+    v_delays[47] = 1.00
+
+    v_words[48] = "Holy"
+    v_delays[48] = 0.45
+
+    v_words[49] = "God,"
+    v_delays[49] = 0.60
+
+    v_words[50] = "Holy"
+    v_delays[50] = 0.45
+
+    v_words[51] = "Mighty"
+    v_delays[51] = 0.50
+
+    v_words[52] = "One,"
+    v_delays[52] = 0.55
+
+    v_words[53] = "Holy"
+    v_delays[53] = 0.45
+
+    v_words[54] = "Immortal"
+    v_delays[54] = 0.55
+
+    v_words[55] = "One,"
+    v_delays[55] = 0.55
+
+    v_words[56] = "have"
+    v_delays[56] = 0.35
+
+    v_words[57] = "mercy"
+    v_delays[57] = 0.50
+
+    v_words[58] = "on"
+    v_delays[58] = 0.20
+
+    v_words[59] = "us"
+    v_delays[59] = 0.35
+
+    v_words[60] = "and"
+    v_delays[60] = 0.20
+
+    v_words[61] = "on"
+    v_delays[61] = 0.20
+
+    v_words[62] = "the"
+    v_delays[62] = 0.15
+
+    v_words[63] = "whole"
+    v_delays[63] = 0.40
+
+    v_words[64] = "world."
+    v_delays[64] = 1.20
+
+    v_word_count = 65
+}
+
+# ============================================================================
 # PRAYER SELECTION
 # ============================================================================
 def select_prayer {
@@ -1249,9 +3140,36 @@ def run_selected_prayer {
     elseif v_selected == 2 then
         print("Selected: Hail Mary")
         call setup_hail_mary
-    else
+    elseif v_selected == 3 then
         print("Selected: Nicene Creed")
         call setup_nicene_creed
+    elseif v_selected == 4 then
+        print("Selected: Act of Contrition")
+        call setup_act_of_contrition
+    elseif v_selected == 5 then
+        print("Selected: Angel of God")
+        call setup_angel_of_god
+    elseif v_selected == 6 then
+        print("Selected: Grace Before Meals")
+        call setup_grace_before_meals
+    elseif v_selected == 7 then
+        print("Selected: St. Michael Prayer")
+        call setup_st_michael
+    elseif v_selected == 8 then
+        print("Selected: Apostles' Creed")
+        call setup_apostles_creed
+    elseif v_selected == 9 then
+        print("Selected: Fatima Prayer")
+        call setup_fatima_prayer
+    elseif v_selected == 10 then
+        print("Selected: Gloria")
+        call setup_gloria
+    elseif v_selected == 11 then
+        print("Selected: Confiteor")
+        call setup_confiteor
+    else
+        print("Selected: Divine Mercy Chaplet")
+        call setup_divine_mercy
     endif
     call display_prayer
 }
