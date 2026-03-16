@@ -76,60 +76,59 @@ def get_random_color {
 # ============================================================================
 # DISPLAY PROCEDURES
 # ============================================================================
+# Title protection: minimum Y position to avoid overlapping prayer name
+v_min_y = 10
+
 def display_prayer_name {
     draw_text(62, 0, v_prayer_name, tiny64_font, 8, gray, 60, NORMAL, RIGHT)
 }
 
-def display_virtually_centered {
+def draw_word {
+    if v_center_align == 1 then
+        draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+    else
+        draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+    endif
+}
+
+# Mode 0: Fixed center position (Y = 32)
+def display_fixed_center {
     v_y = 32
     for v_i in (0, v_word_count - 1, 1)
         begin_frame
         call display_prayer_name
-        if v_center_align == 1 then
-            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
-        else
-            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
-        endif
+        call draw_word
         end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
 }
 
-def display_random_vertical {
-    v_bottom_margin = v_text_size
-    v_max_y = 59 - v_bottom_margin
+# Mode 1: Random Y position each word
+def display_random_y {
+    v_max_y = 59 - v_text_size
     for v_i in (0, v_word_count - 1, 1)
         begin_frame
         call display_prayer_name
-        v_y = random(0, v_max_y, 0)
-        if v_center_align == 1 then
-            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
-        else
-            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
-        endif
+        v_y = random(v_min_y, v_max_y, 0)
+        call draw_word
         end_frame
         rest(v_delays[v_i])
         sync_queue
     endfor v_i
 }
 
-def display_top_to_bottom {
-    v_step = 1
-    v_bottom_margin = v_text_size
-    v_max_y = 59 - v_bottom_margin
-    v_y = 0
+# Mode 2: Step down 1 pixel per word (top to bottom)
+def display_step_down {
+    v_max_y = 59 - v_text_size
+    v_y = v_min_y
     for v_i in (0, v_word_count - 1, 1)
         begin_frame
         call display_prayer_name
-        v_y = v_y + v_step
+        call draw_word
+        v_y = v_y + 1
         if v_y > v_max_y then
-            v_y = 0
-        endif
-        if v_center_align == 1 then
-            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
-        else
-            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+            v_y = v_min_y
         endif
         end_frame
         rest(v_delays[v_i])
@@ -137,23 +136,115 @@ def display_top_to_bottom {
     endfor v_i
 }
 
-def display_quarter_drops {
-    v_quarter = 16
-    v_bottom_margin = v_text_size
-    v_max_y = 59 - v_bottom_margin
-    v_y = 0
+# Mode 3: Step up 1 pixel per word (bottom to top)
+def display_step_up {
+    v_max_y = 59 - v_text_size
+    v_y = v_max_y
     for v_i in (0, v_word_count - 1, 1)
         begin_frame
         call display_prayer_name
+        call draw_word
+        v_y = v_y - 1
+        if v_y < v_min_y then
+            v_y = v_max_y
+        endif
+        end_frame
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+# Mode 4: Quarter drops (jump 1/4 screen each word)
+def display_quarter_drops {
+    v_quarter = 12
+    v_max_y = 59 - v_text_size
+    v_y = v_min_y
+    for v_i in (0, v_word_count - 1, 1)
+        begin_frame
+        call display_prayer_name
+        call draw_word
         v_y = v_y + v_quarter
         if v_y > v_max_y then
-            v_y = 0
+            v_y = v_min_y
         endif
-        if v_center_align == 1 then
-            draw_text(32, v_y, v_words[v_i], piboto-regular, v_text_size, v_color, 100, NORMAL, CENTER)
+        end_frame
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+# Mode 5: Bounce (ping-pong between top and bottom)
+def display_bounce {
+    v_max_y = 59 - v_text_size
+    v_y = v_min_y
+    v_direction = 1
+    v_bounce_step = 3
+    for v_i in (0, v_word_count - 1, 1)
+        begin_frame
+        call display_prayer_name
+        call draw_word
+        v_y = v_y + v_bounce_step * v_direction
+        if v_y >= v_max_y then
+            v_y = v_max_y
+            v_direction = -1
+        endif
+        if v_y <= v_min_y then
+            v_y = v_min_y
+            v_direction = 1
+        endif
+        end_frame
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+# Mode 6: Alternating halves (top zone / bottom zone)
+def display_alternating_halves {
+    v_mid = 35
+    v_max_y = 59 - v_text_size
+    v_top_zone = v_min_y + 5
+    v_bottom_zone = v_mid + 5
+    v_use_top = 1
+    for v_i in (0, v_word_count - 1, 1)
+        begin_frame
+        call display_prayer_name
+        if v_use_top == 1 then
+            v_y = v_top_zone
+            v_use_top = 0
         else
-            draw_text(1, v_y, v_words[v_i], piboto-regular, v_text_size, v_color)
+            v_y = v_bottom_zone
+            v_use_top = 1
         endif
+        call draw_word
+        end_frame
+        rest(v_delays[v_i])
+        sync_queue
+    endfor v_i
+}
+
+# Mode 7: Third positions (cycle through 3 vertical positions)
+def display_thirds {
+    v_max_y = 59 - v_text_size
+    v_range = v_max_y - v_min_y
+    v_third = v_range / 3
+    v_pos1 = v_min_y
+    v_pos2 = v_min_y + v_third
+    v_pos3 = v_min_y + v_third * 2
+    v_which = 0
+    for v_i in (0, v_word_count - 1, 1)
+        begin_frame
+        call display_prayer_name
+        if v_which == 0 then
+            v_y = v_pos1
+            v_which = 1
+        elseif v_which == 1 then
+            v_y = v_pos2
+            v_which = 2
+        else
+            v_y = v_pos3
+            v_which = 0
+        endif
+        call draw_word
         end_frame
         rest(v_delays[v_i])
         sync_queue
@@ -161,18 +252,26 @@ def display_quarter_drops {
 }
 
 def display_prayer {
-    v_style = random(0, 3, 0)
+    v_style = random(0, 7, 0)
     v_center_align = random(0, 1, 0)
     call get_random_color
     
     if v_style == 0 then
-        call display_virtually_centered
+        call display_fixed_center
     elseif v_style == 1 then
-        call display_random_vertical
+        call display_random_y
     elseif v_style == 2 then
-        call display_top_to_bottom
-    else
+        call display_step_down
+    elseif v_style == 3 then
+        call display_step_up
+    elseif v_style == 4 then
         call display_quarter_drops
+    elseif v_style == 5 then
+        call display_bounce
+    elseif v_style == 6 then
+        call display_alternating_halves
+    else
+        call display_thirds
     endif
 }
 
