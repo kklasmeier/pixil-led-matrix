@@ -419,6 +419,19 @@ class ConditionTemplate:
             if func in self.original:
                 return False
         
+        # Cannot handle arithmetic expressions in comparisons
+        # e.g., "v_x + v_y > 5" needs evaluate_math_expression
+        # Check for arithmetic operators outside of simple number contexts
+        condition = self.original
+        # Remove quoted strings to avoid false positives
+        condition_no_strings = re.sub(r'"[^"]*"|\'[^\']*\'', '', condition)
+        # Check for arithmetic operators (but not in comparison operators like >=, <=, ==, !=)
+        # Look for + or - that isn't part of a number (like -5 or +3)
+        if re.search(r'v_\w+\s*[+\-*/]\s*', condition_no_strings):
+            return False
+        if re.search(r'\s*[+\-*/]\s*v_\w+', condition_no_strings):
+            return False
+        
         # All supported template types can use fast evaluation
         # (Triple+ ANDs are handled correctly by _evaluate_compound with short-circuit)
         return self.template_type in ['simple', 'compound', 'boolean', 'parenthesized', 'negated']
