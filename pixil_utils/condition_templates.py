@@ -409,9 +409,15 @@ class ConditionTemplate:
 
     def can_fast_evaluate(self) -> bool:
         """Check if this condition can be evaluated using fast path."""
-        # Add checks for problematic patterns
-        if 'random(' in self.original:
-            return False  # Cannot handle function calls
+        # Cannot handle function calls - fall back to slow path
+        # These need evaluate_math_expression to process
+        function_calls = ['random(', 'abs(', 'sin(', 'cos(', 'tan(', 'sqrt(', 'pow(', 
+                         'floor(', 'ceil(', 'round(', 'min(', 'max(', 'radians(', 
+                         'degrees(', 'log(', 'log10(', 'exp(', 'fmod(', 'fabs(',
+                         'get_datetime(', 'get_system(']
+        for func in function_calls:
+            if func in self.original:
+                return False
         
         # All supported template types can use fast evaluation
         # (Triple+ ANDs are handled correctly by _evaluate_compound with short-circuit)
