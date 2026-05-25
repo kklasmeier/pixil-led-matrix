@@ -107,14 +107,69 @@ echo "=== Committing Changes ==="
 echo "Current staged changes:"
 git diff --cached --name-only
 echo ""
-read -p "Enter your commit message: " commit_message
-if [ -z "$commit_message" ]; then
-    echo "Commit message cannot be empty. Using default message."
-    commit_message="Update from interactive script"
+
+read -p "Commit title: " commit_title
+if [ -z "$commit_title" ]; then
+    echo "Title cannot be empty. Using default title."
+    commit_title="Update from interactive script"
 fi
 
-echo "Committing with message: '$commit_message'"
-git commit -m "$commit_message"
+commit_body=""
+read -p "Add a commit body/description? (y/N): " add_body
+add_body=${add_body:-N}
+
+if [ "$add_body" = "y" ] || [ "$add_body" = "Y" ]; then
+    echo "Enter body lines (blank lines within the body are OK)."
+    echo "Press Enter twice on an empty line when finished:"
+    empty_lines=0
+    while IFS= read -r line; do
+        if [ -z "$line" ]; then
+            empty_lines=$((empty_lines + 1))
+            if [ "$empty_lines" -ge 2 ]; then
+                break
+            fi
+            commit_body+=$'\n'
+            continue
+        fi
+        empty_lines=0
+        commit_body+="${line}"$'\n'
+    done
+fi
+
+echo ""
+echo "=== Commit Preview ==="
+echo "Title: $commit_title"
+if [ -n "$commit_body" ]; then
+    echo "Body:"
+    printf '%s' "$commit_body"
+    if [ "${commit_body: -1}" != $'\n' ]; then
+        echo ""
+    fi
+else
+    echo "Body: (none)"
+fi
+echo "========================"
+echo ""
+
+read -p "Create this commit? (Y/n): " commit_confirm
+commit_confirm=${commit_confirm:-Y}
+
+if [ "$commit_confirm" != "y" ] && [ "$commit_confirm" != "Y" ]; then
+    echo "Commit cancelled. Staged changes are unchanged."
+    exit 0
+fi
+
+if [ -n "$commit_body" ]; then
+    git commit -m "$commit_title" -m "$commit_body"
+else
+    git commit -m "$commit_title"
+fi
+
+if [ $? -ne 0 ]; then
+    echo "Commit failed."
+    exit 1
+fi
+
 echo "Commit complete:"
 git log -1 --oneline
 echo ""
