@@ -848,6 +848,10 @@ class RGB_Api:
 
     def rest(self, duration: float):
         """Rest for a duration while still checking burnouts."""
+        from pixil_utils.test_hooks import effective_rest_duration, record_rest
+
+        duration = effective_rest_duration(duration)
+        record_rest()
         debug(f"Resting for {duration} seconds", Level.DEBUG, Component.COMMAND)
         end_time = time.time() + duration
         last_refresh_time = time.time()

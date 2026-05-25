@@ -57,6 +57,13 @@ class CommandExecutor:
         debug(f"Processing command: {command}", Level.DEBUG, Component.COMMAND)
 
         try:
+            if command == '__test_snapshot__':
+                from pixil_utils.test_hooks import is_test_mode
+                if is_test_mode():
+                    from .test_inspect import emit_test_snapshot
+                    emit_test_snapshot(self.api)
+                return
+
             if command in ['end_frame', 'clear', 'dispose_all_sprites', 'sync_queue', 'endsprite']:
                 debug(f"Executing simple command: {command}", Level.DEBUG, Component.COMMAND)
                 self.current_command = command

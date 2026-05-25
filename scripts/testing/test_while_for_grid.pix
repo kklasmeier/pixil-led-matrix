@@ -1,0 +1,28 @@
+# Tier 2: while loop + nested for + create_array + flat index (game-of-life shape)
+# Deterministic — no random. Small grid for fast smoke + stable buffer golden.
+
+v_size = 4
+v_cell = 8
+create_array(v_grid, 16)
+
+for v_i in (0, 15, 1)
+    if v_i < 8 then
+        v_grid[v_i] = 1
+    else
+        v_grid[v_i] = 0
+    endif
+endfor v_i
+
+clear()
+v_gen = 0
+while v_gen < 2 then
+    for v_y in (0, v_size - 1, 1)
+        for v_x in (0, v_size - 1, 1)
+            v_idx = v_y * v_size + v_x
+            if v_grid[v_idx] == 1 then
+                plot(v_x * v_cell + 2, v_y * v_cell + 2, cyan, 100)
+            endif
+        endfor v_x
+    endfor v_y
+    v_gen = v_gen + 1
+endwhile

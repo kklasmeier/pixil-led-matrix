@@ -91,6 +91,7 @@ Content renders in this order (back to front):
 │   ├── terminal_handler.py  # Terminal input handling
 │   ├── timer_manager.py     # Script duration tracking
 │   ├── variable_registry.py # Variable storage and management
+│   ├── test_hooks.py        # PIXIL_TEST_MODE metrics (no cost when unset)
 │   └── jit_compiler/        # JIT compilation for math expressions
 │       ├── __init__.py
 │       ├── bytecode.py      # Bytecode instruction definitions
@@ -111,7 +112,13 @@ Content renders in this order (back to front):
 │   ├── text_effects.py      # Text animation effects
 │   ├── text_renderer.py     # Text rendering
 │   ├── tiny64_font.txt      # Font definition data
-│   └── utils.py             # Color handling - MODIFY for color changes
+│   ├── utils.py             # Color handling - MODIFY for color changes
+│   └── test_inspect.py      # Tier 2 buffer fingerprint (test mode only)
+│
+├── tests/                   # Automated tests — see §8 and tests/README.md
+│   ├── pixil/               # Tier 1: pytest (pixil_utils)
+│   ├── scripts/             # Tier 2: .pix harness, manifest, golden hashes
+│   └── rgb_matrix/          # Tier 3: reserved (simulated matrix; future)
 │
 ├── shared/                  # Inter-process communication
 │   ├── __init__.py
@@ -316,15 +323,106 @@ ADDING A CONTROL STRUCTURE
 8. TESTING CHANGES
 ================================================================================
 
-TEST SCRIPTS
-------------
-Use scripts in scripts/testing/ for quick tests:
+Automated tests live under tests/. They are not imported during normal lightshow
+runs. Full detail: tests/README.md (overview), tests/scripts/README.md (Tier 2).
+
+TWO TIERS (DAILY WORKFLOW)
+--------------------------
+Tier 1 — pixil_utils unit tests (fast, no hardware)
+  Directory:  tests/pixil/
+  Command:    ./run test
+  Needs:      pytest (./run setup-tests once on Pi via apt)
+  Does NOT:   sudo, rgbmatrix, or Pixil.py
+
+Tier 2 — .pix smoke scripts on real matrix
+  Directory:  tests/scripts/  (harness: run_script_tests.py)
+  Manifest:   tests/scripts/manifest/core.txt
+  Command:    ./run test-scripts   or   ./run test-all
+  Needs:      Pi + working matrix + passwordless sudo (sudo -n true)
 
 ```bash
-sudo python Pixil.py scripts/testing/test.pix
+./run setup-tests           # Once: apt install python3-pytest
+./run test                  # Tier 1 only (~130 tests, <1s)
+./run test-scripts          # Tier 2 only (manifest scripts)
+./run test-all              # Tier 1 then Tier 2 (recommended on Pi)
+./run test -- -v -k jit     # Extra pytest args (Tier 1 only)
 ```
 
-Create specific test scripts for your changes.
+Pixil on hardware (not the test harness): sudo python3 Pixil.py ...
+
+WHEN TO ADD WHICH KIND OF TEST
+------------------------------
+Change in...                         Add...
+math, conditions, params, JIT        Tier 1 test in tests/pixil/test_<topic>.py
+new/changed drawing on matrix        Tier 2 script in scripts/testing/ + manifest
+parser bug you can assert in Python  Tier 1 first; optional Tier 2 smoke .pix
+live clock or runtime on screen        Tier 2 with "volatile" (no buffer golden)
+
+See tests/pixil/COVERAGE.md for which modules each Tier 1 file covers.
+
+TIER 2: TEST MODE (PIXIL_TEST_MODE)
+-----------------------------------
+Set automatically by ./run test-scripts (sudo env PIXIL_TEST_MODE=1 ...).
+
+When PIXIL_TEST_MODE is unset (normal lightshow): test_hooks are no-ops — no
+measurable performance impact.
+
+When set (Tier 2 only):
+  - rest() capped (default 0.01s via PIXIL_TEST_REST_CAP)
+  - Command count and script FAIL lines recorded
+  - End of script: __test_snapshot__ captures a buffer fingerprint (hash of
+    non-transparent pixels, or "empty")
+  - Prints PIXIL_TEST_SUMMARY script=... commands=... rest=... failures=...
+    buffer=HASH exit=0
+
+Harness failure conditions: non-zero exit, Python traceback, indented FAIL lines
+in script output, missing summary/buffer, or golden mismatch.
+
+TIER 2: BUFFER GOLDENS
+----------------------
+Goldens are small text files in tests/scripts/golden/*.hash — one line per
+script (e.g. test_math.hash). They are NOT images. Later runs compare the
+snapshot hash to the golden.
+
+First-time capture (on Pi, matrix attached):
+  PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
+
+Normal runs compare automatically. Refresh a golden after an intentional visual
+change to that script only.
+
+Volatile scripts (live clock / runtime) cannot have stable goldens. In
+manifest/core.txt mark them with a second column:
+  testing/test_datetime.pix volatile
+  testing/test_system.pix volatile
+They still run as smoke tests; buffer hash is reported but not compared.
+
+Do not commit golden files for volatile scripts.
+
+TIER 2: ADDING A SCRIPT TO THE MANIFEST
+---------------------------------------
+1. Add or update scripts/testing/your_test.pix (keep short; use sync_queue).
+2. Add a line to tests/scripts/manifest/core.txt:
+     testing/your_test.pix
+   or for time-dependent output:
+     testing/your_test.pix volatile
+3. Run: PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts  (skip if volatile)
+4. Commit the new tests/scripts/golden/your_test.hash (if not volatile)
+
+Optional env vars (Tier 2 harness):
+  PIXIL_SKIP_SCRIPT_TESTS=1     Skip Tier 2 (exit 0, for machines without matrix)
+  PIXIL_SCRIPT_TIME_LIMIT=1:00  Passed to Pixil -t
+  PIXIL_SCRIPT_TIMEOUT=120      Wall-clock kill per script
+  PIXIL_TEST_REST_CAP=0.01      Max rest() seconds in test mode
+  PIXIL_TEST_UPDATE_GOLDEN=1    Write or refresh golden/*.hash files
+
+LEGACY / MANUAL
+---------------
+scripts/test_regression.pix — large visual regression; not run by ./run test.
+Use scripts/testing/ for ad-hoc visual checks:
+
+```bash
+sudo python3 Pixil.py testing/test_print -t 1:00
+```
 
 DEBUG OUTPUT
 ------------
@@ -431,6 +529,10 @@ Array handling                  pixil_utils/array_manager.py
 JIT compilation                 pixil_utils/jit_compiler/
 Command queue                   shared/command_queue.py
 Performance metrics             database/pixil_metrics.py
+Unit tests (Tier 1)             tests/pixil/
+Script smoke tests (Tier 2)     tests/scripts/manifest/core.txt
+Test mode hooks                 pixil_utils/test_hooks.py
+Buffer fingerprint (test)       rgb_matrix_lib/test_inspect.py
 
 ================================================================================
 END OF DEVELOPMENT GUIDE

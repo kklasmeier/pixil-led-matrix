@@ -15,7 +15,11 @@ from pixil_utils.variable_registry import VariableRegistry
 from pixil_utils.debug import (DEBUG_OFF, DEBUG_CONCISE, DEBUG_SUMMARY, DEBUG_VERBOSE, DEBUG_LEVEL, set_debug_level, debug_print, current_command)
 from pixil_utils.math_functions import (MATH_FUNCTIONS, random_float, has_math_expression, evaluate_math_expression, evaluate_condition, report_jit_stats, reset_jit_stats, report_condition_template_stats, reset_condition_template_stats, set_script_start_time)
 from pixil_utils.file_manager import PixilFileManager
-from pixil_utils.parameter_types import (PARAMETER_TYPES, validate_command_params)
+from pixil_utils.parameter_types import (
+    PARAMETER_TYPES,
+    validate_command_params,
+    expand_legacy_shape_params,
+)
 from pixil_utils.expression_parser import format_parameter
 from pixil_utils import (ScriptManager, parse_args, 
                         # Timer management
@@ -26,6 +30,15 @@ from pixil_utils import (ScriptManager, parse_args,
                         initialize_terminal, start_terminal, 
                         stop_terminal, check_spacebar_throttled)
 from pixil_utils.array_manager import PixilArray
+from pixil_utils.test_hooks import (
+    is_test_mode,
+    reset_metrics,
+    set_script_name,
+    record_command_dispatched,
+    set_buffer_hash,
+    print_summary,
+    note_fail_in_line,
+)
 from collections import OrderedDict  # Make sure this is imported
 from pixil_utils.optimization_flags import (
     ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE,
@@ -526,8 +539,21 @@ def process_script(filename, execute_func=None):
         with open(filename, 'r') as f:
             return [line.split('#', 1)[0].strip() for line in f if line.split('#', 1)[0].strip()]
 
+    _orig_print = None
     # Load and scan script for variable optimization
     print("Initializing optimized variable system...")
+    if is_test_mode():
+        reset_metrics(Path(filename).name)
+        set_script_name(Path(filename).name)
+        import builtins
+        _orig_print = builtins.print
+
+        def _test_aware_print(*args, **kwargs):
+            note_fail_in_line(" ".join(str(a) for a in args))
+            return _orig_print(*args, **kwargs)
+
+        builtins.print = _test_aware_print
+
     script_lines = preprocess_lines(filename)  # Use existing preprocessing
     variables = VariableRegistry()
     variables.scan_and_register(script_lines)
@@ -547,6 +573,8 @@ def process_script(filename, execute_func=None):
         force_instant = any([
             cmd == 'begin_frame',
             cmd == 'end_frame',
+            cmd == 'sync_queue',
+            cmd == '__test_snapshot__',
             cmd.startswith('define_sprite'),
             cmd.startswith('sprite_draw'),
             cmd == 'endsprite',
@@ -566,6 +594,7 @@ def process_script(filename, execute_func=None):
         """Store command if in frame mode, execute immediately if not"""
         global _metrics
         _metrics['commands_processed'] += 1
+        record_command_dispatched()
         
         # TEMPORARY DEBUG - let's see what commands look like
         #if 'plot' in cmd:
@@ -1696,6 +1725,7 @@ def process_script(filename, execute_func=None):
                         command_name = command_match.group(1)
                         try:
                             args = validate_command_params(command_name, command_match.group(2))
+                            args = expand_legacy_shape_params(command_name, args)
                             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                                 debug_print(f"Command: {command_name}", DEBUG_VERBOSE)
                                 debug_print(f"Parameters: {args}", DEBUG_VERBOSE)
@@ -1728,7 +1758,22 @@ def process_script(filename, execute_func=None):
             execute_command('sync_queue')
             queue.wait_until_empty()
             queue.last_command_time = time.time() * 1000
+            if is_test_mode():
+                queue.drain_test_snapshot_reply()
+                execute_command('__test_snapshot__')
+                queue.wait_for_completion(cooldown=0.2)
+                from rgb_matrix_lib.test_inspect import read_buffer_hash_state
+
+                fp = queue.wait_for_test_snapshot(timeout=3.0)
+                if not fp:
+                    fp = read_buffer_hash_state()
+                if fp:
+                    set_buffer_hash(fp)
+                print_summary(0)
     finally:
+        if is_test_mode() and _orig_print is not None:
+            import builtins
+            builtins.print = _orig_print
         debug_print("\n1. Starting cleanup sequence...", DEBUG_CONCISE)
         
         # Get initial queue size

@@ -12,11 +12,17 @@ from .parameter_types import PARAMETER_TYPES, PARAM_INFO_LOOKUP, get_parameter_t
 def validate_color_value(value: Union[str, int, float]) -> int:
     """Validate a numeric value is within 0-100, rounding floats."""
     try:
+        if isinstance(value, str):
+            value = value.strip()
+            if "." in value or "e" in value.lower():
+                value = float(value)
+            else:
+                value = int(value)
         if isinstance(value, float):
             value = round(value)
         num = int(value)
         if not 0 <= num <= 100:
-            raise ValueError(f"Value {num} must be between 0 and 99")
+            raise ValueError(f"Value {num} must be between 0 and 100")
         return num
     except (ValueError, TypeError):
         raise ValueError(f"Cannot convert {value} to valid integer")

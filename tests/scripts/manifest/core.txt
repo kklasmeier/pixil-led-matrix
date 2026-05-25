@@ -1,0 +1,17 @@
+# Tier 2 smoke scripts — one path per line, relative to scripts/
+# Optional second token: volatile  (live clock/runtime — no buffer golden)
+# Keep this list small; each run uses Pixil -t cap (see run_script_tests.py).
+# Lines starting with # are ignored.
+
+testing/test_print.pix
+testing/test_if_else.pix
+testing/test_procedure.pix
+testing/test_math_2.pix
+testing/test_math.pix
+testing/test_for_loop_2.pix
+testing/test_random.pix
+testing/test_system.pix volatile
+testing/test_datetime.pix volatile
+testing/test_parentheses_conditions.pix
+testing/test_while_for_grid.pix
+testing/test_elseif_chain.pix

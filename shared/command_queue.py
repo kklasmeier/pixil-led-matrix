@@ -10,6 +10,8 @@ class MatrixCommandQueue:
     def __init__(self, queue_size: int = 5000):
         """Initialize command queue with specified size"""
         self.command_queue = Queue(maxsize=queue_size)
+        # Consumer -> main: buffer fingerprint after __test_snapshot__
+        self._test_snapshot_reply: Queue = Queue(maxsize=1)
         self._consumer_process: Optional[Process] = None
         self._running = False
         self.last_command_time = time.time() * 1000  # Convert to milliseconds
@@ -122,6 +124,27 @@ class MatrixCommandQueue:
                     if command == "__SHUTDOWN__":
                         print("[QUEUE] Received shutdown command")
                         break
+
+                    # Test harness: capture drawing buffer fingerprint (consumer process)
+                    if command == "__test_snapshot__":
+                        try:
+                            from rgb_matrix_lib.test_inspect import emit_test_snapshot
+
+                            fp = emit_test_snapshot(api_instance)
+                            try:
+                                self._test_snapshot_reply.put_nowait(fp)
+                            except Full:
+                                try:
+                                    self._test_snapshot_reply.get_nowait()
+                                except Empty:
+                                    pass
+                                self._test_snapshot_reply.put_nowait(fp)
+                        except Exception as snap_err:
+                            print(
+                                f"PIXIL_TEST_SNAPSHOT_ERROR={snap_err}",
+                                flush=True,
+                            )
+                        continue
                     
                     # Wait for specified delay
                     if delay > 0:
@@ -167,6 +190,21 @@ class MatrixCommandQueue:
             return True
         except KeyboardInterrupt:
             return False  # Exit on interrupt
+
+    def drain_test_snapshot_reply(self) -> None:
+        """Discard stale fingerprint from a prior snapshot in this process."""
+        while True:
+            try:
+                self._test_snapshot_reply.get_nowait()
+            except Empty:
+                break
+
+    def wait_for_test_snapshot(self, timeout: float = 3.0) -> Optional[str]:
+        """Block until consumer posts a buffer fingerprint (or timeout)."""
+        try:
+            return self._test_snapshot_reply.get(timeout=timeout)
+        except Empty:
+            return None
 
     def wait_for_completion(self, cooldown: float = 1.0):
         """

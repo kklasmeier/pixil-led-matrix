@@ -185,7 +185,14 @@ for command, params in PARAMETER_TYPES.items():
             param.get('optional', False)
         )
 
-__all__ = ['PARAMETER_TYPES', 'PARAM_INFO_LOOKUP', 'get_parameter_type', 'convert_to_type', 'validate_command_params']
+__all__ = [
+    'PARAMETER_TYPES',
+    'PARAM_INFO_LOOKUP',
+    'get_parameter_type',
+    'convert_to_type',
+    'validate_command_params',
+    'expand_legacy_shape_params',
+]
 
 def get_parameter_type(command: str, position: int) -> ParamType:
     """Get the expected type for a parameter at a specific position in a command."""
@@ -295,6 +302,33 @@ def convert_to_type(value: Union[str, int, float, bool], target_type: ParamType)
             
     except (ValueError, TypeError) as e:
         raise ValueError(f"Cannot convert {value} to {target_type}: {str(e)}")
+
+def _is_bool_literal(value: str) -> bool:
+    return value.strip().lower() in ('true', 'false')
+
+
+def expand_legacy_shape_params(command: str, params: List[str]) -> List[str]:
+    """
+    Insert default intensity (100) when scripts omit it and pass filled/burnout next.
+
+    Supports legacy testing scripts such as:
+      draw_rectangle(x, y, w, h, color, true, duration)
+      draw_circle(x, y, r, color, false, duration)
+
+    Documented form remains:
+      draw_rectangle(x, y, w, h, color, 100, true, duration)
+    """
+    params = list(params)
+    if command == 'draw_rectangle' and len(params) >= 6 and _is_bool_literal(params[5]):
+        params.insert(5, '100')
+    elif command == 'draw_circle' and len(params) >= 5 and _is_bool_literal(params[4]):
+        params.insert(4, '100')
+    elif command == 'draw_polygon' and len(params) >= 8 and _is_bool_literal(params[7]):
+        params.insert(7, '100')
+    elif command == 'draw_ellipse' and len(params) >= 7 and _is_bool_literal(params[6]):
+        params.insert(6, '100')
+    return params
+
 
 def validate_command_params(command: str, param_string: str) -> List[str]:
     """

@@ -2,9 +2,35 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+REPO_ROOT="$(pwd)"
 
 LOG_FILE="pixil.log"
 PIXIL_MATCH='python(3)? .*Pixil\.py'
+
+# Python for ./run test (no sudo). Prefer a venv with pytest installed.
+resolve_test_python() {
+  local candidates=()
+  if [[ -n "${PIXIL_PYTHON:-}" ]]; then
+    candidates+=("$PIXIL_PYTHON")
+  fi
+  candidates+=(
+    "$REPO_ROOT/python_venv/bin/python3"
+    "$REPO_ROOT/../python_venv/bin/python3"
+    "/home/pi/Programming/python_venv/bin/python3"
+  )
+  local c
+  for c in "${candidates[@]}"; do
+    if [[ -x "$c" ]] && "$c" -m pytest --version &>/dev/null; then
+      echo "$c"
+      return 0
+    fi
+  done
+  if python3 -m pytest --version &>/dev/null; then
+    echo "python3"
+    return 0
+  fi
+  return 1
+}
 
 usage() {
   cat <<'EOF'
@@ -16,6 +42,10 @@ USAGE:
   ./run [--] [pixil args...]     (No command) => RUN INTERACTIVE in foreground
 
 COMMANDS:
+  test          Run Tier 1 unit tests (pixil_utils; no LED hardware).
+  test-scripts  Run Tier 2 .pix smoke scripts (sudo + matrix; see manifest).
+  test-all      Run Tier 1 then Tier 2.
+  setup-tests   Install pytest on the Pi via apt (one-time; no venv).
   interactive   Run Pixil in the FOREGROUND (stays attached to terminal).
   start         Run Pixil in the BACKGROUND (sudo + nohup + &), logs to pixil.log.
   bg            Alias for start.
@@ -35,6 +65,15 @@ EXAMPLES (foreground):
 EXAMPLES (background):
 ./run start -- main/* -t 60:00
 ./run bg main/* -t 60:00 
+
+TESTS (Tier 1: install once with ./run setup-tests):
+./run setup-tests
+./run test
+./run test -- -v -k condition
+
+TESTS (Tier 2: Pi with passwordless sudo + matrix):
+./run test-scripts
+./run test-all
 
 INFO / STATUS / STOP:
 ./run info
@@ -141,7 +180,7 @@ guard_against_bare_star() {
 # ------------------------------------------------------------
 COMMAND=""
 case "${1:-}" in
-  help|info|status|stop|killpython|interactive|start|bg)
+  help|info|status|stop|killpython|interactive|start|bg|test|test-scripts|test-all|setup-tests)
     COMMAND="$1"
     shift
     ;;
@@ -231,6 +270,52 @@ case "$COMMAND" in
     echo "Command: sudo python3 Pixil.py ${PASS_ARGS[*]}"
     echo
     exec sudo python3 Pixil.py "${PASS_ARGS[@]}"
+    ;;
+
+  setup-tests)
+    echo "Installing test dependencies (pytest via apt; no venv required)..."
+    sudo apt-get update -qq
+    sudo apt-get install -y python3-pytest python3-venv
+    echo
+    echo "Done. Run: ./run test"
+    ;;
+
+  test-scripts)
+    if ! TEST_PYTHON="$(resolve_test_python 2>/dev/null)"; then
+      TEST_PYTHON="python3"
+    fi
+    echo "Running Tier 2 script smoke tests (sudo, LED matrix)..."
+    echo "Manifest: tests/scripts/manifest/core.txt"
+    echo
+    exec "$TEST_PYTHON" tests/scripts/run_script_tests.py
+    ;;
+
+  test-all)
+    "$0" test || exit 1
+    "$0" test-scripts
+    ;;
+
+  test)
+    if ! TEST_PYTHON="$(resolve_test_python)"; then
+      echo "ERROR: pytest is not installed for any known Python."
+      echo
+      echo "On Raspberry Pi (no venv needed for ./run test):"
+      echo "  ./run setup-tests"
+      echo "  # or: sudo apt install -y python3-pytest"
+      echo
+      echo "Optional venv (only if you prefer pip-managed deps):"
+      echo "  python3 -m venv python_venv"
+      echo "  python_venv/bin/pip install -r requirement.txt"
+      echo
+      echo "Note: Pixil still uses 'sudo python3' for the LED matrix."
+      echo "      Unit tests do not need sudo or rgbmatrix."
+      exit 1
+    fi
+    echo "Running automated tests (tests/pixil — no LED hardware)..."
+    echo "Python:  $TEST_PYTHON"
+    echo "Command: $TEST_PYTHON -m pytest tests/pixil ${PASS_ARGS[*]}"
+    echo
+    exec "$TEST_PYTHON" -m pytest tests/pixil "${PASS_ARGS[@]}"
     ;;
 
   start|bg)

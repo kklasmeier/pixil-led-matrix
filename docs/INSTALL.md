@@ -98,6 +98,24 @@ Install Python dependencies:
 pip install -r requirement.txt
 ```
 
+**Note:** Many Pi setups run Pixil with system Python and `sudo` (see Step 5), not
+a venv. The `rgbmatrix` module is installed system-wide by the matrix library
+build (`sudo make install`). That is normal and separate from automated unit tests.
+
+### Automated tests (optional, no venv)
+
+```bash
+./run setup-tests    # once: installs python3-pytest via apt
+./run test           # Tier 1: pixil_utils unit tests (no matrix, no sudo)
+./run test-all       # Tier 1 + Tier 2 smoke scripts on the matrix (needs sudo -n)
+```
+
+Tier 2 runs scripts from `tests/scripts/manifest/core.txt` and compares optional
+buffer goldens. See `tests/README.md` and `docs/Pixil_Development_Guide.txt` §8.
+
+Do not run `pip install pytest` on system Python on recent Raspberry Pi OS — use
+`./run setup-tests` or a project venv instead.
+
 ## Step 5: Test Your Installation
 
 Run one of the example scripts to verify everything is working:

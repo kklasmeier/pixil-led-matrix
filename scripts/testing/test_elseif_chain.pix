@@ -1,0 +1,31 @@
+# Tier 2: if / elseif / else chain (snake-style mode selection)
+# Runs three modes in one script — distinct plot columns for stable golden.
+
+clear()
+
+v_mode = 1
+if v_mode == 1 then
+    plot(6, 10, red, 100)
+elseif v_mode == 2 then
+    plot(22, 10, green, 100)
+else
+    plot(38, 10, blue, 100)
+endif
+
+v_mode = 2
+if v_mode == 1 then
+    plot(6, 26, red, 100)
+elseif v_mode == 2 then
+    plot(22, 26, green, 100)
+else
+    plot(38, 26, blue, 100)
+endif
+
+v_mode = 3
+if v_mode == 1 then
+    plot(6, 42, red, 100)
+elseif v_mode == 2 then
+    plot(22, 42, green, 100)
+else
+    plot(38, 42, blue, 100)
+endif
