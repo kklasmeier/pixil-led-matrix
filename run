@@ -39,50 +39,90 @@ run - Pixil runner and controller
 USAGE:
   ./run                          Show this help
   ./run <command> [--] [args]    Run a command
-  ./run [--] [pixil args...]     (No command) => RUN INTERACTIVE in foreground
+  ./run [--] [pixil args...]     (No command) => interactive in foreground
 
-COMMANDS:
-  test          Run Tier 1 unit tests (pixil_utils; no LED hardware).
-  test-scripts  Run Tier 2 .pix smoke scripts (sudo + matrix; see manifest).
-  test-all      Run Tier 1 then Tier 2.
-  setup-tests   Install pytest on the Pi via apt (one-time; no venv).
-  interactive   Run Pixil in the FOREGROUND (stays attached to terminal).
-  start         Run Pixil in the BACKGROUND (sudo + nohup + &), logs to pixil.log.
-  bg            Alias for start.
-  info          Show current script and last 10 scripts run (from log).
-  status        Show running Pixil processes (PID + command).
-  stop          Stop Pixil processes (TERM first, then KILL if needed).
-  killpython    Big hammer: kill Pixil python processes, then optionally ALL python.
-  help          Show this help.
+================================================================================
+AUTOMATED TESTS (two tiers)
+================================================================================
 
-DEFAULT PIXIL ARGS (when omitted for interactive/start):
+Pixil tests live under tests/. They do not run during normal lightshow use.
+
+  Tier 1 — ./run test
+    Fast pytest on pixil_utils (~300+ tests, about 1 second).
+    Covers math, conditions, parameters, JIT-off paths, etc.
+    No sudo, no LED matrix, safe on any machine.
+
+  Tier 2 — ./run test-scripts
+    Runs short .pix scripts from tests/scripts/manifest/core.txt on the real
+    matrix (sudo + passwordless sudo). Proves scripts execute end-to-end.
+    Each run records a buffer fingerprint (16-char hash of lit pixels, or
+    "empty"). Optional golden files: tests/scripts/golden/<script>.hash
+
+  ./run test-all
+    Tier 1, then Tier 2. Use this before committing on the Pi.
+
+  ./run setup-tests
+    One-time: install python3-pytest via apt (needed for Tier 1).
+
+More detail: tests/README.md and docs/Pixil_Development_Guide.txt section 8.
+
+--------------------------------------------------------------------------------
+GOLDEN FILES (Tier 2 only)
+--------------------------------------------------------------------------------
+
+  ./run test-scripts   DEFAULT — recommended daily / after adding scripts
+    • Script already has a .hash file  → compare only (leave file unchanged)
+    • Script has no .hash yet          → create golden (golden created -> ...)
+    • "volatile" scripts in manifest   → run but never use goldens (live clock)
+
+  Example: goldens exist for test A, B, C; D and E are new in the manifest.
+    ./run test-scripts  → A,B,C compared; D,E get new .hash files; A,B,C untouched.
+
+  ./run test-scripts -- --update-golden
+  PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
+    Overwrite EVERY non-volatile golden. Use only after intentional visual changes.
+
+  ./run test-scripts -- --no-update-missing
+    Compare when golden exists; skip scripts with no .hash (no auto-create).
+
+Adding a test script: scripts/testing/your_test.pix + line in manifest/core.txt,
+then ./run test-scripts and commit the new golden/*.hash (if not volatile).
+
+================================================================================
+COMMANDS
+================================================================================
+
+  test, test-scripts, test-all, setup-tests   See AUTOMATED TESTS above
+  interactive   Pixil in foreground (attached terminal)
+  start, bg       Pixil in background (nohup, log: pixil.log)
+  info            Current / recent scripts from pixil.log
+  status          Running Pixil PIDs
+  stop            Stop Pixil (TERM, then KILL)
+  killpython      Emergency: kill Pixil python, optionally all python
+  help            This help
+
+DEFAULT PIXIL ARGS (interactive / start / bg when args omitted):
   main/* -t 60:00
 
-EXAMPLES (foreground):
-./run interactive -- main/* -t 5:00 -q
-./run main/* -t 5:00 -q
+EXAMPLES — run lightshows:
+  ./run interactive -- main/* -t 5:00 -q
+  ./run start -- main/* -t 60:00
 
-EXAMPLES (background):
-./run start -- main/* -t 60:00
-./run bg main/* -t 60:00 
-
-TESTS (Tier 1: install once with ./run setup-tests):
-./run setup-tests
-./run test
-./run test -- -v -k condition
-
-TESTS (Tier 2: Pi with passwordless sudo + matrix):
-./run test-scripts
-./run test-all
+EXAMPLES — tests:
+  ./run setup-tests
+  ./run test
+  ./run test -- -v -k condition
+  ./run test-scripts
+  ./run test-all
 
 INFO / STATUS / STOP:
-./run info
-./run status
-./run stop
+  ./run info
+  ./run status
+  ./run stop
 
-IMPORTANT:
-  Do NOT type:  main *  (a bare '*' expands to every file in the folder)
-  Use:          main/*  (matches scripts in main/)
+IMPORTANT — wildcards:
+  Do NOT type:  main *     (bare * expands to every file in this directory)
+  Use:          main/*    (all scripts in scripts/main/)
 EOF
 }
 
@@ -287,7 +327,7 @@ case "$COMMAND" in
     echo "Running Tier 2 script smoke tests (sudo, LED matrix)..."
     echo "Manifest: tests/scripts/manifest/core.txt"
     echo
-    exec "$TEST_PYTHON" tests/scripts/run_script_tests.py
+    exec "$TEST_PYTHON" tests/scripts/run_script_tests.py "${PASS_ARGS[@]}"
     ;;
 
   test-all)

@@ -1,0 +1,9 @@
+# Tier 2: counted while / endwhile (no nested grid)
+# v_i = 0,1,2,3 — plots along y = 30.
+
+clear()
+v_i = 0
+while v_i < 4 then
+    plot(v_i * 12 + 4, 30, cyan, 100)
+    v_i = v_i + 1
+endwhile

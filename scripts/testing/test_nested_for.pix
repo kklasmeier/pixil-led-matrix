@@ -1,0 +1,11 @@
+# Tier 2: three nested for loops (Frost/Tetris-style depth)
+# Deterministic plot positions — no random.
+
+clear()
+for v_a in (0, 1, 1)
+    for v_b in (0, 2, 1)
+        for v_c in (0, 3, 1)
+            plot(v_a * 24 + v_b * 6 + v_c, 50, white, 100)
+        endfor v_c
+    endfor v_b
+endfor v_a

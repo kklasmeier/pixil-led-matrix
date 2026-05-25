@@ -1,0 +1,7 @@
+# Tier 2: for loop with negative step (countdown)
+# v_i = 10, 8, 6, 4, 2, 0 — plots along y = 20.
+
+clear()
+for v_i in (10, 0, -2)
+    plot(v_i, 20, blue, 100)
+endfor v_i

@@ -1,0 +1,8 @@
+# Tier 2: for loop with variable end bound (Boids-style: v_n - 1)
+# Plots at x = 0, 10, 20, 30, 40 for v_n = 5.
+
+v_n = 5
+clear()
+for v_i in (0, v_n - 1, 1)
+    plot(v_i * 10, 8, red, 100)
+endfor v_i

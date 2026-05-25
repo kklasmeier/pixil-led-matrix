@@ -7,11 +7,16 @@ With PIXIL_TEST_MODE=1 (set automatically), Pixil emits:
   PIXIL_TEST_BUFFER_HASH=HASH  (from consumer process)
 
 Optional golden buffer hashes in tests/scripts/golden/<script>.hash
-Update goldens: PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
+
+Golden modes (non-volatile scripts only):
+  Default (./run test-scripts): compare existing goldens; create *.hash if missing.
+  Refresh all: PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
+  Compare only (no auto-create): PIXIL_TEST_UPDATE_MISSING_GOLDEN=0 ./run test-scripts
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import subprocess
@@ -33,12 +38,44 @@ PIXIL = REPO_ROOT / "Pixil.py"
 
 SUBPROCESS_TIMEOUT = int(os.environ.get("PIXIL_SCRIPT_TIMEOUT", "120"))
 PIXIL_TIME_LIMIT = os.environ.get("PIXIL_SCRIPT_TIME_LIMIT", "1:00")
-UPDATE_GOLDEN = os.environ.get("PIXIL_TEST_UPDATE_GOLDEN", "").lower() in (
-    "1",
-    "true",
-    "yes",
-    "on",
-)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Tier 2 Pixil script smoke tests")
+    parser.add_argument(
+        "--update-golden",
+        action="store_true",
+        help="Overwrite every non-volatile golden (same as PIXIL_TEST_UPDATE_GOLDEN=1)",
+    )
+    parser.add_argument(
+        "--no-update-missing",
+        action="store_true",
+        help="Do not create goldens for scripts that lack a .hash file",
+    )
+    return parser.parse_args(argv)
+
+
+def _golden_mode(cli: argparse.Namespace) -> tuple[bool, bool]:
+    """Return (update_all, update_missing)."""
+    update_all = cli.update_golden or _env_bool("PIXIL_TEST_UPDATE_GOLDEN", False)
+    if update_all:
+        return True, False
+    update_missing = not cli.no_update_missing and _env_bool(
+        "PIXIL_TEST_UPDATE_MISSING_GOLDEN", True
+    )
+    return False, update_missing
+
+
+# Set in main() after CLI parse
+UPDATE_GOLDEN = False
+UPDATE_MISSING_GOLDEN = True
 
 # Script self-check lines like "  FAIL: ..." (not PIXIL_TEST_SUMMARY failures=0)
 SCRIPT_FAIL_PATTERN = re.compile(r"^\s+FAIL\b", re.IGNORECASE | re.MULTILINE)
@@ -124,6 +161,10 @@ def _check_golden(
         path.write_text(buffer_hash + "\n", encoding="utf-8")
         return True, f"golden updated -> {path.name}"
     if not path.is_file():
+        if UPDATE_MISSING_GOLDEN:
+            GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+            path.write_text(buffer_hash + "\n", encoding="utf-8")
+            return True, f"golden created -> {path.name}"
         return True, "no golden file yet (skipped)"
     expected = path.read_text(encoding="utf-8").strip()
     if expected != buffer_hash:
@@ -215,7 +256,20 @@ def run_one(script_rel: str, *, volatile: bool = False) -> tuple[bool, str]:
     )
 
 
+def _golden_mode_label() -> str:
+    if UPDATE_GOLDEN:
+        return "UPDATE all golden hashes"
+    if UPDATE_MISSING_GOLDEN:
+        return "compare goldens; create missing"
+    return "compare goldens only (missing skipped)"
+
+
 def main() -> int:
+    global UPDATE_GOLDEN, UPDATE_MISSING_GOLDEN
+
+    cli = _parse_cli()
+    UPDATE_GOLDEN, UPDATE_MISSING_GOLDEN = _golden_mode(cli)
+
     ok, reason = _can_run()
     if not ok:
         print(f"SKIP Tier 2 script tests: {reason}")
@@ -227,9 +281,9 @@ def main() -> int:
         print("ERROR: empty manifest", file=sys.stderr)
         return 1
 
-    mode = "UPDATE golden hashes" if UPDATE_GOLDEN else "compare goldens when present"
     print(
-        f"Tier 2: {len(scripts)} scripts (PIXIL_TEST_MODE=1, -t {PIXIL_TIME_LIMIT}, {mode})"
+        f"Tier 2: {len(scripts)} scripts "
+        f"(PIXIL_TEST_MODE=1, -t {PIXIL_TIME_LIMIT}, {_golden_mode_label()})"
     )
     failed = []
     for rel, volatile in scripts:
@@ -248,11 +302,14 @@ def main() -> int:
         return 1
 
     print(f"\nAll {len(scripts)} script(s) passed.")
-    if not UPDATE_GOLDEN and not any(
-        _golden_path(r).is_file() for r, vol in scripts if not vol
-    ):
+    missing = [
+        r for r, vol in scripts if not vol and not _golden_path(r).is_file()
+    ]
+    if missing and not UPDATE_MISSING_GOLDEN and not UPDATE_GOLDEN:
         print(
-            "\nTip: capture buffer goldens with:\n"
+            "\nTip: re-run with missing-golden capture enabled (default):\n"
+            "  ./run test-scripts\n"
+            "Or refresh every golden:\n"
             "  PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts"
         )
     return 0

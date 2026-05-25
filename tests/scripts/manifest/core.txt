@@ -15,3 +15,9 @@ testing/test_datetime.pix volatile
 testing/test_parentheses_conditions.pix
 testing/test_while_for_grid.pix
 testing/test_elseif_chain.pix
+testing/test_nested_for.pix
+testing/test_for_bounds_expr.pix
+testing/test_for_negative_step.pix
+testing/test_assignments.pix
+testing/test_while_loop.pix
+testing/test_procedure_flow.pix

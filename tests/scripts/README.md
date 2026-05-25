@@ -47,7 +47,8 @@ PIXIL_SKIP_SCRIPT_TESTS=1 ./run test-scripts   # exits 0 with SKIP message
 | `PIXIL_SCRIPT_TIMEOUT` | `120` | Wall-clock kill per script |
 | `PIXIL_SKIP_SCRIPT_TESTS` | unset | Skip Tier 2 entirely |
 | `PIXIL_TEST_REST_CAP` | `0.01` | Max `rest()` seconds in test mode |
-| `PIXIL_TEST_UPDATE_GOLDEN` | unset | Set `1` to write `golden/*.hash` files |
+| `PIXIL_TEST_UPDATE_GOLDEN` | unset | Set `1` to overwrite all non-volatile `golden/*.hash` files |
+| (default) | — | `./run test-scripts` creates goldens only when the `.hash` file is missing |
 
 ## How it works (maintainers)
 
@@ -81,8 +82,7 @@ Implementation touchpoints:
    ```
 3. On the Pi:
    ```bash
-   ./run test-scripts                    # should pass (no golden yet, or volatile)
-   PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts   # skip step for volatile
+   ./run test-scripts   # creates golden/your_test.hash if missing (volatile: skip)
    ```
 4. Commit `golden/your_test.hash` if not volatile.
 
@@ -92,8 +92,8 @@ Keep `core.txt` small (daily `./run test-all` time). Longer experiments can stay
 
 | Goal | Command |
 |------|---------|
-| First capture | `PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts` |
+| New script in manifest | `./run test-scripts` (creates missing `.hash` only) |
 | Daily verify | `./run test-all` |
-| Intentional visual change | Re-run update golden for that script |
+| Intentional visual change | `PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts` or `--update-golden` |
 
-See [golden/README.md](golden/README.md) for commit checklist (8 goldens, no volatile files).
+See [golden/README.md](golden/README.md) for commit checklist (one golden per non-volatile script).

@@ -342,7 +342,7 @@ Tier 2 — .pix smoke scripts on real matrix
 
 ```bash
 ./run setup-tests           # Once: apt install python3-pytest
-./run test                  # Tier 1 only (~130 tests, <1s)
+./run test                  # Tier 1 only (~320 tests, <2s)
 ./run test-scripts          # Tier 2 only (manifest scripts)
 ./run test-all              # Tier 1 then Tier 2 (recommended on Pi)
 ./run test -- -v -k jit     # Extra pytest args (Tier 1 only)
@@ -384,11 +384,13 @@ Goldens are small text files in tests/scripts/golden/*.hash — one line per
 script (e.g. test_math.hash). They are NOT images. Later runs compare the
 snapshot hash to the golden.
 
-First-time capture (on Pi, matrix attached):
-  PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
+First-time capture for a new manifest script (on Pi, matrix attached):
+  ./run test-scripts
+  (creates golden/*.hash only for non-volatile scripts that lack a file)
 
-Normal runs compare automatically. Refresh a golden after an intentional visual
-change to that script only.
+Normal runs compare existing goldens automatically. Refresh all goldens after
+intentional visual changes:
+  PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts
 
 Volatile scripts (live clock / runtime) cannot have stable goldens. In
 manifest/core.txt mark them with a second column:
@@ -405,15 +407,21 @@ TIER 2: ADDING A SCRIPT TO THE MANIFEST
      testing/your_test.pix
    or for time-dependent output:
      testing/your_test.pix volatile
-3. Run: PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts  (skip if volatile)
+3. Run: ./run test-scripts  (creates golden if missing; skip golden file if volatile)
 4. Commit the new tests/scripts/golden/your_test.hash (if not volatile)
+
+Control-flow smokes in manifest/core.txt (deterministic goldens):
+  test_assignments, test_while_loop, test_while_for_grid, test_elseif_chain,
+  test_nested_for, test_for_bounds_expr, test_for_negative_step, test_procedure_flow
 
 Optional env vars (Tier 2 harness):
   PIXIL_SKIP_SCRIPT_TESTS=1     Skip Tier 2 (exit 0, for machines without matrix)
   PIXIL_SCRIPT_TIME_LIMIT=1:00  Passed to Pixil -t
   PIXIL_SCRIPT_TIMEOUT=120      Wall-clock kill per script
   PIXIL_TEST_REST_CAP=0.01      Max rest() seconds in test mode
-  PIXIL_TEST_UPDATE_GOLDEN=1    Write or refresh golden/*.hash files
+  PIXIL_TEST_UPDATE_GOLDEN=1    Overwrite all non-volatile golden/*.hash files
+  PIXIL_TEST_UPDATE_MISSING_GOLDEN=0  Compare only; do not create missing goldens
+  (default) missing goldens are created on ./run test-scripts
 
 LEGACY / MANUAL
 ---------------

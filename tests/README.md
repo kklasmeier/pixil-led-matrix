@@ -50,7 +50,7 @@ PIXIL_SKIP_SCRIPT_TESTS=1 ./run test
 ./run test -- -v -k condition
 ```
 
-- **~300 tests** in `tests/pixil/` (see `COVERAGE.md`)
+- **~320 tests** in `tests/pixil/` (see `COVERAGE.md`)
 - Imports `pixil_utils` only — not `Pixil.py` at runtime
 - Prefer new tests here for logic you can assert in Python
 
@@ -65,8 +65,8 @@ On Debian/Raspberry Pi OS, use **`./run setup-tests`** (apt). Avoid `pip install
 Full documentation: **[tests/scripts/README.md](scripts/README.md)** and **[tests/scripts/golden/README.md](scripts/golden/README.md)**.
 
 ```bash
-./run test-scripts
-PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts   # capture/refresh goldens
+./run test-scripts   # compare goldens; create .hash files only when missing
+PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts   # overwrite all non-volatile goldens
 ```
 
 ### Manifest
@@ -85,9 +85,9 @@ testing/test_datetime.pix volatile
 
 After a deterministic script is in the manifest:
 
-1. `PIXIL_TEST_UPDATE_GOLDEN=1 ./run test-scripts`
+1. `./run test-scripts` on the Pi (writes `golden/<name>.hash` if missing)
 2. Commit `tests/scripts/golden/<name>.hash` (one line: `empty` or 16 hex chars)
-3. Later `./run test-scripts` compares automatically
+3. Later `./run test-scripts` compares automatically; use `PIXIL_TEST_UPDATE_GOLDEN=1` only to refresh after visual changes
 
 ### Adding tests when you change code
 

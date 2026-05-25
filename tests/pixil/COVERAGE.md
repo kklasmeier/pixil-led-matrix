@@ -3,6 +3,7 @@
 | Test file | Module(s) | Covers |
 |-----------|-----------|--------|
 | `test_variable_registry.py` | `variable_registry.py` | register/get/set, dict API, fast array access/assign |
+| `test_assignment_semantics.py` | `math_functions.py`, `array_manager.py` | v_=expr semantics, array size/flat index (Pixil assignment path) |
 | `test_arrays.py` | `array_manager.py` | PixilArray numeric/string, bounds, validate_array_access |
 | `test_math_expressions.py` | `math_functions.py` | evaluate_math_expression, fast paths, has_math_expression |
 | `test_math_depth.py` | `math_functions.py` | split_outside_quotes, compound datetime, nested arrays, log/atan |
@@ -23,6 +24,7 @@
 | `_math_cases.py`, `_condition_cases.py` | — | shared parametrized case tables |
 
 **Tier 2:** `tests/scripts/manifest/core.txt` + `./run test-scripts`  
+Includes control-flow smokes: `test_assignments`, `test_while_loop`, `test_while_for_grid`, `test_elseif_chain`, `test_nested_for`, `test_for_bounds_expr`, `test_for_negative_step`, `test_procedure_flow` (plus `test_if_else`, `test_procedure`, `test_for_loop_2`).  
 See `tests/scripts/README.md` (goldens, `volatile`, env vars). Dev overview: `docs/Pixil_Development_Guide.txt` §8.
 
 ## Not yet covered

@@ -1,0 +1,11 @@
+# Tier 2: variable assignment lines (v_x = expr) then use in commands
+# Deterministic — no random.
+
+clear()
+v_n = 5
+v_x = v_n * 2
+v_y = (v_x + 3) % 64
+v_flag = true
+plot(v_x, 10, red, 100)
+plot(v_y, 22, green, 100)
+plot(v_n, 34, blue, 100)
