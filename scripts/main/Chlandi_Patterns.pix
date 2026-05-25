@@ -1,0 +1,183 @@
+# Chladni Patterns - Optimized
+# Simulates sand particles settling on a vibrating plate
+# Particles migrate to nodal lines where vibration is minimal
+
+# Configuration
+v_num_particles = 75
+v_frames_per_mode = 400
+v_num_modes = 6
+
+# Precompute pi/32 for the Chladni function (scaled for 64x64)
+v_scale = 0.09817477
+
+# Create particle position arrays
+create_array(v_px, v_num_particles, numeric)
+create_array(v_py, v_num_particles, numeric)
+
+# Mode parameters (n, m values for Chladni equation)
+create_array(v_mode_n, v_num_modes, numeric)
+create_array(v_mode_m, v_num_modes, numeric)
+
+# Define modes
+v_mode_n[0] = 1
+v_mode_m[0] = 2
+v_mode_n[1] = 2
+v_mode_m[1] = 3
+v_mode_n[2] = 3
+v_mode_m[2] = 4
+v_mode_n[3] = 2
+v_mode_m[3] = 5
+v_mode_n[4] = 4
+v_mode_m[4] = 5
+v_mode_n[5] = 3
+v_mode_m[5] = 7
+
+# Initialize particles randomly
+for v_i in (0, v_num_particles - 1, 1)
+    v_px[v_i] = random(2, 61, 0)
+    v_py[v_i] = random(2, 61, 0)
+endfor v_i
+
+# Main loop - cycle through modes
+v_current_mode = 0
+
+while v_current_mode < v_num_modes then
+    v_n = v_mode_n[v_current_mode]
+    v_m = v_mode_m[v_current_mode]
+    
+    print(f"Chladni mode ({v_n}, {v_m})")
+    
+    # Scatter particles for new mode
+    for v_i in (0, v_num_particles - 1, 1)
+        v_px[v_i] = v_px[v_i] + random(-8, 8, 0)
+        v_py[v_i] = v_py[v_i] + random(-8, 8, 0)
+        if v_px[v_i] < 2 then
+            v_px[v_i] = 2
+        endif
+        if v_px[v_i] > 61 then
+            v_px[v_i] = 61
+        endif
+        if v_py[v_i] < 2 then
+            v_py[v_i] = 2
+        endif
+        if v_py[v_i] > 61 then
+            v_py[v_i] = 61
+        endif
+    endfor v_i
+    
+    # Precompute mode-specific values
+    v_n_scale = v_n * v_scale
+    v_m_scale = v_m * v_scale
+    
+    # Animate this mode
+    for v_frame in (0, v_frames_per_mode - 1, 1)
+        begin_frame(false)
+        
+        # Draw border
+        draw_rectangle(0, 0, 64, 64, dark_gray, 40, false)
+        
+        # Update and draw each particle
+        for v_i in (0, v_num_particles - 1, 1)
+            v_x = v_px[v_i]
+            v_y = v_py[v_i]
+            
+            # Inline Chladni evaluation at current position
+            v_cx = v_x - 32
+            v_cy = v_y - 32
+            v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+            v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+            v_current_val = abs(v_term1 + v_term2)
+            
+            v_best_x = v_x
+            v_best_y = v_y
+            v_best_val = v_current_val
+            
+            # Check only 2 random neighbors (not all 4)
+            v_dir = random(0, 3, 0)
+            
+            if v_dir == 0 and v_x > 2 then
+                v_tx = v_x - 1
+                v_cx = v_tx - 32
+                v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                v_test_val = abs(v_term1 + v_term2)
+                if v_test_val < v_best_val then
+                    v_best_val = v_test_val
+                    v_best_x = v_tx
+                endif
+            endif
+            
+            if v_dir == 1 and v_x < 61 then
+                v_tx = v_x + 1
+                v_cx = v_tx - 32
+                v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                v_test_val = abs(v_term1 + v_term2)
+                if v_test_val < v_best_val then
+                    v_best_val = v_test_val
+                    v_best_x = v_tx
+                endif
+            endif
+            
+            if v_dir == 2 and v_y > 2 then
+                v_ty = v_y - 1
+                v_cy = v_ty - 32
+                v_cx = v_x - 32
+                v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                v_test_val = abs(v_term1 + v_term2)
+                if v_test_val < v_best_val then
+                    v_best_val = v_test_val
+                    v_best_y = v_ty
+                endif
+            endif
+            
+            if v_dir == 3 and v_y < 61 then
+                v_ty = v_y + 1
+                v_cy = v_ty - 32
+                v_cx = v_x - 32
+                v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                v_test_val = abs(v_term1 + v_term2)
+                if v_test_val < v_best_val then
+                    v_best_val = v_test_val
+                    v_best_y = v_ty
+                endif
+            endif
+            
+            # Move toward best or jitter
+            v_rand = random(0, 100, 0)
+            if v_rand < 75 then
+                v_px[v_i] = v_best_x
+                v_py[v_i] = v_best_y
+            else
+                v_jit = random(-1, 1, 0)
+                v_new_x = v_x + v_jit
+                if v_new_x > 2 and v_new_x < 61 then
+                    v_px[v_i] = v_new_x
+                endif
+                v_jit = random(-1, 1, 0)
+                v_new_y = v_y + v_jit
+                if v_new_y > 2 and v_new_y < 61 then
+                    v_py[v_i] = v_new_y
+                endif
+            endif
+            
+            # Simple 2-level color: settled (white) vs moving (gold)
+            if v_current_val < 0.2 then
+                mplot(v_px[v_i], v_py[v_i], white, 100)
+            else
+                mplot(v_px[v_i], v_py[v_i], gold, 70)
+            endif
+        endfor v_i
+        
+        mflush()
+        end_frame
+    endfor v_frame
+    
+    v_current_mode = v_current_mode + 1
+endwhile
+
+print("Chladni patterns complete")
+clear()
+

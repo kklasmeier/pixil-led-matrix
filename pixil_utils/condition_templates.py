@@ -678,7 +678,9 @@ class ConditionTemplate:
         elif value_type == 'string':
             right_value = value_data
         else:
-            right_value = value_data
+            # Parenthesized/array math on RHS (e.g. v_arr[v_i] + 20) — evaluate once per check
+            from .math_functions import evaluate_math_expression
+            right_value = evaluate_math_expression(self.right_value, variables)
         
         # Fast comparison using lookup table
         if self.operator is None:

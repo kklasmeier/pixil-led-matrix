@@ -1,0 +1,232 @@
+# Chladni Patterns - Optimized v2
+# Simulates sand particles settling on a vibrating plate
+# Particles migrate to nodal lines where vibration is minimal
+
+# Configuration
+v_num_particles = 75
+v_frames_per_mode = 350
+v_num_modes = 12
+
+# Precompute pi/32 for the Chladni function
+v_scale = 0.09817477
+
+# Create particle position arrays
+create_array(v_px, v_num_particles, numeric)
+create_array(v_py, v_num_particles, numeric)
+
+# Mode parameters - 12 different (n,m) combinations
+create_array(v_mode_n, v_num_modes, numeric)
+create_array(v_mode_m, v_num_modes, numeric)
+
+v_mode_n[0] = 1
+v_mode_m[0] = 2
+v_mode_n[1] = 2
+v_mode_m[1] = 3
+v_mode_n[2] = 3
+v_mode_m[2] = 4
+v_mode_n[3] = 2
+v_mode_m[3] = 5
+v_mode_n[4] = 4
+v_mode_m[4] = 5
+v_mode_n[5] = 3
+v_mode_m[5] = 7
+v_mode_n[6] = 5
+v_mode_m[6] = 6
+v_mode_n[7] = 4
+v_mode_m[7] = 7
+v_mode_n[8] = 6
+v_mode_m[8] = 7
+v_mode_n[9] = 5
+v_mode_m[9] = 8
+v_mode_n[10] = 3
+v_mode_m[10] = 5
+v_mode_n[11] = 4
+v_mode_m[11] = 9
+
+# Initialize particles randomly
+for v_i in (0, v_num_particles - 1, 1)
+    v_px[v_i] = random(2, 61, 0)
+    v_py[v_i] = random(2, 61, 0)
+endfor v_i
+
+# Run forever
+while 1 == 1 then
+    
+    # Cycle through all modes
+    for v_current_mode in (0, v_num_modes - 1, 1)
+        v_n = v_mode_n[v_current_mode]
+        v_m = v_mode_m[v_current_mode]
+        
+        print(f"Chladni mode ({v_n}, {v_m})")
+        
+        # Scatter particles for new mode
+        for v_i in (0, v_num_particles - 1, 1)
+            v_px[v_i] = v_px[v_i] + random(-10, 10, 0)
+            v_py[v_i] = v_py[v_i] + random(-10, 10, 0)
+            if v_px[v_i] < 2 then
+                v_px[v_i] = random(2, 30, 0)
+            endif
+            if v_px[v_i] > 61 then
+                v_px[v_i] = random(33, 61, 0)
+            endif
+            if v_py[v_i] < 2 then
+                v_py[v_i] = random(2, 30, 0)
+            endif
+            if v_py[v_i] > 61 then
+                v_py[v_i] = random(33, 61, 0)
+            endif
+        endfor v_i
+        
+        # Precompute mode-specific values
+        v_n_scale = v_n * v_scale
+        v_m_scale = v_m * v_scale
+        
+        # Animate this mode
+        for v_frame in (0, v_frames_per_mode - 1, 1)
+            begin_frame(false)
+            
+            # Draw border
+            draw_rectangle(0, 0, 64, 64, dark_gray, 40, false)
+            
+            # Update and draw each particle
+            for v_i in (0, v_num_particles - 1, 1)
+                v_x = v_px[v_i]
+                v_y = v_py[v_i]
+                
+                # Evaluate Chladni at current position
+                v_cx = v_x - 32
+                v_cy = v_y - 32
+                v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                v_current_val = abs(v_term1 + v_term2)
+                
+                v_best_x = v_x
+                v_best_y = v_y
+                v_best_val = v_current_val
+                
+                # Check opposite pair of directions (horizontal or vertical)
+                v_axis = random(0, 1, 0)
+                
+                if v_axis == 0 then
+                    # Check left
+                    if v_x > 2 then
+                        v_tx = v_x - 1
+                        v_cx = v_tx - 32
+                        v_cy = v_y - 32
+                        v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                        v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                        v_test_val = abs(v_term1 + v_term2)
+                        if v_test_val < v_best_val then
+                            v_best_val = v_test_val
+                            v_best_x = v_tx
+                        endif
+                    endif
+                    # Check right
+                    if v_x < 61 then
+                        v_tx = v_x + 1
+                        v_cx = v_tx - 32
+                        v_cy = v_y - 32
+                        v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                        v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                        v_test_val = abs(v_term1 + v_term2)
+                        if v_test_val < v_best_val then
+                            v_best_val = v_test_val
+                            v_best_x = v_tx
+                        endif
+                    endif
+                else
+                    # Check up
+                    if v_y > 2 then
+                        v_ty = v_y - 1
+                        v_cx = v_x - 32
+                        v_cy = v_ty - 32
+                        v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                        v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                        v_test_val = abs(v_term1 + v_term2)
+                        if v_test_val < v_best_val then
+                            v_best_val = v_test_val
+                            v_best_y = v_ty
+                        endif
+                    endif
+                    # Check down
+                    if v_y < 61 then
+                        v_ty = v_y + 1
+                        v_cx = v_x - 32
+                        v_cy = v_ty - 32
+                        v_term1 = cos(v_n_scale * v_cx) * cos(v_m_scale * v_cy)
+                        v_term2 = cos(v_m_scale * v_cx) * cos(v_n_scale * v_cy)
+                        v_test_val = abs(v_term1 + v_term2)
+                        if v_test_val < v_best_val then
+                            v_best_val = v_test_val
+                            v_best_y = v_ty
+                        endif
+                    endif
+                endif
+                
+                # Move logic - stronger attraction when far from nodal line
+                v_rand = random(0, 100, 0)
+                
+                if v_current_val > 0.8 then
+                    # Far from nodal line - always move, bigger jumps
+                    v_dx = v_best_x - v_x
+                    v_dy = v_best_y - v_y
+                    v_px[v_i] = v_x + v_dx * 2
+                    v_py[v_i] = v_y + v_dy * 2
+                    # Clamp
+                    if v_px[v_i] < 2 then
+                        v_px[v_i] = 2
+                    endif
+                    if v_px[v_i] > 61 then
+                        v_px[v_i] = 61
+                    endif
+                    if v_py[v_i] < 2 then
+                        v_py[v_i] = 2
+                    endif
+                    if v_py[v_i] > 61 then
+                        v_py[v_i] = 61
+                    endif
+                elseif v_current_val > 0.4 then
+                    # Medium distance - high chance to move
+                    if v_rand < 90 then
+                        v_px[v_i] = v_best_x
+                        v_py[v_i] = v_best_y
+                    endif
+                elseif v_current_val > 0.15 then
+                    # Getting close - moderate move chance
+                    if v_rand < 70 then
+                        v_px[v_i] = v_best_x
+                        v_py[v_i] = v_best_y
+                    endif
+                else
+                    # On nodal line - mostly jitter to simulate vibration
+                    if v_rand < 20 then
+                        v_jit = random(-1, 1, 0)
+                        v_new_x = v_x + v_jit
+                        if v_new_x > 2 and v_new_x < 61 then
+                            v_px[v_i] = v_new_x
+                        endif
+                        v_jit = random(-1, 1, 0)
+                        v_new_y = v_y + v_jit
+                        if v_new_y > 2 and v_new_y < 61 then
+                            v_py[v_i] = v_new_y
+                        endif
+                    endif
+                endif
+                
+                # Color based on settlement
+                if v_current_val < 0.15 then
+                    mplot(v_px[v_i], v_py[v_i], white, 100)
+                elseif v_current_val < 0.4 then
+                    mplot(v_px[v_i], v_py[v_i], light_gray, 85)
+                else
+                    mplot(v_px[v_i], v_py[v_i], gold, 65)
+                endif
+            endfor v_i
+            
+            mflush()
+            end_frame
+        endfor v_frame
+    endfor v_current_mode
+    
+endwhile
+
