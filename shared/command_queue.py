@@ -28,12 +28,11 @@ class MatrixCommandQueue:
         
     def set_throttle(self, factor: float):
         """Set the throttle factor to control command timing"""
+        from pixil_utils.param_bounds import clamp_throttle
+
         try:
-            factor = float(factor)
-            if factor < 0:
-                raise ValueError("Throttle factor must be greater than 0")
-            self.throttle_factor = factor
-        except ValueError as e:
+            self.throttle_factor = clamp_throttle(factor)
+        except (ValueError, TypeError) as e:
             raise ValueError(f"Invalid throttle factor: {str(e)}")
             
     def start_consumer(self):

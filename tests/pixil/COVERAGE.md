@@ -19,7 +19,7 @@
 | `test_expression_parser.py` | `expression_parser.py` | colors, format_parameter, escape, draw_text |
 | `test_jit_compiler.py` | `jit_compiler/` | dormant-path guard (JIT off in production) |
 | `test_script_manager.py` | `script_manager.py`, `file_manager.py` | path resolution, glob |
-| `test_shape_param_shorthand.py` | `parameter_types.py` | expand_legacy_shape_params |
+| `test_shape_param_shorthand.py` | `parameter_types.py` | expand_legacy + format_parameter for rectangle/circle/polygon/ellipse (legacy + full forms) |
 | `test_small_modules.py` | `cli.py`, `timer_manager.py`, `optimization_flags.py`, `regex_patterns.py`, `debug.py` | validators, timer, flags, regex smoke |
 | `_math_cases.py`, `_condition_cases.py` | — | shared parametrized case tables |
 

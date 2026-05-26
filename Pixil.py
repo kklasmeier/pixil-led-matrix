@@ -1638,8 +1638,7 @@ def process_script(filename, execute_func=None):
                         
                         # Parse factor with position information
                         factor = parse_value(args[0], 'throttle', 0)
-                        
-                        # Update throttle factor in queue
+
                         queue.set_throttle(float(factor))
                         debug_print(f"Set throttle factor to: {factor}", DEBUG_SUMMARY)
                         
@@ -1731,12 +1730,21 @@ def process_script(filename, execute_func=None):
                                 debug_print(f"Parameters: {args}", DEBUG_VERBOSE)
                             
                             parsed_args = [
-                                parse_value(arg, command_name, position) 
+                                parse_value(arg, command_name, position)
                                 for position, arg in enumerate(args)
                             ]
-                            
-                            # Filter out empty strings from optional parameters
-                            command_args = [arg for arg in parsed_args if arg != '']
+
+                            # Preserve positional arity: never drop a supplied argument
+                            command_args = []
+                            for position, arg in enumerate(parsed_args):
+                                if arg != '':
+                                    command_args.append(arg)
+                                else:
+                                    param_name = PARAMETER_TYPES[command_name][position]['name']
+                                    raise ValueError(
+                                        f"Command '{command_name}': could not resolve "
+                                        f"parameter '{param_name}' at position {position}"
+                                    )
                             command = f"{command_name}({', '.join(command_args)})"
                             
                             if DEBUG_LEVEL >= DEBUG_SUMMARY:

@@ -16,9 +16,9 @@ def test_validate_color_value_int_and_round():
     assert validate_color_value(49.6) == 50
 
 
-def test_validate_color_value_out_of_range():
-    with pytest.raises(ValueError):
-        validate_color_value(101)
+def test_validate_color_value_out_of_range_clamps():
+    assert validate_color_value(101) == 100
+    assert validate_color_value(-1) == 0
 
 
 def test_validate_color_value_fractional_string():
@@ -66,10 +66,10 @@ def test_format_parameter_bool_lowercase():
     assert format_parameter("true", "draw_rectangle", 6, reg) == "true"
 
 
-def test_format_parameter_invalid_intensity_raises():
+def test_format_parameter_invalid_intensity_clamps(capsys):
     reg = VariableRegistry()
-    with pytest.raises(ValueError, match="formatting parameter"):
-        format_parameter("200", "plot", 3, reg)
+    assert format_parameter("200", "plot", 3, reg) == "100"
+    assert "WARN" in capsys.readouterr().out
 
 
 def test_escape_string_non_string_passthrough():

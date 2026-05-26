@@ -1,0 +1,293 @@
+# Fifteen Puzzle (4x4 sliding tiles)
+# Auto-shuffles with legal moves, then solves by replaying moves in reverse.
+# 64x64 display: 15x15 tiles with 1px gaps (16px cells)
+
+throttle(0)
+
+v_cell = 15
+v_stride = 16
+v_anim_steps = 5
+v_shuffle_moves = 140
+v_move_pause = 0.035
+
+create_array(v_board, 16)
+create_array(v_moves, 200)
+
+v_empty = 15
+v_move_count = 0
+v_last_shuffle_dir = -1
+
+def idx_to_col {
+    v_col = v_idx - int(v_idx / 4) * 4
+}
+
+def idx_to_row {
+    v_row = int(v_idx / 4)
+}
+
+def cell_to_px {
+    call idx_to_col
+    call idx_to_row
+    v_px = v_col * v_stride
+    v_py = v_row * v_stride
+}
+
+def tile_color {
+    if v_num == 1 then
+        v_color = "navy"
+    elseif v_num == 2 then
+        v_color = "royal_blue"
+    elseif v_num == 3 then
+        v_color = "azure"
+    elseif v_num == 4 then
+        v_color = "sky_blue"
+    elseif v_num == 5 then
+        v_color = "cyan"
+    elseif v_num == 6 then
+        v_color = "teal"
+    elseif v_num == 7 then
+        v_color = "turquoise"
+    elseif v_num == 8 then
+        v_color = "mint"
+    elseif v_num == 9 then
+        v_color = "spring_green"
+    elseif v_num == 10 then
+        v_color = "lime"
+    elseif v_num == 11 then
+        v_color = "yellow"
+    elseif v_num == 12 then
+        v_color = "gold"
+    elseif v_num == 13 then
+        v_color = "orange"
+    elseif v_num == 14 then
+        v_color = "coral"
+    else
+        v_color = "crimson"
+    endif
+}
+
+def draw_tile_number {
+    v_tx = v_px + 7
+    v_ty = v_py + 4
+    draw_text(v_tx + 1, v_ty + 1, int(v_val), tiny64_font, 8, black, 100, NORMAL, CENTER)
+    draw_text(v_tx, v_ty, int(v_val), tiny64_font, 8, white, 100, NORMAL, CENTER)
+}
+
+def draw_tile_at {
+    if v_val > 0 then
+        v_num = v_val
+        call tile_color
+        draw_rectangle(v_px, v_py, v_cell, v_cell, v_color, 92, true)
+        draw_rectangle(v_px, v_py, v_cell, v_cell, white, 40, false)
+        call draw_tile_number
+    else
+        draw_rectangle(v_px, v_py, v_cell, v_cell, dark_gray, 25, true)
+    endif
+}
+
+def draw_frame_border {
+    draw_rectangle(0, 0, 64, 64, white, 35, false)
+}
+
+def draw_board {
+    begin_frame
+        draw_frame_border
+        for v_row in (0, 3, 1)
+            for v_col in (0, 3, 1)
+                v_idx = v_row * 4 + v_col
+                v_val = v_board[v_idx]
+                v_px = v_col * v_stride
+                v_py = v_row * v_stride
+                call draw_tile_at
+            endfor v_col
+        endfor v_row
+    end_frame
+}
+
+def draw_board_skip {
+    begin_frame
+        draw_frame_border
+        for v_row in (0, 3, 1)
+            for v_col in (0, 3, 1)
+                v_idx = v_row * 4 + v_col
+                if v_idx != v_skip_idx then
+                    v_val = v_board[v_idx]
+                    v_px = v_col * v_stride
+                    v_py = v_row * v_stride
+                    call draw_tile_at
+                endif
+            endfor v_col
+        endfor v_row
+        v_val = v_anim_val
+        v_px = v_anim_px
+        v_py = v_anim_py
+        call draw_tile_at
+    end_frame
+}
+
+def init_solved {
+    for v_i in (0, 14, 1)
+        v_board[v_i] = v_i + 1
+    endfor v_i
+    v_board[15] = 0
+    v_empty = 15
+}
+
+def inverse_dir {
+    if v_dir == 0 then
+        v_dir = 2
+    elseif v_dir == 1 then
+        v_dir = 3
+    elseif v_dir == 2 then
+        v_dir = 0
+    else
+        v_dir = 1
+    endif
+}
+
+def try_move {
+  v_ok = 0
+  v_tile_idx = v_empty
+  if v_dir == 0 then
+      if v_empty >= 4 then
+          v_tile_idx = v_empty - 4
+          v_ok = 1
+      endif
+  elseif v_dir == 1 then
+      v_col = v_empty - int(v_empty / 4) * 4
+      if v_col < 3 then
+          v_tile_idx = v_empty + 1
+          v_ok = 1
+      endif
+  elseif v_dir == 2 then
+      if v_empty < 12 then
+          v_tile_idx = v_empty + 4
+          v_ok = 1
+      endif
+  else
+      v_col = v_empty - int(v_empty / 4) * 4
+      if v_col > 0 then
+          v_tile_idx = v_empty - 1
+          v_ok = 1
+      endif
+  endif
+}
+
+def animate_slide {
+    v_anim_val = v_board[v_tile_idx]
+    v_idx = v_tile_idx
+    call cell_to_px
+    v_from_px = v_px
+    v_from_py = v_py
+    v_idx = v_empty
+    call cell_to_px
+    v_to_px = v_px
+    v_to_py = v_py
+    v_skip_idx = v_tile_idx
+    for v_step in (1, v_anim_steps, 1)
+        v_t = v_step / v_anim_steps
+        v_anim_px = v_from_px + (v_to_px - v_from_px) * v_t
+        v_anim_py = v_from_py + (v_to_py - v_from_py) * v_t
+        call draw_board_skip
+        rest(v_move_pause)
+    endfor v_step
+    v_temp = v_board[v_empty]
+    v_board[v_empty] = v_board[v_tile_idx]
+    v_board[v_tile_idx] = v_temp
+    v_empty = v_tile_idx
+}
+
+def do_move {
+    call try_move
+    if v_ok == 1 then
+        call animate_slide
+    endif
+}
+
+def pick_shuffle_dir {
+    v_ok_pick = 0
+    v_tries = 0
+    while v_tries < 16 and v_ok_pick == 0 then
+        v_dir = random(0, 3, 0)
+        v_reject = 0
+        if v_last_shuffle_dir >= 0 then
+            v_undo = v_last_shuffle_dir
+            if v_undo == 0 then
+                v_undo = 2
+            elseif v_undo == 1 then
+                v_undo = 3
+            elseif v_undo == 2 then
+                v_undo = 0
+            else
+                v_undo = 1
+            endif
+            if v_dir == v_undo then
+                v_reject = 1
+            endif
+        endif
+        if v_reject == 0 then
+            call try_move
+            if v_ok == 1 then
+                v_ok_pick = 1
+            endif
+        endif
+        v_tries = v_tries + 1
+    endwhile
+}
+
+def shuffle_board {
+    v_move_count = 0
+    v_last_shuffle_dir = -1
+    for v_i in (0, v_shuffle_moves - 1, 1)
+        call pick_shuffle_dir
+        if v_ok == 1 then
+            v_moves[v_move_count] = v_dir
+            v_move_count = v_move_count + 1
+            call animate_slide
+            v_last_shuffle_dir = v_dir
+        endif
+    endfor v_i
+}
+
+def solve_board {
+    for v_i in (v_move_count - 1, 0, -1)
+        v_dir = v_moves[v_i]
+        call inverse_dir
+        call do_move
+    endfor v_i
+}
+
+def show_title {
+    begin_frame
+        draw_frame_border
+        draw_text(32, 8, "15", tiny64_font, 10, white, 100, NORMAL, CENTER)
+        draw_text(32, 22, "PUZZLE", tiny64_font, 10, cyan, 100, NORMAL, CENTER)
+        for v_row in (0, 3, 1)
+            for v_col in (0, 3, 1)
+                v_val = v_row * 4 + v_col + 1
+                if v_val <= 15 then
+                    v_px = v_col * v_stride
+                    v_py = v_row * v_stride + 28
+                    call draw_tile_at
+                endif
+            endfor v_col
+        endfor v_row
+    end_frame
+    rest(2)
+}
+
+call init_solved
+call show_title
+
+while 1 then
+    call init_solved
+    call draw_board
+    rest(1.2)
+
+    call shuffle_board
+    rest(0.6)
+
+    call solve_board
+    call draw_board
+    rest(2)
+endwhile

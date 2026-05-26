@@ -314,19 +314,21 @@ def expand_legacy_shape_params(command: str, params: List[str]) -> List[str]:
     Supports legacy testing scripts such as:
       draw_rectangle(x, y, w, h, color, true, duration)
       draw_circle(x, y, r, color, false, duration)
+      draw_polygon(x, y, radius, sides, color, rotation, false)
 
     Documented form remains:
       draw_rectangle(x, y, w, h, color, 100, true, duration)
+      draw_polygon(x, y, radius, sides, color, intensity, rotation, false)
     """
     params = list(params)
-    if command == 'draw_rectangle' and len(params) >= 6 and _is_bool_literal(params[5]):
+    if command == 'draw_rectangle' and len(params) == 7 and _is_bool_literal(params[5]):
         params.insert(5, '100')
-    elif command == 'draw_circle' and len(params) >= 5 and _is_bool_literal(params[4]):
+    elif command == 'draw_circle' and len(params) == 6 and _is_bool_literal(params[4]):
         params.insert(4, '100')
-    elif command == 'draw_polygon' and len(params) >= 8 and _is_bool_literal(params[7]):
-        params.insert(7, '100')
-    elif command == 'draw_ellipse' and len(params) >= 7 and _is_bool_literal(params[6]):
-        params.insert(6, '100')
+    elif command == 'draw_polygon' and len(params) == 7 and _is_bool_literal(params[6]):
+        params.insert(5, '100')
+    elif command == 'draw_ellipse' and len(params) == 7 and _is_bool_literal(params[5]):
+        params.insert(5, '100')
     return params
 
 
