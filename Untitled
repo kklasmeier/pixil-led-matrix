@@ -1,0 +1,1 @@
+python tools/view_pixil_metrics.py trends --script "Boids_Flocking_Simulation.pix" --verbose

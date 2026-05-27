@@ -4,67 +4,92 @@
 
 A comprehensive tool for analyzing Pixil script performance data from the database. Provides insights into script execution times, optimization effectiveness, and JIT compilation performance.
 
-*** RUN FROM the root directory ***
+**Run from the repository root directory.**
 
 ## Basic Usage
 
+The tool uses subcommands. Put the command name first, then its options:
+
 ```bash
-python tools/view_pixil_metrics.py [options]
-python tools/view_pixil_metrics.py runs --script "Cloth_simulation.pix"
+python tools/view_pixil_metrics.py <command> [options]
+python tools/view_pixil_metrics.py --help
+python tools/view_pixil_metrics.py trends --help
 ```
 
-## Command Options
+If you omit the command, the tool prints help (there is no default action).
 
-### Recent Executions (Default)
+## Commands
+
+### recent — Recent Executions
+
 ```bash
-# Show 10 most recent script runs (default)
-python tools/view_pixil_metrics.py
+# Show 10 most recent script runs (default count)
+python tools/view_pixil_metrics.py recent
 
-# Show specific number of recent runs
-python tools/view_pixil_metrics.py --recent 20
+# Show a specific number of recent runs
+python tools/view_pixil_metrics.py recent --count 20
+
+# Recent runs for one script only
+python tools/view_pixil_metrics.py recent --script "bouncing_ball.pix" --count 5
 ```
 
 **Output includes**:
 - Script name and execution time
 - Performance metrics (commands/sec, lines/sec)
 - Optimization hit rates (Fast Path, Fast Math, Cache, Parse Value)
-- JIT performance (Hit Rate, Skip Efficiency)
-- Total time saved by optimizations
+- JIT performance (Hit Rate, Skip Efficiency) when present
 
-### Script-Specific Analysis
+### trends — Performance Trends
+
 ```bash
-# Show performance history for a specific script
-python tools/view_pixil_metrics.py --script "bouncing_ball.pix"
+# System-wide trends (last 20 executions, default)
+python tools/view_pixil_metrics.py trends
 
-# Show performance trends for a script (last 20 executions)
-python tools/view_pixil_metrics.py --trends "starfield.pix"
+# Trends for a specific script
+python tools/view_pixil_metrics.py trends --script "starfield.pix"
 
-# Show more executions in trends
-python tools/view_pixil_metrics.py --trends "fractal_trees.pix" --count 50
+# More executions and verbose columns
+python tools/view_pixil_metrics.py trends --script "fractal_trees.pix" --count 50 --verbose
+
+# System-wide with verbose output
+python tools/view_pixil_metrics.py trends --count 30 --verbose
 ```
 
-### System-Wide Analysis
+Omit `--script` for system-wide trends; use `--script` for a single script.
+
+### summary — Performance Summary
+
 ```bash
-# Show overall performance summary (last 7 days)
-python tools/view_pixil_metrics.py --summary
+# System-wide summary (last 7 days)
+python tools/view_pixil_metrics.py summary
 
-# Show system-wide performance trends
-python tools/view_pixil_metrics.py --trends-all
-
-# Show more detailed trends with verbose output
-python tools/view_pixil_metrics.py --trends-all --count 30 --verbose
+# Summary for one script
+python tools/view_pixil_metrics.py summary --script "bouncing_ball.pix"
 ```
 
-### JIT Compilation Analysis
+### runs — Execution Runs (detailed table)
+
 ```bash
-# Show JIT line caching performance summary
-python tools/view_pixil_metrics.py --jit-summary
+# Recent runs across all scripts
+python tools/view_pixil_metrics.py runs --count 20
+
+# Runs for one script, last 7 days, verbose columns
+python tools/view_pixil_metrics.py runs --script "Boids_Flocking_Simulation.pix" --days 7 --verbose
+
+# Only resource-efficient runs (active time ≥ 99% of total time)
+python tools/view_pixil_metrics.py runs --resource-constrained --verbose
 ```
 
-### Database Management
+### jit-summary — JIT Compilation Analysis
+
 ```bash
-# List all scripts in database
-python tools/view_pixil_metrics.py --list
+python tools/view_pixil_metrics.py jit-summary
+```
+
+### list — Scripts in Database
+
+```bash
+python tools/view_pixil_metrics.py list
 ```
 
 ## Understanding the Output
@@ -77,74 +102,84 @@ python tools/view_pixil_metrics.py --list
 - **Execution Time**: Total time including setup/teardown vs Active time (pure execution)
 
 **Optimization Hit Rates**:
-- **Fast Path**: Percentage of commands using optimized execution paths
-- **Fast Math**: Percentage of math operations using fast evaluation
-- **Cache**: Expression cache hit rate
-- **Parse Value**: Parse value cache hit rate for repeated evaluations
+- **FP% (Fast Path)**: Simple variable lookups
+- **FM% (Fast Math)**: Optimized math expressions
+- **C% (Cache)**: Expression cache hit rate
+- **UF% (Ultra Fast)**: Direct integers/colors/strings
+- **Fast%**: Fast Path Parse (array access/simple arithmetic)
+- **Cache%**: Variable Cache (LRU parameter cache)
+- **ParseVal%**: Parse value cache (compact trends view only)
 
 **JIT Compilation Metrics**:
-- **JIT Hit Rate**: Percentage of expressions served from JIT bytecode cache
-- **Skip Efficiency**: Percentage of expression lines that could be skipped entirely
-- **JIT Time Saved**: Time saved through JIT compilation
-- **Skip Time Saved**: Time saved by skipping redundant evaluations
+- **JIT%**: Expressions served from JIT bytecode cache
+- **Skip%**: Expressions skipped due to known failures
+- **JIT-Size**: Expressions in JIT cache
+- **JIT-Hit**: JIT cache utilization
+- **JIT-Comp**: JIT compilation time
+- **Failed**: Unique script lines that failed JIT compilation
 
 ### Trend Indicators
 
 When viewing trends, arrows indicate performance direction:
 - **↗**: Improving (faster execution, higher optimization rates)
-- **↘**: Declining (slower execution, lower optimization rates)  
+- **↘**: Declining (slower execution, lower optimization rates)
 - **→**: Stable (no significant change)
 
 ### Output Formats
 
-**Compact Format** (default for trends):
+**Compact format** (trends, default):
+
 ```
 Date/Time           ExecTime  Cmds/s  Lines/s  FastPath%  FastMath%  Cache%  ParseVal%  JIT%  Skip%
 2025-05-26 14:30    2.1s      1250    890      85%        72%        64%     58%        42%   28%
 ```
 
-**Verbose Format** (with `--verbose`):
+**Verbose format** (`--verbose` on `trends` or `runs`):
+
 ```
-Date/Time           Script              TotalTime ActTime  Cmds/s   Lines/s    FP%     FM%   C%   PV%   JIT%  Skip%  JIT-Time JIT-Skip Failed
-2025-05-26 14:30    bouncing_ball.pix   2.3s      2.1s     1250     890        85%     72%   64%  58%   42%   28%    0.12s    0.08s    3
+Date/Time           Script              TotalTime ActTime  Commands Cmds/s   Lines/s   FP%   FM%   C%  UF%  Fast% Cache% JIT%  Skip%  JIT-Size JIT-Hit  JIT-Comp Failed
 ```
 
 ## Common Use Cases
 
 ### 1. Performance Monitoring
+
 ```bash
 # Quick check of recent performance
-python tools/view_pixil_metrics.py --recent 5
+python tools/view_pixil_metrics.py recent --count 5
 
 # Weekly performance summary
-python tools/view_pixil_metrics.py --summary
+python tools/view_pixil_metrics.py summary
 ```
 
 ### 2. Script Optimization
+
 ```bash
-# Analyze specific script performance
-python tools/view_pixil_metrics.py --script "bouncing_ball.pix"
+# Analyze specific script history
+python tools/view_pixil_metrics.py recent --script "bouncing_ball.pix"
 
 # Track optimization improvements over time
-python tools/view_pixil_metrics.py --trends "bouncing_ball.pix" --verbose
+python tools/view_pixil_metrics.py trends --script "bouncing_ball.pix" --verbose
 ```
 
 ### 3. JIT Compilation Analysis
+
 ```bash
 # Check JIT effectiveness
-python tools/view_pixil_metrics.py --jit-summary
+python tools/view_pixil_metrics.py jit-summary
 
-# Detailed JIT performance in trends
-python tools/view_pixil_metrics.py --trends-all --verbose
+# Detailed JIT columns in trends
+python tools/view_pixil_metrics.py trends --verbose
 ```
 
 ### 4. System Performance Trends
+
 ```bash
 # Overall system performance
-python tools/view_pixil_metrics.py --trends-all --count 100
+python tools/view_pixil_metrics.py trends --count 100
 
 # Find performance regressions
-python tools/view_pixil_metrics.py --trends-all --verbose
+python tools/view_pixil_metrics.py trends --count 100 --verbose
 ```
 
 ## Interpreting Results
@@ -163,7 +198,7 @@ python tools/view_pixil_metrics.py --trends-all --verbose
 
 ### JIT Cache Efficiency
 - **Hit Rate >40%**: Good JIT utilization
-- **Skip Efficiency >20%**: Effective redundant computation elimination  
+- **Skip Efficiency >20%**: Effective redundant computation elimination
 - **Low Failed Lines**: <10 per script indicates good expression compatibility
 
 ## Tips for Analysis
@@ -178,17 +213,19 @@ python tools/view_pixil_metrics.py --trends-all --verbose
 
 ```bash
 # 1. Check overall system health
-python tools/view_pixil_metrics.py --summary
+python tools/view_pixil_metrics.py summary
 
-# 2. Identify problematic scripts
-python tools/view_pixil_metrics.py --list
-python tools/view_pixil_metrics.py --trends "slow_script.pix"
+# 2. Identify scripts in the database
+python tools/view_pixil_metrics.py list
 
-# 3. Analyze JIT performance
-python tools/view_pixil_metrics.py --jit-summary
+# 3. Drill into a slow script
+python tools/view_pixil_metrics.py trends --script "slow_script.pix" --verbose
 
-# 4. Monitor recent changes
-python tools/view_pixil_metrics.py --recent 10 --verbose
+# 4. Analyze JIT performance
+python tools/view_pixil_metrics.py jit-summary
+
+# 5. Monitor recent changes
+python tools/view_pixil_metrics.py recent --count 10
 ```
 
 This tool provides comprehensive insights into Pixil's performance characteristics and helps optimize both individual scripts and the overall system.

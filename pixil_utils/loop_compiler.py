@@ -1,0 +1,707 @@
+"""
+Compiled block bodies (loops v0, procedures v0).
+
+Parses a block once into a small statement tree, then runs it without re-dispatching
+lines through process_lines.
+
+Loops: nested for (literal bounds folded at compile time), v_ assignments, if/endif (no elseif/else), mplot(...).
+Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
+            begin_frame, end_frame, mflush, draw_line, draw_circle.
+Unsupported constructs cause compile failure and interpreter fallback.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, List, Optional, Tuple
+
+from .regex_patterns import (
+    FOR_LOOP_PATTERN,
+    COMMAND_PATTERN,
+    PROCEDURE_CALL_PATTERN,
+    ARRAY_ASSIGN_PATTERN,
+    NUMBER_PATTERN,
+)
+from . import optimization_flags
+from .math_functions import evaluate_math_expression, evaluate_condition, has_math_expression
+from .condition_templates import evaluate_condition_fast
+from .jit_compiler import ExpressionCompiler, PixilVM, PixilVMError
+from .array_manager import PixilArray
+from shared.mplot_protocol import NAMED_COLOR_TO_ID
+
+_expr_compiler = ExpressionCompiler()
+_loop_vm = PixilVM()
+_LOOP_BODY_CACHE: dict[tuple[str, ...], "CompiledBlock"] = {}
+_PROCEDURE_BODY_CACHE: dict[tuple[str, ...], "CompiledBlock"] = {}
+
+# Stats (reset per script in Pixil.py)
+COMPILED_LOOP_ATTEMPTS = 0
+COMPILED_LOOP_HITS = 0
+COMPILED_LOOP_FALLBACKS = 0
+COMPILED_LOOP_ITERATIONS = 0
+COMPILED_PROC_ATTEMPTS = 0
+COMPILED_PROC_HITS = 0
+COMPILED_PROC_FALLBACKS = 0
+COMPILED_PROC_CALLS = 0
+
+_FRAME_COMMANDS = frozenset({
+    "draw_line", "draw_circle", "draw_rectangle", "plot", "draw_ellipse", "draw_polygon",
+})
+_FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background"})
+# Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
+_FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS
+_BARE_CALL_RESERVED = frozenset(
+    {"else", "endif", "endfor", "endsprite", "then", "true", "false"}
+)
+
+
+def reset_loop_compiler_stats() -> None:
+    global COMPILED_LOOP_ATTEMPTS, COMPILED_LOOP_HITS, COMPILED_LOOP_FALLBACKS
+    global COMPILED_LOOP_ITERATIONS, COMPILED_PROC_ATTEMPTS, COMPILED_PROC_HITS
+    global COMPILED_PROC_FALLBACKS, COMPILED_PROC_CALLS
+    COMPILED_LOOP_ATTEMPTS = 0
+    COMPILED_LOOP_HITS = 0
+    COMPILED_LOOP_FALLBACKS = 0
+    COMPILED_LOOP_ITERATIONS = 0
+    COMPILED_PROC_ATTEMPTS = 0
+    COMPILED_PROC_HITS = 0
+    COMPILED_PROC_FALLBACKS = 0
+    COMPILED_PROC_CALLS = 0
+    _LOOP_BODY_CACHE.clear()
+    _PROCEDURE_BODY_CACHE.clear()
+
+
+def _precompile_expression(expr: str) -> Optional[Any]:
+    if not optimization_flags.ENABLE_COMPILED_LOOP_EXPR:
+        return None
+    try:
+        return _expr_compiler.compile(expr)
+    except Exception:
+        return None
+
+
+def _eval_expression(expr: str, compiled: Optional[Any], ctx: "ExecContext") -> Any:
+    if compiled is not None:
+        try:
+            return _loop_vm.execute(compiled, ctx.variables)
+        except PixilVMError:
+            pass
+    return ctx.eval_expr(expr)
+
+
+def _eval_mplot_color(color_expr: str, compiled: Optional[Any], ctx: "ExecContext") -> Any:
+    """Resolve mplot color like parse_value: named colors pass through, expressions evaluate.
+
+    Pixil scripts sometimes use quoted named colors (e.g. `"white"`). The interpreter
+    path strips those quotes via `format_parameter()`; compiled blocks should too.
+    """
+    s = color_expr.strip()
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+
+    lower = s.lower()
+    if lower in NAMED_COLOR_TO_ID:
+        return lower
+    if NUMBER_PATTERN.match(s):
+        return float(s) if "." in s else int(s)
+    if s.startswith("v_") or has_math_expression(s):
+        result = _eval_expression(s, compiled, ctx)
+        if isinstance(result, str) and (
+            (result.startswith('"') and result.endswith('"'))
+            or (result.startswith("'") and result.endswith("'"))
+        ):
+            result = result[1:-1]
+        return result
+    return s
+
+
+def get_loop_compiler_stats() -> dict:
+    return {
+        "compiled_loop_attempts": COMPILED_LOOP_ATTEMPTS,
+        "compiled_loop_hits": COMPILED_LOOP_HITS,
+        "compiled_loop_fallbacks": COMPILED_LOOP_FALLBACKS,
+        "compiled_loop_iterations": COMPILED_LOOP_ITERATIONS,
+        "compiled_proc_attempts": COMPILED_PROC_ATTEMPTS,
+        "compiled_proc_hits": COMPILED_PROC_HITS,
+        "compiled_proc_fallbacks": COMPILED_PROC_FALLBACKS,
+        "compiled_proc_calls": COMPILED_PROC_CALLS,
+    }
+
+
+@dataclass
+class ExecContext:
+    variables: Any
+    eval_expr: Callable[[str], Any]
+    eval_cond: Callable[[str], bool]
+    mplot: Callable[..., None]
+    is_expired: Callable[[], bool]
+    call_procedure: Optional[Callable[[str], None]] = None
+    run_command: Optional[Callable[[str, List[str]], None]] = None
+
+
+# Backward-compatible alias
+LoopContext = ExecContext
+
+
+@dataclass
+class CompiledBlock:
+    statements: List["Statement"]
+
+
+# Legacy alias
+CompiledLoopBody = CompiledBlock
+
+
+class Statement:
+    def run(self, ctx: ExecContext) -> None:
+        raise NotImplementedError
+
+
+@dataclass
+class AssignStmt(Statement):
+    var: str
+    expr: str
+    compiled_expr: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        ctx.variables.set(self.var, _eval_expression(self.expr, self.compiled_expr, ctx))
+
+
+@dataclass
+class ArrayAssignStmt(Statement):
+    array: str
+    index_expr: str
+    value_expr: str
+    compiled_index: Optional[Any] = field(default=None, repr=False)
+    compiled_value: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        arr = ctx.variables.get(self.array)
+        if not isinstance(arr, PixilArray):
+            raise ValueError(f"Variable '{self.array}' is not an array")
+        index = int(float(_eval_expression(self.index_expr, self.compiled_index, ctx)))
+        value = _eval_expression(self.value_expr, self.compiled_value, ctx)
+        arr[index] = value
+
+
+@dataclass
+class IfStmt(Statement):
+    branches: List[Tuple[Optional[str], List[Statement]]]
+
+    def run(self, ctx: ExecContext) -> None:
+        for condition, body in self.branches:
+            if condition is None:
+                for stmt in body:
+                    stmt.run(ctx)
+                return
+            if ctx.eval_cond(condition):
+                for stmt in body:
+                    stmt.run(ctx)
+                return
+
+
+def _try_literal_float(expr: str) -> Optional[float]:
+    """Return float when expr is a numeric literal (e.g. 0, 63, 1)."""
+    s = expr.strip()
+    if NUMBER_PATTERN.match(s):
+        return float(s)
+    return None
+
+
+def _make_for_stmt(
+    loop_var: str,
+    start_e: str,
+    end_e: str,
+    step_e: str,
+    body: List[Statement],
+) -> "ForStmt":
+    cs = _try_literal_float(start_e)
+    ce = _try_literal_float(end_e)
+    cst = _try_literal_float(step_e)
+    if cs is not None and ce is not None and cst is not None:
+        return ForStmt(loop_var, start_e, end_e, step_e, body, cs, ce, cst)
+    return ForStmt(loop_var, start_e, end_e, step_e, body)
+
+
+@dataclass
+class ForStmt(Statement):
+    loop_var: str
+    start_expr: str
+    end_expr: str
+    step_expr: str
+    body: List[Statement]
+    const_start: Optional[float] = field(default=None, repr=False)
+    const_end: Optional[float] = field(default=None, repr=False)
+    const_step: Optional[float] = field(default=None, repr=False)
+
+    def _resolve_bounds(self, ctx: ExecContext) -> tuple[float, float, float]:
+        if self.const_start is not None:
+            return self.const_start, self.const_end, self.const_step  # type: ignore[return-value]
+        return (
+            float(ctx.eval_expr(self.start_expr)),
+            float(ctx.eval_expr(self.end_expr)),
+            float(ctx.eval_expr(self.step_expr)),
+        )
+
+    def run(self, ctx: ExecContext) -> None:
+        start, end, step = self._resolve_bounds(ctx)
+        epsilon = 1e-10
+        current = start
+        while (step > 0 and current <= end + epsilon) or (step < 0 and current >= end - epsilon):
+            if ctx.is_expired():
+                break
+            ctx.variables.set(self.loop_var, current)
+            for stmt in self.body:
+                stmt.run(ctx)
+            global COMPILED_LOOP_ITERATIONS
+            COMPILED_LOOP_ITERATIONS += 1
+            current += step
+
+
+@dataclass
+class MplotStmt(Statement):
+    x_expr: str
+    y_expr: str
+    color_expr: str
+    intensity_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x: Optional[Any] = field(default=None, repr=False)
+    compiled_y: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x = int(float(_eval_expression(self.x_expr, self.compiled_x, ctx)))
+        y = int(float(_eval_expression(self.y_expr, self.compiled_y, ctx)))
+        if not (0 <= x <= 63 and 0 <= y <= 63):
+            return
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_expression(self.burnout_mode_expr, self.compiled_burnout_mode, ctx)
+            if isinstance(burnout_mode, str):
+                burnout_mode = burnout_mode.strip('"').strip("'")
+        if burnout is not None or burnout_mode is not None:
+            ctx.mplot(x, y, color, intensity, burnout, burnout_mode)
+        else:
+            ctx.mplot(x, y, color, intensity)
+
+
+@dataclass
+class CallStmt(Statement):
+    proc_name: str
+
+    def run(self, ctx: ExecContext) -> None:
+        if ctx.call_procedure is None:
+            raise RuntimeError("call_procedure not configured")
+        ctx.call_procedure(self.proc_name)
+
+
+@dataclass
+class CommandStmt(Statement):
+    command_name: str
+    arg_exprs: List[str]
+
+    def run(self, ctx: ExecContext) -> None:
+        if ctx.run_command is None:
+            raise RuntimeError("run_command not configured")
+        ctx.run_command(self.command_name, self.arg_exprs)
+
+
+def _parse_mplot(line: str) -> Optional[MplotStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "mplot":
+        return None
+    from .parameter_types import split_command_parameters
+    args = split_command_parameters(match.group(2))
+    if len(args) < 4:
+        return None
+    burnout_expr = args[4].strip() if len(args) > 4 and args[4].strip() else None
+    burnout_mode_expr = args[5].strip() if len(args) > 5 and args[5].strip() else None
+    return MplotStmt(
+        args[0], args[1], args[2], args[3],
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_assign(line: str) -> Optional[AssignStmt]:
+    if not line.startswith("v_") or "=" not in line:
+        return None
+    parts = line.split("=", 1)
+    if len(parts) != 2:
+        return None
+    var = parts[0].strip()
+    if "[" in var:
+        return None
+    expr = parts[1].strip()
+    return AssignStmt(var, expr, _precompile_expression(expr))
+
+
+def _parse_array_assign(line: str) -> Optional[ArrayAssignStmt]:
+    match = ARRAY_ASSIGN_PATTERN.match(line)
+    if not match:
+        return None
+    array = match.group(1)
+    index_expr = match.group(2).strip()
+    value_expr = match.group(3).strip()
+    return ArrayAssignStmt(
+        array, index_expr, value_expr,
+        _precompile_expression(index_expr),
+        _precompile_expression(value_expr),
+    )
+
+
+def _parse_if_header(line: str) -> Optional[str]:
+    line = line.strip()
+    if not line.startswith("if ") or not line.endswith("then"):
+        return None
+    if line.startswith("elseif ") or line == "else":
+        return None
+    return line[3:-4].strip()
+
+
+def _parse_call(line: str) -> Optional[CallStmt]:
+    match = PROCEDURE_CALL_PATTERN.match(line.strip())
+    if match:
+        return CallStmt(match.group(1))
+    return None
+
+
+def _parse_bare_call(line: str, allow_bare: bool) -> Optional[CallStmt]:
+    if not allow_bare:
+        return None
+    name = line.strip()
+    if not name or " " in name or "(" in name:
+        return None
+    if name in _BARE_CALL_RESERVED or name in _FRAME_BUILTIN_NAMES:
+        return None
+    if name.startswith("v_"):
+        return None
+    if name.startswith("end") or name.startswith("print"):
+        return None
+    return CallStmt(name)
+
+
+def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
+    if not allow_commands:
+        return None
+    stripped = line.strip()
+    base = stripped.rstrip("()")
+    if base in _FRAME_NO_ARG:
+        return CommandStmt(base, [])
+    if stripped.startswith("begin_frame("):
+        inner = stripped[len("begin_frame("):-1].strip()
+        return CommandStmt("begin_frame", [inner] if inner else [])
+    match = COMMAND_PATTERN.match(stripped)
+    if not match:
+        return None
+    cmd = match.group(1)
+    if cmd not in _FRAME_COMMANDS:
+        return None
+    args = [a.strip() for a in match.group(2).split(",")] if match.group(2).strip() else []
+    return CommandStmt(cmd, args)
+
+
+def _parse_if_block(
+    lines: List[str],
+    index: int,
+    allow_else: bool,
+    allow_bare_call: bool,
+    allow_commands: bool,
+) -> Optional[tuple[IfStmt, int]]:
+    line = lines[index].strip()
+    cond = _parse_if_header(line)
+    if cond is None:
+        return None
+    i = index + 1
+    branches: List[Tuple[Optional[str], List[Statement]]] = []
+    current_cond: Optional[str] = cond
+    body_lines: List[str] = []
+    depth = 1
+    n = len(lines)
+
+    while i < n:
+        inner = lines[i].strip()
+        if inner.startswith("if ") and inner.endswith("then"):
+            depth += 1
+            body_lines.append(lines[i])
+            i += 1
+            continue
+        if inner == "endif":
+            depth -= 1
+            if depth == 0:
+                parsed = _parse_block(
+                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                )
+                if parsed is None:
+                    return None
+                branches.append((current_cond, parsed[0]))
+                return IfStmt(branches), i + 1
+            body_lines.append(lines[i])
+            i += 1
+            continue
+        if depth == 1 and allow_else:
+            if inner.startswith("elseif ") and inner.endswith("then"):
+                parsed = _parse_block(
+                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                )
+                if parsed is None:
+                    return None
+                branches.append((current_cond, parsed[0]))
+                current_cond = inner[7:-5].strip()
+                body_lines = []
+                i += 1
+                continue
+            if inner == "else":
+                parsed = _parse_block(
+                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                )
+                if parsed is None:
+                    return None
+                branches.append((current_cond, parsed[0]))
+                current_cond = None
+                body_lines = []
+                i += 1
+                continue
+        body_lines.append(lines[i])
+        i += 1
+    return None
+
+
+def _parse_block(
+    lines: List[str],
+    index: int = 0,
+    allow_else: bool = False,
+    allow_bare_call: bool = False,
+    allow_commands: bool = False,
+) -> Optional[tuple[List[Statement], int]]:
+    statements: List[Statement] = []
+    i = index
+    n = len(lines)
+
+    while i < n:
+        line = lines[i].strip()
+        if not line:
+            i += 1
+            continue
+
+        if line.startswith("#"):
+            i += 1
+            continue
+
+        if line.lower().startswith("print("):
+            return None
+
+        for_match = FOR_LOOP_PATTERN.match(line)
+        if for_match:
+            loop_var = for_match.group(1)
+            start_e = for_match.group(2).strip()
+            end_e = for_match.group(3).strip()
+            step_e = for_match.group(4).strip()
+            i += 1
+            inner_lines: List[str] = []
+            depth = 1
+            while i < n and depth > 0:
+                inner = lines[i].strip()
+                if FOR_LOOP_PATTERN.match(inner):
+                    depth += 1
+                    inner_lines.append(lines[i])
+                elif inner.startswith("endfor "):
+                    depth -= 1
+                    if depth == 0:
+                        if inner != f"endfor {loop_var}":
+                            return None
+                        i += 1
+                        break
+                    inner_lines.append(lines[i])
+                else:
+                    inner_lines.append(lines[i])
+                i += 1
+            inner = _parse_block(inner_lines, 0, allow_else, allow_bare_call, allow_commands)
+            if inner is None:
+                return None
+            statements.append(_make_for_stmt(loop_var, start_e, end_e, step_e, inner[0]))
+            continue
+
+        if _parse_if_header(line) is not None:
+            parsed_if = _parse_if_block(lines, i, allow_else, allow_bare_call, allow_commands)
+            if parsed_if is None:
+                return None
+            statements.append(parsed_if[0])
+            i = parsed_if[1]
+            continue
+
+        if line == "endif":
+            return statements, i
+
+        if line.startswith("endfor "):
+            return statements, i
+
+        mplot = _parse_mplot(line)
+        if mplot is not None:
+            statements.append(mplot)
+            i += 1
+            continue
+
+        arr = _parse_array_assign(line)
+        if arr is not None:
+            if not allow_bare_call:
+                return None
+            statements.append(arr)
+            i += 1
+            continue
+
+        assign = _parse_assign(line)
+        if assign is not None:
+            statements.append(assign)
+            i += 1
+            continue
+
+        cmd = _parse_command(line, allow_commands)
+        if cmd is not None:
+            statements.append(cmd)
+            i += 1
+            continue
+
+        call = _parse_call(line)
+        if call is not None:
+            if not allow_bare_call:
+                return None
+            statements.append(call)
+            i += 1
+            continue
+
+        bare = _parse_bare_call(line, allow_bare_call)
+        if bare is not None:
+            statements.append(bare)
+            i += 1
+            continue
+
+        return None
+
+    return statements, i
+
+
+def try_compile_loop_block(loop_block: List[str]) -> Optional[CompiledBlock]:
+    global COMPILED_LOOP_ATTEMPTS, COMPILED_LOOP_HITS, COMPILED_LOOP_FALLBACKS
+    if not optimization_flags.ENABLE_COMPILED_LOOPS:
+        return None
+    COMPILED_LOOP_ATTEMPTS += 1
+    if not loop_block:
+        return None
+    cache_key = tuple(loop_block)
+    if cache_key in _LOOP_BODY_CACHE:
+        COMPILED_LOOP_HITS += 1
+        return _LOOP_BODY_CACHE[cache_key]
+    try:
+        result = _parse_block(loop_block, 0, allow_else=False, allow_bare_call=False, allow_commands=False)
+        if result is None:
+            COMPILED_LOOP_FALLBACKS += 1
+            return None
+        statements, _ = result
+        body = CompiledBlock(statements)
+        _LOOP_BODY_CACHE[cache_key] = body
+        COMPILED_LOOP_HITS += 1
+        return body
+    except Exception:
+        COMPILED_LOOP_FALLBACKS += 1
+        return None
+
+
+def try_compile_procedure_block(proc_block: List[str]) -> Optional[CompiledBlock]:
+    global COMPILED_PROC_ATTEMPTS, COMPILED_PROC_HITS, COMPILED_PROC_FALLBACKS
+    if not optimization_flags.ENABLE_COMPILED_PROCEDURES:
+        return None
+    COMPILED_PROC_ATTEMPTS += 1
+    if not proc_block:
+        return None
+    cache_key = tuple(proc_block)
+    if cache_key in _PROCEDURE_BODY_CACHE:
+        COMPILED_PROC_HITS += 1
+        return _PROCEDURE_BODY_CACHE[cache_key]
+    try:
+        result = _parse_block(
+            proc_block, 0,
+            allow_else=True,
+            allow_bare_call=True,
+            allow_commands=True,
+        )
+        if result is None:
+            COMPILED_PROC_FALLBACKS += 1
+            return None
+        statements, _ = result
+        body = CompiledBlock(statements)
+        _PROCEDURE_BODY_CACHE[cache_key] = body
+        COMPILED_PROC_HITS += 1
+        return body
+    except Exception:
+        COMPILED_PROC_FALLBACKS += 1
+        return None
+
+
+def run_compiled_block(compiled: CompiledBlock, ctx: ExecContext) -> None:
+    global COMPILED_PROC_CALLS
+    COMPILED_PROC_CALLS += 1
+    for stmt in compiled.statements:
+        stmt.run(ctx)
+
+
+def run_compiled_loop_body(
+    compiled: CompiledBlock,
+    loop_var: str,
+    start: float,
+    end: float,
+    step: float,
+    ctx: ExecContext,
+) -> None:
+    epsilon = 1e-10
+    current = start
+    while (step > 0 and current <= end + epsilon) or (step < 0 and current >= end - epsilon):
+        if ctx.is_expired():
+            break
+        ctx.variables.set(loop_var, current)
+        for stmt in compiled.statements:
+            stmt.run(ctx)
+        global COMPILED_LOOP_ITERATIONS
+        COMPILED_LOOP_ITERATIONS += 1
+        current += step
+
+
+def make_loop_context(
+    variables: Any,
+    mplot_fn: Callable[..., None],
+    is_expired: Callable[[], bool],
+    call_procedure: Optional[Callable[[str], None]] = None,
+    run_command: Optional[Callable[[str, List[str]], None]] = None,
+) -> ExecContext:
+    def eval_expr(expr: str) -> Any:
+        return evaluate_math_expression(expr, variables)
+
+    def eval_cond(condition: str) -> bool:
+        fast = evaluate_condition_fast(condition, variables)
+        if fast is not None:
+            return bool(fast)
+        return bool(evaluate_condition(condition, variables))
+
+    return ExecContext(
+        variables=variables,
+        eval_expr=eval_expr,
+        eval_cond=eval_cond,
+        mplot=mplot_fn,
+        is_expired=is_expired,
+        call_procedure=call_procedure,
+        run_command=run_command,
+    )

@@ -321,9 +321,10 @@ def expand_legacy_shape_params(command: str, params: List[str]) -> List[str]:
       draw_polygon(x, y, radius, sides, color, intensity, rotation, false)
     """
     params = list(params)
-    if command == 'draw_rectangle' and len(params) == 7 and _is_bool_literal(params[5]):
+    # Omitted intensity: (color, filled) or (color, filled, duration)
+    if command == 'draw_rectangle' and len(params) in (6, 7) and _is_bool_literal(params[5]):
         params.insert(5, '100')
-    elif command == 'draw_circle' and len(params) == 6 and _is_bool_literal(params[4]):
+    elif command == 'draw_circle' and len(params) in (5, 6) and _is_bool_literal(params[4]):
         params.insert(4, '100')
     elif command == 'draw_polygon' and len(params) == 7 and _is_bool_literal(params[6]):
         params.insert(5, '100')

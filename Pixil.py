@@ -524,6 +524,8 @@ def process_script(filename, execute_func=None):
     reset_parse_value_stats()
     reset_jit_stats()
     reset_condition_template_stats()
+    from pixil_utils.loop_compiler import reset_loop_compiler_stats
+    reset_loop_compiler_stats()
     show_status()
     
     # Get queue instance
@@ -532,7 +534,7 @@ def process_script(filename, execute_func=None):
     queue.reset_throttle()
 
     # Initialize script environment
-    global variables, frame_commands, in_frame_mode
+    global variables
 
     # Preprocess lines to remove comments
     def preprocess_lines(filename):
@@ -559,6 +561,7 @@ def process_script(filename, execute_func=None):
     variables.scan_and_register(script_lines)
 
     procedures = {}
+    compiled_procedures = {}
     sprite_context = SpriteContext()  # Add sprite context
     frame_commands = []  # Add frame command buffer
     in_frame_mode = False  # Add frame mode tracking
@@ -590,15 +593,34 @@ def process_script(filename, execute_func=None):
             debug_print(f"Sending to queue: {cmd} (instant: {force_instant})", DEBUG_SUMMARY)
         queue.put_command(cmd, force_instant)
 
+    def flush_frame_commands():
+        """Execute batched frame commands in order before end_frame."""
+        for cmd in frame_commands:
+            queue.put_command(cmd, force_instant=True)
+        frame_commands.clear()
+
+    def start_frame_buffer(preserve: bool = False):
+        """Begin matrix frame and batch draw commands until end_frame."""
+        nonlocal in_frame_mode
+        global mplot_buffer, mplot_count
+        frame_commands.clear()
+        mplot_buffer.clear()
+        mplot_count = 0
+        execute_command(f'begin_frame({str(preserve).lower()})')
+        in_frame_mode = True
+
+    def finish_frame_buffer():
+        """Flush batched commands then end the matrix frame."""
+        nonlocal in_frame_mode
+        in_frame_mode = False
+        flush_frame_commands()
+        execute_command('end_frame')
+
     def store_frame_command(cmd):
         """Store command if in frame mode, execute immediately if not"""
         global _metrics
         _metrics['commands_processed'] += 1
         record_command_dispatched()
-        
-        # TEMPORARY DEBUG - let's see what commands look like
-        #if 'plot' in cmd:
-        #    print(f"DEBUG COMMAND: {cmd}")
         
         if in_frame_mode:
             frame_commands.append(cmd)
@@ -1327,6 +1349,72 @@ def process_script(filename, execute_func=None):
             # Handle non-f-string print
             print(content.strip('"\''))
 
+    def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
+        global mplot_buffer, mplot_count
+        if not (0 <= x <= 63 and 0 <= y <= 63):
+            return
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        record = pack_mplot(x, y, final_color, intensity, burnout, burnout_mode)
+        mplot_buffer.extend(record)
+        mplot_count += 1
+
+    def _run_compiled_command(cmd_name, arg_exprs):
+        global mplot_buffer, mplot_count
+        if cmd_name == 'begin_frame':
+            preserve = False
+            if arg_exprs:
+                preserve = bool(parse_value(arg_exprs[0], 'begin_frame', 0))
+            start_frame_buffer(preserve)
+        elif cmd_name == 'end_frame':
+            finish_frame_buffer()
+        elif cmd_name == 'mflush':
+            if len(mplot_buffer) > 0:
+                encoded_data = encode_buffer(mplot_buffer)
+                store_frame_command(f'plot_batch("{encoded_data}")')
+                mplot_buffer.clear()
+                mplot_count = 0
+        else:
+            arg_str = ','.join(arg_exprs)
+            args = validate_command_params(cmd_name, arg_str)
+            args = expand_legacy_shape_params(cmd_name, args)
+            parsed_args = [
+                parse_value(arg, cmd_name, position)
+                for position, arg in enumerate(args)
+            ]
+            command_args = []
+            for position, arg in enumerate(parsed_args):
+                if arg != '':
+                    command_args.append(arg)
+                else:
+                    param_name = PARAMETER_TYPES[cmd_name][position]['name']
+                    raise ValueError(
+                        f"Command '{cmd_name}': could not resolve "
+                        f"parameter '{param_name}' at position {position}"
+                    )
+            store_frame_command(f"{cmd_name}({', '.join(str(a) for a in command_args)})")
+
+    def invoke_procedure(proc_name):
+        from pixil_utils.loop_compiler import run_compiled_block, make_loop_context
+        from pixil_utils.optimization_flags import ENABLE_COMPILED_PROCEDURES
+
+        if proc_name not in procedures:
+            debug_print(f"Error: Procedure {proc_name} not defined", DEBUG_SUMMARY)
+            return
+        debug_print(f"Calling procedure: {proc_name}", DEBUG_SUMMARY)
+        compiled = compiled_procedures.get(proc_name)
+        if compiled is not None and ENABLE_COMPILED_PROCEDURES:
+            ctx = make_loop_context(
+                variables,
+                _compiled_mplot,
+                is_time_expired,
+                call_procedure=invoke_procedure,
+                run_command=_run_compiled_command,
+            )
+            run_compiled_block(compiled, ctx)
+        else:
+            process_lines(iter(procedures[proc_name]))
+
     # Generator-based line processing logic
     def process_lines(line_generator):
         nonlocal normal_exit  # Track script exit status
@@ -1436,38 +1524,38 @@ def process_script(filename, execute_func=None):
                     proc_commands.append(proc_line.strip())
 
                 procedures[proc_name] = proc_commands
-                debug_print(f"Procedure defined: {proc_name}", DEBUG_SUMMARY)
+                from pixil_utils.loop_compiler import try_compile_procedure_block
+                from pixil_utils.optimization_flags import ENABLE_COMPILED_PROCEDURES
+
+                compiled_procedures[proc_name] = (
+                    try_compile_procedure_block(proc_commands)
+                    if ENABLE_COMPILED_PROCEDURES else None
+                )
+                if compiled_procedures[proc_name] is not None:
+                    debug_print(f"Procedure compiled: {proc_name}", DEBUG_SUMMARY)
+                else:
+                    debug_print(f"Procedure defined: {proc_name}", DEBUG_SUMMARY)
 
             # Procedure call
             elif (proc_match := PROCEDURE_CALL_PATTERN.match(line)):
                 proc_name = proc_match.group(1)   # ✅ safe, because we already checked proc_match
-                if proc_name in procedures:
-                    debug_print(f"Calling procedure: {proc_name}", DEBUG_SUMMARY)
-                    process_lines(iter(procedures[proc_name]))
-                else:
-                    debug_print(f"Error: Procedure {proc_name} not defined", DEBUG_SUMMARY)
+                invoke_procedure(proc_name)
 
             # Frame buffer commands
             elif line.startswith('begin_frame'):
-                # Handle different forms of begin_frame command
                 if line == 'begin_frame' or line == 'begin_frame()':
-                    execute_command('begin_frame(false)')  # Default to non-preserve mode
+                    start_frame_buffer(False)
                     debug_print("Beginning frame buffer mode (standard)", DEBUG_SUMMARY)
                 else:
-                    # Parse parameter if provided
                     match = FRAME_PARAM_PATTERN.match(line)
                     if match:
-                        preserve = match.group(1).strip()
-                        # Convert string true/false to lowercase boolean
-                        if preserve.lower() == 'true':
-                            execute_command('begin_frame(true)')
-                            debug_print("Beginning frame buffer mode (preserve)", DEBUG_SUMMARY)
-                        else:
-                            execute_command('begin_frame(false)')
-                            debug_print("Beginning frame buffer mode (standard)", DEBUG_SUMMARY)
+                        preserve = match.group(1).strip().lower() == 'true'
+                        start_frame_buffer(preserve)
+                        mode = "preserve" if preserve else "standard"
+                        debug_print(f"Beginning frame buffer mode ({mode})", DEBUG_SUMMARY)
 
             elif line == 'end_frame' or line == 'end_frame()':
-                execute_command('end_frame')
+                finish_frame_buffer()
                 debug_print("Ending frame buffer mode", DEBUG_SUMMARY)
 
             # For loop logic
@@ -1484,21 +1572,34 @@ def process_script(filename, execute_func=None):
                         break
                     loop_block.append(loop_line.strip())
                 
-                epsilon = 1e-10  # always numeric
-                current_value = start
-                iteration_count = 0
-                while ((step > 0 and current_value <= end + epsilon) or 
-                    (step < 0 and current_value >= end - epsilon)):
-                    if is_time_expired():
-                        print(f"Line {line_number}: Breaking for loop due to timer expiration")
-                        break
-                    variables[loop_var] = current_value
-                    process_lines(iter(loop_block))
-                    current_value += step
-                    iteration_count += 1
-                    if iteration_count > 1000000:
-                        print(f"Line {line_number}: WARNING: Loop iteration count exceeded 1,000,000. Breaking loop.")
-                        break
+                from pixil_utils.loop_compiler import (
+                    try_compile_loop_block,
+                    run_compiled_loop_body,
+                    make_loop_context,
+                )
+                from pixil_utils.optimization_flags import ENABLE_COMPILED_LOOPS
+
+                compiled_loop = try_compile_loop_block(loop_block) if ENABLE_COMPILED_LOOPS else None
+
+                if compiled_loop is not None:
+                    loop_ctx = make_loop_context(variables, _compiled_mplot, is_time_expired)
+                    run_compiled_loop_body(compiled_loop, loop_var, start, end, step, loop_ctx)
+                else:
+                    epsilon = 1e-10  # always numeric
+                    current_value = start
+                    iteration_count = 0
+                    while ((step > 0 and current_value <= end + epsilon) or 
+                        (step < 0 and current_value >= end - epsilon)):
+                        if is_time_expired():
+                            print(f"Line {line_number}: Breaking for loop due to timer expiration")
+                            break
+                        variables[loop_var] = current_value
+                        process_lines(iter(loop_block))
+                        current_value += step
+                        iteration_count += 1
+                        if iteration_count > 1000000:
+                            print(f"Line {line_number}: WARNING: Loop iteration count exceeded 1,000,000. Breaking loop.")
+                            break
 
             # while looping
             elif (while_match := WHILE_LOOP_PATTERN.match(line)):

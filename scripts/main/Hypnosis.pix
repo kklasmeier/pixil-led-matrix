@@ -1,4 +1,4 @@
-throttle(0.7)
+throttle(2.0)
 
 # Initialize configuration variables
 v_base_x = 32           # Base center X
@@ -111,4 +111,5 @@ while 1 then
     endif
     
     end_frame
+    rest(0.0075)
 endwhile

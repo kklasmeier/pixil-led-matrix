@@ -153,13 +153,18 @@ ENABLE_EXPRESSION_CACHE = False      # False C% - Cache results of math expressi
 ENABLE_JIT = False                   # False JIT%, Skip%, JIT-Size, JIT-Hit, JIT-Comp, Failed - JIT compilation of expressions
 ENABLE_CONDITION_TEMPLATES = True    # Condition Templates - Pre-parsed condition templates for fast boolean evaluation
 
+# ===== LOOP / PROCEDURE COMPILATION (v0) =====
+ENABLE_COMPILED_LOOPS = True       # Compile supported for-loop bodies; fallback to interpreter
+ENABLE_COMPILED_LOOP_EXPR = False   # Bytecode eval inside compiled loops (often slower than fast math on Pi)
+ENABLE_COMPILED_PROCEDURES = True  # Compile supported def bodies; fast path on call
+
 # ===== DEBUGGING AND MONITORING =====
 SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup
 
 # ===== PREDEFINED PROFILES =====
 def set_profile_all_off():
     """Disable all optimizations for baseline testing."""
-    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
+    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH, ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES, ENABLE_COMPILED_LOOPS, ENABLE_COMPILED_LOOP_EXPR, ENABLE_COMPILED_PROCEDURES
 
     ENABLE_ULTRA_FAST_PATH = False
     ENABLE_FAST_PATH = False
@@ -167,6 +172,9 @@ def set_profile_all_off():
     ENABLE_PHASE1_FAST_PATH = False
     ENABLE_FAST_MATH = False
     ENABLE_EXPRESSION_CACHE = False
+    ENABLE_COMPILED_LOOPS = False
+    ENABLE_COMPILED_LOOP_EXPR = False
+    ENABLE_COMPILED_PROCEDURES = False
     ENABLE_JIT = False
     ENABLE_CONDITION_TEMPLATES = False
     print("✓ All optimizations disabled (baseline mode)")
@@ -224,6 +232,44 @@ def set_profile_only_working():
     ENABLE_JIT = False                # High hit rate but poor performance
     print("✓ Only proven optimizations enabled")
 
+def set_profile_grid_sim():
+    """Grid simulations (Metaballs, Life): compiled loops + fast math, JIT off."""
+    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH
+    global ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
+    global ENABLE_COMPILED_LOOPS, ENABLE_COMPILED_LOOP_EXPR, ENABLE_COMPILED_PROCEDURES
+
+    ENABLE_ULTRA_FAST_PATH = True
+    ENABLE_FAST_PATH = True
+    ENABLE_PARSE_VALUE_CACHE = False
+    ENABLE_PHASE1_FAST_PATH = True
+    ENABLE_FAST_MATH = True
+    ENABLE_EXPRESSION_CACHE = False
+    ENABLE_JIT = False
+    ENABLE_CONDITION_TEMPLATES = True
+    ENABLE_COMPILED_LOOPS = True
+    ENABLE_COMPILED_LOOP_EXPR = False
+    ENABLE_COMPILED_PROCEDURES = False
+    print("✓ Grid simulation profile enabled (compiled loops ON, loop expr JIT OFF)")
+
+def set_profile_boids():
+    """Flocking sims: compiled procedures + loops, fast math, JIT off."""
+    global ENABLE_ULTRA_FAST_PATH, ENABLE_FAST_PATH, ENABLE_PARSE_VALUE_CACHE, ENABLE_PHASE1_FAST_PATH
+    global ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABLE_JIT, ENABLE_CONDITION_TEMPLATES
+    global ENABLE_COMPILED_LOOPS, ENABLE_COMPILED_LOOP_EXPR, ENABLE_COMPILED_PROCEDURES
+
+    ENABLE_ULTRA_FAST_PATH = True
+    ENABLE_FAST_PATH = True
+    ENABLE_PARSE_VALUE_CACHE = False
+    ENABLE_PHASE1_FAST_PATH = True
+    ENABLE_FAST_MATH = True
+    ENABLE_EXPRESSION_CACHE = False
+    ENABLE_JIT = False
+    ENABLE_CONDITION_TEMPLATES = True
+    ENABLE_COMPILED_LOOPS = True
+    ENABLE_COMPILED_LOOP_EXPR = False
+    ENABLE_COMPILED_PROCEDURES = True
+    print("✓ Boids profile enabled (compiled procedures + loops ON)")
+
 def show_status():
     """Display current optimization status."""
     if SHOW_OPTIMIZATION_STATUS:
@@ -235,6 +281,9 @@ def show_status():
         print(f"Fast Math:           {'ON' if ENABLE_FAST_MATH else 'OFF'}")
         print(f"Expression Cache:    {'ON' if ENABLE_EXPRESSION_CACHE else 'OFF'}")
         print(f"JIT Compilation:     {'ON' if ENABLE_JIT else 'OFF'}")
+        print(f"Compiled Loops:      {'ON' if ENABLE_COMPILED_LOOPS else 'OFF'}")
+        print(f"Compiled Loop Expr:  {'ON' if ENABLE_COMPILED_LOOP_EXPR else 'OFF'}")
+        print(f"Compiled Procedures: {'ON' if ENABLE_COMPILED_PROCEDURES else 'OFF'}")
         print("=================================\n")
 
 def set_profile(profile_name):
@@ -244,7 +293,9 @@ def set_profile(profile_name):
         'all_on': set_profile_all_on,
         'math_heavy': set_profile_math_heavy,
         'simple_graphics': set_profile_simple_graphics,
-        'only_working': set_profile_only_working
+        'only_working': set_profile_only_working,
+        'grid_sim': set_profile_grid_sim,
+        'boids': set_profile_boids,
     }
     
     if profile_name in profile_functions:

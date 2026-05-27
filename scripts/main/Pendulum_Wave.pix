@@ -73,7 +73,7 @@ while v_running then
     endfor v_i
     
     end_frame
-    
+    rest(0.01)
     v_time = v_time + 0.02
     
     # Reset with new settings when cycle completes

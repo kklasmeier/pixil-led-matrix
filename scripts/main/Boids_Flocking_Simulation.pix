@@ -191,7 +191,7 @@ def apply_flocking_rules {
         for v_j in (0, v_num_boids - 1, 1) then
             if v_i != v_j then
                 # Calculate distance to neighbor
-                calculate_distance
+                call calculate_distance
                 
                 # SEPARATION: Avoid crowding neighbors (short range)
                 if v_dist < v_separation_dist and v_dist > 0 then
@@ -472,6 +472,9 @@ print("Starting Boids Flocking Simulation")
 print(f"Number of boids: {v_num_boids}")
 print(f"Wraparound mode: {v_wraparound}")
 
+v_frame = 0
+v_profile_every = 100
+
 # Simulation loop
 while 1 then
     # Update random events (scatter & targets)
@@ -485,7 +488,13 @@ while 1 then
     
     # Draw boids and trails
     call draw_boids
-    
+
+    v_frame = v_frame + 1
+    if v_frame % v_profile_every == 0 then
+        v_secs = int(get_system("runtime") / 1000)
+        print(f"Boids frame {v_frame} at {get_datetime("H:mi:s")} elapsed {v_secs}s")
+    endif
+
     # Small delay between frames
     #rest(v_frame_delay)
 endwhile

@@ -94,5 +94,5 @@ while true then
     
     end_frame
     
-    rest(.01)
+    rest(.03)
 endwhile

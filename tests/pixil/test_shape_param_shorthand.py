@@ -14,9 +14,19 @@ LEGACY_EXPAND_CASES = [
         ["5", "5", "20", "20", "green", "100", "true", "5"],
     ),
     (
+        "draw_rectangle",
+        ["1", "1", "2", "2", "green", "false"],
+        ["1", "1", "2", "2", "green", "100", "false"],
+    ),
+    (
         "draw_circle",
         ["15", "15", "5", "yellow", "false", "3"],
         ["15", "15", "5", "yellow", "100", "false", "3"],
+    ),
+    (
+        "draw_circle",
+        ["3", "3", "5", "blue", "false"],
+        ["3", "3", "5", "blue", "100", "false"],
     ),
     (
         "draw_polygon",

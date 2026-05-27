@@ -127,6 +127,24 @@ NAMED_COLOR_TO_ID = {
 # Reverse mapping: ID to named color (for unpacking)
 ID_TO_NAMED_COLOR = {v: k for k, v in NAMED_COLOR_TO_ID.items()}
 
+def normalize_mplot_color(color: Union[str, int, float]) -> Union[str, int]:
+    """
+    Coerce plot/mplot color args to the string or int form get_color_id expects.
+    Interpreted scripts often pass spectral numbers as strings via format_parameter;
+    compiled loops may pass raw floats from expressions like min(v_sum * 15, 95).
+    """
+    if isinstance(color, float):
+        from pixil_utils.param_bounds import clamp_spectral_color
+        return clamp_spectral_color(color, command="mplot", param_name="color", warn=False)
+    if isinstance(color, int):
+        return color
+    if isinstance(color, str):
+        if color.isdigit():
+            return int(color)
+        return color
+    raise ValueError(f"Color must be string or int, got {type(color)}")
+
+
 def get_color_id(color: Union[str, int]) -> int:
     """
     Convert color specification to color ID.
@@ -238,6 +256,7 @@ def pack_mplot(x: int, y: int, color: Union[str, int],
         raise ValueError(f"Y coordinate must be 0-65535, got {y}")
     
     # Convert color to ID
+    color = normalize_mplot_color(color)
     color_id = get_color_id(color)
     
     # Handle optional intensity

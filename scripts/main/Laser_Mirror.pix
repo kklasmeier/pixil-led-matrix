@@ -19,7 +19,7 @@ v_rotation_speed_min = 1
 v_rotation_speed_max = 4
 v_rotations_per_cycle = 2
 v_max_bounces = 12
-v_burnout_duration = 200
+v_burnout_duration = 50
 
 # Multi-laser settings
 v_max_lasers = 3
@@ -424,15 +424,15 @@ def generate_field {
 # PROCEDURE: Draw all mirrors
 # ============================================================================
 def draw_mirrors {
-    # Mirrors
     for v_i in (0, v_edge_count - 1, 1)
         draw_line(v_edge_x1[v_i], v_edge_y1[v_i], v_edge_x2[v_i], v_edge_y2[v_i], v_edge_color[v_i], 80)
     endfor v_i
 
-    # Outer border (walls) - keep crisp on top in burnout mode
     if v_has_walls == 1 then
-        # Outline rectangle: (x1,y1) to (x2,y2)
-        draw_rectangle(v_min_x, v_min_y, 64, 64, "white", 60, false)
+        draw_line(v_min_x, v_min_y, v_max_x, v_min_y, white, 60)
+        draw_line(v_min_x, v_max_y, v_max_x, v_max_y, white, 60)
+        draw_line(v_min_x, v_min_y, v_min_x, v_max_y, white, 60)
+        draw_line(v_max_x, v_min_y, v_max_x, v_max_y, white, 60)
     endif
 }
 
@@ -526,9 +526,20 @@ def find_closest_hit {
     v_best_dist = 9999
     v_best_edge = -1
 
-    # Scan mirror edges only (walls handled analytically)
     for v_i in (0, v_edge_count - 1, 1)
-        call ray_segment_intersect
+        v_hit_dist = 9999
+        v_temp = v_edge_dx[v_i]
+        v_temp2 = v_edge_dy[v_i]
+        v_denom = v_ray_dx * v_temp2 - v_ray_dy * v_temp
+        if abs(v_denom) > 0.0001 then
+            v_t = ((v_edge_x1[v_i] - v_ray_x) * v_temp2 - (v_edge_y1[v_i] - v_ray_y) * v_temp) / v_denom
+            v_u = ((v_edge_x1[v_i] - v_ray_x) * v_ray_dy - (v_edge_y1[v_i] - v_ray_y) * v_ray_dx) / v_denom
+            if v_t > 0.01 and v_u >= 0 and v_u <= 1 then
+                v_hit_dist = v_t
+                v_hit_x = v_ray_x + v_ray_dx * v_t
+                v_hit_y = v_ray_y + v_ray_dy * v_t
+            endif
+        endif
         if v_hit_dist < v_best_dist then
             v_best_dist = v_hit_dist
             v_best_x = v_hit_x
@@ -537,14 +548,53 @@ def find_closest_hit {
         endif
     endfor v_i
 
-    # Compare with analytic wall hit (if enabled)
     if v_has_walls == 1 then
-        call wall_hit
+        v_wall_hit = 0
+        v_wall_t = 9999
+        v_wall_axis = -1
+        if abs(v_ray_dx) > 0.0001 then
+            if v_ray_dx > 0 then
+                v_t = (v_max_x - v_ray_x) / v_ray_dx
+                if v_t > 0.01 and v_t < v_wall_t then
+                    v_wall_t = v_t
+                    v_wall_axis = 0
+                    v_wall_hit = 1
+                endif
+            else
+                v_t = (v_min_x - v_ray_x) / v_ray_dx
+                if v_t > 0.01 and v_t < v_wall_t then
+                    v_wall_t = v_t
+                    v_wall_axis = 0
+                    v_wall_hit = 1
+                endif
+            endif
+        endif
+        if abs(v_ray_dy) > 0.0001 then
+            if v_ray_dy > 0 then
+                v_t = (v_max_y - v_ray_y) / v_ray_dy
+                if v_t > 0.01 and v_t < v_wall_t then
+                    v_wall_t = v_t
+                    v_wall_axis = 1
+                    v_wall_hit = 1
+                endif
+            else
+                v_t = (v_min_y - v_ray_y) / v_ray_dy
+                if v_t > 0.01 and v_t < v_wall_t then
+                    v_wall_t = v_t
+                    v_wall_axis = 1
+                    v_wall_hit = 1
+                endif
+            endif
+        endif
+        if v_wall_hit == 1 then
+            v_wall_x = v_ray_x + v_ray_dx * v_wall_t
+            v_wall_y = v_ray_y + v_ray_dy * v_wall_t
+        endif
         if v_wall_hit == 1 and v_wall_t < v_best_dist then
             v_best_dist = v_wall_t
             v_best_x = v_wall_x
             v_best_y = v_wall_y
-            v_best_edge = -2      # sentinel for wall
+            v_best_edge = -2
             v_best_wall_axis = v_wall_axis
         endif
     endif
@@ -575,7 +625,9 @@ def calculate_reflection {
 
 # ============================================================================
 # PROCEDURE: Draw laser beam with fading
-# Traces ray and draws with bounces
+# Traces ray and draws with bounces. Laser segments always use burnout so
+# trails fade (bleeding effect); v_use_burnout only selects full-frame vs
+# preserve-static-mirrors rendering in run_rotation.
 # ============================================================================
 def draw_laser {
     v_ray_x = v_laser_x
@@ -602,11 +654,7 @@ def draw_laser {
             if v_intensity < 20 then
                 v_intensity = 20
             endif
-            if v_use_burnout == 1 then
-                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
-            else
-                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity)
-            endif
+            draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
             v_pixels_drawn = v_pixels_drawn + v_best_dist
             if v_keep_tracing == 1 then
                 if v_pixels_drawn > v_futility then
@@ -630,11 +678,7 @@ def draw_laser {
             if v_intensity < 20 then
                 v_intensity = 20
             endif
-            if v_use_burnout == 1 then
-                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
-            else
-                draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity)
-            endif
+            draw_line(int(v_prev_x), int(v_prev_y), int(v_best_x), int(v_best_y), v_current_color, v_intensity, v_burnout_duration)
             v_keep_tracing = 0
         endif
     endwhile
@@ -688,20 +732,28 @@ def run_rotation {
     else
         v_rest_time = 0.03
     endif
+    # Trail length in ms (shorter = crisper beam, less angular fan while rotating)
+    if v_laser_count == 1 then
+        v_burnout_duration = v_rest_time * 600 / v_laser_speeds[0]
+        if v_burnout_duration < 12 then
+            v_burnout_duration = 12
+        endif
+        if v_burnout_duration > v_rest_time * 900 then
+            v_burnout_duration = v_rest_time * 900
+        endif
+    else
+        v_burnout_duration = v_rest_time * 1500
+    endif
     while v_rotations_done < v_rotations_per_cycle then
-        if v_use_burnout == 1then
+        if v_use_burnout == 1 then
             begin_frame
-                call draw_mirrors
-                call draw_all_lasers
-                call draw_all_emitters
-            end_frame
         else
             begin_frame(true)
-            call draw_mirrors
-            call draw_all_lasers
-            call draw_all_emitters
-            end_frame
         endif
+        call draw_all_lasers
+        call draw_mirrors
+        call draw_all_emitters
+        end_frame
         call update_laser_angles
         v_primary_angle = v_laser_angles[0]
         if v_primary_angle < v_prev_angle then

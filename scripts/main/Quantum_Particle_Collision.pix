@@ -94,5 +94,6 @@ while true then
         endif
     endfor v_i
     end_frame
+    rest(0.02)
     v_color = v_color + 0.5  # Slower color shift
 endwhile
