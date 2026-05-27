@@ -18,6 +18,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from .regex_patterns import (
     FOR_LOOP_PATTERN,
+    WHILE_LOOP_PATTERN,
     COMMAND_PATTERN,
     PROCEDURE_CALL_PATTERN,
     ARRAY_ASSIGN_PATTERN,
@@ -51,8 +52,9 @@ _FRAME_COMMANDS = frozenset({
 _FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background"})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
 _FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS
+_SPRITE_COMMANDS = frozenset({"show_sprite", "move_sprite", "hide_sprite"})
 _BARE_CALL_RESERVED = frozenset(
-    {"else", "endif", "endfor", "endsprite", "then", "true", "false"}
+    {"else", "endif", "endfor", "endwhile", "endsprite", "then", "true", "false"}
 )
 
 
@@ -276,6 +278,24 @@ class ForStmt(Statement):
 
 
 @dataclass
+class WhileStmt(Statement):
+    condition: str
+
+    body: List[Statement]
+
+    def run(self, ctx: ExecContext) -> None:
+        while True:
+            if ctx.is_expired():
+                break
+            if not ctx.eval_cond(self.condition):
+                break
+            for stmt in self.body:
+                stmt.run(ctx)
+            global COMPILED_LOOP_ITERATIONS
+            COMPILED_LOOP_ITERATIONS += 1
+
+
+@dataclass
 class MplotStmt(Statement):
     x_expr: str
     y_expr: str
@@ -412,6 +432,23 @@ def _parse_bare_call(line: str, allow_bare: bool) -> Optional[CallStmt]:
     return CallStmt(name)
 
 
+def _parse_sprite_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
+    if not allow_commands:
+        return None
+    stripped = line.strip()
+    match = COMMAND_PATTERN.match(stripped)
+    if not match:
+        return None
+    cmd = match.group(1)
+    if cmd not in _SPRITE_COMMANDS:
+        return None
+    from .parameter_types import split_command_parameters
+
+    inner = match.group(2)
+    args = [a.strip() for a in split_command_parameters(inner)] if inner.strip() else []
+    return CommandStmt(cmd, args)
+
+
 def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
     if not allow_commands:
         return None
@@ -422,6 +459,9 @@ def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
     if stripped.startswith("begin_frame("):
         inner = stripped[len("begin_frame("):-1].strip()
         return CommandStmt("begin_frame", [inner] if inner else [])
+    sprite = _parse_sprite_command(stripped, allow_commands)
+    if sprite is not None:
+        return sprite
     match = COMMAND_PATTERN.match(stripped)
     if not match:
         return None
@@ -560,6 +600,32 @@ def _parse_block(
             statements.append(_make_for_stmt(loop_var, start_e, end_e, step_e, inner[0]))
             continue
 
+        while_match = WHILE_LOOP_PATTERN.match(line)
+        if while_match:
+            condition = while_match.group(1).strip()
+            i += 1
+            inner_lines: List[str] = []
+            depth = 1
+            while i < n and depth > 0:
+                inner = lines[i].strip()
+                if WHILE_LOOP_PATTERN.match(inner):
+                    depth += 1
+                if inner == "endwhile":
+                    depth -= 1
+                    if depth == 0:
+                        i += 1
+                        break
+                if depth > 0:
+                    inner_lines.append(lines[i])
+                i += 1
+            inner = _parse_block(
+                inner_lines, 0, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+            )
+            if inner is None:
+                return None
+            statements.append(WhileStmt(condition, inner[0]))
+            continue
+
         if _parse_if_header(line) is not None:
             parsed_if = _parse_if_block(
                 lines, i, allow_else, allow_bare_call, allow_commands, allow_array_assign,
@@ -574,6 +640,9 @@ def _parse_block(
             return statements, i
 
         if line.startswith("endfor "):
+            return statements, i
+
+        if line == "endwhile":
             return statements, i
 
         mplot = _parse_mplot(line)
@@ -690,6 +759,22 @@ def run_compiled_block(compiled: CompiledBlock, ctx: ExecContext) -> None:
     COMPILED_PROC_CALLS += 1
     for stmt in compiled.statements:
         stmt.run(ctx)
+
+
+def run_compiled_while_body(
+    compiled: CompiledBlock,
+    condition: str,
+    ctx: ExecContext,
+) -> None:
+    while True:
+        if ctx.is_expired():
+            break
+        if not ctx.eval_cond(condition):
+            break
+        for stmt in compiled.statements:
+            stmt.run(ctx)
+        global COMPILED_LOOP_ITERATIONS
+        COMPILED_LOOP_ITERATIONS += 1
 
 
 def run_compiled_loop_body(

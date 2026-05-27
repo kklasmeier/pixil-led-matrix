@@ -160,6 +160,7 @@ ENABLE_COMPILED_PROCEDURES = True  # Compile supported def bodies; fast path on 
 
 # ===== FRAME DRAW BATCHING =====
 ENABLE_DRAW_BATCH = True  # Pack plot + draw_* into one draw_batch at end_frame / mflush
+ENABLE_SPRITE_BATCH = True  # Pack show/move/hide_sprite into one sprite_batch at end_frame
 
 # ===== DEBUGGING AND MONITORING =====
 SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup
@@ -287,6 +288,8 @@ def show_status():
         print(f"Compiled Loops:      {'ON' if ENABLE_COMPILED_LOOPS else 'OFF'}")
         print(f"Compiled Loop Expr:  {'ON' if ENABLE_COMPILED_LOOP_EXPR else 'OFF'}")
         print(f"Compiled Procedures: {'ON' if ENABLE_COMPILED_PROCEDURES else 'OFF'}")
+        print(f"Draw Batch:          {'ON' if ENABLE_DRAW_BATCH else 'OFF'}")
+        print(f"Sprite Batch:        {'ON' if ENABLE_SPRITE_BATCH else 'OFF'}")
         print("=================================\n")
 
 def set_profile(profile_name):

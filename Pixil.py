@@ -62,6 +62,8 @@ mplot_count = 0
 # Unified frame draw batch (plot + draw_* when ENABLE_DRAW_BATCH)
 draw_buffer = bytearray()
 draw_count = 0
+sprite_buffer = bytearray()
+sprite_count = 0
 
 
 def is_headless():
@@ -125,7 +127,7 @@ def reset_fast_path_stats():
 
 def initialize_metrics():
     """Reset metrics at start of script."""
-    global _metrics, mplot_buffer, mplot_count, draw_buffer, draw_count
+    global _metrics, mplot_buffer, mplot_count, draw_buffer, draw_count, sprite_buffer, sprite_count
     _metrics['commands_processed'] = 0
     _metrics['script_lines_processed'] = 0
     _metrics['start_time'] = time.time()
@@ -141,6 +143,8 @@ def initialize_metrics():
     mplot_count = 0
     draw_buffer.clear()
     draw_count = 0
+    sprite_buffer.clear()
+    sprite_count = 0
 
 def report_parse_value_stats():
     """Report detailed parse value optimization statistics."""
@@ -592,6 +596,7 @@ def process_script(filename, execute_func=None):
             cmd.startswith('nudge_background'),
             cmd.startswith('set_background_offset'),
             cmd.startswith('draw_batch'),
+            cmd.startswith('sprite_batch'),
             sprite_context.in_sprite_definition,  # All commands in sprite definition
             in_frame_mode,  # All commands in frame mode
         ])
@@ -620,6 +625,20 @@ def process_script(filename, execute_func=None):
         if DEBUG_LEVEL >= DEBUG_SUMMARY and n_records:
             debug_print(f"Flushing draw_batch ({n_records} ops)", DEBUG_SUMMARY)
 
+    def flush_sprite_buffer_commands():
+        """Emit sprite_batch if buffer has records."""
+        global sprite_buffer, sprite_count
+        from pixil_utils.optimization_flags import ENABLE_SPRITE_BATCH
+        if not ENABLE_SPRITE_BATCH or not sprite_buffer:
+            return
+        from pixil_utils.sprite_batch_dispatch import flush_sprite_buffer
+
+        n_records = sprite_count
+        flush_sprite_buffer(sprite_buffer, store_frame_command)
+        sprite_count = 0
+        if DEBUG_LEVEL >= DEBUG_SUMMARY and n_records:
+            debug_print(f"Flushing sprite_batch ({n_records} ops)", DEBUG_SUMMARY)
+
     def _append_to_draw_batch(cmd_name, parsed_args):
         global draw_buffer, draw_count
         from pixil_utils.draw_batch_dispatch import append_parsed_draw
@@ -637,6 +656,28 @@ def process_script(filename, execute_func=None):
             return True
         return in_frame_mode
 
+    def _append_to_sprite_batch(cmd_name, parsed_args):
+        global sprite_buffer, sprite_count
+        from pixil_utils.sprite_batch_dispatch import append_parsed_sprite
+
+        append_parsed_sprite(sprite_buffer, cmd_name, parsed_args)
+        sprite_count += 1
+
+    def _use_sprite_batch_for(cmd_name: str) -> bool:
+        from pixil_utils.optimization_flags import ENABLE_SPRITE_BATCH
+        from pixil_utils.sprite_batch_dispatch import SPRITE_BATCH_COMMANDS
+        if not ENABLE_SPRITE_BATCH or cmd_name not in SPRITE_BATCH_COMMANDS:
+            return False
+        return in_frame_mode
+
+    def _queue_sprite_command(cmd_name: str, parsed_args: List) -> None:
+        """Route sprite ops to batch (in frame mode) or immediate queue."""
+        if _use_sprite_batch_for(cmd_name):
+            _append_to_sprite_batch(cmd_name, parsed_args)
+            return
+        params = [str(a) for a in parsed_args]
+        store_frame_command(f"{cmd_name}({', '.join(params)})")
+
     def flush_frame_commands():
         """Execute batched frame commands in order before end_frame."""
         for cmd in frame_commands:
@@ -646,12 +687,14 @@ def process_script(filename, execute_func=None):
     def start_frame_buffer(preserve: bool = False):
         """Begin matrix frame and batch draw commands until end_frame."""
         nonlocal in_frame_mode
-        global mplot_buffer, mplot_count, draw_buffer, draw_count
+        global mplot_buffer, mplot_count, draw_buffer, draw_count, sprite_buffer, sprite_count
         frame_commands.clear()
         mplot_buffer.clear()
         mplot_count = 0
         draw_buffer.clear()
         draw_count = 0
+        sprite_buffer.clear()
+        sprite_count = 0
         execute_command(f'begin_frame({str(preserve).lower()})')
         in_frame_mode = True
 
@@ -659,6 +702,7 @@ def process_script(filename, execute_func=None):
         """Flush batched commands then end the matrix frame."""
         nonlocal in_frame_mode
         flush_draw_buffer_commands()
+        flush_sprite_buffer_commands()
         in_frame_mode = False
         flush_frame_commands()
         execute_command('end_frame')
@@ -1335,7 +1379,14 @@ def process_script(filename, execute_func=None):
         
         if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Sprite operation: {cmd}", DEBUG_VERBOSE)
-        store_frame_command(cmd)
+        from pixil_utils.parameter_types import split_command_parameters
+        inner = line[line.index("(") + 1 : line.rindex(")")]
+        raw_args = split_command_parameters(inner)
+        parsed_args = [
+            parse_value(arg.strip(), f"{op}_sprite", pos)
+            for pos, arg in enumerate(raw_args)
+        ]
+        _queue_sprite_command(f"{op}_sprite", parsed_args)
         return True
 
     
@@ -1439,6 +1490,9 @@ def process_script(filename, execute_func=None):
             ]
             if _use_draw_batch_for(cmd_name):
                 _append_to_draw_batch(cmd_name, parsed_args)
+                return
+            if _use_sprite_batch_for(cmd_name):
+                _append_to_sprite_batch(cmd_name, parsed_args)
                 return
             command_args = []
             for position, arg in enumerate(parsed_args):
@@ -1633,6 +1687,7 @@ def process_script(filename, execute_func=None):
                 from pixil_utils.loop_compiler import (
                     try_compile_loop_block,
                     run_compiled_loop_body,
+                    run_compiled_while_body,
                     make_loop_context,
                 )
                 from pixil_utils.optimization_flags import ENABLE_COMPILED_LOOPS
@@ -1689,15 +1744,32 @@ def process_script(filename, execute_func=None):
                     if nesting_level > 0:  # Only collect if we're still in our loop
                         loop_block.append(loop_line)
                 
-                # Execute loop
-                while evaluate_condition(condition, variables):
-                    if is_time_expired():
+                from pixil_utils.loop_compiler import (
+                    try_compile_loop_block,
+                    run_compiled_while_body,
+                    make_loop_context,
+                )
+                from pixil_utils.optimization_flags import ENABLE_COMPILED_LOOPS
+
+                compiled_while = try_compile_loop_block(loop_block) if ENABLE_COMPILED_LOOPS else None
+
+                if compiled_while is not None:
+                    loop_ctx = make_loop_context(
+                        variables,
+                        _compiled_mplot,
+                        is_time_expired,
+                        run_command=_run_compiled_command,
+                    )
+                    run_compiled_while_body(compiled_while, condition, loop_ctx)
+                else:
+                    while evaluate_condition(condition, variables):
+                        if is_time_expired():
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                                debug_print("Breaking while loop due to timer expiration", DEBUG_VERBOSE)
+                            break
                         if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                            debug_print("Breaking while loop due to timer expiration", DEBUG_VERBOSE)
-                        break
-                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                        debug_print(f"Executing while loop body: {condition}", DEBUG_VERBOSE)
-                    process_lines(iter(loop_block))
+                            debug_print(f"Executing while loop body: {condition}", DEBUG_VERBOSE)
+                        process_lines(iter(loop_block))
 
             elif (if_match := IF_PATTERN.match(line)):
                 condition = if_match.group(1)   # ✅ safe, Pylance knows if_match isn’t None

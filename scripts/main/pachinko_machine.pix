@@ -24,8 +24,11 @@ v_wall_brightness = 40
 v_peg_brightness = 70
 
 # ========== PHYSICS CONSTANTS ==========
-v_collision_dist = 2.5        # Distance from peg center to trigger bounce
-v_coll_dist_sq = 6.25         # Pre-computed collision distance squared
+# Match draw_circle(..., radius 1) pegs + 1px ball sprite (center-to-center at contact ~1.5)
+v_peg_radius = 1
+v_ball_radius = 0.5
+v_collision_dist = v_peg_radius + v_ball_radius
+v_coll_dist_sq = v_collision_dist * v_collision_dist
 v_bounce_randomness = 0.5     # Random horizontal kick on peg bounce
 v_max_velocity = 3            # Maximum ball speed in any direction
 v_neg_max_velocity = -3       # Pre-computed negative max velocity
@@ -1546,10 +1549,11 @@ while 1 == 1 then
         v_peg_color = 88
     endif
     
-    # ========== DRAW STATIC BACKGROUND ==========
+    # ========== DRAW STATIC BACKGROUND (once per board; not cleared each frame) ==========
     v_peg_end = v_num_pegs - 1
     
     clear()
+    begin_frame(false)
     
     draw_line(0, 0, 0, 63, v_wall_color, 10)
     draw_line(1, 0, 1, 63, v_wall_color, 20)
@@ -1567,9 +1571,13 @@ while 1 == 1 then
         draw_circle(v_px, v_py, 1, v_peg_color, v_peg_brightness, true)
     endfor v_p
     
-    # ========== BALL DROP LOOP ==========
+    end_frame
+    
+    # ========== BALL DROP LOOP (preserve static board; batch sprites per frame) ==========
     v_running = 1
     while v_running == 1 then
+        
+        begin_frame(true)
         
         v_should_drop = v_frame_count % v_drop_interval
         if v_should_drop == 0 then
@@ -1727,6 +1735,8 @@ while 1 == 1 then
                 v_running = 0
             endif
         endif
+        
+        end_frame
         
     endwhile
     
