@@ -55,9 +55,13 @@ from pixil_utils.regex_patterns import (
     FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN
 )
 
-# Multi-plot buffer management
+# Multi-plot buffer management (legacy when ENABLE_DRAW_BATCH is off)
 mplot_buffer = bytearray()
 mplot_count = 0
+
+# Unified frame draw batch (plot + draw_* when ENABLE_DRAW_BATCH)
+draw_buffer = bytearray()
+draw_count = 0
 
 
 def is_headless():
@@ -121,7 +125,7 @@ def reset_fast_path_stats():
 
 def initialize_metrics():
     """Reset metrics at start of script."""
-    global _metrics, mplot_buffer, mplot_count
+    global _metrics, mplot_buffer, mplot_count, draw_buffer, draw_count
     _metrics['commands_processed'] = 0
     _metrics['script_lines_processed'] = 0
     _metrics['start_time'] = time.time()
@@ -132,9 +136,11 @@ def initialize_metrics():
     # Set start time for get_system("runtime")
     set_script_start_time(_metrics['start_time'])
 
-    # Reset mplot buffer
+    # Reset plot/draw batch buffers
     mplot_buffer.clear()
     mplot_count = 0
+    draw_buffer.clear()
+    draw_count = 0
 
 def report_parse_value_stats():
     """Report detailed parse value optimization statistics."""
@@ -585,6 +591,7 @@ def process_script(filename, execute_func=None):
             cmd.startswith('hide_background'),
             cmd.startswith('nudge_background'),
             cmd.startswith('set_background_offset'),
+            cmd.startswith('draw_batch'),
             sprite_context.in_sprite_definition,  # All commands in sprite definition
             in_frame_mode,  # All commands in frame mode
         ])
@@ -592,6 +599,43 @@ def process_script(filename, execute_func=None):
         if DEBUG_LEVEL >= DEBUG_SUMMARY:
             debug_print(f"Sending to queue: {cmd} (instant: {force_instant})", DEBUG_SUMMARY)
         queue.put_command(cmd, force_instant)
+
+    def flush_draw_buffer_commands():
+        """Emit draw_batch if unified buffer has records."""
+        global draw_buffer, draw_count
+        from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
+        if not ENABLE_DRAW_BATCH or not draw_buffer:
+            return
+        from shared.draw_batch_protocol import encode_buffer
+
+        n_records = draw_count
+        encoded = encode_buffer(bytes(draw_buffer))
+        cmd = f'draw_batch("{encoded}")'
+        if in_frame_mode:
+            store_frame_command(cmd)
+        else:
+            execute_command(cmd)
+        draw_buffer.clear()
+        draw_count = 0
+        if DEBUG_LEVEL >= DEBUG_SUMMARY and n_records:
+            debug_print(f"Flushing draw_batch ({n_records} ops)", DEBUG_SUMMARY)
+
+    def _append_to_draw_batch(cmd_name, parsed_args):
+        global draw_buffer, draw_count
+        from pixil_utils.draw_batch_dispatch import append_parsed_draw
+
+        append_parsed_draw(draw_buffer, cmd_name, parsed_args)
+        draw_count += 1
+
+    def _use_draw_batch_for(cmd_name: str) -> bool:
+        from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
+        from pixil_utils.draw_batch_dispatch import DRAW_BATCH_COMMANDS
+        if not ENABLE_DRAW_BATCH or cmd_name not in DRAW_BATCH_COMMANDS:
+            return False
+        # mplot grids often run without begin_frame — still batch until mflush
+        if cmd_name == "mplot":
+            return True
+        return in_frame_mode
 
     def flush_frame_commands():
         """Execute batched frame commands in order before end_frame."""
@@ -602,16 +646,19 @@ def process_script(filename, execute_func=None):
     def start_frame_buffer(preserve: bool = False):
         """Begin matrix frame and batch draw commands until end_frame."""
         nonlocal in_frame_mode
-        global mplot_buffer, mplot_count
+        global mplot_buffer, mplot_count, draw_buffer, draw_count
         frame_commands.clear()
         mplot_buffer.clear()
         mplot_count = 0
+        draw_buffer.clear()
+        draw_count = 0
         execute_command(f'begin_frame({str(preserve).lower()})')
         in_frame_mode = True
 
     def finish_frame_buffer():
         """Flush batched commands then end the matrix frame."""
         nonlocal in_frame_mode
+        flush_draw_buffer_commands()
         in_frame_mode = False
         flush_frame_commands()
         execute_command('end_frame')
@@ -1350,11 +1397,14 @@ def process_script(filename, execute_func=None):
             print(content.strip('"\''))
 
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
-        global mplot_buffer, mplot_count
+        global mplot_buffer, mplot_count, draw_buffer, draw_count
         if not (0 <= x <= 63 and 0 <= y <= 63):
             return
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
+        if _use_draw_batch_for('mplot'):
+            _append_to_draw_batch('mplot', [x, y, final_color, intensity, burnout, burnout_mode])
+            return
         record = pack_mplot(x, y, final_color, intensity, burnout, burnout_mode)
         mplot_buffer.extend(record)
         mplot_count += 1
@@ -1362,14 +1412,19 @@ def process_script(filename, execute_func=None):
     def _run_compiled_command(cmd_name, arg_exprs):
         global mplot_buffer, mplot_count
         if cmd_name == 'begin_frame':
+            from pixil_utils.parameter_types import parse_bool_literal
+
             preserve = False
             if arg_exprs:
-                preserve = bool(parse_value(arg_exprs[0], 'begin_frame', 0))
+                preserve = parse_bool_literal(arg_exprs[0])
             start_frame_buffer(preserve)
         elif cmd_name == 'end_frame':
             finish_frame_buffer()
         elif cmd_name == 'mflush':
-            if len(mplot_buffer) > 0:
+            from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
+            if ENABLE_DRAW_BATCH:
+                flush_draw_buffer_commands()
+            elif len(mplot_buffer) > 0:
                 encoded_data = encode_buffer(mplot_buffer)
                 store_frame_command(f'plot_batch("{encoded_data}")')
                 mplot_buffer.clear()
@@ -1382,6 +1437,9 @@ def process_script(filename, execute_func=None):
                 parse_value(arg, cmd_name, position)
                 for position, arg in enumerate(args)
             ]
+            if _use_draw_batch_for(cmd_name):
+                _append_to_draw_batch(cmd_name, parsed_args)
+                return
             command_args = []
             for position, arg in enumerate(parsed_args):
                 if arg != '':
@@ -1711,7 +1769,9 @@ def process_script(filename, execute_func=None):
                             debug_print(f"Final else_block contents: {else_block}", DEBUG_VERBOSE)
                         process_lines(iter(else_block))  # Process as a single block
                 except Exception as e:
-                    raise ValueError(f"Error processing if/elseif condition: {str(e)}\nCommand: {current_command}")
+                    raise ValueError(
+                        f"Error in if block: {str(e)}\nCommand: {current_command}"
+                    )
 
 
 
@@ -1753,7 +1813,7 @@ def process_script(filename, execute_func=None):
                         raise
                 # Handle mplot command
                 elif line.startswith('mplot('):
-                    global mplot_buffer, mplot_count 
+                    global mplot_buffer, mplot_count, draw_buffer, draw_count
                     command_match = COMMAND_PATTERN.match(line)
                     if command_match:
                         try:
@@ -1785,21 +1845,29 @@ def process_script(filename, execute_func=None):
                             if len(args) > 4 and args[4]:
                                 burnout = int(float(parse_value(args[4], 'mplot', 4)))
                             
-                            # NEW: Handle burnout_mode parameter
-                            burnout_mode = None  # Default to 'instant' in pack_mplot
+                            burnout_mode = None
                             if len(args) > 5 and args[5]:
                                 burnout_mode = parse_value(args[5], 'mplot', 5)
-                                # Remove quotes if present
                                 if isinstance(burnout_mode, str):
                                     burnout_mode = burnout_mode.strip('"').strip("'")
-                            
-                            # Pack into buffer (coordinates are already validated)
-                            record = pack_mplot(x, y, final_color, intensity, burnout, burnout_mode)
-                            mplot_buffer.extend(record)
-                            mplot_count += 1
+
+                            if _use_draw_batch_for('mplot'):
+                                _append_to_draw_batch(
+                                    'mplot',
+                                    [x, y, final_color, intensity, burnout, burnout_mode],
+                                )
+                            else:
+                                record = pack_mplot(
+                                    x, y, final_color, intensity, burnout, burnout_mode,
+                                )
+                                mplot_buffer.extend(record)
+                                mplot_count += 1
 
                             if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                                debug_print(f"Packed mplot: buffer size={len(mplot_buffer)}, count={mplot_count}", DEBUG_VERBOSE)
+                                debug_print(
+                                    f"Packed mplot: draw_batch={_use_draw_batch_for('mplot')}",
+                                    DEBUG_VERBOSE,
+                                )
                                 
                         except (ValueError, KeyError) as e:
                             debug_print(f"Error processing mplot command: {str(e)}", DEBUG_SUMMARY)
@@ -1807,17 +1875,20 @@ def process_script(filename, execute_func=None):
 
                 # Handle mflush command  
                 elif line == 'mflush' or line == 'mflush()':
-                    if len(mplot_buffer) > 0:
-                        # Encode buffer and send as single command
+                    from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
+                    if ENABLE_DRAW_BATCH:
+                        flush_draw_buffer_commands()
+                    elif len(mplot_buffer) > 0:
                         encoded_data = encode_buffer(mplot_buffer)
                         command = f"plot_batch(\"{encoded_data}\")"
                         
                         if DEBUG_LEVEL >= DEBUG_SUMMARY:
-                            debug_print(f"Flushing {mplot_count} mplot commands as plot_batch", DEBUG_SUMMARY)
+                            debug_print(
+                                f"Flushing {mplot_count} mplot commands as plot_batch",
+                                DEBUG_SUMMARY,
+                            )
                         
                         store_frame_command(command)
-                        
-                        # Clear buffer
                         mplot_buffer.clear()
                         mplot_count = 0
                     else:
@@ -1851,11 +1922,13 @@ def process_script(filename, execute_func=None):
                                         f"Command '{command_name}': could not resolve "
                                         f"parameter '{param_name}' at position {position}"
                                     )
-                            command = f"{command_name}({', '.join(command_args)})"
-                            
-                            if DEBUG_LEVEL >= DEBUG_SUMMARY:
-                                debug_print(f"Command to execute: {command}", DEBUG_SUMMARY)
-                            store_frame_command(command)  # Changed from execute_command for frame consistency
+                            if _use_draw_batch_for(command_name):
+                                _append_to_draw_batch(command_name, parsed_args)
+                            else:
+                                command = f"{command_name}({', '.join(command_args)})"
+                                if DEBUG_LEVEL >= DEBUG_SUMMARY:
+                                    debug_print(f"Command to execute: {command}", DEBUG_SUMMARY)
+                                store_frame_command(command)
                         except (ValueError, KeyError) as e:
                             debug_print(f"Error processing command '{command_name}': {str(e)}", DEBUG_SUMMARY)
                             raise

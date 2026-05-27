@@ -24,6 +24,15 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'burnout_mode', 'type': 'str', 'position': 5, 'optional': True, 'default': 'instant'}
     ],
     'mflush': [],
+    'begin_frame': [
+        {
+            'name': 'preserve_changes',
+            'type': 'bool',
+            'position': 0,
+            'optional': True,
+            'default': 'false',
+        },
+    ],
     'draw_line': [
         {'name': 'x1', 'type': 'int', 'position': 0},
         {'name': 'y1', 'type': 'int', 'position': 1},
@@ -190,6 +199,7 @@ __all__ = [
     'PARAM_INFO_LOOKUP',
     'get_parameter_type',
     'convert_to_type',
+    'parse_bool_literal',
     'validate_command_params',
     'expand_legacy_shape_params',
 ]
@@ -305,6 +315,21 @@ def convert_to_type(value: Union[str, int, float, bool], target_type: ParamType)
 
 def _is_bool_literal(value: str) -> bool:
     return value.strip().lower() in ('true', 'false')
+
+
+def parse_bool_literal(value: Union[str, bool, int, float]) -> bool:
+    """Parse Pixil true/false literals (not Python bool(string) semantics)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s == 'true':
+            return True
+        if s == 'false':
+            return False
+    raise ValueError(f"Expected boolean literal true/false, got {value!r}")
 
 
 def expand_legacy_shape_params(command: str, params: List[str]) -> List[str]:

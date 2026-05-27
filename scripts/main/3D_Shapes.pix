@@ -2,7 +2,7 @@
 # Global animation controls
 v_speedctrl = 20
 v_maxrotspeed = 1.0
-v_resttime = 0.015
+v_resttime = 0.025
 v_shapetime = 10      # How long each shape animates (in seconds)
 v_pausetime = .5      # Pause between shapes (in seconds)
 v_intensity = 75      # Shape color intensity

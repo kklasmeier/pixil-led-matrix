@@ -28,7 +28,7 @@ from .math_functions import evaluate_math_expression, evaluate_condition, has_ma
 from .condition_templates import evaluate_condition_fast
 from .jit_compiler import ExpressionCompiler, PixilVM, PixilVMError
 from .array_manager import PixilArray
-from shared.mplot_protocol import NAMED_COLOR_TO_ID
+from shared.mplot_protocol import BURNOUT_MODE_TO_INT, NAMED_COLOR_TO_ID
 
 _expr_compiler = ExpressionCompiler()
 _loop_vm = PixilVM()
@@ -112,6 +112,22 @@ def _eval_mplot_color(color_expr: str, compiled: Optional[Any], ctx: "ExecContex
             or (result.startswith("'") and result.endswith("'"))
         ):
             result = result[1:-1]
+        return result
+    return s
+
+
+def _eval_burnout_mode(mode_expr: str, compiled: Optional[Any], ctx: "ExecContext") -> Any:
+    """Resolve mplot burnout_mode: instant/fade literals, not math identifiers."""
+    s = mode_expr.strip()
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    lower = s.lower()
+    if lower in BURNOUT_MODE_TO_INT:
+        return lower
+    if s.startswith("v_") or has_math_expression(s):
+        result = _eval_expression(s, compiled, ctx)
+        if isinstance(result, str):
+            return result.strip('"').strip("'").lower()
         return result
     return s
 
@@ -286,9 +302,9 @@ class MplotStmt(Statement):
             burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
         burnout_mode = None
         if self.burnout_mode_expr is not None:
-            burnout_mode = _eval_expression(self.burnout_mode_expr, self.compiled_burnout_mode, ctx)
-            if isinstance(burnout_mode, str):
-                burnout_mode = burnout_mode.strip('"').strip("'")
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
         if burnout is not None or burnout_mode is not None:
             ctx.mplot(x, y, color, intensity, burnout, burnout_mode)
         else:

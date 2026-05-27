@@ -158,6 +158,9 @@ ENABLE_COMPILED_LOOPS = True       # Compile supported for-loop bodies; fallback
 ENABLE_COMPILED_LOOP_EXPR = False   # Bytecode eval inside compiled loops (often slower than fast math on Pi)
 ENABLE_COMPILED_PROCEDURES = True  # Compile supported def bodies; fast path on call
 
+# ===== FRAME DRAW BATCHING =====
+ENABLE_DRAW_BATCH = True  # Pack plot + draw_* into one draw_batch at end_frame / mflush
+
 # ===== DEBUGGING AND MONITORING =====
 SHOW_OPTIMIZATION_STATUS = True     # Display optimization status at startup
 

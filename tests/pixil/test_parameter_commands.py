@@ -45,3 +45,13 @@ def test_draw_text_requires_six_params():
     raw = '10, 20, "Hi", tiny64_font, 8, white'
     params = validate_command_params("draw_text", raw)
     assert len(params) == 6
+
+
+def test_begin_frame_false_and_true_params():
+    """Regression: begin_frame must be in PARAMETER_TYPES (Chladni compiled loops)."""
+    assert validate_command_params("begin_frame", "false") == ["false"]
+    assert validate_command_params("begin_frame", "true") == ["true"]
+
+
+def test_begin_frame_no_params():
+    assert validate_command_params("begin_frame", "") == []

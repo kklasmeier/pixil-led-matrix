@@ -1,17 +1,19 @@
 # Animated 3D Square - Figure-8 Flight over Infinite Grid
 # Creates a figure-8 flight pattern with banking over an infinite-feeling grid
 
+throttle(0.05)
+
 # Animation parameters
 v_time = 0
 v_speed = 0.05
 
-# Zoom settings - now these represent the actual zoom factors
-v_zoom_in_amount = 7.5   # Maximum zoom in factor (3.2x larger)
-v_zoom_out_amount = 7.0  # Minimum zoom out factor (0.1x = 10% of original size)
-v_zoom_speed = 0.3       # Speed of zooming (1.0 = normal, 2.0 = twice as fast, 0.5 = half speed)
+# Zoom settings - large factors keep most of the grid off-screen (infinite feel)
+v_zoom_in_amount = 7.5
+v_zoom_out_amount = 7.0
+v_zoom_speed = 0.3
 
 # Pan settings - left/right movement (East/West) - Figure-8 flight
-v_pan_amount = 15        # How far left/right to pan (in pixels)
+v_pan_amount = 15
 v_pan_speed = 0.5        # Speed of panning (creates figure-8 with different north/south speed)
 v_pan_center_x = 32      # Center point for left/right panning (32 = screen center)
 
@@ -26,15 +28,15 @@ v_tilt_max_angle = 0.8   # Maximum perspective ratio (banking right)
 v_tilt_speed = 0.2       # Speed of perspective changes (matches pan speed for banking effect)
 
 # Texture settings - grid lines (enlarged for infinite effect)
-v_num_v_lines = 18       # Number of vertical lines across the square (50% more for larger grid)
-v_num_h_lines = 12       # Number of horizontal lines across the square (50% more for larger grid)
+v_num_v_lines = 18
+v_num_h_lines = 12
 v_line_intensity = 60    # Intensity of texture lines (lower than edges for subtlety)
 
 # Base square dimensions (enlarged 50% for infinite grid effect)
-v_base_bottom_width = 102 # 50% larger than previous (was 68)
-v_base_top_width = 42     # 50% larger than previous (was 28)
-v_base_bottom_y = 70      # Expanded height range
-v_base_top_y = 10         # Expanded height range  
+v_base_bottom_width = 102
+v_base_top_width = 42
+v_base_bottom_y = 70
+v_base_top_y = 10
 v_base_height = v_base_bottom_y - v_base_top_y
 
 # Animation loop - run forever

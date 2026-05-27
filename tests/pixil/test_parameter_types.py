@@ -5,6 +5,7 @@ import pytest
 from pixil_utils.parameter_types import (
     convert_to_type,
     get_parameter_type,
+    parse_bool_literal,
     split_command_parameters,
     validate_command_params,
 )
@@ -56,3 +57,37 @@ def test_validate_command_params_unknown_command():
 
 def test_mflush_accepts_no_params():
     assert validate_command_params("mflush", "") == []
+
+
+def test_parse_bool_literal_true_false():
+    assert parse_bool_literal("true") is True
+    assert parse_bool_literal("false") is False
+    assert parse_bool_literal(" TRUE ") is True
+    assert parse_bool_literal(True) is True
+    assert parse_bool_literal(False) is False
+
+
+def test_parse_bool_literal_rejects_garbage():
+    with pytest.raises(ValueError, match="true/false"):
+        parse_bool_literal("maybe")
+    with pytest.raises(ValueError, match="true/false"):
+        parse_bool_literal("")
+
+
+def test_parse_bool_literal_not_python_bool_string():
+    """Document regression: bool('false') is True in Python."""
+    assert bool("false") is True
+    assert parse_bool_literal("false") is False
+
+
+def test_get_parameter_type_begin_frame():
+    assert get_parameter_type("begin_frame", 0) == "bool"
+
+
+def test_validate_begin_frame_preserve_argument():
+    assert validate_command_params("begin_frame", "false") == ["false"]
+    assert validate_command_params("begin_frame", "true") == ["true"]
+
+
+def test_validate_begin_frame_no_args():
+    assert validate_command_params("begin_frame", "") == []

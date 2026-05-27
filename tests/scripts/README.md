@@ -43,8 +43,9 @@ PIXIL_SKIP_SCRIPT_TESTS=1 ./run test-scripts   # exits 0 with SKIP message
 
 | Env var | Default | Meaning |
 |---------|---------|---------|
-| `PIXIL_SCRIPT_TIME_LIMIT` | `1:00` | Passed to Pixil `-t` |
-| `PIXIL_SCRIPT_TIMEOUT` | `120` | Wall-clock kill per script |
+| `PIXIL_SCRIPT_TIME_LIMIT` | `0:10` | Default per-script `-t` when manifest omits time |
+| `PIXIL_SCRIPT_TIMEOUT` | `90` | Max wall-clock kill per script (also scaled to limit) |
+| `PIXIL_TEST_MANIFESTS` | — | Colon-separated manifest paths (overrides default) |
 | `PIXIL_SKIP_SCRIPT_TESTS` | unset | Skip Tier 2 entirely |
 | `PIXIL_TEST_REST_CAP` | `0.01` | Max `rest()` seconds in test mode |
 | `PIXIL_TEST_UPDATE_GOLDEN` | unset | Set `1` to overwrite all non-volatile `golden/*.hash` files |
@@ -86,7 +87,13 @@ Implementation touchpoints:
    ```
 4. Commit `golden/your_test.hash` if not volatile.
 
-Keep `core.txt` small (daily `./run test-all` time). Longer experiments can stay in `scripts/testing/` unlisted until promoted.
+Keep `core.txt` small (daily `./run test-scripts`). Main-show regressions live in `main_smoke.txt` with **6–8s** limits (not 1:00):
+
+```
+main/My_Show.pix volatile 6s
+```
+
+Tokens: `volatile` (no golden), `quick` (5s), `6s`, `0:08`. `./run test-all` runs core + main_smoke.
 
 ## Golden workflow summary
 

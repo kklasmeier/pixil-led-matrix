@@ -21,3 +21,4 @@ testing/test_for_negative_step.pix
 testing/test_assignments.pix
 testing/test_while_loop.pix
 testing/test_procedure_flow.pix
+# Main-show smokes: tests/scripts/manifest/main_smoke.txt (run via ./run test-all)

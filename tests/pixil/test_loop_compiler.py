@@ -140,6 +140,26 @@ def test_mplot_burnout_in_compiled_loop():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
+def test_mplot_fade_burnout_mode_in_compiled_loop():
+    """Regression: burnout_mode 'fade' must not go through evaluate_math_expression."""
+    flags.ENABLE_COMPILED_LOOPS = True
+    plots = []
+
+    def capture_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
+        plots.append((x, y, color, intensity, burnout, burnout_mode))
+
+    block = [
+        "mplot(10, 20, white, 50, 100, fade)",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    variables = VariableRegistry()
+    ctx = make_loop_context(variables, capture_mplot, lambda: False)
+    run_compiled_block(compiled, ctx)
+    assert plots == [(10, 20, "white", 50, 100, "fade")]
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
 def test_mplot_accepts_float_spectral_color():
     flags.ENABLE_COMPILED_LOOPS = True
     from shared.mplot_protocol import normalize_mplot_color
@@ -245,6 +265,75 @@ def test_nested_literal_bounds_inner_for():
     # body assign only: 3 cells * 2 rows = 6 evals for v_sum = v_sum + 1
     assert variables.get("v_sum") == 6.0
     assert eval_count["n"] == 6
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_begin_frame_false_literal_parsing():
+    """begin_frame(false) must not use bool('false') which is True in Python."""
+    from pixil_utils.parameter_types import parse_bool_literal
+
+    assert parse_bool_literal("false") is False
+    assert parse_bool_literal("true") is True
+    assert bool("false") is True  # why compiled path avoids bool(parse_value(...))
+
+
+def test_loop_begin_frame_false_compiles():
+    flags.ENABLE_COMPILED_LOOPS = True
+    block = ["begin_frame(false)", "end_frame"]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    commands = []
+
+    def capture(cmd_name, arg_exprs):
+        commands.append((cmd_name, list(arg_exprs)))
+
+    variables = VariableRegistry()
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, run_command=capture,
+    )
+    run_compiled_block(compiled, ctx)
+    assert commands[0] == ("begin_frame", ["false"])
+    from pixil_utils.parameter_types import parse_bool_literal
+
+    assert parse_bool_literal(commands[0][1][0]) is False
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_loop_chladni_style_begin_frame_plot_end_frame():
+    """Chladni inner loop: begin_frame(false), plot with literals, end_frame."""
+    from pixil_utils.parameter_types import parse_bool_literal
+    from shared.draw_batch_protocol import pack_draw_op
+
+    flags.ENABLE_COMPILED_LOOPS = True
+    block = [
+        "begin_frame(false)",
+        "plot(32, 32, white, 100)",
+        "end_frame",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+
+    frame_starts: list[bool] = []
+    plots_packed = 0
+
+    def run_command(cmd_name, arg_exprs):
+        nonlocal plots_packed
+        if cmd_name == "begin_frame":
+            preserve = False
+            if arg_exprs:
+                preserve = parse_bool_literal(arg_exprs[0])
+            frame_starts.append(preserve)
+        elif cmd_name == "plot":
+            pack_draw_op("plot", arg_exprs)
+            plots_packed += 1
+
+    variables = VariableRegistry()
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, run_command=run_command,
+    )
+    run_compiled_block(compiled, ctx)
+    assert frame_starts == [False]
+    assert plots_packed == 1
     flags.ENABLE_COMPILED_LOOPS = False
 
 

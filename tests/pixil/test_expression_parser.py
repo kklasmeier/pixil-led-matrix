@@ -66,6 +66,12 @@ def test_format_parameter_bool_lowercase():
     assert format_parameter("true", "draw_rectangle", 6, reg) == "true"
 
 
+def test_format_parameter_begin_frame_preserve():
+    reg = VariableRegistry()
+    assert format_parameter("false", "begin_frame", 0, reg) == "false"
+    assert format_parameter("true", "begin_frame", 0, reg) == "true"
+
+
 def test_format_parameter_invalid_intensity_clamps(capsys):
     reg = VariableRegistry()
     assert format_parameter("200", "plot", 3, reg) == "100"

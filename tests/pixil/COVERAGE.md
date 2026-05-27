@@ -13,12 +13,13 @@
 | `test_condition_parity.py` | `condition_templates.py`, `math_functions.py` | Legacy/paren port + fast/full parity + error cases |
 | `test_string_and_datetime.py` | `math_functions.py` | concat, get_datetime, get_system |
 | `test_parameter_splitting.py` | `parameter_types.py` | split_command_parameters |
-| `test_parameter_types.py` | `parameter_types.py` | convert, validate (subset) |
+| `test_parameter_types.py` | `parameter_types.py` | convert, validate, `parse_bool_literal`, `begin_frame` |
 | `test_parameter_commands.py` | `parameter_types.py` | minimal params for **all** commands |
 | `test_parameter_errors.py` | `parameter_types.py` | too few/many params, invalid conversions |
 | `test_expression_parser.py` | `expression_parser.py` | colors, format_parameter, escape, draw_text |
 | `test_jit_compiler.py` | `jit_compiler/` | dormant-path guard (JIT off in production) |
-| `test_loop_compiler.py` | `loop_compiler.py` | compile/run mplot grids, draw_* in loops, elseif, array assign, reject call in loops |
+| `test_loop_compiler.py` | `loop_compiler.py` | compile/run mplot grids, draw_* in loops, elseif, array assign, `begin_frame(false)`, Chladni-style frame+plot, reject call in loops |
+| `test_draw_batch_protocol.py` | `draw_batch_protocol.py`, `draw_batch_dispatch.py` | pack/unpack plot+shapes, string coords (plot/mplot), submission order |
 | `test_procedure_compiler.py` | `loop_compiler.py` | procedures: call, array assign, if/else, begin_frame |
 | `test_compiled_blocks.py` | `loop_compiler.py` | flag gating, elseif execution, Boids compile smoke, mplot named/expression colors |
 | `test_script_manager.py` | `script_manager.py`, `file_manager.py` | path resolution, glob |
@@ -26,9 +27,10 @@
 | `test_small_modules.py` | `cli.py`, `timer_manager.py`, `optimization_flags.py`, `regex_patterns.py`, `debug.py` | validators, timer, flags, regex smoke |
 | `_math_cases.py`, `_condition_cases.py` | — | shared parametrized case tables |
 
-**Tier 2:** `tests/scripts/manifest/core.txt` + `./run test-scripts`  
-Includes control-flow smokes: `test_assignments`, `test_while_loop`, `test_while_for_grid`, `test_elseif_chain`, `test_nested_for`, `test_for_bounds_expr`, `test_for_negative_step`, `test_procedure_flow` (plus `test_if_else`, `test_procedure`, `test_for_loop_2`).  
-See `tests/scripts/README.md` (goldens, `volatile`, env vars). Dev overview: `docs/Pixil_Development_Guide.txt` §8.
+**Tier 2:** `tests/scripts/manifest/core.txt` + optional `main_smoke.txt` via `./run test-scripts` / `test-all`  
+Harness: `run_script_tests.py` (per-script `-t`, PASS/FAIL via `PIXIL_TEST_SUMMARY`).  
+Unit tests: `test_script_manifest.py` (manifest parsing, no LED).  
+Main smokes: 6–8s each in `main_smoke.txt` (not 1:00). See `tests/scripts/README.md`.
 
 ## Not yet covered
 

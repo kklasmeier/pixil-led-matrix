@@ -6,6 +6,7 @@ from .debug import debug, Level, Component
 from .utils import NAMED_COLORS, get_color_rgb  # Removed parse_color_spec
 from .text_effects import TextEffect, EffectModifier
 from shared.mplot_protocol import decode_buffer, unpack_mplot_batch
+from shared.draw_batch_protocol import decode_buffer as decode_draw_buffer, unpack_draw_batch
 class CommandExecutor:
     """Handles parsing and execution of drawing commands."""
     
@@ -38,6 +39,7 @@ class CommandExecutor:
             'dispose_all_sprites': self._handle_dispose_all_sprites,
             'sync_queue': self._handle_sync_queue,
             'plot_batch': self._handle_plot_batch,
+            'draw_batch': self._handle_draw_batch,
             'set_background': self._handle_set_background,
             'hide_background': self._handle_hide_background,
             'nudge_background': self._handle_nudge_background,
@@ -523,3 +525,28 @@ class CommandExecutor:
         except Exception as e:
             debug(f"Error processing plot_batch: {str(e)}", Level.ERROR, Component.COMMAND)
             raise ValueError(f"plot_batch execution failed: {str(e)}")
+
+    def _handle_draw_batch(self, encoded_data: str):
+        """Handle unified draw_batch (plot + draw_* in submission order)."""
+        debug(
+            f"Handling draw_batch command with encoded data length: {len(encoded_data)}",
+            Level.DEBUG,
+            Component.COMMAND,
+        )
+        try:
+            binary_data = decode_draw_buffer(encoded_data)
+            count = 0
+            for cmd_name, args in unpack_draw_batch(binary_data):
+                handler = self.command_handlers.get(cmd_name)
+                if handler is None:
+                    raise ValueError(f"draw_batch unknown command: {cmd_name}")
+                handler(*args)
+                count += 1
+            debug(
+                f"Successfully executed draw_batch with {count} ops in order",
+                Level.DEBUG,
+                Component.COMMAND,
+            )
+        except Exception as e:
+            debug(f"Error processing draw_batch: {str(e)}", Level.ERROR, Component.COMMAND)
+            raise ValueError(f"draw_batch execution failed: {str(e)}")

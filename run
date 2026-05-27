@@ -53,13 +53,15 @@ Pixil tests live under tests/. They do not run during normal lightshow use.
     No sudo, no LED matrix, safe on any machine.
 
   Tier 2 — ./run test-scripts
-    Runs short .pix scripts from tests/scripts/manifest/core.txt on the real
-    matrix (sudo + passwordless sudo). Proves scripts execute end-to-end.
-    Each run records a buffer fingerprint (16-char hash of lit pixels, or
-    "empty"). Optional golden files: tests/scripts/golden/<script>.hash
+    Fast smokes from tests/scripts/manifest/core.txt (~3 min on Pi, not 20+).
+    Default -t is 0:10 per script (was 1:00). Each script self-reports PASS/FAIL
+    via PIXIL_TEST_SUMMARY; harness detects tracebacks and golden mismatches.
 
   ./run test-all
-    Tier 1, then Tier 2. Use this before committing on the Pi.
+    Tier 1 pytest (~2s), then core manifest + short main-show smokes (main_smoke.txt).
+
+  ./run test-scripts-main
+    Only main-show regression smokes (6–8s each, volatile).
 
   ./run setup-tests
     One-time: install python3-pytest via apt (needed for Tier 1).
@@ -220,7 +222,7 @@ guard_against_bare_star() {
 # ------------------------------------------------------------
 COMMAND=""
 case "${1:-}" in
-  help|info|status|stop|killpython|interactive|start|bg|test|test-scripts|test-all|setup-tests)
+  help|info|status|stop|killpython|interactive|start|bg|test|test-scripts|test-scripts-main|test-all|setup-tests)
     COMMAND="$1"
     shift
     ;;
@@ -325,14 +327,35 @@ case "$COMMAND" in
       TEST_PYTHON="python3"
     fi
     echo "Running Tier 2 script smoke tests (sudo, LED matrix)..."
-    echo "Manifest: tests/scripts/manifest/core.txt"
+    echo "Manifest: tests/scripts/manifest/core.txt (default -t 0:10)"
     echo
+    export PIXIL_SCRIPT_TIME_LIMIT="${PIXIL_SCRIPT_TIME_LIMIT:-0:10}"
     exec "$TEST_PYTHON" tests/scripts/run_script_tests.py "${PASS_ARGS[@]}"
     ;;
 
+  test-scripts-main)
+    if ! TEST_PYTHON="$(resolve_test_python 2>/dev/null)"; then
+      TEST_PYTHON="python3"
+    fi
+    echo "Running Tier 2 main-show smokes (short)..."
+    echo "Manifest: tests/scripts/manifest/main_smoke.txt"
+    echo
+    exec "$TEST_PYTHON" tests/scripts/run_script_tests.py \
+      --manifest tests/scripts/manifest/main_smoke.txt "${PASS_ARGS[@]}"
+    ;;
+
   test-all)
+    if ! TEST_PYTHON="$(resolve_test_python 2>/dev/null)"; then
+      TEST_PYTHON="python3"
+    fi
     "$0" test || exit 1
-    "$0" test-scripts
+    echo
+    echo "Running Tier 2 (core + main smokes)..."
+    export PIXIL_SCRIPT_TIME_LIMIT="${PIXIL_SCRIPT_TIME_LIMIT:-0:10}"
+    exec "$TEST_PYTHON" tests/scripts/run_script_tests.py \
+      --manifest tests/scripts/manifest/core.txt \
+      --manifest tests/scripts/manifest/main_smoke.txt \
+      "${PASS_ARGS[@]}"
     ;;
 
   test)

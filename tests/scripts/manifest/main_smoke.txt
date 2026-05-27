@@ -1,0 +1,8 @@
+# Main-show regression smokes (short run — catches startup/compile/draw_batch bugs).
+# Format: path [volatile] [time]   time = quick (5s), 6s, 0:08, etc.
+# volatile = skip buffer golden (random/animated content).
+
+main/Chladni_Patterns.pix volatile 6s
+main/Floating_Geometry.pix volatile 6s
+main/3D_asterisk.pix volatile 6s
+main/Perlin_Noise_Particle_System.pix volatile 8s
