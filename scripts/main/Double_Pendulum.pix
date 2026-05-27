@@ -1,6 +1,9 @@
 # Double Pendulum - Infinite Chaotic Motion with Energy Injection
 # Physics simulation that runs forever with periodic energy boosts
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Physics settings

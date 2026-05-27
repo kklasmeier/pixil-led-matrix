@@ -1,6 +1,10 @@
 # Expanding/Contracting Circles Lightshow
 
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize base parameters
 v_centerX = 32
 v_centerY = 32

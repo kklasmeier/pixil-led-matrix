@@ -1,4 +1,8 @@
 # Draw background seismic activity
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 def draw_background_activity {
     if v_background_activity == 1 then
         # Draw seismic monitoring stations

@@ -6,6 +6,9 @@
 # For gears to mesh: distance between centers = radius1 + radius2 + tooth_length
 # For teeth to interlock: gear2 angle offset = (180 / teeth) degrees
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_tooth_length = 3
 
 # Gear 1 (center, driving gear) - 8 teeth

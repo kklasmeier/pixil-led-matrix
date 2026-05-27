@@ -1,6 +1,9 @@
 
 throttle(0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize both points at different locations
 v_x1 = 10
 v_y1 = 30

@@ -5,6 +5,9 @@
 
 throttle(0.3)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # -----------------------------
 # Display Config
 # -----------------------------

@@ -1,5 +1,9 @@
 # Electric Web with periodic screen refresh
 # Node count configuration
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_max_nodes = 6
 v_array_size = v_max_nodes
 v_last_index = v_max_nodes - 1

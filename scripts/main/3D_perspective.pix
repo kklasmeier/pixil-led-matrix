@@ -1,6 +1,10 @@
 # 3D Dot Matrix - Five layers with extended depth
 # Deep grid pattern with smooth transitions
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Movement control
 v_angle = 0
 v_speed = 0.2      

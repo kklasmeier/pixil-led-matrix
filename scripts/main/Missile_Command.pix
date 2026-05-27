@@ -1,6 +1,10 @@
 # Missile Command - Refactored with Procedures
 
 # Constants
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_max_missiles = 4  # Increased from 2 to 3
 v_steps = 40  # Increased from 32 to have more room for the full path
 v_blast_radius = 5  # Explosion radius for proximity check

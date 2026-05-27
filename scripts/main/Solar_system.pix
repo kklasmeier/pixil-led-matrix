@@ -203,6 +203,9 @@ def draw_system {
 # Set animation speed
 throttle(1.0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 print("Starting Solar System Animation")
 print("Each state lasts ~12 seconds (1200 frames)")
 print("Planets move at realistic orbital speeds")

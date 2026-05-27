@@ -65,10 +65,23 @@ def test_procedure_if_else():
     flags.ENABLE_COMPILED_PROCEDURES = False
 
 
-def test_loop_still_rejects_call():
+def test_loop_rejects_bare_procedure_name():
     flags.ENABLE_COMPILED_LOOPS = True
     reset_loop_compiler_stats()
-    assert try_compile_loop_block(["call foo"]) is None
+    assert try_compile_loop_block(["draw_particles"]) is None
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_loop_accepts_call_keyword():
+    from pixil_utils.loop_compiler import CallStmt
+
+    flags.ENABLE_COMPILED_LOOPS = True
+    reset_loop_compiler_stats()
+    compiled = try_compile_loop_block(["call draw_particles"])
+    assert compiled is not None
+    assert len(compiled.statements) == 1
+    assert isinstance(compiled.statements[0], CallStmt)
+    assert compiled.statements[0].proc_name == "draw_particles"
     flags.ENABLE_COMPILED_LOOPS = False
 
 

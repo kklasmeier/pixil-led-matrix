@@ -1,4 +1,8 @@
 # Define constants
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_arcs = 6            # Number of simultaneous arcs
 v_colors = 5              # Number of bright colors
 create_array(v_color_list, v_colors, string)  # Array for colors

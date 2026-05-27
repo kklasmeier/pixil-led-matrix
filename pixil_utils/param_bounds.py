@@ -11,6 +11,7 @@ INTENSITY_MAX = 100
 SPECTRAL_MIN = 0
 SPECTRAL_MAX = 99
 THROTTLE_MIN = 0.01
+FPS_MAX = 240.0
 BURNOUT_PERMANENT = -1
 
 
@@ -120,6 +121,29 @@ def clamp_burnout_duration(
     return num
 
 
+def clamp_fps(
+    value: Union[str, int, float],
+    *,
+    warn: bool = True,
+) -> float:
+    """fps(0) disables pacing; negative values treated as 0."""
+    raw = _to_number(value)
+    num = float(raw)
+    if num <= 0:
+        return 0.0
+    if num > FPS_MAX:
+        if warn:
+            warn_param_clamp(
+                "fps",
+                "rate",
+                num,
+                FPS_MAX,
+                f"max {FPS_MAX}",
+            )
+        return FPS_MAX
+    return num
+
+
 def clamp_throttle(
     value: Union[str, int, float],
     *,
@@ -162,11 +186,13 @@ __all__ = [
     "SPECTRAL_MIN",
     "SPECTRAL_MAX",
     "THROTTLE_MIN",
+    "FPS_MAX",
     "BURNOUT_PERMANENT",
     "warn_param_clamp",
     "clamp_intensity",
     "clamp_spectral_color",
     "clamp_burnout_duration",
+    "clamp_fps",
     "clamp_throttle",
     "format_burnout_for_command",
     "is_burnout_duration_param",

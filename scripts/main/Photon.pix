@@ -1,4 +1,8 @@
 # Configuration
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_photons = 4           # Single photon
 v_base_speed = 2           # Base speed for photons
 v_speed_variance = 1.5     # How much speed can vary

@@ -1,5 +1,9 @@
 # Number of particles
 throttle(.5)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_particles = 25    
 
 # Create arrays for particle properties

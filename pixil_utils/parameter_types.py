@@ -178,7 +178,10 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
     ],
     'throttle': [
         {'name': 'factor', 'type': 'float', 'position': 0}
-    ],    
+    ],
+    'fps': [
+        {'name': 'rate', 'type': 'float', 'position': 0}
+    ],
     'clear': [],
     'sync_queue': []
 }

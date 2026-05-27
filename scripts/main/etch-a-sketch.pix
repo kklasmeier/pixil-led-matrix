@@ -1,4 +1,8 @@
 # Natural Etch-a-Sketch
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_x = 32
 v_y = 32
 v_prev_x = 32

@@ -2,6 +2,10 @@
 # Staggered brick rows with thin mortar lines that *appear* slanted.
 
 # --- Tunables ---
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_tile_w = 10
 v_tile_h = 6
 v_mortar  = 1

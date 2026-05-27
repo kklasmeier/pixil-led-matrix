@@ -2,6 +2,9 @@
 # Simulates cracks spreading from an impact point with various styles
 # Each sequence generates unique patterns
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while true then
 
 clear()

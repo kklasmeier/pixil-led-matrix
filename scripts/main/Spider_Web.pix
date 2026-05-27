@@ -2,6 +2,9 @@
 # Creates a realistic spider web with radial spokes and connecting rings
 # on a 64x64 LED matrix
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while true then
 
 clear()

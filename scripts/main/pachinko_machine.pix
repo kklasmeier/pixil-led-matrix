@@ -6,6 +6,10 @@
 # ========== PERFORMANCE ==========
 throttle(0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(30)
+
+
 # ========== CONFIGURABLE SETTINGS ==========
 v_num_balls = 50              # Total number of balls to drop per board
 v_max_balls_active = 8        # Maximum balls on screen at once

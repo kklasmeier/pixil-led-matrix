@@ -5,6 +5,10 @@
 # ============================================
 # GAME STATE VARIABLES
 # ============================================
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_p1_games = 0
 v_p2_games = 0
 v_game_number = 0

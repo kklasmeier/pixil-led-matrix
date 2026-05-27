@@ -62,6 +62,9 @@ v_dust_phase[0] = 0
 # Set performance
 throttle(0.3)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Main animation loop
 v_time = 0
 v_angle = 0

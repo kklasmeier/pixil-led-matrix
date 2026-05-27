@@ -1,6 +1,10 @@
 # Ripple Tank with Multiple Morph Patterns
 # Features random color schemes and morphing patterns
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Configuration variables
 v_max_sources = 5
 v_matrix_size = 64

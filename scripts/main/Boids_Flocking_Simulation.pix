@@ -2,6 +2,10 @@
 # Simulates bird flocking behavior using Craig Reynolds' algorithm
 
 # Initialize constants
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_boids = 5        # Number of boids
 v_max_speed = 2.5        # Maximum speed
 v_min_speed = 0.5        # Minimum speed

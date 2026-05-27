@@ -101,6 +101,10 @@ def draw_ripple {
 
 # Main infinite loop
 throttle(0.5)  # Faster execution for continuous ripples
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while v_running == 1 then
     call draw_ripple
     rest(0.1)  # Brief pause between ripples

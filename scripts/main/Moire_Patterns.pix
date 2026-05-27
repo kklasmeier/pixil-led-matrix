@@ -1,4 +1,8 @@
 # Initialize variables for grid control
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_size = 64
 v_spacing = 8
 v_speed = 0.05

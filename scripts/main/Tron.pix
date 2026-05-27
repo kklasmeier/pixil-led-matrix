@@ -3,6 +3,10 @@
 # Each leaves a trail - crash into any trail or wall and you lose!
 
 # Game settings
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_game_speed = 0
 v_max_rounds = 5
 v_p1_wins = 0

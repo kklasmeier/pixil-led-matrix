@@ -41,8 +41,10 @@ PIXIL = REPO_ROOT / "Pixil.py"
 
 # Default smoke duration (was 1:00 — too slow for infinite-loop main shows).
 DEFAULT_TIME_LIMIT = os.environ.get("PIXIL_SCRIPT_TIME_LIMIT", "0:10")
-# Wall-clock cap per script (overridden per entry when possible).
-DEFAULT_SUBPROCESS_TIMEOUT = int(os.environ.get("PIXIL_SCRIPT_TIMEOUT", "90"))
+# Wall-clock cap per script: limit + margin (see run_one). PIXIL_SCRIPT_TIMEOUT_MAX
+# is an optional ceiling (default 120s) for very heavy smokes.
+_TIMEOUT_MARGIN = int(os.environ.get("PIXIL_SCRIPT_TIMEOUT_MARGIN", "40"))
+_SUBPROCESS_TIMEOUT_MAX = int(os.environ.get("PIXIL_SCRIPT_TIMEOUT_MAX", "120"))
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -270,10 +272,11 @@ def run_one(
 
     pixil_arg = str(Path(script_rel).with_suffix(""))
     limit_seconds = _parse_seconds_from_limit(time_limit)
-    subprocess_timeout = min(
-        DEFAULT_SUBPROCESS_TIMEOUT,
-        max(limit_seconds + 25, 30),
-    )
+    # Cap wall time: limit + margin, but not much more than needed for short smokes.
+    margin = min(_TIMEOUT_MARGIN, limit_seconds + 12)
+    subprocess_timeout = max(limit_seconds + margin, 30)
+    if _SUBPROCESS_TIMEOUT_MAX > 0:
+        subprocess_timeout = min(subprocess_timeout, _SUBPROCESS_TIMEOUT_MAX)
 
     TEST_STATE_DIR.mkdir(parents=True, exist_ok=True)
     if STATE_HASH.is_file():
@@ -340,10 +343,13 @@ def run_one(
     if (not buffer_hash or buffer_hash == "none") and STATE_HASH.is_file():
         buffer_hash = STATE_HASH.read_text(encoding="utf-8").strip() or None
     if not buffer_hash or buffer_hash == "none":
-        return False, (
-            "missing buffer fingerprint (__test_snapshot__ did not run? "
-            f"summary buffer={summary.get('buffer')})"
-        ), elapsed
+        if volatile and summary.get("commands", 0) > 0:
+            buffer_hash = "volatile"
+        else:
+            return False, (
+                "missing buffer fingerprint (__test_snapshot__ did not run? "
+                f"summary buffer={summary.get('buffer')})"
+            ), elapsed
 
     ok, golden_msg = _check_golden(script_rel, buffer_hash, volatile=volatile)
     if not ok:

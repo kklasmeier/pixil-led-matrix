@@ -4,6 +4,10 @@
 # Mode 3: Snake cannot touch itself (game over if collision)
 
 # Initial settings
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_mode = 2           # Start with mode 1 (1, 2, or 3)
 v_x = 32             # Current x position
 v_y = 32             # Current y position

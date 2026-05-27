@@ -35,6 +35,9 @@ create_array(v_pattern_y, 8) # Y coordinates for pattern on disk
 # Initialize throttle to optimize animation performance
 throttle(0.7)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Main animation loop
 while 1 == 1 then
     # Calculate wobble factors based on momentum

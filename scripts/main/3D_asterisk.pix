@@ -2,6 +2,10 @@
 # A 3D star with 6 spokes that rotates through different patterns
 
 # Constants for center of display
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_center_x = 32
 v_center_y = 32
 
@@ -46,6 +50,8 @@ create_array(v_z_3d, v_num_spokes * 2)
 create_array(v_x_2d, v_num_spokes * 2)
 create_array(v_y_2d, v_num_spokes * 2)
 create_array(v_z_2d, v_num_spokes * 2)
+create_array(v_z_order, v_num_spokes * 2)
+create_array(v_indices, v_num_spokes * 2)
 
 # Generate the initial star points in 3D space
 # We create points at both ends of each spoke
@@ -200,10 +206,6 @@ while 1 == 1 then
         v_y_2d[v_i] = v_y
         v_z_2d[v_i] = v_z
     endfor v_i
-    
-    # Create arrays for storing Z-order and indices
-    create_array(v_z_order, v_num_spokes * 2)
-    create_array(v_indices, v_num_spokes * 2)
     
     # Initialize arrays for Z-ordering
     for v_i in (0, v_num_spokes * 2 - 1, 1)

@@ -1,6 +1,9 @@
 # Radar Sweep - Realistic radar display with sweep-detected objects
 # Objects only appear when the sweep line passes over them
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Radar center and parameters

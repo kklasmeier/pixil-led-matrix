@@ -1,4 +1,8 @@
 throttle(2)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Define sprites
 define_sprite(ice_particle, 1, 1)
     plot(0, 0, white, 100)

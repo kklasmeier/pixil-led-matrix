@@ -2,6 +2,10 @@
 # Creates symmetrical patterns with rotating geometric shapes
 
 # Initialize parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_center_x = 32
 v_center_y = 32
 v_max_radius = 30

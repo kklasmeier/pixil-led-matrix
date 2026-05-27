@@ -1,5 +1,8 @@
 throttle(2.0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize configuration variables
 v_base_x = 32           # Base center X
 v_base_y = 32           # Base center Y

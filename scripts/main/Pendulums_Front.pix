@@ -1,6 +1,9 @@
 # Front View Pendulums - True front view looking at pendulums swinging toward/away
 # Pendulums stacked vertically with different string lengths
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Parameters

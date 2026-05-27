@@ -1,4 +1,8 @@
 # Fractal fire simulation
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_width = 64
 v_height = 64
 create_array(v_heat, v_width * v_height)

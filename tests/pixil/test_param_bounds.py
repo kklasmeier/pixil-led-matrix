@@ -53,6 +53,14 @@ def test_clamp_burnout_positive_unchanged(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_clamp_fps_zero_and_max(capsys):
+    from pixil_utils.param_bounds import clamp_fps, FPS_MAX
+
+    assert clamp_fps(0) == 0.0
+    assert clamp_fps(-1) == 0.0
+    assert clamp_fps(FPS_MAX + 10) == FPS_MAX
+
+
 def test_clamp_throttle_low_side(capsys):
     assert clamp_throttle(0) == THROTTLE_MIN
     assert clamp_throttle(-2) == THROTTLE_MIN

@@ -3,6 +3,10 @@
 # Blue = compression, Orange/Red = tension
 
 # Bridge parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_bridge_left = 4
 v_bridge_right = 59
 v_bridge_top = 25

@@ -169,13 +169,26 @@ def test_mplot_accepts_float_spectral_color():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
-def test_unsupported_call_falls_back():
+def test_bare_procedure_name_still_falls_back():
     flags.ENABLE_COMPILED_LOOPS = True
     reset_loop_compiler_stats()
     block = [
-        "call foo",
+        "calculate_distance",
     ]
     assert try_compile_loop_block(block) is None
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_call_keyword_compiles_in_loop():
+    flags.ENABLE_COMPILED_LOOPS = True
+    reset_loop_compiler_stats()
+    from pixil_utils.loop_compiler import CallStmt
+
+    block = ["call foo"]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    assert isinstance(compiled.statements[0], CallStmt)
+    assert compiled.statements[0].proc_name == "foo"
     flags.ENABLE_COMPILED_LOOPS = False
 
 
@@ -398,8 +411,7 @@ def test_loop_elseif_draw_shape_branches():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
-def test_loop_call_inside_if_does_not_compile():
-    """Regression: if-bodies must not enable call parsing in loop mode."""
+def test_loop_call_inside_if_compiles():
     flags.ENABLE_COMPILED_LOOPS = True
     reset_loop_compiler_stats()
     block = [
@@ -409,7 +421,7 @@ def test_loop_call_inside_if_does_not_compile():
         "endif",
         "endfor v_j",
     ]
-    assert try_compile_loop_block(block) is None
+    assert try_compile_loop_block(block) is not None
     flags.ENABLE_COMPILED_LOOPS = False
 
 

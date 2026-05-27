@@ -1,4 +1,8 @@
 # Initialize variables
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_angle = 0
 v_variation = 0
 v_cycle_count = 0

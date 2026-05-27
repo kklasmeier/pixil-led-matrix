@@ -1,7 +1,15 @@
 # 3D Shape Animation with Multiple Shapes
 # Global animation controls
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(30)
+
 v_speedctrl = 20
-v_maxrotspeed = 1.0
+v_rotctrl = 10
+v_maxrotspeed = 0.28
+v_rotdamping = 0.994
+v_bouncerest = 0.9
+v_spink = 0.0045
 v_resttime = 0.025
 v_shapetime = 10      # How long each shape animates (in seconds)
 v_pausetime = .5      # Pause between shapes (in seconds)
@@ -12,9 +20,9 @@ v_anglex = 0
 v_angley = 0
 v_anglez = 0
 v_frame_counter = 0 
-v_rotspeedx = 0.0015 * v_speedctrl    # Half of 0.003
-v_rotspeedy = 0.0025 * v_speedctrl    # Half of 0.005
-v_rotspeedz = 0.001 * v_speedctrl     # Half of 0.002
+v_rotspeedx = 0.0004 * v_rotctrl
+v_rotspeedy = 0.0005 * v_rotctrl
+v_rotspeedz = 0.0003 * v_rotctrl
 
 # Position and movement
 v_centerx = 32
@@ -45,6 +53,32 @@ create_array(v_shapes, 6) # Create array to store shape sequence (1=Tetrahedron,
 v_displaywidth = 64
 v_displayheight = 64
 v_displaymargin = 1  # Small margin to ensure visibility
+
+# Wall bounce scratch (impact = speed into wall, tangent = slide along wall)
+v_bounce_impact = 0
+v_bounce_tangent = 0
+v_bounce_tangent2 = 0
+v_bounce_vsign = 1
+v_bounce_wsign = 1
+
+# Reflect X translation; Z-roll from tangential Y (glancing hits spin more)
+def bounce_reflect_x {
+    v_rotspeedz = v_rotspeedz + v_bounce_wsign * v_spink * v_bounce_tangent * v_bounce_impact
+    v_speedx = v_bounce_vsign * v_bounce_impact * v_bouncerest
+}
+
+# Reflect Y translation; X-roll from tangential X
+def bounce_reflect_y {
+    v_rotspeedx = v_rotspeedx + v_bounce_wsign * v_spink * v_bounce_tangent * v_bounce_impact
+    v_speedy = v_bounce_vsign * v_bounce_impact * v_bouncerest
+}
+
+# Reflect Z depth; pitch/yaw from tangential motion in the plane
+def bounce_reflect_z {
+    v_rotspeedx = v_rotspeedx + v_bounce_wsign * v_spink * v_bounce_tangent * v_bounce_impact
+    v_rotspeedy = v_rotspeedy + v_bounce_vsign * v_spink * v_bounce_tangent2 * v_bounce_impact
+    v_speedz = v_bounce_vsign * v_bounce_impact * v_bouncerest
+}
 
 # Initialize tetrahedron vertices
 def init_tetrahedron {
@@ -388,33 +422,32 @@ def animate_shape {
         v_speedz = 1.0
     endif
     
-    # Randomize initial rotation speeds
-    v_rotspeedx = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros
-    v_rotspeedy = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros  
-    v_rotspeedz = random(-2, 2, 3) / 100 * v_speedctrl    # Remove 3 zeros
+    # Initial spin (moderate baseline; walls add velocity-scaled roll)
+    v_rotspeedx = random(-1.5, 1.5, 3) / 200 * v_rotctrl
+    v_rotspeedy = random(-1.5, 1.5, 3) / 200 * v_rotctrl
+    v_rotspeedz = random(-1.5, 1.5, 3) / 200 * v_rotctrl
     
-    # Make sure we have some rotation
-    if abs(v_rotspeedx) < 0.002 then
+    if abs(v_rotspeedx) < 0.0012 then
         if v_rotspeedx >= 0 then
-            v_rotspeedx = 0.002
+            v_rotspeedx = 0.0012
         else
-            v_rotspeedx = -0.002
+            v_rotspeedx = -0.0012
         endif
     endif
 
-    if abs(v_rotspeedy) < 0.002 then
+    if abs(v_rotspeedy) < 0.0012 then
         if v_rotspeedy >= 0 then
-            v_rotspeedy = 0.002
+            v_rotspeedy = 0.0012
         else
-            v_rotspeedy = -0.002
+            v_rotspeedy = -0.0012
         endif
     endif
 
-    if abs(v_rotspeedz) < 0.002 then
+    if abs(v_rotspeedz) < 0.0012 then
         if v_rotspeedz >= 0 then
-            v_rotspeedz = 0.002
+            v_rotspeedz = 0.0012
         else
-            v_rotspeedz = -0.002
+            v_rotspeedz = -0.0012
         endif
     endif
     
@@ -428,10 +461,13 @@ def animate_shape {
         v_posy = v_posy + v_speedy
         v_posz = v_posz + v_speedz
         
-        # Update rotation angles
+        # Update rotation angles (damping keeps spin from running away)
         v_anglex = v_anglex + v_rotspeedx
         v_angley = v_angley + v_rotspeedy
         v_anglez = v_anglez + v_rotspeedz
+        v_rotspeedx = v_rotspeedx * v_rotdamping
+        v_rotspeedy = v_rotspeedy * v_rotdamping
+        v_rotspeedz = v_rotspeedz * v_rotdamping
 
         # Debug: Check if angles are accumulating (add frame counter first)
         v_frame_counter = v_frame_counter + 1
@@ -446,26 +482,64 @@ def animate_shape {
         v_effectivey = (v_maxbound[1] - v_minbound[1]) / 3
         v_effectivez = (v_maxbound[2] - v_minbound[2]) / 3
         
-        # Position bounds checking with dynamic boundaries
+        # 3D position bounds (reflect + spin from impact/tangent velocities)
         if v_posx > v_boundx - v_effectivex then
-            v_speedx = -2.5  # Slightly increased bounce speed
+            if v_speedx > 0 then
+                v_bounce_impact = v_speedx
+                v_bounce_tangent = v_speedy
+                v_bounce_vsign = -1
+                v_bounce_wsign = -1
+                call bounce_reflect_x
+            endif
         endif
         if v_posx < -v_boundx + v_effectivex then
-            v_speedx = 2.5
+            if v_speedx < 0 then
+                v_bounce_impact = -v_speedx
+                v_bounce_tangent = v_speedy
+                v_bounce_vsign = 1
+                v_bounce_wsign = 1
+                call bounce_reflect_x
+            endif
         endif
         
         if v_posy > v_boundy - v_effectivey then
-            v_speedy = -2  # Slightly increased bounce speed
+            if v_speedy > 0 then
+                v_bounce_impact = v_speedy
+                v_bounce_tangent = v_speedx
+                v_bounce_vsign = -1
+                v_bounce_wsign = -1
+                call bounce_reflect_y
+            endif
         endif
         if v_posy < -v_boundy + v_effectivey then
-            v_speedy = 2
+            if v_speedy < 0 then
+                v_bounce_impact = -v_speedy
+                v_bounce_tangent = v_speedx
+                v_bounce_vsign = 1
+                v_bounce_wsign = 1
+                call bounce_reflect_y
+            endif
         endif
         
         if v_posz > 150 - v_effectivez then
-            v_speedz = -1.5  # Slightly increased bounce speed
+            if v_speedz > 0 then
+                v_bounce_impact = v_speedz
+                v_bounce_tangent = v_speedx
+                v_bounce_tangent2 = v_speedy
+                v_bounce_vsign = -1
+                v_bounce_wsign = 1
+                call bounce_reflect_z
+            endif
         endif
         if v_posz < 50 + v_effectivez then
-            v_speedz = 1.5
+            if v_speedz < 0 then
+                v_bounce_impact = -v_speedz
+                v_bounce_tangent = v_speedx
+                v_bounce_tangent2 = v_speedy
+                v_bounce_vsign = 1
+                v_bounce_wsign = -1
+                call bounce_reflect_z
+            endif
         endif
         
         # Randomly change rotation speeds occasionally
@@ -481,26 +555,6 @@ def animate_shape {
         #        v_rotspeedz = random(-2, 2, 3) / 100000 * v_speedctrl
         #    endif
         #endif
-        
-        # Limit rotation speeds
-        if v_rotspeedx > v_maxrotspeed then
-            v_rotspeedx = v_maxrotspeed
-        endif
-        if v_rotspeedx < -v_maxrotspeed then
-            v_rotspeedx = -v_maxrotspeed
-        endif
-        if v_rotspeedy > v_maxrotspeed then
-            v_rotspeedy = v_maxrotspeed
-        endif
-        if v_rotspeedy < -v_maxrotspeed then
-            v_rotspeedy = -v_maxrotspeed
-        endif
-        if v_rotspeedz > v_maxrotspeed then
-            v_rotspeedz = v_maxrotspeed
-        endif
-        if v_rotspeedz < -v_maxrotspeed then
-            v_rotspeedz = -v_maxrotspeed
-        endif
         
         begin_frame
         
@@ -560,67 +614,67 @@ def animate_shape {
             endif
         endfor v_i
         
-        # Check for screen boundary collisions using actual shape extents
+        # Screen edges: same physics as position bounds (spin = tangent * impact)
         if v_maxscreenx > v_displaywidth - v_displaymargin then
-            v_speedx = -2.5
-            # Right wall: if moving down and spinning clockwise, add counter-clockwise force
-            # if moving down and spinning counter-clockwise, add more counter-clockwise force
-            if v_speedy > 0 then  # Moving down
-                v_rotspeedz = v_rotspeedz - random(0.0005, 0.000625, 3)  # Counter-clockwise force
-            else  # Moving up
-                v_rotspeedz = v_rotspeedz + random(0.0005, 0.000625, 3)  # Clockwise force
+            if v_speedx > 0 then
+                v_bounce_impact = v_speedx
+                v_bounce_tangent = v_speedy
+                v_bounce_vsign = -1
+                v_bounce_wsign = -1
+                call bounce_reflect_x
             endif
-            v_rotspeedy = v_rotspeedy + random(-0.000625, 0.000625, 3)
-            # print("HIT RIGHT WALL - adding spin")
         endif
 
         if v_minscreenx < v_displaymargin then
-            v_speedx = 2.5
-            # Left wall: opposite of right wall
-            if v_speedy > 0 then  # Moving down
-                v_rotspeedz = v_rotspeedz + random(0.0005, 0.000625, 3)  # Clockwise force
-            else  # Moving up
-                v_rotspeedz = v_rotspeedz - random(0.0005, 0.000625, 3)  # Counter-clockwise force
+            if v_speedx < 0 then
+                v_bounce_impact = -v_speedx
+                v_bounce_tangent = v_speedy
+                v_bounce_vsign = 1
+                v_bounce_wsign = 1
+                call bounce_reflect_x
             endif
-            v_rotspeedy = v_rotspeedy + random(-0.000625, 0.000625, 3)
-            # print("HIT LEFT WALL - adding spin")
         endif
 
         if v_maxscreeny > v_displayheight - v_displaymargin then
-            v_speedy = -2
-            # Top wall: if moving right and spinning, physics applies to X rotation
-            if v_speedx > 0 then  # Moving right
-                v_rotspeedx = v_rotspeedx + random(0.0005, 0.000625, 3)  # Forward tumble
-            else  # Moving left
-                v_rotspeedx = v_rotspeedx - random(0.0005, 0.000625, 3)  # Backward tumble
+            if v_speedy > 0 then
+                v_bounce_impact = v_speedy
+                v_bounce_tangent = v_speedx
+                v_bounce_vsign = -1
+                v_bounce_wsign = 1
+                call bounce_reflect_y
             endif
-            v_rotspeedz = v_rotspeedz + random(-0.000625, 0.000625, 3)
-            # print("HIT TOP WALL - adding spin")
         endif
 
         if v_minscreeny < v_displaymargin then
-            v_speedy = 2
-            # Bottom wall: opposite of top wall
-            if v_speedx > 0 then  # Moving right
-                v_rotspeedx = v_rotspeedx - random(0.0005, 0.000625, 3)  # Backward tumble
-            else  # Moving left
-                v_rotspeedx = v_rotspeedx + random(0.0005, 0.000625, 3)  # Forward tumble
+            if v_speedy < 0 then
+                v_bounce_impact = -v_speedy
+                v_bounce_tangent = v_speedx
+                v_bounce_vsign = 1
+                v_bounce_wsign = -1
+                call bounce_reflect_y
             endif
-            v_rotspeedz = v_rotspeedz + random(-0.000625, 0.000625, 3)
-            # print("HIT BOTTOM WALL - adding spin")
         endif
 
-        # Z-axis boundary check (keeps shape visible)
-        if v_posz > 150 then
-            v_speedz = -1.5
-            v_rotspeedy = v_rotspeedy + random(-0.001, 0.001, 3)
-            v_rotspeedx = v_rotspeedx + random(-0.000625, 0.000625, 3)
+        # Clamp spin after all wall impulses this frame
+        if v_rotspeedx > v_maxrotspeed then
+            v_rotspeedx = v_maxrotspeed
         endif
-        if v_posz < 50 then
-            v_speedz = 1.5
-            v_rotspeedy = v_rotspeedy + random(-0.001, 0.001, 3)
-            v_rotspeedx = v_rotspeedx + random(-0.000625, 0.000625, 3)
-        endif        
+        if v_rotspeedx < -v_maxrotspeed then
+            v_rotspeedx = -v_maxrotspeed
+        endif
+        if v_rotspeedy > v_maxrotspeed then
+            v_rotspeedy = v_maxrotspeed
+        endif
+        if v_rotspeedy < -v_maxrotspeed then
+            v_rotspeedy = -v_maxrotspeed
+        endif
+        if v_rotspeedz > v_maxrotspeed then
+            v_rotspeedz = v_maxrotspeed
+        endif
+        if v_rotspeedz < -v_maxrotspeed then
+            v_rotspeedz = -v_maxrotspeed
+        endif
+
         # Draw current shape
         if v_vertcount == 4 then
             call draw_tetrahedron

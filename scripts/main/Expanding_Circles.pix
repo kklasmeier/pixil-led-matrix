@@ -1,4 +1,8 @@
 throttle(.4)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Spiral Expanding Circles with enhanced color cycling and rotating polygon shapes
 v_angle = 0
 v_max_circles = 20  # Keep original capacity

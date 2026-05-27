@@ -3,6 +3,10 @@
 # Runs forever, each cycle builds a unique building
 
 # Ground and sky
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_ground_y = 58
 
 # Building parameters (will be randomized)

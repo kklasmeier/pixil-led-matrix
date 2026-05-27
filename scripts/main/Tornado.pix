@@ -1,6 +1,9 @@
 # Tornado Formation - Optimized version with pre-calculated spiral paths
 # Fast performance with visual spiral effect
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Tornado center

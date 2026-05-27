@@ -1,6 +1,9 @@
 # Oscilloscope Display - Optimized with pre-calculated waveforms
 # Fast performance using lookup tables
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Pre-calculated waveform lookup tables (smaller for better performance)

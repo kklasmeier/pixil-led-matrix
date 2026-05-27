@@ -1,4 +1,8 @@
 # Gravity wells setup
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 create_array(v_wells_x, 3)
 create_array(v_wells_y, 3)
 create_array(v_wells_force, 3)  # Store force per well

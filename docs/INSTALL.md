@@ -163,7 +163,7 @@ If the display looks distorted or flickering:
 
 If animations become sluggish:
 
-1. Use the `throttle` command in your scripts to adjust animation speed
+1. Use the `fps` command in your scripts to cap animation speed (e.g. `fps(30)`). Use `throttle` only for legacy queue tuning.
 2. Add occasional `sync_queue` commands to prevent queue overruns
 3. Reduce animation complexity in high-activity scenes
 

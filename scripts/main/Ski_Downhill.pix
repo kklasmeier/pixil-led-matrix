@@ -19,6 +19,9 @@
 
 throttle(0.15)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ============================================================
 # LAYER 0: DISTANT MOUNTAINS & SKY (128x64)
 # ============================================================

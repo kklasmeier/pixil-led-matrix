@@ -2,6 +2,10 @@
 # Creates multiple rings that expand outward with cycling color transitions
 
 # Ring properties
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_rings = 15  # Number of active rings
 v_spawn_rate = 18  # New ring every 20 frames
 

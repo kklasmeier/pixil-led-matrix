@@ -1,4 +1,8 @@
 # Initialize variables
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 create_array(v_x_origins, 6)
 create_array(v_y_origins, 6)
 create_array(v_radii, 6)

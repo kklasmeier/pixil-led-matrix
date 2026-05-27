@@ -7,6 +7,10 @@
 # ============================================
 # CONFIGURATION
 # ============================================
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_sequence_duration = 6    # Approximate seconds per sequence
 v_test_sequence = 16         # 0 = shuffle, 1-16 = pin specific, -1 = sequential debug mode
 v_num_sequences = 16        # Total number of sequences

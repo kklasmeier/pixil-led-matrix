@@ -2,6 +2,10 @@
 # Creates perspective effect of stars moving from center outward
 
 # Constants
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_center_x = 32          # Center of display X
 v_center_y = 32          # Center of display Y
 v_min_z = 1             # Minimum Z distance

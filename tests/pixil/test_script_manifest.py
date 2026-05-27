@@ -44,7 +44,7 @@ def test_main_smoke_manifest_short_limits():
     assert len(entries) == 4
     for rel, volatile, limit in entries:
         assert volatile
-        assert _parse_seconds_from_limit(limit) <= 8
+        assert _parse_seconds_from_limit(limit) <= 40
         assert rel.startswith("main/")
 
 

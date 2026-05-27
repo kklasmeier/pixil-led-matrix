@@ -257,9 +257,14 @@ clear_text(10, 20)
 
 ```
 sync_queue          # Wait for all queued commands to complete
-throttle(0.5)       # Adjust command timing (0.5 = faster, 2.0 = slower)
-rest(0.1)           # Pause script execution for 0.1 seconds
+fps(60)             # Cap display refresh to 60 Hz (0 = unlimited, default)
+throttle(0.5)       # Adjust delay between queued commands (legacy; use fps for animation)
+rest(0.1)           # Pause script execution for 0.1 seconds (holds / timed pauses)
 ```
+
+`fps()` limits how fast the LED matrix **presents** frames (after `end_frame` or each immediate
+swap). It is independent of Pi CPU speed and works with `begin_frame` / `end_frame` batching.
+Default is off (`fps(0)`); each script starts and ends with pacing disabled unless you set it.
 
 ## Project Structure
 

@@ -1,4 +1,8 @@
 throttle(.1)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Procedure to draw a rainbow sweep from upper right to lower left
 def draw_rainbow_sweep_down_right_to_left {
     begin_frame(true)  # Preserve mode to layer over previous content

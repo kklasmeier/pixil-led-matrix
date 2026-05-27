@@ -6,6 +6,10 @@
 # ============================================================================
 # Set to -1 for random prayer selection
 # Set to 0-12 to force a specific prayer (see list below)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_debug_prayer = -1
 v_num_prayers = 13
 

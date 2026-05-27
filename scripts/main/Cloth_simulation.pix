@@ -213,6 +213,9 @@ v_i2 = 0
 v_frame = 0
 throttle(0.3)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while true then
     
     # === VERLET INTEGRATION ===

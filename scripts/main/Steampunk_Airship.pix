@@ -18,6 +18,9 @@
 
 throttle(0.2)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ============================================================
 # LAYER 0: SKY GRADIENT (static 64x64)
 # Sunset/dawn colors - warm at horizon, deep blue above

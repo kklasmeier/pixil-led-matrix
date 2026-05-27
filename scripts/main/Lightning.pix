@@ -1,5 +1,9 @@
 # Lightning Storm Effect
 # Core variables for timing and randomization
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_time = 0
 v_flash_active = 0
 v_flash_intensity = 0

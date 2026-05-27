@@ -16,6 +16,9 @@ create_array(v_settled, v_num_particles)  # Track if particles are settled
 # Set throttle for maximum speed
 throttle(0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize particles
 for v_i in (0, v_num_particles - 1, 1)
     v_px[v_i] = random(5, 58, 0)

@@ -1,3 +1,6 @@
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_size = 8  # 8x8 grid on 64x64 display (8 pixels per cell)
 create_array(v_pulse, 64)  # 8x8 = 64 cells
 v_color = 0

@@ -1,4 +1,8 @@
 # Animation settings
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_speed = 0.02
 v_center_x = 32
 v_center_y = 32

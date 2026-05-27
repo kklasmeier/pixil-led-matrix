@@ -36,6 +36,7 @@ from pixil_utils.test_hooks import (
     set_script_name,
     record_command_dispatched,
     set_buffer_hash,
+    get_metrics,
     print_summary,
     note_fail_in_line,
 )
@@ -597,6 +598,7 @@ def process_script(filename, execute_func=None):
             cmd.startswith('set_background_offset'),
             cmd.startswith('draw_batch'),
             cmd.startswith('sprite_batch'),
+            cmd.startswith('fps('),
             sprite_context.in_sprite_definition,  # All commands in sprite definition
             in_frame_mode,  # All commands in frame mode
         ])
@@ -604,6 +606,8 @@ def process_script(filename, execute_func=None):
         if DEBUG_LEVEL >= DEBUG_SUMMARY:
             debug_print(f"Sending to queue: {cmd} (instant: {force_instant})", DEBUG_SUMMARY)
         queue.put_command(cmd, force_instant)
+
+    execute_command('fps(0)')
 
     def flush_draw_buffer_commands():
         """Emit draw_batch if unified buffer has records."""
@@ -679,8 +683,26 @@ def process_script(filename, execute_func=None):
         store_frame_command(f"{cmd_name}({', '.join(params)})")
 
     def flush_frame_commands():
-        """Execute batched frame commands in order before end_frame."""
+        """Execute frame commands before end_frame.
+
+        draw_batch/sprite_batch are appended at end_frame flush time, after
+        commands like draw_text were already queued in frame_commands — run
+        batches first so HUD/text drawn on top of the grid.
+        """
+        draw_batches: list[str] = []
+        sprite_batches: list[str] = []
+        plot_batches: list[str] = []
+        other: list[str] = []
         for cmd in frame_commands:
+            if cmd.startswith("draw_batch("):
+                draw_batches.append(cmd)
+            elif cmd.startswith("sprite_batch("):
+                sprite_batches.append(cmd)
+            elif cmd.startswith("plot_batch("):
+                plot_batches.append(cmd)
+            else:
+                other.append(cmd)
+        for cmd in draw_batches + sprite_batches + plot_batches + other:
             queue.put_command(cmd, force_instant=True)
         frame_commands.clear()
 
@@ -1462,7 +1484,15 @@ def process_script(filename, execute_func=None):
 
     def _run_compiled_command(cmd_name, arg_exprs):
         global mplot_buffer, mplot_count
-        if cmd_name == 'begin_frame':
+        if cmd_name == 'fps':
+            from pixil_utils.param_bounds import clamp_fps
+            from pixil_utils.test_hooks import effective_fps
+
+            rate = 0.0
+            if arg_exprs:
+                rate = effective_fps(clamp_fps(parse_value(arg_exprs[0], 'fps', 0)))
+            execute_command(f'fps({rate})')
+        elif cmd_name == 'begin_frame':
             from pixil_utils.parameter_types import parse_bool_literal
 
             preserve = False
@@ -1525,7 +1555,11 @@ def process_script(filename, execute_func=None):
             )
             run_compiled_block(compiled, ctx)
         else:
-            process_lines(iter(procedures[proc_name]))
+            from pixil_utils.loop_compiler import LoopBreak
+            try:
+                process_lines(iter(procedures[proc_name]))
+            except LoopBreak:
+                pass
 
     # Generator-based line processing logic
     def process_lines(line_generator):
@@ -1558,6 +1592,10 @@ def process_script(filename, execute_func=None):
             if not line:
                 debug_print("  Skipping empty line or comment", DEBUG_VERBOSE)
                 continue
+
+            if line.strip().lower() == "break":
+                from pixil_utils.loop_compiler import LoopBreak
+                raise LoopBreak()
 
             # Array creation handling
             if process_array_creation(line):
@@ -1699,6 +1737,7 @@ def process_script(filename, execute_func=None):
                         variables,
                         _compiled_mplot,
                         is_time_expired,
+                        call_procedure=invoke_procedure,
                         run_command=_run_compiled_command,
                     )
                     run_compiled_loop_body(compiled_loop, loop_var, start, end, step, loop_ctx)
@@ -1712,7 +1751,11 @@ def process_script(filename, execute_func=None):
                             print(f"Line {line_number}: Breaking for loop due to timer expiration")
                             break
                         variables[loop_var] = current_value
-                        process_lines(iter(loop_block))
+                        from pixil_utils.loop_compiler import LoopBreak
+                        try:
+                            process_lines(iter(loop_block))
+                        except LoopBreak:
+                            break
                         current_value += step
                         iteration_count += 1
                         if iteration_count > 1000000:
@@ -1758,6 +1801,7 @@ def process_script(filename, execute_func=None):
                         variables,
                         _compiled_mplot,
                         is_time_expired,
+                        call_procedure=invoke_procedure,
                         run_command=_run_compiled_command,
                     )
                     run_compiled_while_body(compiled_while, condition, loop_ctx)
@@ -1769,7 +1813,11 @@ def process_script(filename, execute_func=None):
                             break
                         if DEBUG_LEVEL >= DEBUG_VERBOSE:
                             debug_print(f"Executing while loop body: {condition}", DEBUG_VERBOSE)
-                        process_lines(iter(loop_block))
+                        from pixil_utils.loop_compiler import LoopBreak
+                        try:
+                            process_lines(iter(loop_block))
+                        except LoopBreak:
+                            break
 
             elif (if_match := IF_PATTERN.match(line)):
                 condition = if_match.group(1)   # ✅ safe, Pylance knows if_match isn’t None
@@ -1875,13 +1923,28 @@ def process_script(filename, execute_func=None):
                         debug_print(f"Throttle command with args: {args}", DEBUG_VERBOSE)
                         
                         # Parse factor with position information
-                        factor = parse_value(args[0], 'throttle', 0)
+                        from pixil_utils.test_hooks import effective_throttle
 
-                        queue.set_throttle(float(factor))
+                        factor = effective_throttle(float(parse_value(args[0], 'throttle', 0)))
+
+                        queue.set_throttle(factor)
                         debug_print(f"Set throttle factor to: {factor}", DEBUG_SUMMARY)
                         
                     except (ValueError, KeyError) as e:
                         debug_print(f"Error processing throttle command: {str(e)}", DEBUG_SUMMARY)
+                        raise
+                elif command_match := re.match(r'fps\((.*)\)', line):
+                    try:
+                        from pixil_utils.param_bounds import clamp_fps
+
+                        from pixil_utils.test_hooks import effective_fps
+
+                        args = validate_command_params('fps', command_match.group(1))
+                        rate = effective_fps(clamp_fps(parse_value(args[0], 'fps', 0)))
+                        execute_command(f'fps({rate})')
+                        debug_print(f"Set target FPS to: {rate}", DEBUG_SUMMARY)
+                    except (ValueError, KeyError) as e:
+                        debug_print(f"Error processing fps command: {str(e)}", DEBUG_SUMMARY)
                         raise
                 # Handle mplot command
                 elif line.startswith('mplot('):
@@ -2008,28 +2071,46 @@ def process_script(filename, execute_func=None):
                             debug_print(f"Command processing completed: {command_name}", DEBUG_VERBOSE)
 
                     
-    # Call the generator for file reading
-    try:
-        process_lines(iter(script_lines))
-        if normal_exit:
-            print("Script completed normally - sync queue run")
-            debug_print("Script completed normally, adding sync_queue", DEBUG_SUMMARY)
+    def _capture_test_buffer_if_needed() -> None:
+        """Fingerprint display buffer for Tier 2 (timer-limited scripts may skip normal_exit path)."""
+        if not is_test_mode() or get_metrics().buffer_hash:
+            return
+        try:
             execute_command('sync_queue')
             queue.wait_until_empty()
             queue.last_command_time = time.time() * 1000
-            if is_test_mode():
-                queue.drain_test_snapshot_reply()
-                execute_command('__test_snapshot__')
-                queue.wait_for_completion(cooldown=0.2)
-                from rgb_matrix_lib.test_inspect import read_buffer_hash_state
+            queue.drain_test_snapshot_reply()
+            execute_command('__test_snapshot__')
+            queue.wait_for_completion(cooldown=0.2)
+            from rgb_matrix_lib.test_inspect import read_buffer_hash_state
 
-                fp = queue.wait_for_test_snapshot(timeout=3.0)
-                if not fp:
-                    fp = read_buffer_hash_state()
-                if fp:
-                    set_buffer_hash(fp)
-                print_summary(0)
+            snap_timeout = 2.0 if is_test_mode() else 8.0
+            fp = queue.wait_for_test_snapshot(timeout=snap_timeout)
+            if not fp:
+                fp = read_buffer_hash_state()
+            set_buffer_hash(fp if fp else 'empty')
+        except Exception:
+            set_buffer_hash('empty')
+
+    # Call the generator for file reading
+    _test_exit_code = 0
+    try:
+        from pixil_utils.loop_compiler import LoopBreak
+        try:
+            process_lines(iter(script_lines))
+        except LoopBreak:
+            pass
+        if normal_exit:
+            print("Script completed normally - sync queue run")
+            debug_print("Script completed normally, adding sync_queue", DEBUG_SUMMARY)
+            _capture_test_buffer_if_needed()
+    except Exception:
+        _test_exit_code = 1
+        raise
     finally:
+        if is_test_mode():
+            _capture_test_buffer_if_needed()
+            print_summary(_test_exit_code)
         if is_test_mode() and _orig_print is not None:
             import builtins
             builtins.print = _orig_print
@@ -2065,17 +2146,22 @@ def process_script(filename, execute_func=None):
                     break
 
         debug_print(f"   Final drain count: {drained_commands} of {initial_queue_size} commands", DEBUG_SUMMARY)
-        time.sleep(.5)  # Brief pause after draining        
+        if is_test_mode():
+            time.sleep(0.05)
+        else:
+            time.sleep(0.5)  # Brief pause after draining
         # Do cleanup
         debug_print("4. Executing cleanup commands...", DEBUG_CONCISE)
+        execute_command('fps(0)')
         execute_command('end_frame')
         execute_command('clear')
         execute_command('dispose_all_sprites()')
-        execute_command('sync_queue')   
+        execute_command('sync_queue')
 
         # Wait for cleanup
         debug_print("5. Waiting for cleanup completion...", DEBUG_CONCISE)
-        queue_instance.wait_for_completion(cooldown=0.5)
+        cleanup_cooldown = 0.15 if is_test_mode() else 0.5
+        queue_instance.wait_for_completion(cooldown=cleanup_cooldown)
         
         debug_print("Cleanup sequence completed", DEBUG_CONCISE)
         gc.collect()

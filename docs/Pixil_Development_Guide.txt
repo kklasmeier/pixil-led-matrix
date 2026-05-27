@@ -203,6 +203,18 @@ STEP 4: Update documentation
 ----------------------------
 Add the new command to Pixil_Scripting_Guide.txt.
 
+FPS COMMAND (reference implementation)
+--------------------------------------
+fps(rate) is handled in rgb_matrix_lib (not Pixil sleep):
+
+- Pixil.py: parse fps(N), queue fps(N) with force_instant
+- commands.py: _handle_fps -> api.set_fps(rate)
+- api.py: set_fps / reset_fps / _pace_after_present
+  - Called after end_frame() and after _maybe_swap_buffer() (non-frame mode)
+- Default fps(0); reset at script start and in cleanup (Pixil finally + api.cleanup)
+- parameter_types.py: fps rate parameter
+- param_bounds.py: clamp_fps (0 = off, max 240)
+
 ================================================================================
 5. THE COMMAND FLOW
 ================================================================================
@@ -491,7 +503,8 @@ RENDERING PERFORMANCE
 QUEUE MANAGEMENT
 ----------------
 - Producer can outpace consumer
-- throttle() adjusts producer speed
+- throttle() adjusts producer queue delay between commands
+- fps() caps consumer present rate (end_frame and immediate swaps)
 - sync_queue waits for queue to empty
 - Monitor queue depth with -q flag
 

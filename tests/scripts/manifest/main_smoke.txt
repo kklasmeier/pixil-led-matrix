@@ -5,4 +5,4 @@
 main/Chladni_Patterns.pix volatile 6s
 main/Floating_Geometry.pix volatile 6s
 main/3D_asterisk.pix volatile 6s
-main/Perlin_Noise_Particle_System.pix volatile 8s
+main/Perlin_Noise_Particle_System.pix volatile 6s

@@ -1569,6 +1569,7 @@ def get_system(metric: str) -> int:
     
     Available metrics:
         runtime - Milliseconds since script started (integer)
+        test_mode - 1 when PIXIL_TEST_MODE is set, else 0
     
     Args:
         metric: The system metric to retrieve
@@ -1591,8 +1592,12 @@ def get_system(metric: str) -> int:
             return 0
         elapsed = time.time() - _script_start_time
         return int(elapsed * 1000)
+
+    if metric_lower == "test_mode":
+        from pixil_utils.test_hooks import is_test_mode
+        return 1 if is_test_mode() else 0
     
-    raise ValueError(f"Unknown system metric: '{metric}' - valid options: runtime")
+    raise ValueError(f"Unknown system metric: '{metric}' - valid options: runtime, test_mode")
 
 # Math function dictionary containing all allowed mathematical operations
 MATH_FUNCTIONS = {

@@ -135,6 +135,9 @@ def update_swarm {
 # Set throttle
 throttle(v_speed_base)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize
 call init_swarm
 

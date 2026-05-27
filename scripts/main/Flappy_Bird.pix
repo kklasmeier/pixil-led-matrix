@@ -5,6 +5,10 @@
 #================================================
 # CONSTANTS AND CONFIGURATION
 #================================================
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_screen_width = 64
 v_screen_height = 64
 v_bird_x = 12

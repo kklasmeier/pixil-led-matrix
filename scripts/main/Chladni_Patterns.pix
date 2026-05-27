@@ -3,6 +3,10 @@
 # Particles migrate to nodal lines where vibration is minimal
 
 # Configuration
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_particles = 75
 v_frames_per_mode = 350
 v_num_modes = 12

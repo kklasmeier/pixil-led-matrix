@@ -7,6 +7,9 @@
 
 throttle(0.2)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ----------------------------------------------------------------------------
 # CONFIGURATION
 # ----------------------------------------------------------------------------
@@ -51,6 +54,16 @@ v_spawn_mode = 0
 #   3 = Horizontal Forest    8 = Chaos Field
 #   4 = Radial Burst         9 = Serpentine
 v_debug_sequence = 9
+
+# Tier 2 smoke: minimal frames, no shuffle/setup prints (fps/throttle forced off in Pixil)
+if get_system("test_mode") == 1 then
+    throttle(0)
+    fps(0)
+    v_num_particles = 8
+    v_burnout = 400
+    v_sequence_duration = 999999
+    v_debug_sequence = 0
+endif
 
 # ----------------------------------------------------------------------------
 # ARRAYS
@@ -488,20 +501,21 @@ def setup_sequence {
     call init_particles
 }
 
+# Tier 2: one field + palette, no shuffle/setup_sequence (interpreted prints are slow)
+def fast_smoke_init {
+    call field_turbulent
+    call palette_ocean
+    v_particle_speed = 100
+    v_spawn_mode = 0
+    v_max_age = 200
+    call init_particles
+}
+
 # ----------------------------------------------------------------------------
 # MAIN
 # ----------------------------------------------------------------------------
 
-# Initialize
-v_sequence_idx = 0
-v_frame = 0
-call shuffle_sequences
-call setup_sequence
-clear()
-
-# Main loop
-while 1 == 1 then
-    
+def simulation_frame {
     # Calculate loop bound once per frame
     v_last_p = v_num_particles - 1
     
@@ -676,5 +690,25 @@ while 1 == 1 then
         
         call setup_sequence
     endif
-    
-endwhile
+}
+
+# Initialize
+v_sequence_idx = 0
+v_frame = 0
+if get_system("test_mode") == 1 then
+    call fast_smoke_init
+else
+    call shuffle_sequences
+    call setup_sequence
+endif
+clear()
+
+if get_system("test_mode") == 1 then
+    for v_smoke_tick in (0, 4, 1)
+        call simulation_frame
+    endfor v_smoke_tick
+else
+    while 1 == 1 then
+        call simulation_frame
+    endwhile
+endif

@@ -5,7 +5,7 @@ Parses a block once into a small statement tree, then runs it without re-dispatc
 lines through process_lines.
 
 Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
-       if/elseif/else, mplot(...), plot/draw_* frame commands (no call/bare proc in loops).
+       if/elseif/else, break, mplot(...), call proc, plot/draw_* frame commands (no bare proc name).
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
             begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon, etc.
 Unsupported constructs cause compile failure and interpreter fallback.
@@ -50,12 +50,23 @@ _FRAME_COMMANDS = frozenset({
     "draw_line", "draw_circle", "draw_rectangle", "plot", "draw_ellipse", "draw_polygon",
 })
 _FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background"})
+_FRAME_MISC_COMMANDS = frozenset({"fps"})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
-_FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS
+_FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS
 _SPRITE_COMMANDS = frozenset({"show_sprite", "move_sprite", "hide_sprite"})
 _BARE_CALL_RESERVED = frozenset(
-    {"else", "endif", "endfor", "endwhile", "endsprite", "then", "true", "false"}
+    {"else", "break", "endif", "endfor", "endwhile", "endsprite", "then", "true", "false"}
 )
+
+
+class LoopBreak(Exception):
+    """Exit the innermost compiled for/while loop body."""
+
+
+def _run_body(statements: List["Statement"], ctx: ExecContext) -> None:
+    """Run a statement list; LoopBreak propagates to the enclosing for/while."""
+    for stmt in statements:
+        stmt.run(ctx)
 
 
 def reset_loop_compiler_stats() -> None:
@@ -177,6 +188,12 @@ class Statement:
 
 
 @dataclass
+class BreakStmt(Statement):
+    def run(self, ctx: ExecContext) -> None:
+        raise LoopBreak()
+
+
+@dataclass
 class AssignStmt(Statement):
     var: str
     expr: str
@@ -210,12 +227,10 @@ class IfStmt(Statement):
     def run(self, ctx: ExecContext) -> None:
         for condition, body in self.branches:
             if condition is None:
-                for stmt in body:
-                    stmt.run(ctx)
+                _run_body(body, ctx)
                 return
             if ctx.eval_cond(condition):
-                for stmt in body:
-                    stmt.run(ctx)
+                _run_body(body, ctx)
                 return
 
 
@@ -270,8 +285,10 @@ class ForStmt(Statement):
             if ctx.is_expired():
                 break
             ctx.variables.set(self.loop_var, current)
-            for stmt in self.body:
-                stmt.run(ctx)
+            try:
+                _run_body(self.body, ctx)
+            except LoopBreak:
+                break
             global COMPILED_LOOP_ITERATIONS
             COMPILED_LOOP_ITERATIONS += 1
             current += step
@@ -289,8 +306,10 @@ class WhileStmt(Statement):
                 break
             if not ctx.eval_cond(self.condition):
                 break
-            for stmt in self.body:
-                stmt.run(ctx)
+            try:
+                _run_body(self.body, ctx)
+            except LoopBreak:
+                break
             global COMPILED_LOOP_ITERATIONS
             COMPILED_LOOP_ITERATIONS += 1
 
@@ -459,6 +478,9 @@ def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
     if stripped.startswith("begin_frame("):
         inner = stripped[len("begin_frame("):-1].strip()
         return CommandStmt("begin_frame", [inner] if inner else [])
+    if stripped.startswith("fps("):
+        inner = stripped[len("fps("):-1].strip()
+        return CommandStmt("fps", [inner] if inner else ["0"])
     sprite = _parse_sprite_command(stripped, allow_commands)
     if sprite is not None:
         return sprite
@@ -476,6 +498,7 @@ def _parse_if_block(
     lines: List[str],
     index: int,
     allow_else: bool,
+    allow_call: bool,
     allow_bare_call: bool,
     allow_commands: bool,
     allow_array_assign: bool,
@@ -502,8 +525,8 @@ def _parse_if_block(
             depth -= 1
             if depth == 0:
                 parsed = _parse_block(
-                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
-                    allow_array_assign,
+                    body_lines, 0, allow_else, allow_call, allow_bare_call,
+                    allow_commands, allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -515,8 +538,8 @@ def _parse_if_block(
         if depth == 1 and allow_else:
             if inner.startswith("elseif ") and inner.endswith("then"):
                 parsed = _parse_block(
-                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
-                    allow_array_assign,
+                    body_lines, 0, allow_else, allow_call, allow_bare_call,
+                    allow_commands, allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -527,8 +550,8 @@ def _parse_if_block(
                 continue
             if inner == "else":
                 parsed = _parse_block(
-                    body_lines, 0, allow_else, allow_bare_call, allow_commands,
-                    allow_array_assign,
+                    body_lines, 0, allow_else, allow_call, allow_bare_call,
+                    allow_commands, allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -546,6 +569,7 @@ def _parse_block(
     lines: List[str],
     index: int = 0,
     allow_else: bool = False,
+    allow_call: bool = False,
     allow_bare_call: bool = False,
     allow_commands: bool = False,
     allow_array_assign: bool = False,
@@ -593,7 +617,8 @@ def _parse_block(
                     inner_lines.append(lines[i])
                 i += 1
             inner = _parse_block(
-                inner_lines, 0, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+                inner_lines, 0, allow_else, allow_call, allow_bare_call,
+                allow_commands, allow_array_assign,
             )
             if inner is None:
                 return None
@@ -619,7 +644,8 @@ def _parse_block(
                     inner_lines.append(lines[i])
                 i += 1
             inner = _parse_block(
-                inner_lines, 0, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+                inner_lines, 0, allow_else, allow_call, allow_bare_call,
+                allow_commands, allow_array_assign,
             )
             if inner is None:
                 return None
@@ -628,7 +654,8 @@ def _parse_block(
 
         if _parse_if_header(line) is not None:
             parsed_if = _parse_if_block(
-                lines, i, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+                lines, i, allow_else, allow_call, allow_bare_call,
+                allow_commands, allow_array_assign,
             )
             if parsed_if is None:
                 return None
@@ -644,6 +671,11 @@ def _parse_block(
 
         if line == "endwhile":
             return statements, i
+
+        if line.lower() == "break":
+            statements.append(BreakStmt())
+            i += 1
+            continue
 
         mplot = _parse_mplot(line)
         if mplot is not None:
@@ -673,7 +705,7 @@ def _parse_block(
 
         call = _parse_call(line)
         if call is not None:
-            if not allow_bare_call:
+            if not allow_call:
                 return None
             statements.append(call)
             i += 1
@@ -705,6 +737,7 @@ def try_compile_loop_block(loop_block: List[str]) -> Optional[CompiledBlock]:
         result = _parse_block(
             loop_block, 0,
             allow_else=True,
+            allow_call=True,
             allow_bare_call=False,
             allow_commands=True,
             allow_array_assign=True,
@@ -737,6 +770,7 @@ def try_compile_procedure_block(proc_block: List[str]) -> Optional[CompiledBlock
         result = _parse_block(
             proc_block, 0,
             allow_else=True,
+            allow_call=True,
             allow_bare_call=True,
             allow_commands=True,
             allow_array_assign=True,
@@ -757,8 +791,10 @@ def try_compile_procedure_block(proc_block: List[str]) -> Optional[CompiledBlock
 def run_compiled_block(compiled: CompiledBlock, ctx: ExecContext) -> None:
     global COMPILED_PROC_CALLS
     COMPILED_PROC_CALLS += 1
-    for stmt in compiled.statements:
-        stmt.run(ctx)
+    try:
+        _run_body(compiled.statements, ctx)
+    except LoopBreak:
+        pass
 
 
 def run_compiled_while_body(
@@ -771,8 +807,11 @@ def run_compiled_while_body(
             break
         if not ctx.eval_cond(condition):
             break
-        for stmt in compiled.statements:
-            stmt.run(ctx)
+        try:
+            for stmt in compiled.statements:
+                stmt.run(ctx)
+        except LoopBreak:
+            break
         global COMPILED_LOOP_ITERATIONS
         COMPILED_LOOP_ITERATIONS += 1
 
@@ -791,8 +830,11 @@ def run_compiled_loop_body(
         if ctx.is_expired():
             break
         ctx.variables.set(loop_var, current)
-        for stmt in compiled.statements:
-            stmt.run(ctx)
+        try:
+            for stmt in compiled.statements:
+                stmt.run(ctx)
+        except LoopBreak:
+            break
         global COMPILED_LOOP_ITERATIONS
         COMPILED_LOOP_ITERATIONS += 1
         current += step

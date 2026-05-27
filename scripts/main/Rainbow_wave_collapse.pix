@@ -1,4 +1,8 @@
 # Define constants and array for rainbow colors
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_size = 8                # Size of each square (8x8 fits 64x64 grid)
 v_colors = 6              # Number of rainbow colors
 v_i = 0

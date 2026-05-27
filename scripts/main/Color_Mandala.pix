@@ -1,6 +1,10 @@
 # Color Mandala Effect with Dynamic Patterns
 
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize variables
 v_time = 0
 v_base_color = 20

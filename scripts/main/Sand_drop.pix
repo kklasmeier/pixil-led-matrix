@@ -1,4 +1,8 @@
 # Define sprites
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 define_sprite(chute, 5, 5)
     draw_rectangle(0, 0, 3, 2, navy, 100, true)
     plot(1, 2, royal_blue, 100)

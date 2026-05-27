@@ -7,6 +7,9 @@
 
 throttle(0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ============================================================
 # BACKGROUND: MULTI-CEL PATTERN VARIATIONS
 # Each cel is a different visual theme

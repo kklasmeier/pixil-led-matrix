@@ -31,6 +31,20 @@ def effective_rest_duration(requested: float) -> float:
     return min(requested, REST_CAP_SECONDS)
 
 
+def effective_fps(rate: float) -> float:
+    """In test mode, disable present pacing so -t limits match wall clock."""
+    if is_test_mode():
+        return 0.0
+    return rate
+
+
+def effective_throttle(factor: float) -> float:
+    """In test mode, do not add queue delay between commands."""
+    if is_test_mode():
+        return 0.0
+    return factor
+
+
 @dataclass
 class TestRunMetrics:
     script: str = ""

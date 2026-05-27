@@ -1,6 +1,10 @@
 # Digital Rain
 # Matrix-style falling characters - Full 64x64 display
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Parameters
 v_width = 64
 v_height = 64

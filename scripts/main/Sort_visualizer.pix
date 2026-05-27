@@ -1,4 +1,8 @@
 throttle (0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Global configurations up top since they'll be used by all algorithms
 v_intensity = 75
 v_base_color = "white"

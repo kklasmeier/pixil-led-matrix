@@ -33,6 +33,7 @@ class CommandExecutor:
             'dispose_sprite': self._handle_dispose_sprite,
             'clear': self._handle_clear,
             'rest': self._handle_rest,
+            'fps': self._handle_fps,
             'begin_frame': self._handle_begin_frame,
             'end_frame': self._handle_end_frame,
             'draw_text': self._handle_draw_text,
@@ -413,6 +414,11 @@ class CommandExecutor:
         """Handle rest command."""
         debug(f"Handling rest command: {duration}s", Level.DEBUG, Component.COMMAND)
         self.api.rest(duration)
+
+    def _handle_fps(self, rate: float):
+        """Handle fps command — cap display presents per second (0 = off)."""
+        debug(f"Handling fps command: {rate}", Level.DEBUG, Component.COMMAND)
+        self.api.set_fps(rate)
 
     def _handle_begin_frame(self, preserve_changes: bool = False):
         """Handle begin_frame command."""

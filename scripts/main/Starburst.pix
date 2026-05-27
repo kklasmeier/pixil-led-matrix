@@ -24,6 +24,10 @@ v_wave_freq = 4        # Frequency of wave pattern in rays
 v_ray_spacing = 5      # Angle between rays (smaller = more rays)
 v_ray_step = 2         # Step size along rays (smaller = denser)
 throttle(.3)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while 1 then
     # Change effects periodically
     if v_effect_duration > v_effect_max_time then

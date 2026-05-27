@@ -15,6 +15,9 @@
 
 throttle(0.1)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ============================================================
 # LAYER 0: DISTANT STAR FIELD (128x64) - tiny dim stars
 # ============================================================

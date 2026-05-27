@@ -6,6 +6,10 @@
 # =============================================================================
 
 # Invader Type 1 (Red) - Bottom row
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 define_sprite(invader1, 8, 6)
     sprite_cel(0)
         draw_rectangle(2, 0, 4, 1, red, 100, true)

@@ -1,5 +1,8 @@
 throttle(.55)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize variables
 v_num_drops = 20  # Number of raindrops
 v_max_x = 63     # Display width - 1

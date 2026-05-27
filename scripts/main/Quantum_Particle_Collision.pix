@@ -1,3 +1,6 @@
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_particles = 4
 v_max_particles = 7
 create_array(v_x, v_max_particles)

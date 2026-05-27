@@ -3,6 +3,10 @@
 # Colors change based on time of day
 
 # Clock face parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_clock_x = 32
 v_clock_y = 22
 v_clock_radius = 18

@@ -2,6 +2,10 @@
 # A colorful fountain of particles that shoot up and fall with gravity
 
 # Initialize variables
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_particles = 15
 v_gravity = 0.25
 v_max_age = 250

@@ -1472,6 +1472,9 @@ print("")
 clear()
 throttle(0.3)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Run forever
 while 1 == 1 then
     call run_frost_cycle

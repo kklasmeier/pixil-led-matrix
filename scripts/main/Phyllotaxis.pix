@@ -1,0 +1,182 @@
+# Phyllotaxis / Sunflower Spiral
+# Golden-angle Fermat spiral: each seed sits at angle n*phi and radius c*sqrt(n)
+# Positions precomputed; bloom rotation uses one cos/sin per frame (2D rotate)
+
+fps(30)
+
+v_center_x = 32
+v_center_y = 32
+v_golden_angle = 2.3999632297
+v_scale = 2.05
+v_max_seeds = 225
+v_seeds_per_frame = 2
+
+v_seed_count = 0
+v_phase = 0
+v_rotation = 0
+v_frame = 0
+v_bloom_frames = 0
+v_bloom_limit = 200
+v_palette = 0
+
+# Precomputed geometry and draw data (filled at startup / palette change)
+create_array(v_seed_ox, v_max_seeds, numeric)
+create_array(v_seed_oy, v_max_seeds, numeric)
+create_array(v_seed_intensity, v_max_seeds, numeric)
+create_array(v_seed_color, v_max_seeds, string)
+create_array(v_seed_hue, v_max_seeds, numeric)
+
+v_palette = random(0, 2, 0)
+
+def init_geometry {
+    for v_n in (0, v_max_seeds - 1, 1)
+        v_theta = v_n * v_golden_angle
+        v_r = v_scale * sqrt(v_n + 1)
+        v_seed_ox[v_n] = cos(v_theta) * v_r
+        v_seed_oy[v_n] = sin(v_theta) * v_r
+        v_seed_intensity[v_n] = 100 - v_n * 38 / v_max_seeds
+        if v_seed_intensity[v_n] < 42 then
+            v_seed_intensity[v_n] = 42
+        endif
+    endfor v_n
+}
+
+def init_palette {
+    for v_n in (0, v_max_seeds - 1, 1)
+        if v_palette == 0 then
+            if v_n < 12 then
+                v_seed_color[v_n] = "yellow"
+            elseif v_n < 45 then
+                v_seed_color[v_n] = "gold"
+            elseif v_n < 100 then
+                v_seed_color[v_n] = "orange"
+            elseif v_n < 160 then
+                v_seed_color[v_n] = "peach"
+            else
+                v_seed_color[v_n] = "olive"
+            endif
+        elseif v_palette == 1 then
+            v_seed_hue[v_n] = 55 + v_n * 30 / v_max_seeds
+        else
+            if v_n < 20 then
+                v_seed_color[v_n] = "crimson"
+            elseif v_n < 90 then
+                v_seed_color[v_n] = "orange"
+            else
+                v_seed_color[v_n] = "brown"
+            endif
+        endif
+    endfor v_n
+}
+
+def draw_center {
+    v_pulse = 55 + sin(radians(v_frame * 6)) * 25
+    v_glow_r = 2
+    if v_phase == 1 then
+        v_glow_r = 3
+    endif
+    for v_dx in (-v_glow_r, v_glow_r, 1)
+        for v_dy in (-v_glow_r, v_glow_r, 1)
+            if v_dx * v_dx + v_dy * v_dy <= v_glow_r * v_glow_r then
+                v_gx = v_center_x + v_dx
+                v_gy = v_center_y + v_dy
+                if v_gx >= 0 and v_gx <= 63 and v_gy >= 0 and v_gy <= 63 then
+                    if v_palette == 0 then
+                        plot(v_gx, v_gy, yellow, v_pulse)
+                    elseif v_palette == 1 then
+                        plot(v_gx, v_gy, white, v_pulse)
+                    else
+                        plot(v_gx, v_gy, gold, v_pulse)
+                    endif
+                endif
+            endif
+        endfor v_dy
+    endfor v_dx
+}
+
+def draw_seeds_grow {
+    for v_n in (0, v_seed_count - 1, 1)
+        v_x = v_center_x + v_seed_ox[v_n]
+        v_y = v_center_y + v_seed_oy[v_n]
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+            v_intensity = v_seed_intensity[v_n]
+            if v_n >= v_seed_count - v_seeds_per_frame then
+                v_intensity = 100
+            endif
+            if v_palette == 1 then
+                plot(v_x, v_y, v_seed_hue[v_n], v_intensity)
+            else
+                plot(v_x, v_y, v_seed_color[v_n], v_intensity)
+            endif
+        endif
+    endfor v_n
+}
+
+def draw_seeds_rotate {
+    v_cos_r = cos(v_rotation)
+    v_sin_r = sin(v_rotation)
+    for v_n in (0, v_max_seeds - 1, 1)
+        v_ox = v_seed_ox[v_n] * v_pulse_scale
+        v_oy = v_seed_oy[v_n] * v_pulse_scale
+        v_x = v_center_x + v_ox * v_cos_r - v_oy * v_sin_r
+        v_y = v_center_y + v_ox * v_sin_r + v_oy * v_cos_r
+        if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
+            if v_palette == 1 then
+                plot(v_x, v_y, v_seed_hue[v_n], v_seed_intensity[v_n])
+            else
+                plot(v_x, v_y, v_seed_color[v_n], v_seed_intensity[v_n])
+            endif
+        endif
+    endfor v_n
+}
+
+call init_geometry
+call init_palette
+
+while true then
+    begin_frame
+
+    if v_phase == 0 then
+        v_seed_count = v_seed_count + v_seeds_per_frame
+        if v_seed_count >= v_max_seeds then
+            v_seed_count = v_max_seeds
+            v_phase = 1
+            v_bloom_frames = 0
+        endif
+    endif
+
+    if v_phase == 1 then
+        v_rotation = v_rotation + 0.045
+        v_bloom_frames = v_bloom_frames + 1
+        if v_bloom_frames >= v_bloom_limit then
+            v_phase = 2
+        endif
+    endif
+
+    if v_phase == 2 then
+        v_seed_count = 0
+        v_rotation = 0
+        v_bloom_frames = 0
+        v_phase = 0
+        v_palette = random(0, 2, 0)
+        call init_palette
+    endif
+
+    v_pulse_scale = 1
+    if v_phase == 1 then
+        v_pulse_scale = 1 + sin(v_frame * 0.07) * 0.06
+    endif
+
+    call draw_center
+
+    if v_seed_count > 0 then
+        if v_phase == 1 then
+            call draw_seeds_rotate
+        else
+            call draw_seeds_grow
+        endif
+    endif
+
+    end_frame
+    v_frame = v_frame + 1
+endwhile

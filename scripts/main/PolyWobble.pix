@@ -5,6 +5,10 @@
 # Runs infinitely until stopped
 
 # Clear display at the start
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Set up variables for cylinder position and dimensions

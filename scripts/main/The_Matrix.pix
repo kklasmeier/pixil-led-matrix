@@ -1,5 +1,8 @@
 throttle(.72)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_drops = 6  # Increased number of drops
 create_array(v_x, v_num_drops)
 create_array(v_y, v_num_drops)

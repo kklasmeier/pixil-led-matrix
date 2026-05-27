@@ -3,6 +3,9 @@
 
 throttle(0.05)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Animation parameters
 v_time = 0
 v_speed = 0.05

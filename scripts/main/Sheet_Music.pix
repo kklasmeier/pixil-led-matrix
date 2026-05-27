@@ -4,6 +4,10 @@
 # ============================================
 # CONFIGURATION
 # ============================================
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_tempo = 108
 v_beat_ms = 60000 / v_tempo
 v_scroll_speed = 16

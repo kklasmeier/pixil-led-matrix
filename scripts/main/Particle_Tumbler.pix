@@ -1,6 +1,10 @@
 # Rock Tumbler Script (Authentic Physics)
 
 # Configuration
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_rocks = 18         # Number of rocks
 v_radius = 30            # Tumbler radius
 v_center_x = 32          # Center of tumbler

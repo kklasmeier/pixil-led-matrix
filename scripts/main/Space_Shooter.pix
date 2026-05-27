@@ -5,6 +5,10 @@
 # ============================================================
 # Configuration
 # ============================================================
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_base_scroll = 2
 v_base_cooldown = 12
 

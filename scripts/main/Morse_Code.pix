@@ -21,6 +21,10 @@
 # ============================================================
 
 # Message 0: "SOS"
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 create_array(v_msg0, 4, numeric)
 v_msg0[0] = 18
 v_msg0[1] = 14

@@ -98,6 +98,9 @@ print("")
 v_max_angle = tau * 8
 throttle(0.3)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 while v_angle < v_max_angle then
     call draw_frame
     v_angle = v_angle + v_speed

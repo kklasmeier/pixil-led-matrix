@@ -1,5 +1,9 @@
 # Matrix Rain Pattern Lightshow
 # Initialize display parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_columns = 16    # Number of vertical streams
 v_height = 64         # Display height
 

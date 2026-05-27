@@ -2,6 +2,10 @@
 # Creates an organic plasma effect with flowing tendrils
 
 # Ball parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_tendrils = 6
 v_center_x = 32
 v_center_y = 32

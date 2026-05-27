@@ -10,6 +10,9 @@
 #   Cels 0-3: caustics slowly brighten and drift right/down
 #   Cels 4-7: caustics slowly dim and drift back
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 define_sprite(ocean, 128, 128)
 
     # --- Cel 0: Base state ---

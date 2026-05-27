@@ -2,6 +2,10 @@
 # Fixed version that ensures stars move properly
 # Adjust throttle rate - try different values
 throttle(1)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Parameters
 v_width = 64
 v_height = 64

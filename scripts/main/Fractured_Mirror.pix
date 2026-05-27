@@ -1,4 +1,8 @@
 # Grid setup (8x8 tiles, each 8x8 pixels)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 create_array(v_offsets_x, 64)  # X offset for each tile
 create_array(v_offsets_y, 64)  # Y offset for each tile
 

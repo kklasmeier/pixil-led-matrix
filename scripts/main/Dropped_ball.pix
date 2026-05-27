@@ -1,5 +1,8 @@
 # Create ball sprites - First ball (cyan/blue)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 def create_ball_sprites {
     define_sprite(ball0, 6, 6)  # 12 o'clock
         draw_circle(3, 3, 2, cyan, 50, true)

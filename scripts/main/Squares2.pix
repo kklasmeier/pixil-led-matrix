@@ -1,5 +1,9 @@
 # Square animation showcase - Continuous pattern with random elements
 # Set initial values
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_size = 63  # Maximum size for 64x64 panel (0-63)
 
 def check_color_shift {

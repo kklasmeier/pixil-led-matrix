@@ -45,6 +45,13 @@ def test_get_system_runtime():
     assert runtime >= 1
 
 
+def test_get_system_test_mode(monkeypatch):
+    monkeypatch.delenv("PIXIL_TEST_MODE", raising=False)
+    assert get_system("test_mode") == 0
+    monkeypatch.setenv("PIXIL_TEST_MODE", "1")
+    assert get_system("test_mode") == 1
+
+
 def test_get_system_unknown_metric():
     with pytest.raises(ValueError, match="Unknown system metric"):
         get_system("not_a_metric")

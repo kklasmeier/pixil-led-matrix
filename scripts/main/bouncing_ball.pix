@@ -1,4 +1,8 @@
 # Initialize physics variables
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_gravity = 9.8  # Gravity acceleration
 v_dt = 0.05      # Time step
 v_bounce = 0.80  # Bounce coefficient (energy loss)

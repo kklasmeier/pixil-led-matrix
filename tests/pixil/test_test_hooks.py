@@ -20,6 +20,14 @@ def test_effective_rest_capped_when_on(monkeypatch):
     assert test_hooks.effective_rest_duration(5.0) == 0.01
 
 
+def test_effective_fps_and_throttle_zero_in_test_mode(monkeypatch):
+    monkeypatch.setenv("PIXIL_TEST_MODE", "1")
+    from pixil_utils.test_hooks import effective_fps, effective_throttle
+
+    assert effective_fps(60) == 0.0
+    assert effective_throttle(0.2) == 0.0
+
+
 def test_summary_line_format(monkeypatch):
     monkeypatch.setenv("PIXIL_TEST_MODE", "1")
     test_hooks.reset_metrics("testing/foo.pix")

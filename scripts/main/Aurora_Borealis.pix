@@ -2,6 +2,10 @@
 # Simulates the flowing waves of the northern lights
 
 # Parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_width = 64
 v_height = 64
 v_num_waves = 4

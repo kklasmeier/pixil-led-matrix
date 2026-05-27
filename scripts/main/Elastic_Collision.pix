@@ -1,4 +1,8 @@
 # Check if system needs energy boost
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 def check_energy_boost {
     # Calculate total kinetic energy of all balls
     v_total_energy = 0

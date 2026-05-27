@@ -1,6 +1,9 @@
 # Metaballs - organic, blob-like shapes
 throttle(0)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_balls = 5
 create_array(v_pos_x, v_num_balls)
 create_array(v_pos_y, v_num_balls)

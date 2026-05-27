@@ -1,4 +1,8 @@
 throttle(.01)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize variables
 v_offset = 0
 v_time = 0

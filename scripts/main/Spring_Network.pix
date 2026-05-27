@@ -1,6 +1,9 @@
 # Spring Network - Interconnected Mass-Spring System
 # Physics simulation of masses connected by springs with wave propagation
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 clear()
 
 # Configuration - adjust for performance

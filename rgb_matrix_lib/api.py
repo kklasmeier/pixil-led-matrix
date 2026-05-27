@@ -63,6 +63,9 @@ class RGB_Api:
         self.current_command_pixels = []
         self.frame_mode = False
         self.preserve_frame_changes = False
+        self._target_fps = 0.0
+        self._frame_interval = 0.0
+        self._last_present_time = 0.0
         self.grid_dirty = np.zeros((self.matrix.height // GRID_SIZE, self.matrix.width // GRID_SIZE), dtype=bool)
         self.sprite_manager = SpriteManager()
         self.background_manager = BackgroundManager(self.sprite_manager)
@@ -71,6 +74,38 @@ class RGB_Api:
         self.burnout_manager.start()
                 
         debug("RGB_Api initialization complete", Level.INFO, Component.SYSTEM)
+
+    def set_fps(self, fps: float) -> None:
+        """Set maximum display refresh rate. fps<=0 disables pacing (full speed)."""
+        rate = float(fps)
+        if rate <= 0:
+            self._target_fps = 0.0
+            self._frame_interval = 0.0
+            debug("FPS pacing disabled", Level.INFO, Component.SYSTEM)
+        else:
+            self._target_fps = rate
+            self._frame_interval = 1.0 / rate
+            debug(
+                f"FPS pacing enabled: {rate} Hz ({self._frame_interval:.6f}s per frame)",
+                Level.INFO,
+                Component.SYSTEM,
+            )
+
+    def reset_fps(self) -> None:
+        """Disable FPS pacing (same as fps(0))."""
+        self.set_fps(0)
+
+    def _pace_after_present(self) -> None:
+        """Sleep if the last present was faster than the target frame interval."""
+        if self._frame_interval <= 0:
+            return
+        now = time.perf_counter()
+        if self._last_present_time > 0:
+            elapsed = now - self._last_present_time
+            sleep_for = self._frame_interval - elapsed
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+        self._last_present_time = time.perf_counter()
 
     def dispose_all_sprites(self):
         """Remove all sprites from memory and clear them from display."""
@@ -222,6 +257,7 @@ class RGB_Api:
             self.current_command_pixels.clear()
             self.frame_mode = False
             self.preserve_frame_changes = False
+            self._pace_after_present()
 
 #    def end_frame(self):
 #        """End frame mode and display the accumulated drawing."""
@@ -264,6 +300,7 @@ class RGB_Api:
             for x, y, r, g, b in self.current_command_pixels:
                 self.canvas.SetPixel(x, y, r, g, b)
             self.current_command_pixels.clear()
+            self._pace_after_present()
 
     # Basic Drawing Methods
     def plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, 
@@ -1221,6 +1258,7 @@ class RGB_Api:
         """Clean up resources."""
         print("\nStarting RGB_Api instance cleanup...")
         try:
+            self.reset_fps()
             if self.frame_mode:
                 print("RGB_Api cleanup: ending frame mode")
                 self.end_frame()

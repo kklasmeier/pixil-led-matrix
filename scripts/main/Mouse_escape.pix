@@ -1,4 +1,8 @@
 # Global configurations
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_intensity = 75            # Base color intensity
 v_mouse_speed = 0.1        # Movement speed
 

@@ -1,3 +1,6 @@
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_num_wisps = 20
 
 create_array(v_cx, v_num_wisps)
@@ -102,11 +105,10 @@ while true then
         endif
 
         if v_x >= 0 and v_x <= 63 and v_y >= 0 and v_y <= 63 then
-            mplot(v_x, v_y, v_color[v_i], v_b, 60)
+            plot(v_x, v_y, v_color[v_i], v_b, 60)
         endif
     endfor v_i
 
-    mflush()
     end_frame
     #rest(0.02)
     v_frame = v_frame + 1

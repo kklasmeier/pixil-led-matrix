@@ -1,5 +1,9 @@
 # Wave Grid Pattern Lightshow
 # Initialize base parameters
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_centerX = 32
 v_centerY = 32
 v_angle = 0

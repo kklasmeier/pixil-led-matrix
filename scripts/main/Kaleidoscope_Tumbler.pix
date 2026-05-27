@@ -23,6 +23,9 @@ v_wedge_intensity = 25
 
 throttle(0.6)
 
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # ============================================================
 # CONSTANTS
 # ============================================================

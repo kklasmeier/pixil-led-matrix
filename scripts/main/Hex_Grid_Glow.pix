@@ -1,4 +1,8 @@
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_radius = 5
 v_spacing_x = v_radius * 1.5
 v_spacing_y = v_radius * 1.732

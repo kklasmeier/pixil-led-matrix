@@ -4,6 +4,10 @@
 # -------------------------
 # Tunables
 # -------------------------
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_bg_color = "black"
 v_bg_i = 20
 

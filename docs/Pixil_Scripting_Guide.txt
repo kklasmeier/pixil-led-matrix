@@ -480,6 +480,9 @@ for v_i in (v_start, v_end, v_step)
     plot(v_i, v_y, green, 100)
 endfor v_i
 
+Use break to exit the innermost for or while loop early (compiled and interpreted).
+break inside if still exits the enclosing loop; break outside any loop is ignored.
+
 WHILE LOOPS
 -----------
 
@@ -487,8 +490,6 @@ Syntax:
 while <condition> then
     # commands
 endwhile
-
-Note: There is no break statement to exit while loops early.
 
 While loops support all condition features: compound conditions, parentheses, and NOT.
 
@@ -1176,11 +1177,46 @@ CLEANUP BEHAVIOR
 15. PERFORMANCE COMMANDS
 ================================================================================
 
+FPS (RECOMMENDED FOR ANIMATION SPEED)
+-------------------------------------
+fps(rate)
+
+Caps how fast the LED matrix presents frames. Pacing runs in rgb_matrix_lib at each
+display swap (end_frame and immediate-mode draws), so speed is consistent regardless of
+Pi CPU load or Pixil optimizations.
+
+- fps(60)  — at most 60 frames per second (~0.0167s between presents)
+- fps(30)  — at most 30 FPS
+- fps(0)   — unlimited (default; pacing off)
+
+Default is off. Each script starts with fps(0); set fps in the script when you want a cap.
+You may call fps() anywhere and change it during the show.
+
+if work finishes before the frame budget, the library waits the remainder.
+if work is slower than the budget, it does not add extra delay (no catch-up burst).
+
+Example (framed animation — preferred):
+
+fps(30)
+while true then
+    begin_frame(true)
+    # ... simulation and draws ...
+    end_frame
+endwhile
+
+Example (legacy immediate draws — fps still applies per swap):
+
+fps(60)
+for v_i in (0, 63, 1)
+    plot(v_i, v_i, green, 100)
+endfor v_i
+
 REST
 ----
 rest(seconds)
 
-Pauses script execution. Use for timing animations.
+Pauses the consumer for a fixed wall-clock duration. Use for holds and timed pauses,
+not for steady animation speed (use fps for that).
 
 rest(1)       # Pause 1 second
 rest(0.05)    # Pause 50 milliseconds
@@ -1204,7 +1240,9 @@ THROTTLE
 --------
 throttle(factor)
 
-Adjusts timing delay between commands.
+Adjusts delay between queued commands in Pixil (producer side). Less predictable
+with draw_batch / sprite_batch; prefer fps() for animation rate.
+
 - factor < 1.0: Faster execution (less delay)
 - factor = 1.0: Default timing
 - factor > 1.0: Slower execution (more delay)
@@ -1214,9 +1252,8 @@ throttle(2.0)           # Run slower
 throttle(v_speed)       # Variable throttle
 
 Use throttle to:
-- Reduce queue backup in complex animations (lower values)
-- Slow down for debugging (higher values)
-- Dynamically adjust animation speed
+- Tune legacy scripts that issue many separate queue commands
+- Slow down for debugging
 
 ================================================================================
 16. DEBUGGING
@@ -1376,7 +1413,7 @@ GENERAL TIPS
 1. Use mplot/mflush for many pixels instead of individual plot() calls
 2. Use burnout instead of manually clearing pixels
 3. Prefer simpler shapes when possible (circles are more expensive than rectangles)
-4. Use throttle() to manage queue depth in complex animations
+4. Use fps() to cap display refresh rate; use throttle() only for legacy queue tuning
 
 LOOP OPTIMIZATION
 -----------------
@@ -1393,7 +1430,7 @@ mflush()
 
 FRAME RATE TIPS
 ---------------
-- Target 30 FPS (rest(0.033)) for smooth animation
+- Target 30 FPS with fps(30) and begin_frame/end_frame for smooth animation
 - Complex calculations inside loops slow down frame rate
 - Pre-calculate values outside loops when possible
 

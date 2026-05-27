@@ -4,6 +4,10 @@
 # Fluid transitions between parameter sets
 
 # Center of display
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_cx = 32
 v_cy = 32
 

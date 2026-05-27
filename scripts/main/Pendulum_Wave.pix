@@ -2,6 +2,10 @@
 # Creates a mesmerizing wave pattern using multiple pendulums with different periods
 
 # Settings that will change each cycle
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 v_cycle_time = 60          # Time before reset and new pattern
 v_min_pendulums = 5       # Minimum number of pendulums
 v_max_pendulums = 20      # Maximum number of pendulums

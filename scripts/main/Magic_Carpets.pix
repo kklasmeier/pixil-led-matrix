@@ -1,6 +1,10 @@
 # Aurora Borealis Effect with Color Shifting and Dynamic Patterns
 
 throttle(1)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize variables
 v_time = 0
 v_wave_speed = 80

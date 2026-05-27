@@ -1,6 +1,10 @@
 # Raindrop simulation (top-down view with subtle tapering and logarithmic fade)
 # Drops spawn randomly, taper slightly inward, and fade with a slowing taper
 throttle(0)
+
+# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
+fps(60)
+
 # Initialize variables
 v_max_drops = 20          # Number of simultaneous raindrops
 v_drop_height = 6         # Steps for drop to "fall" (keeps natural rate)
