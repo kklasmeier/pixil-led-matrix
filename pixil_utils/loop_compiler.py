@@ -4,9 +4,10 @@ Compiled block bodies (loops v0, procedures v0).
 Parses a block once into a small statement tree, then runs it without re-dispatching
 lines through process_lines.
 
-Loops: nested for (literal bounds folded at compile time), v_ assignments, if/endif (no elseif/else), mplot(...).
+Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
+       if/elseif/else, mplot(...), plot/draw_* frame commands (no call/bare proc in loops).
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
-            begin_frame, end_frame, mflush, draw_line, draw_circle.
+            begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon, etc.
 Unsupported constructs cause compile failure and interpreter fallback.
 """
 
@@ -421,6 +422,7 @@ def _parse_if_block(
     allow_else: bool,
     allow_bare_call: bool,
     allow_commands: bool,
+    allow_array_assign: bool,
 ) -> Optional[tuple[IfStmt, int]]:
     line = lines[index].strip()
     cond = _parse_if_header(line)
@@ -445,6 +447,7 @@ def _parse_if_block(
             if depth == 0:
                 parsed = _parse_block(
                     body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                    allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -457,6 +460,7 @@ def _parse_if_block(
             if inner.startswith("elseif ") and inner.endswith("then"):
                 parsed = _parse_block(
                     body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                    allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -468,6 +472,7 @@ def _parse_if_block(
             if inner == "else":
                 parsed = _parse_block(
                     body_lines, 0, allow_else, allow_bare_call, allow_commands,
+                    allow_array_assign,
                 )
                 if parsed is None:
                     return None
@@ -487,6 +492,7 @@ def _parse_block(
     allow_else: bool = False,
     allow_bare_call: bool = False,
     allow_commands: bool = False,
+    allow_array_assign: bool = False,
 ) -> Optional[tuple[List[Statement], int]]:
     statements: List[Statement] = []
     i = index
@@ -530,14 +536,18 @@ def _parse_block(
                 else:
                     inner_lines.append(lines[i])
                 i += 1
-            inner = _parse_block(inner_lines, 0, allow_else, allow_bare_call, allow_commands)
+            inner = _parse_block(
+                inner_lines, 0, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+            )
             if inner is None:
                 return None
             statements.append(_make_for_stmt(loop_var, start_e, end_e, step_e, inner[0]))
             continue
 
         if _parse_if_header(line) is not None:
-            parsed_if = _parse_if_block(lines, i, allow_else, allow_bare_call, allow_commands)
+            parsed_if = _parse_if_block(
+                lines, i, allow_else, allow_bare_call, allow_commands, allow_array_assign,
+            )
             if parsed_if is None:
                 return None
             statements.append(parsed_if[0])
@@ -558,7 +568,7 @@ def _parse_block(
 
         arr = _parse_array_assign(line)
         if arr is not None:
-            if not allow_bare_call:
+            if not allow_bare_call and not allow_array_assign:
                 return None
             statements.append(arr)
             i += 1
@@ -607,7 +617,13 @@ def try_compile_loop_block(loop_block: List[str]) -> Optional[CompiledBlock]:
         COMPILED_LOOP_HITS += 1
         return _LOOP_BODY_CACHE[cache_key]
     try:
-        result = _parse_block(loop_block, 0, allow_else=False, allow_bare_call=False, allow_commands=False)
+        result = _parse_block(
+            loop_block, 0,
+            allow_else=True,
+            allow_bare_call=False,
+            allow_commands=True,
+            allow_array_assign=True,
+        )
         if result is None:
             COMPILED_LOOP_FALLBACKS += 1
             return None
@@ -638,6 +654,7 @@ def try_compile_procedure_block(proc_block: List[str]) -> Optional[CompiledBlock
             allow_else=True,
             allow_bare_call=True,
             allow_commands=True,
+            allow_array_assign=True,
         )
         if result is None:
             COMPILED_PROC_FALLBACKS += 1

@@ -18,7 +18,7 @@
 | `test_parameter_errors.py` | `parameter_types.py` | too few/many params, invalid conversions |
 | `test_expression_parser.py` | `expression_parser.py` | colors, format_parameter, escape, draw_text |
 | `test_jit_compiler.py` | `jit_compiler/` | dormant-path guard (JIT off in production) |
-| `test_loop_compiler.py` | `loop_compiler.py` | compile/run mplot grids, reject call in loops |
+| `test_loop_compiler.py` | `loop_compiler.py` | compile/run mplot grids, draw_* in loops, elseif, array assign, reject call in loops |
 | `test_procedure_compiler.py` | `loop_compiler.py` | procedures: call, array assign, if/else, begin_frame |
 | `test_compiled_blocks.py` | `loop_compiler.py` | flag gating, elseif execution, Boids compile smoke, mplot named/expression colors |
 | `test_script_manager.py` | `script_manager.py`, `file_manager.py` | path resolution, glob |

@@ -1,6 +1,7 @@
 """Loop compiler v0 — parse and run metaballs-style blocks."""
 
 from pixil_utils.loop_compiler import (
+    CommandStmt,
     try_compile_loop_block,
     try_compile_procedure_block,
     run_compiled_loop_body,
@@ -247,6 +248,67 @@ def test_nested_literal_bounds_inner_for():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
+def test_loop_draw_circle_compiles_and_invokes_run_command():
+    flags.ENABLE_COMPILED_LOOPS = True
+    # Inner body only — Pixil wraps with run_compiled_loop_body (see Pixil.py for loop)
+    block = [
+        "draw_circle(v_i, 5, 3, 50, 80, false)",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    assert any(isinstance(s, CommandStmt) for s in compiled.statements)
+
+    commands = []
+
+    def capture_command(cmd_name, arg_exprs):
+        commands.append((cmd_name, list(arg_exprs)))
+
+    variables = VariableRegistry()
+    variables.scan_and_register(["v_i"])
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, run_command=capture_command,
+    )
+    run_compiled_loop_body(compiled, "v_i", 0.0, 2.0, 1.0, ctx)
+    assert len(commands) == 3
+    assert all(c[0] == "draw_circle" for c in commands)
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_loop_elseif_draw_shape_branches():
+    """Expanding_Circles-style shape dispatch in a compiled loop."""
+    flags.ENABLE_COMPILED_LOOPS = True
+    block = [
+        "if v_shape[v_i] == 0 then",
+        "draw_polygon(10, 10, 4, 5, 20, 80, 0, false)",
+        "elseif v_shape[v_i] == 1 then",
+        "draw_polygon(10, 10, 4, 7, 30, 80, 0, false)",
+        "else",
+        "draw_circle(10, 10, 4, 40, 80, false)",
+        "endif",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+
+    commands = []
+
+    def capture_command(cmd_name, arg_exprs):
+        commands.append(cmd_name)
+
+    variables = VariableRegistry()
+    variables.scan_and_register(["v_i", "v_shape"])
+    variables.set("v_shape", PixilArray(3))
+    variables.get("v_shape")[0] = 0
+    variables.get("v_shape")[1] = 1
+    variables.get("v_shape")[2] = 2
+
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, run_command=capture_command,
+    )
+    run_compiled_loop_body(compiled, "v_i", 0.0, 2.0, 1.0, ctx)
+    assert commands == ["draw_polygon", "draw_polygon", "draw_circle"]
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
 def test_loop_call_inside_if_does_not_compile():
     """Regression: if-bodies must not enable call parsing in loop mode."""
     flags.ENABLE_COMPILED_LOOPS = True
@@ -259,6 +321,56 @@ def test_loop_call_inside_if_does_not_compile():
         "endfor v_j",
     ]
     assert try_compile_loop_block(block) is None
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_loop_array_assign_compiles():
+    flags.ENABLE_COMPILED_LOOPS = True
+    block = [
+        "v_radius[v_i] = v_radius[v_i] + v_growth_speed",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    variables = VariableRegistry()
+    variables.scan_and_register(["v_i", "v_radius", "v_growth_speed"])
+    variables.set("v_radius", PixilArray(3))
+    variables.get("v_radius")[0] = 1.0
+    variables.get("v_radius")[1] = 2.0
+    variables.get("v_radius")[2] = 3.0
+    variables.set("v_growth_speed", 0.5)
+    ctx = make_loop_context(variables, lambda *a: None, lambda: False)
+    run_compiled_loop_body(compiled, "v_i", 0.0, 2.0, 1.0, ctx)
+    assert variables.get("v_radius")[0] == 1.5
+    assert variables.get("v_radius")[2] == 3.5
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
+def test_expanding_circles_draw_loop_compiles():
+    """Regression: main draw/update for in Expanding_Circles.pix (inner body only)."""
+    flags.ENABLE_COMPILED_LOOPS = True
+    body = [
+        "if v_active[v_i] == 1 then",
+        "v_draw_x = round(v_center_x[v_i])",
+        "v_draw_y = round(v_center_y[v_i])",
+        "v_draw_radius = round(v_radius[v_i])",
+        "if v_draw_radius >= 1 then",
+        "if v_shape[v_i] == 0 then",
+        "draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 5, v_color[v_i], 80, 0, false)",
+        "elseif v_shape[v_i] == 1 then",
+        "draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 7, v_color[v_i], 80, 0, false)",
+        "elseif v_shape[v_i] == 2 then",
+        "draw_polygon(v_draw_x, v_draw_y, v_draw_radius, 9, v_color[v_i], 80, 0, false)",
+        "else",
+        "draw_circle(v_draw_x, v_draw_y, v_draw_radius, v_color[v_i], 80, false)",
+        "endif",
+        "endif",
+        "v_radius[v_i] = v_radius[v_i] + v_growth_speed",
+        "if v_radius[v_i] > 45 then",
+        "v_active[v_i] = 0",
+        "endif",
+        "endif",
+    ]
+    assert try_compile_loop_block(body) is not None
     flags.ENABLE_COMPILED_LOOPS = False
 
 

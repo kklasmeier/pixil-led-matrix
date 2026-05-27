@@ -1582,7 +1582,12 @@ def process_script(filename, execute_func=None):
                 compiled_loop = try_compile_loop_block(loop_block) if ENABLE_COMPILED_LOOPS else None
 
                 if compiled_loop is not None:
-                    loop_ctx = make_loop_context(variables, _compiled_mplot, is_time_expired)
+                    loop_ctx = make_loop_context(
+                        variables,
+                        _compiled_mplot,
+                        is_time_expired,
+                        run_command=_run_compiled_command,
+                    )
                     run_compiled_loop_body(compiled_loop, loop_var, start, end, step, loop_ctx)
                 else:
                     epsilon = 1e-10  # always numeric
