@@ -12,7 +12,7 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'y', 'type': 'int', 'position': 1},
         {'name': 'color', 'type': 'color', 'position': 2},
         {'name': 'intensity', 'type': 'int', 'position': 3, 'optional': True},
-        {'name': 'duration', 'type': 'float', 'position': 4, 'optional': True},
+        {'name': 'burnout', 'type': 'float', 'position': 4, 'optional': True},
         {'name': 'burnout_mode', 'type': 'str', 'position': 5, 'optional': True, 'default': 'instant'}
     ],
     'mplot': [

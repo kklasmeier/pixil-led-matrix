@@ -10,6 +10,7 @@ v_color_list[0] = "white"
 v_color_list[1] = "blue"
 v_color_list[2] = "yellow"
 v_color_list[3] = "cyan"
+v_color_list[4] = "magenta"
 
 v_center_x = 32           # Center of display
 v_center_y = 32

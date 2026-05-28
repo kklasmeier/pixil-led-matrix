@@ -5,7 +5,7 @@ Parses a block once into a small statement tree, then runs it without re-dispatc
 lines through process_lines.
 
 Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
-       if/elseif/else, break, mplot(...), call proc, plot/draw_* frame commands (no bare proc name).
+       if/elseif/else, break, mplot(...), plot(...) (fast path), other draw_* via CommandStmt.
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
             begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon, etc.
 Unsupported constructs cause compile failure and interpreter fallback.
@@ -49,7 +49,7 @@ COMPILED_PROC_CALLS = 0
 _FRAME_COMMANDS = frozenset({
     "draw_line", "draw_circle", "draw_rectangle", "plot", "draw_ellipse", "draw_polygon",
 })
-_FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background"})
+_FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background", "clear"})
 _FRAME_MISC_COMMANDS = frozenset({"fps"})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
 _FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS
@@ -167,6 +167,7 @@ class ExecContext:
     is_expired: Callable[[], bool]
     call_procedure: Optional[Callable[[str], None]] = None
     run_command: Optional[Callable[[str, List[str]], None]] = None
+    plot: Optional[Callable[..., None]] = None
 
 
 # Backward-compatible alias
@@ -351,6 +352,45 @@ class MplotStmt(Statement):
 
 
 @dataclass
+class PlotStmt(Statement):
+    """Fast compiled path for plot(x, y, color, [intensity], [burnout], [burnout_mode])."""
+
+    x_expr: str
+    y_expr: str
+    color_expr: str
+    intensity_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x: Optional[Any] = field(default=None, repr=False)
+    compiled_y: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x = int(float(_eval_expression(self.x_expr, self.compiled_x, ctx)))
+        y = int(float(_eval_expression(self.y_expr, self.compiled_y, ctx)))
+        if not (0 <= x <= 63 and 0 <= y <= 63):
+            return
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        plot_fn = ctx.plot if ctx.plot is not None else ctx.mplot
+        if burnout is not None or burnout_mode is not None:
+            plot_fn(x, y, color, intensity, burnout, burnout_mode)
+        else:
+            plot_fn(x, y, color, intensity)
+
+
+@dataclass
 class CallStmt(Statement):
     proc_name: str
 
@@ -369,6 +409,30 @@ class CommandStmt(Statement):
         if ctx.run_command is None:
             raise RuntimeError("run_command not configured")
         ctx.run_command(self.command_name, self.arg_exprs)
+
+
+def _parse_plot(line: str) -> Optional[PlotStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "plot":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 3:
+        return None
+    intensity_expr = args[3].strip() if len(args) > 3 and args[3].strip() else "100"
+    burnout_expr = args[4].strip() if len(args) > 4 and args[4].strip() else None
+    burnout_mode_expr = args[5].strip() if len(args) > 5 and args[5].strip() else None
+    return PlotStmt(
+        args[0], args[1], args[2], intensity_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(intensity_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
 
 
 def _parse_mplot(line: str) -> Optional[MplotStmt]:
@@ -683,6 +747,12 @@ def _parse_block(
             i += 1
             continue
 
+        plot_stmt = _parse_plot(line)
+        if plot_stmt is not None:
+            statements.append(plot_stmt)
+            i += 1
+            continue
+
         arr = _parse_array_assign(line)
         if arr is not None:
             if not allow_bare_call and not allow_array_assign:
@@ -846,6 +916,7 @@ def make_loop_context(
     is_expired: Callable[[], bool],
     call_procedure: Optional[Callable[[str], None]] = None,
     run_command: Optional[Callable[[str, List[str]], None]] = None,
+    plot_fn: Optional[Callable[..., None]] = None,
 ) -> ExecContext:
     def eval_expr(expr: str) -> Any:
         return evaluate_math_expression(expr, variables)
@@ -864,4 +935,5 @@ def make_loop_context(
         is_expired=is_expired,
         call_procedure=call_procedure,
         run_command=run_command,
+        plot=plot_fn,
     )

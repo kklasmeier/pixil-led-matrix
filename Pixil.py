@@ -774,6 +774,17 @@ def process_script(filename, execute_func=None):
             if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Ultra-fast color: {value_stripped}", DEBUG_VERBOSE)
             return value_stripped
+
+        # Ultra-Fast Path #2b: burnout_mode literals (fade/instant) for plot/mplot
+        if value_stripped in ('fade', 'instant'):
+            try:
+                param_name = PARAMETER_TYPES[command_name][param_position]['name']
+            except (KeyError, IndexError):
+                param_name = ''
+            if param_name == 'burnout_mode':
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Ultra-fast burnout_mode: {value_stripped}", DEBUG_VERBOSE)
+                return value_stripped
         
         # Ultra-Fast Path #3: Direct quoted strings (e.g., "Hello", "piboto-regular")
         if ((value_stripped.startswith('"') and value_stripped.endswith('"')) or
@@ -1469,6 +1480,23 @@ def process_script(filename, execute_func=None):
             # Handle non-f-string print
             print(content.strip('"\''))
 
+    def _compiled_plot(x, y, color, intensity, burnout=None, burnout_mode=None):
+        """Compiled plot(): batch in frame mode; flush immediately otherwise."""
+        global mplot_buffer, mplot_count, draw_buffer, draw_count
+        if not (0 <= x <= 63 and 0 <= y <= 63):
+            return
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        if _use_draw_batch_for('plot'):
+            _append_to_draw_batch('plot', [x, y, final_color, intensity, burnout, burnout_mode])
+            return
+        parts = [str(x), str(y), str(final_color), str(intensity)]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"plot({', '.join(parts)})")
+
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
         global mplot_buffer, mplot_count, draw_buffer, draw_count
         if not (0 <= x <= 63 and 0 <= y <= 63):
@@ -1501,6 +1529,8 @@ def process_script(filename, execute_func=None):
             start_frame_buffer(preserve)
         elif cmd_name == 'end_frame':
             finish_frame_buffer()
+        elif cmd_name == 'clear':
+            execute_command('clear')
         elif cmd_name == 'mflush':
             from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
             if ENABLE_DRAW_BATCH:
@@ -1552,6 +1582,7 @@ def process_script(filename, execute_func=None):
                 is_time_expired,
                 call_procedure=invoke_procedure,
                 run_command=_run_compiled_command,
+                plot_fn=_compiled_plot,
             )
             run_compiled_block(compiled, ctx)
         else:
@@ -1739,6 +1770,7 @@ def process_script(filename, execute_func=None):
                         is_time_expired,
                         call_procedure=invoke_procedure,
                         run_command=_run_compiled_command,
+                        plot_fn=_compiled_plot,
                     )
                     run_compiled_loop_body(compiled_loop, loop_var, start, end, step, loop_ctx)
                 else:
@@ -1803,6 +1835,7 @@ def process_script(filename, execute_func=None):
                         is_time_expired,
                         call_procedure=invoke_procedure,
                         run_command=_run_compiled_command,
+                        plot_fn=_compiled_plot,
                     )
                     run_compiled_while_body(compiled_while, condition, loop_ctx)
                 else:

@@ -1,0 +1,372 @@
+# Galton Board (Bean Machine)
+# Balls fall through staggered pegs and build a bin histogram (bell curve).
+#
+# Bottom layout: 18 slots x 3px = 54px, each slot has 1px margin + 2px bar
+# Rubber-ball physics: pegs reflect velocity; balls zig-zag into bins
+
+throttle(0)
+fps(60)
+
+# =========================
+# CONFIG
+# =========================
+v_left = 4
+v_right = 59
+
+v_bin_top = 48
+v_floor_y = 46
+v_land_y = 62
+
+v_num_bins = 18
+v_slot_w = 3
+v_bar_w = 2
+v_hist_height = 15
+
+v_max_balls = 3
+v_drop_interval = 8
+
+v_gravity = 0.12
+v_air_friction = 0.998
+v_bounce_damping = 0.82
+v_wall_restitution = 0.7
+v_bounce_randomness = 0.18
+v_max_v = 2.5
+v_neg_max_v = -2.5
+
+v_peg_top = 8
+v_peg_rows = 10
+v_row_spacing = 4
+v_col_spacing = 4
+
+v_peg_radius = 0.5
+v_ball_radius = 0.5
+v_collision_dist = v_peg_radius + v_ball_radius
+v_coll_dist_sq = v_collision_dist * v_collision_dist
+v_coll_reject = v_collision_dist + 0.25
+
+v_drop_x = 32
+
+v_bg = "black"
+v_wall_color = "dark_gray"
+v_peg_color = 25
+v_hist_color = "spring_green"
+
+# =========================
+# SPRITES
+# =========================
+define_sprite(ball_px, 1, 1)
+    plot(0, 0, white, 100)
+endsprite
+
+# =========================
+# ARRAYS
+# =========================
+create_array(v_ball_x, v_max_balls, numeric)
+create_array(v_ball_y, v_max_balls, numeric)
+create_array(v_ball_vx, v_max_balls, numeric)
+create_array(v_ball_vy, v_max_balls, numeric)
+create_array(v_ball_active, v_max_balls, numeric)
+create_array(v_ball_ix, v_max_balls, numeric)
+create_array(v_ball_iy, v_max_balls, numeric)
+create_array(v_ball_hidden, v_max_balls, numeric)
+create_array(v_ball_col, v_max_balls, numeric)
+create_array(v_bin_count, v_num_bins, numeric)
+create_array(v_bin_height, v_num_bins, numeric)
+create_array(v_slot_x0, v_num_bins, numeric)
+create_array(v_bar_x0, v_num_bins, numeric)
+
+create_array(v_peg_x, 200, numeric)
+create_array(v_peg_y, 200, numeric)
+v_peg_count = 0
+
+create_array(v_row_start, v_peg_rows, numeric)
+create_array(v_row_end, v_peg_rows, numeric)
+
+# =========================
+# INIT
+# =========================
+clear()
+
+for v_i in (0, v_max_balls - 1, 1)
+    v_ball_active[v_i] = 0
+    v_ball_ix[v_i] = -1
+    v_ball_iy[v_i] = -1
+    v_ball_hidden[v_i] = 0
+    v_ball_col[v_i] = -1
+endfor v_i
+
+for v_i in (0, v_num_bins - 1, 1)
+    v_bin_count[v_i] = 0
+    v_bin_height[v_i] = 0
+endfor v_i
+
+# Inner playfield between walls: columns 5..58 (54 pixels)
+v_inner_left = v_left + 1
+v_inner_right = v_right - 1
+v_inner_w = v_inner_right - v_inner_left + 1
+
+# Fixed slots: [margin][2px bar][edge] per 3px slot, divider at slot boundary
+for v_b in (0, v_num_bins - 1, 1)
+    v_slot_x0[v_b] = v_inner_left + v_b * v_slot_w
+    v_bar_x0[v_b] = v_slot_x0[v_b] + 1
+endfor v_b
+
+# Build staggered peg grid
+for v_r in (0, v_peg_rows - 1, 1)
+    v_row_start[v_r] = v_peg_count
+    v_y = v_peg_top + v_r * v_row_spacing
+    v_offset = (v_r % 2) * (v_col_spacing / 2)
+    for v_c in (0, 20, 1)
+        v_x = v_left + 2 + v_offset + v_c * v_col_spacing
+        if v_x >= v_left + 2 and v_x <= v_right - 2 and v_peg_count < 200 then
+            v_peg_x[v_peg_count] = v_x
+            v_peg_y[v_peg_count] = v_y
+            v_peg_count = v_peg_count + 1
+        endif
+    endfor v_c
+    v_row_end[v_r] = v_peg_count - 1
+endfor v_r
+
+# Draw static board once
+draw_line(v_left, 0, v_left, 63, v_wall_color, 60)
+draw_line(v_right, 0, v_right, 63, v_wall_color, 60)
+draw_line(v_left, v_floor_y, v_right, v_floor_y, v_wall_color, 40)
+
+for v_b in (0, v_num_bins - 2, 1)
+    v_xd = v_slot_x0[v_b] + v_slot_w
+    draw_line(v_xd, v_bin_top, v_xd, 63, v_wall_color, 20)
+endfor v_b
+
+for v_p in (0, v_peg_count - 1, 1)
+    plot(v_peg_x[v_p], v_peg_y[v_p], v_peg_color, 65)
+endfor v_p
+
+v_frame = 0
+v_max_count = 1
+
+# =========================
+# MAIN LOOP
+# =========================
+while 1 == 1 then
+    v_frame = v_frame + 1
+
+    begin_frame(true)
+
+    if (v_frame % v_drop_interval) == 0 then
+        for v_i in (0, v_max_balls - 1, 1)
+            if v_ball_active[v_i] == 0 then
+                v_ball_active[v_i] = 1
+                v_ball_x[v_i] = v_drop_x + random(-1, 1, 1)
+                v_ball_y[v_i] = 0
+                v_ball_vx[v_i] = random(-0.2, 0.2, 2)
+                v_ball_vy[v_i] = 0
+                v_ball_ix[v_i] = int(v_ball_x[v_i])
+                v_ball_iy[v_i] = int(v_ball_y[v_i])
+                v_ball_hidden[v_i] = 0
+                v_ball_col[v_i] = -1
+                show_sprite(ball_px, v_ball_ix[v_i], v_ball_iy[v_i], v_i)
+                break
+            endif
+        endfor v_i
+    endif
+
+    for v_i in (0, v_max_balls - 1, 1)
+        if v_ball_active[v_i] == 1 then
+            v_vx = v_ball_vx[v_i] * v_air_friction
+            v_vy = (v_ball_vy[v_i] + v_gravity) * v_air_friction
+
+            if v_vx > v_max_v then
+                v_vx = v_max_v
+            endif
+            if v_vx < v_neg_max_v then
+                v_vx = v_neg_max_v
+            endif
+            if v_vy > v_max_v then
+                v_vy = v_max_v
+            endif
+            if v_vy < v_neg_max_v then
+                v_vy = v_neg_max_v
+            endif
+
+            v_x = v_ball_x[v_i] + v_vx
+            v_y = v_ball_y[v_i] + v_vy
+
+            if v_y < v_floor_y then
+                if v_x < v_left then
+                    v_x = v_left
+                    v_vx = -v_vx * v_wall_restitution
+                endif
+                if v_x > v_right then
+                    v_x = v_right
+                    v_vx = -v_vx * v_wall_restitution
+                endif
+            endif
+
+            # Peg collisions: current row + motion row only (2 rows, not 3)
+            if v_y < v_floor_y then
+                v_row = int((v_y - v_peg_top) / v_row_spacing)
+                if v_row < 0 then
+                    v_row = 0
+                endif
+                if v_row > (v_peg_rows - 1) then
+                    v_row = v_peg_rows - 1
+                endif
+
+                if v_vy >= 0 then
+                    v_r0 = v_row
+                    v_r1 = v_row + 1
+                else
+                    v_r0 = v_row - 1
+                    v_r1 = v_row
+                endif
+                if v_r0 < 0 then
+                    v_r0 = 0
+                endif
+                if v_r1 > (v_peg_rows - 1) then
+                    v_r1 = v_peg_rows - 1
+                endif
+
+                for v_rr in (v_r0, v_r1, 1)
+                    v_ps = v_row_start[v_rr]
+                    v_pe = v_row_end[v_rr]
+                    for v_p in (v_ps, v_pe, 1)
+                        v_dx = v_x - v_peg_x[v_p]
+                        if v_dx <= v_coll_reject and v_dx >= -v_coll_reject then
+                            v_dy = v_y - v_peg_y[v_p]
+                            if v_dy <= v_coll_reject and v_dy >= -v_coll_reject then
+                                v_d2 = v_dx * v_dx + v_dy * v_dy
+                                if v_d2 > 0.01 and v_d2 < v_coll_dist_sq then
+                                    v_dist = sqrt(v_d2)
+                                    v_nx = v_dx / v_dist
+                                    v_ny = v_dy / v_dist
+                                    v_x = v_peg_x[v_p] + v_nx * v_collision_dist
+                                    v_y = v_peg_y[v_p] + v_ny * v_collision_dist
+                                    v_dot = v_vx * v_nx + v_vy * v_ny
+                                    v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
+                                    v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
+                                    v_vx = v_vx + random(-v_bounce_randomness, v_bounce_randomness, 2)
+                                endif
+                            endif
+                        endif
+                    endfor v_p
+                endfor v_rr
+            endif
+
+            # Bin chute: lock column at shelf, bounce off slot walls
+            if v_y >= v_floor_y then
+                if v_ball_col[v_i] < 0 then
+                    v_ball_col[v_i] = int((v_x - v_inner_left) / v_slot_w)
+                    if v_ball_col[v_i] < 0 then
+                        v_ball_col[v_i] = 0
+                    endif
+                    if v_ball_col[v_i] > (v_num_bins - 1) then
+                        v_ball_col[v_i] = v_num_bins - 1
+                    endif
+                endif
+
+                v_chute_l = v_slot_x0[v_ball_col[v_i]]
+                v_chute_r = v_chute_l + v_slot_w - 1
+
+                if v_x < v_chute_l then
+                    v_x = v_chute_l
+                    v_vx = -v_vx * v_wall_restitution
+                endif
+                if v_x > v_chute_r then
+                    v_x = v_chute_r
+                    v_vx = -v_vx * v_wall_restitution
+                endif
+            endif
+
+            if v_y >= v_land_y then
+                if v_ball_col[v_i] >= 0 then
+                    v_bin = v_ball_col[v_i]
+                else
+                    v_bin = int((v_x - v_inner_left) / v_slot_w)
+                    if v_bin < 0 then
+                        v_bin = 0
+                    endif
+                    if v_bin > (v_num_bins - 1) then
+                        v_bin = v_num_bins - 1
+                    endif
+                endif
+
+                v_bin_count[v_bin] = v_bin_count[v_bin] + 1
+                v_ball_active[v_i] = 0
+                hide_sprite(ball_px, v_i)
+                v_ball_ix[v_i] = -1
+                v_ball_iy[v_i] = -1
+                v_ball_hidden[v_i] = 0
+                v_ball_col[v_i] = -1
+
+                v_old_max = v_max_count
+                if v_bin_count[v_bin] > v_max_count then
+                    v_max_count = v_bin_count[v_bin]
+                endif
+
+                v_h = int((v_bin_count[v_bin] / v_max_count) * v_hist_height)
+                if v_h > v_hist_height then
+                    v_h = v_hist_height
+                endif
+                if v_h < 0 then
+                    v_h = 0
+                endif
+
+                if v_max_count != v_old_max then
+                    draw_rectangle(v_inner_left, v_bin_top, v_inner_w, (64 - v_bin_top), v_bg, 100, true)
+                    for v_b in (0, v_num_bins - 2, 1)
+                        v_xd = v_slot_x0[v_b] + v_slot_w
+                        draw_line(v_xd, v_bin_top, v_xd, 63, v_wall_color, 20)
+                    endfor v_b
+                    for v_b in (0, v_num_bins - 1, 1)
+                        v_bin_height[v_b] = 0
+                    endfor v_b
+                    for v_b in (0, v_num_bins - 1, 1)
+                        v_bh = int((v_bin_count[v_b] / v_max_count) * v_hist_height)
+                        if v_bh > v_hist_height then
+                            v_bh = v_hist_height
+                        endif
+                        if v_bh > 0 then
+                            draw_rectangle(v_bar_x0[v_b], 64 - v_bh, v_bar_w, v_bh, v_hist_color, 70, true)
+                        endif
+                        v_bin_height[v_b] = v_bh
+                    endfor v_b
+                else
+                    v_prev_h = v_bin_height[v_bin]
+                    if v_h > v_prev_h then
+                        draw_rectangle(v_bar_x0[v_bin], 64 - v_h, v_bar_w, (v_h - v_prev_h), v_hist_color, 70, true)
+                        v_bin_height[v_bin] = v_h
+                    endif
+                endif
+            else
+                v_ball_x[v_i] = v_x
+                v_ball_y[v_i] = v_y
+                v_ball_vx[v_i] = v_vx
+                v_ball_vy[v_i] = v_vy
+
+                v_nix = int(v_x)
+                v_niy = int(v_y)
+
+                # Hide on shelf row (behind gray line), show again in bin chute below
+                if v_niy == v_floor_y then
+                    if v_ball_hidden[v_i] == 0 then
+                        hide_sprite(ball_px, v_i)
+                        v_ball_hidden[v_i] = 1
+                    endif
+                else
+                    if v_ball_hidden[v_i] == 1 then
+                        show_sprite(ball_px, v_nix, v_niy, v_i)
+                        v_ball_hidden[v_i] = 0
+                        v_ball_ix[v_i] = v_nix
+                        v_ball_iy[v_i] = v_niy
+                    elseif v_nix != v_ball_ix[v_i] or v_niy != v_ball_iy[v_i] then
+                        move_sprite(ball_px, v_nix, v_niy, v_i)
+                        v_ball_ix[v_i] = v_nix
+                        v_ball_iy[v_i] = v_niy
+                    endif
+                endif
+            endif
+        endif
+    endfor v_i
+
+    end_frame
+endwhile

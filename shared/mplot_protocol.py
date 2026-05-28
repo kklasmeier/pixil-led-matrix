@@ -122,6 +122,7 @@ NAMED_COLOR_TO_ID = {
     'violet': -41,
     'magenta': -42,
     'lavender': -43,
+    'transparent': -44,
 }
 
 # Reverse mapping: ID to named color (for unpacking)

@@ -314,8 +314,8 @@ def test_loop_begin_frame_false_compiles():
 
 def test_loop_chladni_style_begin_frame_plot_end_frame():
     """Chladni inner loop: begin_frame(false), plot with literals, end_frame."""
+    from pixil_utils.loop_compiler import PlotStmt
     from pixil_utils.parameter_types import parse_bool_literal
-    from shared.draw_batch_protocol import pack_draw_op
 
     flags.ENABLE_COMPILED_LOOPS = True
     block = [
@@ -325,28 +325,31 @@ def test_loop_chladni_style_begin_frame_plot_end_frame():
     ]
     compiled = try_compile_loop_block(block)
     assert compiled is not None
+    assert isinstance(compiled.statements[1], PlotStmt)
 
     frame_starts: list[bool] = []
-    plots_packed = 0
+    plots: list[tuple] = []
 
     def run_command(cmd_name, arg_exprs):
-        nonlocal plots_packed
         if cmd_name == "begin_frame":
             preserve = False
             if arg_exprs:
                 preserve = parse_bool_literal(arg_exprs[0])
             frame_starts.append(preserve)
-        elif cmd_name == "plot":
-            pack_draw_op("plot", arg_exprs)
-            plots_packed += 1
+
+    def capture_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
+        plots.append((x, y, color, intensity))
 
     variables = VariableRegistry()
     ctx = make_loop_context(
-        variables, lambda *a: None, lambda: False, run_command=run_command,
+        variables,
+        capture_mplot,
+        lambda: False,
+        run_command=run_command,
     )
     run_compiled_block(compiled, ctx)
     assert frame_starts == [False]
-    assert plots_packed == 1
+    assert plots == [(32, 32, "white", 100)]
     flags.ENABLE_COMPILED_LOOPS = False
 
 

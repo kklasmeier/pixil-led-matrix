@@ -35,6 +35,11 @@ TABLE OF CONTENTS
 18. Performance Tips
 19. Script Examples
 
+To run a script:
+1. ssh pi@192.168.1.58
+2. cd Lightshow/git
+3. ./run main/<filename>
+
 ================================================================================
 1. QUICK REFERENCE
 ================================================================================
@@ -879,51 +884,89 @@ for v_frame in (0, 100, 1)
     rest(0.033)
 endfor v_frame
 
+Automatic draw_batch (important)
+--------------------------------
+While a frame is open, Pixil batches plot(), mplot(), and supported draw_*
+commands (draw_line, draw_circle, draw_rectangle, draw_polygon, draw_ellipse,
+draw_arc) into a single draw_batch that is sent when end_frame runs. You do
+not need mplot() or mflush() inside begin_frame/end_frame for that optimization.
+
+Use ordinary plot() in framed animation loops — same batching benefit as mplot.
+
+begin_frame
+    for v_i in (0, 500, 1)
+        plot(random(0, 63, 0), random(0, 63, 0), white, 80)
+    endfor v_i
+    draw_circle(32, 32, 10, red, 100, true)
+end_frame
+
+Supported shape commands in the frame are batched the same way. Commands that
+are not batched (draw_text, sprites, backgrounds, etc.) are still queued and
+run in frame order after the draw_batch.
+
 ================================================================================
-11. BATCH PLOTTING
+11. BATCH PLOTTING (mplot / mflush)
 ================================================================================
 
-For drawing many pixels efficiently, use mplot/mflush instead of individual 
-plot commands. This is important on the Raspberry Pi where many individual 
-commands can slow down animations.
+mplot and mflush are for scripts that draw many pixels WITHOUT begin_frame/
+end_frame, or when you need an explicit mid-script flush before end_frame.
+
+When you already use begin_frame/end_frame, prefer plot() — end_frame sends
+the batched pixels. Adding mplot/mflush does not make framed scripts faster;
+it only adds noise.
 
 Commands
 --------
 mplot(x, y, color, [intensity], [burnout], [burnout_mode])
 mflush()
 
-mplot queues pixels without displaying. mflush sends all queued pixels at once.
+Outside frame mode: mplot queues pixels; mflush sends them as one draw_batch
+(or plot_batch when draw_batch is disabled).
 
-Example
--------
-# Draw 100 random pixels efficiently
+Inside frame mode: mplot uses the same draw_batch buffer as plot(); end_frame
+flushes it. mflush() before end_frame is optional, not required.
+
+When to use mplot/mflush
+------------------------
+- Starfields, particles, or grids with no begin_frame/end_frame
+- Legacy scripts that plot thousands of pixels per tick without framing
+- Rare: flush pixels mid-script before other queued work (uncommon)
+
+When NOT to default to mplot
+-----------------------------
+- Framed animations (begin_frame ... end_frame) — use plot() instead
+- A few dozen pixels per frame — plot() is fine
+
+Example (no frame buffering)
+----------------------------
+# Draw 100 random pixels efficiently — not using begin_frame/end_frame
 for v_i in (0, 100, 1)
     mplot(random(0, 63, 0), random(0, 63, 0), red, 100)
 endfor v_i
 mflush()
 
-With Burnout
-------------
+With Burnout (no frame)
+-----------------------
 mplot(10, 10, red, 100, 2000, fade)
 mplot(11, 10, red, 100, 2000, fade)
 mplot(12, 10, red, 100, 2000, fade)
 mflush()
 
-With Frame Buffering
---------------------
+Framed animation (preferred style)
+----------------------------------
+# plot is batched automatically — no mflush needed
 begin_frame
     draw_circle(32, 32, 15, blue, 100, true)
     for v_i in (0, 100, 1)
-        mplot(random(20, 44, 0), random(20, 44, 0), white, 80)
+        plot(random(20, 44, 0), random(20, 44, 0), white, 80)
     endfor v_i
-    mflush()
 end_frame
 
 Notes
 -----
-- Buffer persists until mflush() is called
-- Always call mflush() before end_frame
-- Use for starfields, particle effects, noise patterns
+- Outside frame mode: call mflush() after a run of mplot commands
+- Inside frame mode: end_frame flushes the batch; mflush() is optional
+- mplot inside a frame is equivalent to plot for batching purposes
 
 ================================================================================
 12. TEXT COMMANDS
@@ -1410,23 +1453,33 @@ The Raspberry Pi 4 has limited CPU power. Follow these tips for smooth animation
 
 GENERAL TIPS
 ------------
-1. Use mplot/mflush for many pixels instead of individual plot() calls
-2. Use burnout instead of manually clearing pixels
-3. Prefer simpler shapes when possible (circles are more expensive than rectangles)
-4. Use fps() to cap display refresh rate; use throttle() only for legacy queue tuning
+1. Use begin_frame/end_frame for animations; plot() and draw_* batch at end_frame
+2. Use mplot/mflush only when NOT using frame buffering (see section 11)
+3. Use burnout instead of manually clearing pixels
+4. Prefer simpler shapes when possible (circles are more expensive than rectangles)
+5. Use fps() to cap display refresh rate; use throttle() only for legacy queue tuning
 
 LOOP OPTIMIZATION
 -----------------
-# Less efficient - many individual commands
+# Without frames — many plot() calls queue one command each (slow)
 for v_i in (0, 100, 1)
     plot(v_i, 32, red, 100)
 endfor v_i
 
-# More efficient - batched
+# Without frames — batch with mplot/mflush
 for v_i in (0, 100, 1)
     mplot(v_i, 32, red, 100)
 endfor v_i
 mflush()
+
+# With frames — plot() is batched at end_frame (preferred for animations)
+for v_frame in (0, 100, 1)
+    begin_frame
+        for v_i in (0, 100, 1)
+            plot(v_i, 32, red, 100)
+        endfor v_i
+    end_frame
+endfor v_frame
 
 FRAME RATE TIPS
 ---------------

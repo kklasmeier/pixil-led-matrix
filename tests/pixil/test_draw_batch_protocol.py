@@ -28,6 +28,19 @@ def test_mplot_string_coords_from_ultra_fast_parse():
     assert cmds[0][1][:2] == (5, 10)
 
 
+def test_plot_transparent_roundtrip():
+    """Langton's Ant and erasing use plot(..., transparent) inside begin_frame."""
+    rec = pack_draw_op("plot", [5, 5, "transparent"])
+    cmds = list(unpack_draw_batch(rec))
+    assert cmds[0][0] == "plot"
+    x, y, color, intensity, burnout, mode = cmds[0][1]
+    assert (x, y) == (5, 5)
+    assert color == "transparent"
+    assert intensity is None
+    assert burnout is None
+    assert mode == "instant"
+
+
 def test_plot_roundtrip():
     rec = pack_draw_op("plot", [10, 20, "red", 80, 100, "instant"])
     data = encode_buffer(rec)
@@ -40,6 +53,15 @@ def test_plot_roundtrip():
     assert intensity == 80
     assert burnout == 100
     assert mode == "instant"
+
+
+def test_plot_fade_mode_roundtrip():
+  rec = pack_draw_op("plot", [5, 10, 42, 70, 750, "fade"])
+  cmds = list(unpack_draw_batch(rec))
+  assert cmds[0][0] == "plot"
+  x, y, color, intensity, burnout, mode = cmds[0][1]
+  assert burnout == 750
+  assert mode == "fade"
 
 
 def test_draw_order_preserved_circle_rect_polygon():

@@ -155,6 +155,11 @@ class MatrixCommandQueue:
                     #print(f"[{datetime.now()}] [QUEUE] Finished executing: {command}")
                     
                 except Empty:
+                    # Between commands: push burnout fade to LEDs (plot fade needs this)
+                    try:
+                        api_instance.pump_fade_display()
+                    except AttributeError:
+                        pass
                     continue
                 except Exception as e:
                     #print(f"[{datetime.now()}] [QUEUE] Error processing command: {e}")

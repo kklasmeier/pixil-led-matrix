@@ -66,6 +66,7 @@ class RGB_Api:
         self._target_fps = 0.0
         self._frame_interval = 0.0
         self._last_present_time = 0.0
+        self._last_fade_pump_time = 0.0
         self.grid_dirty = np.zeros((self.matrix.height // GRID_SIZE, self.matrix.width // GRID_SIZE), dtype=bool)
         self.sprite_manager = SpriteManager()
         self.background_manager = BackgroundManager(self.sprite_manager)
@@ -883,6 +884,28 @@ class RGB_Api:
         self.burnout_manager.clear_all()
         self.current_command_pixels.clear()
 
+    def pump_fade_display(self, min_interval: float = 0.033, force: bool = False) -> None:
+        """Push burnout fade updates to the physical LEDs (non-frame mode only).
+
+        The burnout thread updates drawing_buffer (and the back canvas) continuously,
+        but SwapOnVSync only runs on plot/rest/refresh. Without periodic pumps, fade mode
+        looks like instant burnout until something calls refresh_display().
+        """
+        if self.frame_mode:
+            return
+        if not self.burnout_manager.has_active_fades():
+            return
+        now = time.time()
+        if not force and (now - self._last_fade_pump_time) < min_interval:
+            return
+        self._last_fade_pump_time = now
+        if (
+            self.burnout_manager.check_and_reset_changes()
+            or self.burnout_manager.has_active_fades()
+        ):
+            debug("Pumping fade updates to display", Level.TRACE, Component.SYSTEM)
+            self.refresh_display()
+
     def rest(self, duration: float):
         """Rest for a duration while still checking burnouts."""
         from pixil_utils.test_hooks import effective_rest_duration, record_rest
@@ -897,14 +920,8 @@ class RGB_Api:
         while time.time() < end_time:
             current_time = time.time()
             
-            # Check if it's time for a display refresh
             if current_time - last_refresh_time >= refresh_interval:
-                # Refresh if not in frame mode AND (burnouts have made changes OR active fades exist)
-                if not self.frame_mode and (self.burnout_manager.check_and_reset_changes() or 
-                                            self.burnout_manager.has_active_fades()):
-                    debug("Refreshing display due to burnout/fade changes", Level.TRACE, Component.SYSTEM)
-                    self._maybe_swap_buffer()
-                    self.refresh_display()
+                self.pump_fade_display(min_interval=0, force=True)
                 last_refresh_time = current_time
                 
             # Sleep for a small amount of time

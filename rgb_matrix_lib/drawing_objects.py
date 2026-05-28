@@ -154,11 +154,15 @@ class ThreadedBurnoutManager:
                     faded_g = int(g * intensity)
                     faded_b = int(b * intensity)
                     
-                    # Check if pixel was overwritten by something brighter
+                    # Skip only if another draw exceeded this object's original color.
+                    # Do not compare to faded_r: the buffer still holds full brightness
+                    # until the first fade write, which made fade look like instant burnout.
                     current = self.api.drawing_buffer[y, x]
-                    if current[0] > faded_r or current[1] > faded_g or current[2] > faded_b:
-                        # Something brighter is here - pixel was overwritten
-                        # Remove from future fade updates
+                    if (
+                        int(current[0]) > r
+                        or int(current[1]) > g
+                        or int(current[2]) > b
+                    ):
                         pixels_to_remove.append((x, y))
                         continue
                     

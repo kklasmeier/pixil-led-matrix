@@ -106,9 +106,37 @@ COMMANDS
 DEFAULT PIXIL ARGS (interactive / start / bg when args omitted):
   main/* -t 60:00
 
+PIXIL OPTIONS (pass after -- with interactive / start / bg):
+  script[.pix]   One script, or a wildcard like main/*
+  -t mm:ss       Run duration per script (e.g. 5:00, 0:30)
+  -d LEVEL       Debug output from the Pixil interpreter (default: DEBUG_OFF)
+  -q             Real-time queue depth monitor
+
+  Debug levels (-d):
+    DEBUG_OFF       No interpreter debug output (default)
+    DEBUG_CONCISE   Minimal (script open/close, cleanup, errors)
+    DEBUG_SUMMARY   Commands queued, procedures, throttle/fps, flush counts
+    DEBUG_VERBOSE   Line-by-line trace (very noisy; use on one script)
+
+  Script print() output always goes to the terminal (interactive) or pixil.log
+  (start/bg). Use sync_queue before print in .pix scripts so output matches
+  what is on the matrix (see docs/Pixil_Scripting_Guide.txt §16).
+
+  Full Pixil CLI help: sudo python3 Pixil.py --help
+
 EXAMPLES — run lightshows:
   ./run interactive -- main/* -t 5:00 -q
   ./run start -- main/* -t 60:00
+
+EXAMPLES — debug (foreground; output on terminal):
+  ./run interactive -- main/Lorenz_Attractor.pix -t 1:00 -d DEBUG_SUMMARY
+  ./run interactive -- main/* -t 0:30 -d DEBUG_VERBOSE -q
+  ./run -- main/test.pix -t 0:10 -d DEBUG_CONCISE
+    (no command => same as interactive)
+
+EXAMPLES — debug (background; output in pixil.log):
+  ./run start -- main/* -t 5:00 -d DEBUG_SUMMARY
+  tail -f pixil.log
 
 EXAMPLES — tests:
   ./run setup-tests
