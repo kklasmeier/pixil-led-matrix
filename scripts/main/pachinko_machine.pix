@@ -12,11 +12,12 @@ fps(30)
 
 # ========== CONFIGURABLE SETTINGS ==========
 v_num_balls = 50              # Total number of balls to drop per board
-v_max_balls_active = 8        # Maximum balls on screen at once
+v_max_balls_active = 10          # Maximum balls on screen at once
 v_gravity = 0.15              # Downward acceleration per frame
 v_bounce_damping = 0.85       # Energy retained after bounce (0-1, higher = bouncier)
-v_drop_interval = 20          # Frames between ball drops
+v_drop_interval = 5          # Frames between ball drops
 v_total_boards = 24           # Total number of board designs
+v_force_board = -1            # -1 = normal shuffle; 0-23 = always use that board (testing)
 
 # ========== DISPLAY CONSTANTS ==========
 v_left_wall = 3
@@ -61,13 +62,15 @@ for v_i in (0, 23, 1)
     v_board_order[v_i] = v_i
 endfor v_i
 
-# Fisher-Yates shuffle
-for v_i in (23, 1, -1)
-    v_j = random(0, v_i, 0)
-    v_temp = v_board_order[v_i]
-    v_board_order[v_i] = v_board_order[v_j]
-    v_board_order[v_j] = v_temp
-endfor v_i
+# Fisher-Yates shuffle (skipped when v_force_board >= 0)
+if v_force_board < 0 then
+    for v_i in (23, 1, -1)
+        v_j = random(0, v_i, 0)
+        v_temp = v_board_order[v_i]
+        v_board_order[v_i] = v_board_order[v_j]
+        v_board_order[v_j] = v_temp
+    endfor v_i
+endif
 
 # ========== DEFINE BALL SPRITE ==========
 define_sprite(ball_sprite, 1, 1)
@@ -79,7 +82,11 @@ v_board_index = 0
 
 while 1 == 1 then
     
-    v_board_type = v_board_order[v_board_index]
+    if v_force_board >= 0 then
+        v_board_type = v_force_board
+    else
+        v_board_type = v_board_order[v_board_index]
+    endif
     
     # ========== RESET STATE ==========
     v_balls_dropped = 0

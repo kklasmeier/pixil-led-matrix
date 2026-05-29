@@ -2,7 +2,7 @@
 # Pendulums stacked vertically with different string lengths
 
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
-fps(60)
+fps(40)
 
 clear()
 
@@ -72,7 +72,6 @@ while 1 == 1 then
     end_frame
     
     v_time = v_time + 0.06
-    #rest(.1)
 endwhile
 
 sync_queue

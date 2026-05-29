@@ -112,6 +112,16 @@ FAST_SIN_PATTERN = re.compile(r'^sin\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
 FAST_COS_PATTERN = re.compile(r'^cos\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
 FAST_RADIANS_PATTERN = re.compile(r'^radians\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
 FAST_SQRT_PATTERN = re.compile(r'^sqrt\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+# sqrt(v_a * v_a + v_b * v_b) — distance / hypot (cloth sim, collisions)
+FAST_SQRT_SUM_SQ_PATTERN = re.compile(
+    r'^sqrt\s*\(\s*'
+    r'(-?\d*\.?\d+|v_\w+)\s*\*\s*\1\s*'
+    r'\+\s*'
+    r'(-?\d*\.?\d+|v_\w+)\s*\*\s*\2\s*'
+    r'\)$'
+)
+FAST_ABS_PATTERN = re.compile(r'^abs\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
+FAST_INT_ARRAY_PATTERN = re.compile(r'^int\s*\(\s*(v_\w+)\[(v_\w+)\]\s*\)$')
 
 # =============================================================================
 # Other

@@ -2,10 +2,10 @@
 # Self-playing brick breaker game with AI paddle
 # Random layouts, classic rainbow colors, increasing difficulty
 
-throttle(0.5)
+throttle(0)
 
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
-fps(60)
+fps(40)
 
 # ============================================
 # Pattern shuffle system - play all 15 before repeating
@@ -321,7 +321,7 @@ show_sprite(ball_sprite, v_ball_x, v_ball_y)
 v_game_active = 1
 
 while v_game_active == 1 then
-    
+    begin_frame(true)
     # ============================================
     # AI Paddle movement with lag
     # ============================================
@@ -472,7 +472,7 @@ while v_game_active == 1 then
     if v_bricks_remaining <= 0 then
         v_game_active = 0
     endif
-    
+    end_frame
 endwhile
 
 # Hide sprites before win screen

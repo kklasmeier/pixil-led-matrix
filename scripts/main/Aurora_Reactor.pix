@@ -1,7 +1,7 @@
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
 fps(60)
 
-v_max_particles = 30
+v_max_particles = 70
 
 create_array(v_r, v_max_particles)
 create_array(v_theta, v_max_particles)
@@ -52,7 +52,7 @@ while true then
     begin_frame(true)
 
     # Override color: every 100 frames, lasts 40
-    if v_frame % 100 == 0 then
+    if v_frame % 200 == 0 then
         if random(0, 1, 0) == 1 then
             v_ci = random(0, 4, 0)
             if v_ci == 0 then
@@ -68,16 +68,16 @@ while true then
             endif
             v_override_active = 1
         endif
-    elseif v_frame % 100 == 40 then
+    elseif v_frame % 200 == 40 then
         v_override_active = 0
     endif
 
     # Long burnout: every 200 frames, lasts 20
-    if v_frame % 200 == 0 then
+    if v_frame % 100 == 0 then
         if random(0, 1, 0) == 1 then
             v_long_burnout = 1
         endif
-    elseif v_frame % 200 == 20 then
+    elseif v_frame % 100 == 20 then
         v_long_burnout = 0
     endif
 

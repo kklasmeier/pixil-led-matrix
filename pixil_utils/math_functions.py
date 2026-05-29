@@ -24,7 +24,8 @@ from .regex_patterns import (
     NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
     MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
     ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN,
-    FAST_SIN_PATTERN, FAST_COS_PATTERN, FAST_RADIANS_PATTERN, FAST_SQRT_PATTERN
+    FAST_SIN_PATTERN, FAST_COS_PATTERN, FAST_RADIANS_PATTERN, FAST_SQRT_PATTERN,
+    FAST_SQRT_SUM_SQ_PATTERN, FAST_ABS_PATTERN, FAST_INT_ARRAY_PATTERN,
 )
 
 _EXPR_CACHE = OrderedDict()
@@ -570,6 +571,54 @@ def _resolve_arg(arg: str, variables: Union[Dict[str, Any], VariableRegistry, No
     else:
         return float(arg)
 
+def try_fast_hypot(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[float]:
+    """
+    Fast path for sqrt(v_a * v_a + v_b * v_b) without eval().
+    Common in cloth, collision, and flocking distance checks.
+    """
+    match = FAST_SQRT_SUM_SQ_PATTERN.match(expr)
+    if not match:
+        return None
+    try:
+        a = _resolve_arg(match.group(1), variables)
+        b = _resolve_arg(match.group(2), variables)
+        if a is not None and b is not None:
+            return math.hypot(a, b)
+    except (ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+def try_fast_abs(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[float]:
+    """Fast path for abs(v_var) or abs(literal)."""
+    match = FAST_ABS_PATTERN.match(expr)
+    if not match:
+        return None
+    try:
+        val = _resolve_arg(match.group(1), variables)
+        if val is not None:
+            return abs(val)
+    except (ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+def try_fast_int_array(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[int]:
+    """Fast path for int(v_array[v_index]) with simple variable index."""
+    match = FAST_INT_ARRAY_PATTERN.match(expr)
+    if not match:
+        return None
+    if not isinstance(variables, VariableRegistry):
+        return None
+    try:
+        array_name, index_var = match.group(1), match.group(2)
+        val = variables.fast_array_access(array_name, index_var)
+        return int(float(val))
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError):
+        pass
+    return None
+
+
 def try_fast_trig(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[float]:
     """
     Fast path for single-argument trig/math functions: sin, cos, radians, sqrt.
@@ -580,7 +629,16 @@ def try_fast_trig(expr: str, variables: Union[Dict[str, Any], VariableRegistry, 
     - cos(v_rad), cos(0)
     - radians(v_angle), radians(90)
     - sqrt(v_value), sqrt(2)
+    - sqrt(v_a * v_a + v_b * v_b) via try_fast_hypot (checked first)
     """
+    hypot_result = try_fast_hypot(expr, variables)
+    if hypot_result is not None:
+        return hypot_result
+
+    abs_result = try_fast_abs(expr, variables)
+    if abs_result is not None:
+        return abs_result
+
     # Try sin(x)
     match = FAST_SIN_PATTERN.match(expr)
     if match:
@@ -653,6 +711,15 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
                 debug_print(f"Fast number hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
         
+        # int(v_array[v_index])
+        if expr.startswith('int(') and '[' in expr:
+            fast_result = try_fast_int_array(expr, variables)
+            if fast_result is not None:
+                _FAST_MATH_HITS += 1
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast int array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                return fast_result
+
         # Try simple array access (v_array[v_index])
         if '[' in expr and ']' in expr and expr.count('[') == 1:
             fast_result = try_fast_array_access(expr, variables)
@@ -679,8 +746,8 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
                     debug_print(f"Fast random hit: {expr} = {fast_result}", DEBUG_VERBOSE)
                 return fast_result
         
-        # Try single-arg math functions: sin, cos, radians, sqrt (NEW)
-        if any(fn in expr for fn in ('sin(', 'cos(', 'radians(', 'sqrt(')):
+        # Try single-arg math functions: sin, cos, radians, sqrt, abs (NEW)
+        if any(fn in expr for fn in ('sin(', 'cos(', 'radians(', 'sqrt(', 'abs(')):
             fast_result = try_fast_trig(expr, variables)
             if fast_result is not None:
                 _FAST_MATH_HITS += 1

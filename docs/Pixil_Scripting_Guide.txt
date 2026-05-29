@@ -1286,10 +1286,12 @@ throttle(factor)
 Adjusts delay between queued commands in Pixil (producer side). Less predictable
 with draw_batch / sprite_batch; prefer fps() for animation rate.
 
+- factor = 0: No extra producer delay (fastest queue pacing)
 - factor < 1.0: Faster execution (less delay)
 - factor = 1.0: Default timing
 - factor > 1.0: Slower execution (more delay)
 
+throttle(0)             # No producer pacing (common in sim scripts)
 throttle(0.3)           # Run faster
 throttle(2.0)           # Run slower
 throttle(v_speed)       # Variable throttle

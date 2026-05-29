@@ -61,8 +61,12 @@ def test_clamp_fps_zero_and_max(capsys):
     assert clamp_fps(FPS_MAX + 10) == FPS_MAX
 
 
-def test_clamp_throttle_low_side(capsys):
-    assert clamp_throttle(0) == THROTTLE_MIN
+def test_clamp_throttle_zero_allowed(capsys):
+    assert clamp_throttle(0) == 0.0
+    assert capsys.readouterr().out == ""
+
+
+def test_clamp_throttle_negative_clamped(capsys):
     assert clamp_throttle(-2) == THROTTLE_MIN
     out = capsys.readouterr().out
     assert "WARN" in out
@@ -125,10 +129,19 @@ def test_format_parameter_rest_duration_not_burnout_clamped(capsys):
     assert "WARN" not in capsys.readouterr().out
 
 
-def test_command_queue_set_throttle_clamps(capsys):
+def test_command_queue_set_throttle_zero(capsys):
     from shared.command_queue import MatrixCommandQueue
 
     q = MatrixCommandQueue()
     q.set_throttle(0)
-    assert q.throttle_factor == THROTTLE_MIN
+    assert q.throttle_factor == 0.0
+    assert capsys.readouterr().out == ""
+
+
+def test_command_queue_set_throttle_negative(capsys):
+    from shared.command_queue import MatrixCommandQueue
+
+    q = MatrixCommandQueue()
+    q.set_throttle(-1)
+    assert q.throttle_factor == 0.0
     assert "WARN" in capsys.readouterr().out

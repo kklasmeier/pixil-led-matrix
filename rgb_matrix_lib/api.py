@@ -978,13 +978,7 @@ class RGB_Api:
         instance.occupied_cells = new_cells
         
         if not self.frame_mode:
-            self._restore_dirty_cells()
-            self.copy_sprite_to_buffer(instance, self.canvas)
-            self._maybe_swap_buffer()
-            self.refresh_display()
-        #else:
-        #    self._restore_dirty_cells()  # Restore old position's background
-        #    self.copy_sprite_to_buffer(instance, self.canvas)  # Draw new position
+            self._present_sprite_update(instance)
 
     def hide_sprite(self, name: str, instance_id: int = 0):
         """
@@ -1000,9 +994,7 @@ class RGB_Api:
             instance.visible = False
             instance.occupied_cells.clear()
             if not self.frame_mode:
-                self._restore_dirty_cells()
-                self.refresh_display()
-                self._maybe_swap_buffer()
+                self._present_sprite_update()
 
     def move_sprite(self, name: str, x: float, y: float, instance_id: int = 0, cel_idx: Optional[int] = None):
         """
@@ -1046,14 +1038,8 @@ class RGB_Api:
             instance.occupied_cells = new_cells
             
             if not self.frame_mode:
-                self._restore_dirty_cells()
-                self.copy_sprite_to_buffer(instance, self.canvas)
-                self._maybe_swap_buffer()
-                self.refresh_display()
-            #else:
-            #    self._restore_dirty_cells()  # Restore Background from drawing_buffer
-            #    self.copy_sprite_to_buffer(instance, self.canvas)
-                
+                self._present_sprite_update(instance)
+
     def dispose_sprite_instance(self, name: str, instance_id: int):
         """Remove a specific sprite instance."""
         debug(f"Disposing of sprite '{name}' instance {instance_id}", 
@@ -1063,8 +1049,7 @@ class RGB_Api:
         if dirty_cells:
             self._mark_cells_dirty(dirty_cells)
             if not self.frame_mode:
-                self._restore_dirty_cells()
-                self.refresh_display()
+                self._present_sprite_update()
 
     def refresh_display(self):
         """Refresh the display with all layers in correct order."""
@@ -1270,6 +1255,18 @@ class RGB_Api:
             cell_sprites = self.sprite_manager.get_overlapping_sprites([(grid_x, grid_y)])
             for sprite in cell_sprites:
                 self.copy_sprite_to_buffer(sprite, self.canvas)
+
+    def _present_sprite_update(self, instance: Optional[SpriteInstance] = None) -> None:
+        """
+        Immediate mode: one full composite + one buffer swap.
+
+        Incremental restore+blit+swap desyncs the double buffer: copy_sprite pixels are not
+        tracked in current_command_pixels, so the back buffer keeps stale sprite pixels and
+        sprites flicker on the next move. refresh_display() rebuilds both layers correctly.
+        """
+        if self.frame_mode:
+            return
+        self.refresh_display()
 
     def cleanup(self):
         """Clean up resources."""

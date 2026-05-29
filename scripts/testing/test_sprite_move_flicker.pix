@@ -1,0 +1,60 @@
+# Minimal repro: immediate-mode move_sprite flicker (no begin_frame)
+# Paddle-sized bar + larger ball block on a static floor line.
+# Run: ./run testing/test_sprite_move_flicker
+# Watch paddle (cyan bar) for flicker; ball (white 3x3) is easier to see than 1px Breakout ball.
+
+throttle(0)
+fps(60)
+
+clear()
+draw_line(0, 62, 63, 62, white, 80)
+
+define_sprite(paddle_sprite, 10, 2)
+    draw_rectangle(0, 0, 10, 2, cyan, 100, true)
+endsprite
+
+define_sprite(ball_sprite, 3, 3)
+    draw_rectangle(0, 0, 3, 3, white, 100, true)
+endsprite
+
+v_paddle_x = 27
+v_paddle_y = 58
+v_ball_x = 10
+v_ball_y = 10
+v_ball_dx = 1
+v_ball_dy = 1
+
+show_sprite(paddle_sprite, v_paddle_x, v_paddle_y)
+show_sprite(ball_sprite, v_ball_x, v_ball_y)
+
+for v_frame in (0, 600, 1)
+    # Paddle sweeps left/right (like Breakout AI steps)
+    if v_frame % 128 < 64 then
+        v_paddle_x = v_paddle_x + 1
+    else
+        v_paddle_x = v_paddle_x - 1
+    endif
+    if v_paddle_x < 2 then
+        v_paddle_x = 2
+    endif
+    if v_paddle_x > 52 then
+        v_paddle_x = 52
+    endif
+    move_sprite(paddle_sprite, v_paddle_x, v_paddle_y)
+
+    # Ball bounces in a box (both sprites move every frame — like Breakout)
+    v_ball_x = v_ball_x + v_ball_dx
+    v_ball_y = v_ball_y + v_ball_dy
+    if v_ball_x <= 2 or v_ball_x >= 60 then
+        v_ball_dx = 0 - v_ball_dx
+    endif
+    if v_ball_y <= 2 or v_ball_y >= 55 then
+        v_ball_dy = 0 - v_ball_dy
+    endif
+    move_sprite(ball_sprite, v_ball_x, v_ball_y)
+    rest(0.05)
+endfor v_frame
+
+hide_sprite(paddle_sprite)
+hide_sprite(ball_sprite)
+clear()

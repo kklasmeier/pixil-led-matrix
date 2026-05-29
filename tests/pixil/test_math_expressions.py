@@ -10,6 +10,9 @@ from pixil_utils.math_functions import (
     try_fast_number,
     try_fast_arithmetic,
     try_fast_array_access,
+    try_fast_hypot,
+    try_fast_abs,
+    try_fast_int_array,
 )
 from pixil_utils.variable_registry import VariableRegistry
 
@@ -46,6 +49,25 @@ def test_trig_and_sqrt(variables):
     assert evaluate_math_expression("sin(0)", variables) == pytest.approx(0.0)
     assert evaluate_math_expression("cos(0)", variables) == pytest.approx(1.0)
     assert evaluate_math_expression("sqrt(16)", variables) == pytest.approx(4.0)
+
+
+def test_fast_hypot_sum_of_squares(variables):
+    variables.set("v_dx", 3)
+    variables.set("v_dy", 4)
+    assert try_fast_hypot("sqrt(v_dx * v_dx + v_dy * v_dy)", variables) == pytest.approx(5.0)
+    assert evaluate_math_expression("sqrt(v_dx * v_dx + v_dy * v_dy)", variables) == pytest.approx(5.0)
+
+
+def test_fast_abs(variables):
+    variables.set("v_dx", -3)
+    assert try_fast_abs("abs(v_dx)", variables) == pytest.approx(3.0)
+    assert evaluate_math_expression("abs(v_dx)", variables) == pytest.approx(3.0)
+
+
+def test_fast_int_array(variables_with_array):
+    variables_with_array.set("v_i", 1)
+    assert try_fast_int_array("int(v_values[v_i])", variables_with_array) == 20
+    assert evaluate_math_expression("int(v_values[v_i])", variables_with_array) == 20
 
 
 def test_round_floor_ceil(variables):

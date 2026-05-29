@@ -10,7 +10,7 @@ INTENSITY_MIN = 0
 INTENSITY_MAX = 100
 SPECTRAL_MIN = 0
 SPECTRAL_MAX = 99
-THROTTLE_MIN = 0.01
+THROTTLE_MIN = 0.0  # throttle(0) = no extra producer delay between commands
 FPS_MAX = 240.0
 BURNOUT_PERMANENT = -1
 
@@ -149,6 +149,7 @@ def clamp_throttle(
     *,
     warn: bool = True,
 ) -> float:
+    """throttle(0) disables producer pacing; negative values are clamped to 0."""
     raw = _to_number(value)
     num = float(raw)
     if num < THROTTLE_MIN:
@@ -158,7 +159,7 @@ def clamp_throttle(
                 "factor",
                 num,
                 THROTTLE_MIN,
-                f"min {THROTTLE_MIN}",
+                "min 0",
             )
         return THROTTLE_MIN
     return num
