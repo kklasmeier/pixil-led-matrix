@@ -1,19 +1,19 @@
 """
 Terminal input handling utilities for Pixil script runner.
-Handles raw terminal input for keyboard control.
+Background thread reads stdin so skip detection does not block script execution.
 """
 
-import sys
-import tty
-import termios
 import select
+import sys
+import termios
+import threading
 from .debug import debug_print, DEBUG_VERBOSE, DEBUG_CONCISE
-import time
 
-# Global terminal handler state
+# Set by reader thread on spacebar; consumed from is_time_expired() on the main thread.
+_skip_event = threading.Event()
+
 _handler = None
-_last_check_time = 0
-_check_interval = 0.05
+
 
 def initialize_terminal():
     """Initialize global terminal handler for keyboard input."""
@@ -22,11 +22,13 @@ def initialize_terminal():
         _handler = TerminalHandler()
     return _handler
 
+
 def start_terminal():
     """Start terminal handling if initialized."""
     global _handler
     if _handler:
         _handler.start()
+
 
 def stop_terminal():
     """Stop terminal handling if active."""
@@ -34,66 +36,63 @@ def stop_terminal():
     if _handler:
         _handler.stop()
         _handler = None
+    _skip_event.clear()
 
-def check_spacebar_throttled():
-    """Throttled spacebar check - only polls stdin every 50ms."""
-    global _last_check_time
-    
-    current_time = time.time()
-    if current_time - _last_check_time < _check_interval:
-        return False  # Skip check, too soon
-    
-    _last_check_time = current_time
-    return check_spacebar()
 
-def check_spacebar():
+def consume_skip_request():
     """
-    Check for spacebar press using global handler.
-    Returns False if handler not initialized.
+    Return True once if the user requested skip (spacebar) since the last consume.
+    Main thread only; clears the pending flag.
     """
-    global _handler
-    if _handler:
-        return _handler.check_spacebar()
+    if _skip_event.is_set():
+        _skip_event.clear()
+        return True
     return False
 
+
 class TerminalHandler:
-    """Manages terminal settings and keyboard input detection."""
-    
+    """Manages terminal settings and a background stdin reader for spacebar skip."""
+
+    _POLL_INTERVAL = 0.25
+
     def __init__(self):
-        """Initialize terminal handler."""
         self.fd = sys.stdin.fileno()
         self.old_settings = None
+        self._stop_event = threading.Event()
+        self._reader_thread = None
         debug_print("Terminal handler initialized", DEBUG_VERBOSE)
-        
+
     def start(self):
-        """
-        Start minimal terminal modifications for keyboard detection.
-        Preserves signal handling while allowing direct character reads.
-        """
+        """Enable raw stdin and start the background reader thread."""
         try:
-            # Save original settings
             self.old_settings = termios.tcgetattr(self.fd)
-            
-            # Get current settings
             new_settings = termios.tcgetattr(self.fd)
-            
-            # Only modify what we need for spacebar detection
             new_settings[3] = new_settings[3] & ~(
-                termios.ICANON |  # Turn off buffered input
-                termios.ECHO      # Turn off echo
+                termios.ICANON |
+                termios.ECHO
             )
-            
-            # Apply new settings
             termios.tcsetattr(self.fd, termios.TCSADRAIN, new_settings)
-            debug_print("Terminal handler started with minimal modifications", DEBUG_VERBOSE)
-            
+            self._stop_event.clear()
+            self._reader_thread = threading.Thread(
+                target=self._reader_loop,
+                name="pixil-stdin-reader",
+                daemon=True,
+            )
+            self._reader_thread.start()
+            debug_print("Terminal handler started (background stdin reader)", DEBUG_VERBOSE)
         except Exception as e:
             debug_print(f"Error starting terminal handler: {str(e)}", DEBUG_CONCISE)
             self.stop()
             raise
 
     def stop(self):
-        """Restore original terminal settings."""
+        """Stop reader thread and restore terminal settings."""
+        self._stop_event.set()
+        reader = self._reader_thread
+        if reader is not None and reader.is_alive():
+            reader.join(timeout=self._POLL_INTERVAL + 0.5)
+        self._reader_thread = None
+
         if self.old_settings:
             try:
                 termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
@@ -103,24 +102,32 @@ class TerminalHandler:
             finally:
                 self.old_settings = None
 
-    def check_spacebar(self):
-        """
-        Non-blocking check for spacebar press.
-        
-        Returns:
-            bool: True if spacebar was pressed, False otherwise
-        """
-        try:
-            # Check for input without blocking
-            r, _, _ = select.select([sys.stdin], [], [], 0)
-            if r:
-                # Read one character if input is available
-                char = sys.stdin.read(1)
-                # Check if it's spacebar
-                return char == ' '
-        except Exception as e:
-            debug_print(f"Error checking spacebar: {str(e)}", DEBUG_VERBOSE)
-        return False
+        _skip_event.clear()
 
-# Export symbols
-__all__ = ['initialize_terminal', 'start_terminal', 'stop_terminal', 'check_spacebar']
+    def _reader_loop(self):
+        """Poll stdin in a side thread; set skip flag on spacebar."""
+        while not self._stop_event.is_set():
+            try:
+                readable, _, _ = select.select(
+                    [sys.stdin], [], [], self._POLL_INTERVAL,
+                )
+                if self._stop_event.is_set():
+                    break
+                if not readable:
+                    continue
+                char = sys.stdin.read(1)
+                if char == ' ':
+                    _skip_event.set()
+                    debug_print("Spacebar skip requested", DEBUG_VERBOSE)
+            except (OSError, ValueError) as e:
+                if not self._stop_event.is_set():
+                    debug_print(f"Stdin reader stopped: {e}", DEBUG_VERBOSE)
+                break
+
+
+__all__ = [
+    'initialize_terminal',
+    'start_terminal',
+    'stop_terminal',
+    'consume_skip_request',
+]

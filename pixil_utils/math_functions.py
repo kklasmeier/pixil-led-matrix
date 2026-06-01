@@ -22,7 +22,7 @@ from .regex_patterns import (
     NUMBER_PATTERN, VAR_ADD_VAR_PATTERN, VAR_MUL_VAR_PATTERN,
     VAR_SUB_VAR_PATTERN, VAR_DIV_VAR_PATTERN,
     NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
-    MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN,
+    MATH_EXPR_PATTERN, ARRAY_ACCESS_PATTERN, VARIABLE_PATTERN, PIXIL_VAR_IN_EXPR_PATTERN,
     ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN,
     FAST_SIN_PATTERN, FAST_COS_PATTERN, FAST_RADIANS_PATTERN, FAST_SQRT_PATTERN,
     FAST_SQRT_SUM_SQ_PATTERN, FAST_ABS_PATTERN, FAST_INT_ARRAY_PATTERN,
@@ -900,8 +900,12 @@ def has_math_expression(value: str) -> bool:
     """
     if not isinstance(value, str):
         return False
-        
-    return any(c in value for c in '+-*/()') or 'v_' in value
+    if any(c in value for c in '+-*/()'):
+        return True
+    if value.startswith("v_"):
+        return True
+    # Pixil variable token (not inv_bullet / sprite names where v_ is mid-identifier)
+    return PIXIL_VAR_IN_EXPR_PATTERN.search(value) is not None
 
 def substitute_variables(expr: str, variables) -> str:
     """

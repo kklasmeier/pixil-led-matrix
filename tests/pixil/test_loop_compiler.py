@@ -355,27 +355,28 @@ def test_loop_chladni_style_begin_frame_plot_end_frame():
 
 def test_loop_draw_circle_compiles_and_invokes_run_command():
     flags.ENABLE_COMPILED_LOOPS = True
+    from pixil_utils.loop_compiler import DrawCircleStmt
     # Inner body only — Pixil wraps with run_compiled_loop_body (see Pixil.py for loop)
     block = [
         "draw_circle(v_i, 5, 3, 50, 80, false)",
     ]
     compiled = try_compile_loop_block(block)
     assert compiled is not None
-    assert any(isinstance(s, CommandStmt) for s in compiled.statements)
+    assert isinstance(compiled.statements[0], DrawCircleStmt)
 
-    commands = []
+    circles = []
 
-    def capture_command(cmd_name, arg_exprs):
-        commands.append((cmd_name, list(arg_exprs)))
+    def capture_draw_circle(x, y, radius, color, intensity, filled, burnout=None, burnout_mode=None):
+        circles.append((x, y, radius, color, intensity, filled))
 
     variables = VariableRegistry()
     variables.scan_and_register(["v_i"])
     ctx = make_loop_context(
-        variables, lambda *a: None, lambda: False, run_command=capture_command,
+        variables, lambda *a: None, lambda: False, draw_circle_fn=capture_draw_circle,
     )
     run_compiled_loop_body(compiled, "v_i", 0.0, 2.0, 1.0, ctx)
-    assert len(commands) == 3
-    assert all(c[0] == "draw_circle" for c in commands)
+    assert len(circles) == 3
+    assert all(c[2] == 3 for c in circles)
     flags.ENABLE_COMPILED_LOOPS = False
 
 

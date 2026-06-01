@@ -27,8 +27,8 @@ from pixil_utils import (ScriptManager, parse_args,
                         # Debug management 
                         set_debug_level,
                         # Terminal handling
-                        initialize_terminal, start_terminal, 
-                        stop_terminal, check_spacebar_throttled)
+                        initialize_terminal, start_terminal,
+                        stop_terminal)
 from pixil_utils.array_manager import PixilArray
 from pixil_utils.test_hooks import (
     is_test_mode,
@@ -86,7 +86,7 @@ if is_headless():
     terminal_handler.initialize_terminal = lambda: None
     terminal_handler.start_terminal = lambda: None
     terminal_handler.stop_terminal = lambda: None
-    terminal_handler.check_spacebar = lambda: False
+    terminal_handler.consume_skip_request = lambda: False
 
 # Performance metrics tracking
 _metrics = {
@@ -1497,6 +1497,38 @@ def process_script(filename, execute_func=None):
                 parts.append(str(burnout_mode))
         store_frame_command(f"plot({', '.join(parts)})")
 
+    def _compiled_draw_line(x0, y0, x1, y1, color, intensity=100, burnout=None, burnout_mode=None):
+        """Compiled draw_line(): batch in frame mode; flush immediately otherwise."""
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        if _use_draw_batch_for('draw_line'):
+            _append_to_draw_batch('draw_line', [x0, y0, x1, y1, final_color, intensity, burnout, burnout_mode])
+            return
+        parts = [str(x0), str(y0), str(x1), str(y1), str(final_color), str(intensity)]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"draw_line({', '.join(parts)})")
+
+    def _compiled_draw_circle(x, y, radius, color, intensity=100, filled=False, burnout=None, burnout_mode=None):
+        """Compiled draw_circle(): batch in frame mode; flush immediately otherwise."""
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        filled_flag = bool(filled)
+        if _use_draw_batch_for('draw_circle'):
+            _append_to_draw_batch(
+                'draw_circle',
+                [x, y, radius, final_color, intensity, filled_flag, burnout, burnout_mode],
+            )
+            return
+        parts = [str(x), str(y), str(radius), str(final_color), str(intensity), str(filled_flag).lower()]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"draw_circle({', '.join(parts)})")
+
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
         global mplot_buffer, mplot_count, draw_buffer, draw_count
         if not (0 <= x <= 63 and 0 <= y <= 63):
@@ -1566,8 +1598,26 @@ def process_script(filename, execute_func=None):
                     )
             store_frame_command(f"{cmd_name}({', '.join(str(a) for a in command_args)})")
 
+    compiled_ctx_pool = None
+
+    def _get_compiled_ctx():
+        nonlocal compiled_ctx_pool
+        from pixil_utils.loop_compiler import ReusableLoopContext
+        if compiled_ctx_pool is None:
+            compiled_ctx_pool = ReusableLoopContext(
+                variables,
+                _compiled_mplot,
+                is_time_expired,
+                call_procedure=invoke_procedure,
+                run_command=_run_compiled_command,
+                plot_fn=_compiled_plot,
+                draw_line_fn=_compiled_draw_line,
+                draw_circle_fn=_compiled_draw_circle,
+            )
+        return compiled_ctx_pool.get()
+
     def invoke_procedure(proc_name):
-        from pixil_utils.loop_compiler import run_compiled_block, make_loop_context
+        from pixil_utils.loop_compiler import run_compiled_block
         from pixil_utils.optimization_flags import ENABLE_COMPILED_PROCEDURES
 
         if proc_name not in procedures:
@@ -1576,15 +1626,7 @@ def process_script(filename, execute_func=None):
         debug_print(f"Calling procedure: {proc_name}", DEBUG_SUMMARY)
         compiled = compiled_procedures.get(proc_name)
         if compiled is not None and ENABLE_COMPILED_PROCEDURES:
-            ctx = make_loop_context(
-                variables,
-                _compiled_mplot,
-                is_time_expired,
-                call_procedure=invoke_procedure,
-                run_command=_run_compiled_command,
-                plot_fn=_compiled_plot,
-            )
-            run_compiled_block(compiled, ctx)
+            run_compiled_block(compiled, _get_compiled_ctx())
         else:
             from pixil_utils.loop_compiler import LoopBreak
             try:
@@ -1606,17 +1648,9 @@ def process_script(filename, execute_func=None):
             from pixil_utils.math_functions import set_current_script_line
             set_current_script_line(current_command)
    
-            # Only check spacebar every 100 lines instead of every line
-            if check_spacebar_throttled():
-                print("Spacebar pressed, skipping to next script...")
-                force_timer_expired()
+            if is_time_expired():
                 normal_exit = False
                 break
-
-            if is_time_expired():
-                debug_print("Script duration expired", DEBUG_CONCISE)
-                normal_exit = False
-                break            
             debug_print(f"\n--------------------------------------", DEBUG_VERBOSE)
             debug_print(f"Processing line {line_number}: {line}", DEBUG_VERBOSE)
 
@@ -1757,22 +1791,15 @@ def process_script(filename, execute_func=None):
                     try_compile_loop_block,
                     run_compiled_loop_body,
                     run_compiled_while_body,
-                    make_loop_context,
                 )
                 from pixil_utils.optimization_flags import ENABLE_COMPILED_LOOPS
 
                 compiled_loop = try_compile_loop_block(loop_block) if ENABLE_COMPILED_LOOPS else None
 
                 if compiled_loop is not None:
-                    loop_ctx = make_loop_context(
-                        variables,
-                        _compiled_mplot,
-                        is_time_expired,
-                        call_procedure=invoke_procedure,
-                        run_command=_run_compiled_command,
-                        plot_fn=_compiled_plot,
+                    run_compiled_loop_body(
+                        compiled_loop, loop_var, start, end, step, _get_compiled_ctx(),
                     )
-                    run_compiled_loop_body(compiled_loop, loop_var, start, end, step, loop_ctx)
                 else:
                     epsilon = 1e-10  # always numeric
                     current_value = start
@@ -1822,22 +1849,13 @@ def process_script(filename, execute_func=None):
                 from pixil_utils.loop_compiler import (
                     try_compile_loop_block,
                     run_compiled_while_body,
-                    make_loop_context,
                 )
                 from pixil_utils.optimization_flags import ENABLE_COMPILED_LOOPS
 
                 compiled_while = try_compile_loop_block(loop_block) if ENABLE_COMPILED_LOOPS else None
 
                 if compiled_while is not None:
-                    loop_ctx = make_loop_context(
-                        variables,
-                        _compiled_mplot,
-                        is_time_expired,
-                        call_procedure=invoke_procedure,
-                        run_command=_run_compiled_command,
-                        plot_fn=_compiled_plot,
-                    )
-                    run_compiled_while_body(compiled_while, condition, loop_ctx)
+                    run_compiled_while_body(compiled_while, condition, _get_compiled_ctx())
                 else:
                     while evaluate_condition(condition, variables):
                         if is_time_expired():

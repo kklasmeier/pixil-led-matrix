@@ -67,6 +67,25 @@ def test_force_timer_expired():
     assert timer.is_time_expired() is True
 
 
+def test_is_time_expired_on_spacebar_skip(monkeypatch):
+    timer.clear_timer()
+    timer.initialize_timer(3600)
+    monkeypatch.setattr(
+        "pixil_utils.terminal_handler.consume_skip_request",
+        lambda: True,
+    )
+    assert timer.is_time_expired() is True
+    timer.clear_timer()
+
+
+def test_consume_skip_request():
+    from pixil_utils import terminal_handler as th
+
+    th._skip_event.set()
+    assert th.consume_skip_request() is True
+    assert th.consume_skip_request() is False
+
+
 def test_set_profile_only_working_keeps_jit_off():
     opt.set_profile_only_working()
     assert opt.ENABLE_JIT is False

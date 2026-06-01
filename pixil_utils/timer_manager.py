@@ -39,9 +39,16 @@ def is_time_expired():
     if timer_expired:
         return True
 
+    from .terminal_handler import consume_skip_request
+
+    if consume_skip_request():
+        print("Spacebar pressed, skipping to next script...")
+        force_timer_expired()
+        return True
+
     if end_time is None:
         return False
-        
+
     timer_expired = time.time() >= end_time
     return timer_expired
 

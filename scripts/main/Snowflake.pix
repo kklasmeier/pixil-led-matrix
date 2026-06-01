@@ -54,7 +54,7 @@ if v_palette == 0 then
     v_intensities[2] = 60
 elseif v_palette == 1 then
     v_colors[0] = "cyan"
-    v_colors[1] = "skyblue"
+    v_colors[1] = "sky_blue"
     v_colors[2] = "white"
     v_intensities[0] = 100
     v_intensities[1] = 85

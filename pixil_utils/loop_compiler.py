@@ -5,7 +5,8 @@ Parses a block once into a small statement tree, then runs it without re-dispatc
 lines through process_lines.
 
 Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
-       if/elseif/else, break, mplot(...), plot(...) (fast path), other draw_* via CommandStmt.
+       if/elseif/else, break, mplot(...), plot(...) (fast path), draw_line/draw_circle
+       (fast path), other draw_* via CommandStmt.
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
             begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon, etc.
 Unsupported constructs cause compile failure and interpreter fallback.
@@ -145,6 +146,32 @@ def _eval_burnout_mode(mode_expr: str, compiled: Optional[Any], ctx: "ExecContex
     return s
 
 
+def _eval_bool_literal(bool_expr: str, compiled: Optional[Any], ctx: "ExecContext") -> bool:
+    """Resolve true/false literals or expressions for shape filled parameters."""
+    s = bool_expr.strip()
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    lower = s.lower()
+    if lower == "true":
+        return True
+    if lower == "false":
+        return False
+    if s.startswith("v_") or has_math_expression(s):
+        result = _eval_expression(s, compiled, ctx)
+        if isinstance(result, bool):
+            return result
+        if isinstance(result, (int, float)):
+            return bool(result)
+        if isinstance(result, str):
+            return result.strip().lower() == "true"
+    from .parameter_types import parse_bool_literal
+    return parse_bool_literal(s)
+
+
+def _is_bool_token(value: str) -> bool:
+    return value.strip().lower() in ("true", "false")
+
+
 def get_loop_compiler_stats() -> dict:
     return {
         "compiled_loop_attempts": COMPILED_LOOP_ATTEMPTS,
@@ -168,6 +195,8 @@ class ExecContext:
     call_procedure: Optional[Callable[[str], None]] = None
     run_command: Optional[Callable[[str, List[str]], None]] = None
     plot: Optional[Callable[..., None]] = None
+    draw_line: Optional[Callable[..., None]] = None
+    draw_circle: Optional[Callable[..., None]] = None
 
 
 # Backward-compatible alias
@@ -391,6 +420,115 @@ class PlotStmt(Statement):
 
 
 @dataclass
+class DrawLineStmt(Statement):
+    """Fast compiled path for draw_line(x0, y0, x1, y1, color, [intensity], ...)."""
+
+    x0_expr: str
+    y0_expr: str
+    x1_expr: str
+    y1_expr: str
+    color_expr: str
+    intensity_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x0: Optional[Any] = field(default=None, repr=False)
+    compiled_y0: Optional[Any] = field(default=None, repr=False)
+    compiled_x1: Optional[Any] = field(default=None, repr=False)
+    compiled_y1: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x0 = int(float(_eval_expression(self.x0_expr, self.compiled_x0, ctx)))
+        y0 = int(float(_eval_expression(self.y0_expr, self.compiled_y0, ctx)))
+        x1 = int(float(_eval_expression(self.x1_expr, self.compiled_x1, ctx)))
+        y1 = int(float(_eval_expression(self.y1_expr, self.compiled_y1, ctx)))
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        draw_fn = ctx.draw_line
+        if draw_fn is None:
+            if ctx.run_command is None:
+                raise RuntimeError("draw_line not configured")
+            args = [self.x0_expr, self.y0_expr, self.x1_expr, self.y1_expr, self.color_expr, self.intensity_expr]
+            if self.burnout_expr is not None:
+                args.append(self.burnout_expr)
+                if self.burnout_mode_expr is not None:
+                    args.append(self.burnout_mode_expr)
+            ctx.run_command("draw_line", args)
+            return
+        if burnout is not None or burnout_mode is not None:
+            draw_fn(x0, y0, x1, y1, color, intensity, burnout, burnout_mode)
+        else:
+            draw_fn(x0, y0, x1, y1, color, intensity)
+
+
+@dataclass
+class DrawCircleStmt(Statement):
+    """Fast compiled path for draw_circle(x, y, radius, color, [intensity], filled, ...)."""
+
+    x_expr: str
+    y_expr: str
+    radius_expr: str
+    color_expr: str
+    intensity_expr: str
+    filled_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x: Optional[Any] = field(default=None, repr=False)
+    compiled_y: Optional[Any] = field(default=None, repr=False)
+    compiled_radius: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_filled: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x = int(float(_eval_expression(self.x_expr, self.compiled_x, ctx)))
+        y = int(float(_eval_expression(self.y_expr, self.compiled_y, ctx)))
+        radius = int(float(_eval_expression(self.radius_expr, self.compiled_radius, ctx)))
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        filled = _eval_bool_literal(self.filled_expr, self.compiled_filled, ctx)
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        draw_fn = ctx.draw_circle
+        if draw_fn is None:
+            if ctx.run_command is None:
+                raise RuntimeError("draw_circle not configured")
+            args = [
+                self.x_expr, self.y_expr, self.radius_expr, self.color_expr,
+                self.intensity_expr, self.filled_expr,
+            ]
+            if self.burnout_expr is not None:
+                args.append(self.burnout_expr)
+                if self.burnout_mode_expr is not None:
+                    args.append(self.burnout_mode_expr)
+            ctx.run_command("draw_circle", args)
+            return
+        if burnout is not None or burnout_mode is not None:
+            draw_fn(x, y, radius, color, intensity, filled, burnout, burnout_mode)
+        else:
+            draw_fn(x, y, radius, color, intensity, filled)
+
+
+@dataclass
 class CallStmt(Statement):
     proc_name: str
 
@@ -430,6 +568,67 @@ def _parse_plot(line: str) -> Optional[PlotStmt]:
         _precompile_expression(args[1]),
         _precompile_expression(args[2]),
         _precompile_expression(intensity_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_draw_line(line: str) -> Optional[DrawLineStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "draw_line":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 5:
+        return None
+    intensity_expr = args[5].strip() if len(args) > 5 and args[5].strip() else "100"
+    burnout_expr = args[6].strip() if len(args) > 6 and args[6].strip() else None
+    burnout_mode_expr = args[7].strip() if len(args) > 7 and args[7].strip() else None
+    return DrawLineStmt(
+        args[0], args[1], args[2], args[3], args[4], intensity_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(args[4]),
+        _precompile_expression(intensity_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_draw_circle(line: str) -> Optional[DrawCircleStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "draw_circle":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 5:
+        return None
+    if _is_bool_token(args[4]):
+        intensity_expr = "100"
+        filled_expr = args[4].strip()
+        burnout_expr = args[5].strip() if len(args) > 5 and args[5].strip() else None
+        burnout_mode_expr = args[6].strip() if len(args) > 6 and args[6].strip() else None
+    elif len(args) >= 6:
+        intensity_expr = args[4].strip() if args[4].strip() else "100"
+        filled_expr = args[5].strip()
+        burnout_expr = args[6].strip() if len(args) > 6 and args[6].strip() else None
+        burnout_mode_expr = args[7].strip() if len(args) > 7 and args[7].strip() else None
+    else:
+        return None
+    return DrawCircleStmt(
+        args[0], args[1], args[2], args[3], intensity_expr, filled_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(intensity_expr),
+        _precompile_expression(filled_expr),
         _precompile_expression(burnout_expr) if burnout_expr else None,
         _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
     )
@@ -753,6 +952,18 @@ def _parse_block(
             i += 1
             continue
 
+        draw_line_stmt = _parse_draw_line(line)
+        if draw_line_stmt is not None:
+            statements.append(draw_line_stmt)
+            i += 1
+            continue
+
+        draw_circle_stmt = _parse_draw_circle(line)
+        if draw_circle_stmt is not None:
+            statements.append(draw_circle_stmt)
+            i += 1
+            continue
+
         arr = _parse_array_assign(line)
         if arr is not None:
             if not allow_bare_call and not allow_array_assign:
@@ -917,6 +1128,8 @@ def make_loop_context(
     call_procedure: Optional[Callable[[str], None]] = None,
     run_command: Optional[Callable[[str, List[str]], None]] = None,
     plot_fn: Optional[Callable[..., None]] = None,
+    draw_line_fn: Optional[Callable[..., None]] = None,
+    draw_circle_fn: Optional[Callable[..., None]] = None,
 ) -> ExecContext:
     def eval_expr(expr: str) -> Any:
         return evaluate_math_expression(expr, variables)
@@ -936,4 +1149,54 @@ def make_loop_context(
         call_procedure=call_procedure,
         run_command=run_command,
         plot=plot_fn,
+        draw_line=draw_line_fn,
+        draw_circle=draw_circle_fn,
     )
+
+
+class ReusableLoopContext:
+    """Lazy-built ExecContext reused across compiled loop/procedure invocations."""
+
+    __slots__ = (
+        "_variables", "_mplot_fn", "_is_expired", "_call_procedure", "_run_command",
+        "_plot_fn", "_draw_line_fn", "_draw_circle_fn", "_ctx",
+    )
+
+    def __init__(
+        self,
+        variables: Any,
+        mplot_fn: Callable[..., None],
+        is_expired: Callable[[], bool],
+        *,
+        call_procedure: Optional[Callable[[str], None]] = None,
+        run_command: Optional[Callable[[str, List[str]], None]] = None,
+        plot_fn: Optional[Callable[..., None]] = None,
+        draw_line_fn: Optional[Callable[..., None]] = None,
+        draw_circle_fn: Optional[Callable[..., None]] = None,
+    ) -> None:
+        self._variables = variables
+        self._mplot_fn = mplot_fn
+        self._is_expired = is_expired
+        self._call_procedure = call_procedure
+        self._run_command = run_command
+        self._plot_fn = plot_fn
+        self._draw_line_fn = draw_line_fn
+        self._draw_circle_fn = draw_circle_fn
+        self._ctx: Optional[ExecContext] = None
+
+    def get(self) -> ExecContext:
+        if self._ctx is None:
+            self._ctx = make_loop_context(
+                self._variables,
+                self._mplot_fn,
+                self._is_expired,
+                call_procedure=self._call_procedure,
+                run_command=self._run_command,
+                plot_fn=self._plot_fn,
+                draw_line_fn=self._draw_line_fn,
+                draw_circle_fn=self._draw_circle_fn,
+            )
+        return self._ctx
+
+    def reset(self) -> None:
+        self._ctx = None

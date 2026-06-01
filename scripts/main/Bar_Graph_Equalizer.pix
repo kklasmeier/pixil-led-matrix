@@ -1,0 +1,271 @@
+# ============================================================
+# BAR GRAPH EQUALIZER - Simulated audio spectrum display
+# ============================================================
+# 16 frequency bars, fake audio from layered sine + noise.
+# Peak-hold "^" markers linger 0.5s at each bar's maximum.
+# "Song" profile cycles every 15 seconds for varied motion.
+# Scrolling backdrop (layer 0) scrolls downward (texture moves down).
+# ============================================================
+
+throttle(0)
+fps(30)
+
+v_bg_scroll_acc = 0.0
+v_bg_scroll_speed = 0.55
+
+v_num_bars = 16
+v_bar_w = 3
+v_bar_gap = 1
+v_floor_y = 62
+v_max_h = 56
+v_min_h = 2
+v_hold_frames = 15
+v_song_len = 450
+
+v_time = 0
+v_song = 0
+v_song_tick = 0
+v_beat = 0
+v_color_shift = 0
+
+create_array(v_bar_h, v_num_bars)
+create_array(v_bar_target, v_num_bars)
+create_array(v_bar_phase, v_num_bars)
+create_array(v_bar_rate, v_num_bars)
+create_array(v_peak_hold_h, v_num_bars)
+create_array(v_peak_timer, v_num_bars)
+
+v_i = 0
+v_x = 0
+v_y = 0
+v_h = 0
+v_draw_h = 0
+v_color = 0
+v_peak = 0
+v_wave = 0
+v_noise = 0
+v_bx = 0
+v_mark_y = 0
+v_sweep = 0
+v_mid = 0
+v_bg_step = 0
+
+# ============================================================
+# SCROLLING BACKDROP (64x128, tiles vertically)
+# ============================================================
+define_sprite(eq_backdrop, 64, 128)
+    draw_rectangle(0, 0, 64, 128, black, 100, true)
+    draw_rectangle(0, 0, 64, 48, navy, 32, true)
+    draw_rectangle(0, 48, 64, 48, indigo, 26, true)
+    draw_rectangle(0, 96, 64, 32, purple, 20, true)
+
+    for v_y in (0, 127, 8)
+        draw_line(0, v_y, 63, v_y, royal_blue, 16)
+    endfor v_y
+
+    for v_y in (4, 127, 16)
+        draw_line(0, v_y, 63, v_y, violet, 10)
+    endfor v_y
+
+    for v_x in (3, 63, 4)
+        draw_line(v_x, 0, v_x, 127, indigo, 12)
+    endfor v_x
+
+    for v_i in (0, 40, 1)
+        plot(random(0, 63, 0), random(0, 127, 0), violet, random(22, 42, 0))
+    endfor v_i
+
+    for v_i in (0, 24, 1)
+        plot(random(0, 63, 0), random(0, 127, 0), azure, random(15, 28, 0))
+    endfor v_i
+
+    draw_rectangle(0, 0, 64, 2, magenta, 12, true)
+    draw_rectangle(0, 32, 64, 2, magenta, 10, true)
+    draw_rectangle(0, 64, 64, 2, magenta, 12, true)
+    draw_rectangle(0, 96, 64, 2, magenta, 10, true)
+endsprite
+
+for v_i in (0, v_num_bars - 1, 1)
+    v_bar_phase[v_i] = v_i * 0.42
+    v_bar_rate[v_i] = 0.08 + v_i * 0.012
+    v_bar_h[v_i] = 4
+    v_bar_target[v_i] = 4
+    v_peak_hold_h[v_i] = 0
+    v_peak_timer[v_i] = 0
+endfor v_i
+
+set_background(eq_backdrop, 0)
+sync_queue
+
+while true then
+    begin_frame
+
+    v_bg_scroll_acc = v_bg_scroll_acc + v_bg_scroll_speed
+    if v_bg_scroll_acc >= 1 then
+        v_bg_step = int(v_bg_scroll_acc)
+        nudge_background(0, 0 - v_bg_step, 0)
+        v_bg_scroll_acc = v_bg_scroll_acc - v_bg_step
+    endif
+
+    v_time = v_time + 1
+    v_song_tick = v_song_tick + 1
+    if v_song_tick >= v_song_len then
+        v_song_tick = 0
+        v_song = v_song + 1
+        if v_song > 4 then
+            v_song = 0
+        endif
+        for v_i in (0, v_num_bars - 1, 1)
+            v_peak_hold_h[v_i] = 0
+            v_peak_timer[v_i] = 0
+        endfor v_i
+    endif
+
+    v_color_shift = v_color_shift + 1
+    if v_color_shift > 99 then
+        v_color_shift = 0
+    endif
+
+    v_beat = 0
+    if v_song == 0 then
+        if int(fmod(v_time, 28)) < 3 then
+            v_beat = 18
+        endif
+        if int(fmod(v_time, 17)) == 0 then
+            v_beat = v_beat + 10
+        endif
+    endif
+    if v_song == 1 then
+        if int(fmod(v_time, 36)) < 2 then
+            v_beat = 8
+        endif
+    endif
+    if v_song == 2 then
+        if int(fmod(v_time, 11)) == 0 then
+            v_beat = 6
+        endif
+    endif
+    if v_song == 3 then
+        v_sweep = sin(v_time * 0.04) * 20
+    endif
+    if v_song == 4 then
+        if int(fmod(v_time, 22)) < 4 then
+            v_beat = 22
+        endif
+    endif
+
+    for v_i in (0, v_num_bars - 1, 1)
+        v_wave = sin(v_time * v_bar_rate[v_i] + v_bar_phase[v_i])
+        v_wave = abs(v_wave)
+        v_noise = random(0, 12, 0)
+
+        v_peak = 8 + v_i * 2
+
+        if v_song == 0 then
+            if v_i < 4 then
+                v_peak = v_peak + v_beat
+            endif
+            if v_i >= 12 then
+                v_peak = v_peak + random(0, 8, 0)
+            endif
+        endif
+
+        if v_song == 1 then
+            v_peak = 6 + v_i
+            if v_i >= 4 and v_i <= 11 then
+                v_peak = v_peak + 14 + v_beat
+            endif
+            v_noise = random(0, 6, 0)
+        endif
+
+        if v_song == 2 then
+            if v_i < 6 then
+                v_peak = 6 + v_i
+            else
+                v_peak = 10 + (v_i - 6) * 3 + v_beat
+                v_noise = random(0, 18, 0)
+            endif
+        endif
+
+        if v_song == 3 then
+            v_mid = abs(v_i - 8)
+            v_peak = 10 + int(v_wave * 12) + int(abs(v_sweep)) - v_mid
+            if v_peak < 4 then
+                v_peak = 4
+            endif
+            v_noise = random(0, 8, 0)
+        endif
+
+        if v_song == 4 then
+            v_peak = 6 + int(v_wave * 28) + v_beat
+            v_noise = random(0, 10, 0)
+        endif
+
+        v_bar_target[v_i] = v_min_h + int(v_wave * v_peak) + v_noise
+        if v_bar_target[v_i] > v_max_h then
+            v_bar_target[v_i] = v_max_h
+        endif
+        if v_bar_target[v_i] < v_min_h then
+            v_bar_target[v_i] = v_min_h
+        endif
+
+        if v_bar_target[v_i] > v_bar_h[v_i] then
+            v_bar_h[v_i] = v_bar_h[v_i] + 3
+            if v_bar_h[v_i] > v_bar_target[v_i] then
+                v_bar_h[v_i] = v_bar_target[v_i]
+            endif
+        else
+            v_bar_h[v_i] = v_bar_h[v_i] - 1
+            if v_bar_h[v_i] < v_bar_target[v_i] then
+                v_bar_h[v_i] = v_bar_target[v_i]
+            endif
+        endif
+
+        v_draw_h = int(v_bar_h[v_i])
+        if v_draw_h > v_peak_hold_h[v_i] then
+            v_peak_hold_h[v_i] = v_draw_h
+            v_peak_timer[v_i] = v_hold_frames
+        endif
+        if v_peak_timer[v_i] > 0 then
+            v_peak_timer[v_i] = v_peak_timer[v_i] - 1
+        endif
+    endfor v_i
+
+    draw_rectangle(0, 60, 64, 4, black, 55, true)
+
+    for v_i in (0, v_num_bars - 1, 1)
+        v_bx = v_i * (v_bar_w + v_bar_gap)
+        v_draw_h = int(v_bar_h[v_i])
+        if v_draw_h < 1 then
+            v_draw_h = 1
+        endif
+        v_y = v_floor_y - v_draw_h + 1
+
+        v_color = 55 + v_i * 2 + int(v_draw_h * 0.6)
+        if v_draw_h > 40 then
+            v_color = 65 + int(fmod(v_color_shift + v_i * 2, 25))
+        endif
+        if v_draw_h > 48 then
+            v_color = 90 + v_i
+        endif
+        if v_color < 0 then
+            v_color = 0
+        endif
+        if v_color > 99 then
+            v_color = 99
+        endif
+
+        draw_rectangle(v_bx, v_y, v_bar_w, v_draw_h, v_color, 100, true)
+
+        if v_peak_timer[v_i] > 0 then
+            v_mark_y = v_floor_y - v_peak_hold_h[v_i]
+            if v_mark_y > 2 then
+                plot(v_bx, v_mark_y, white, 100)
+                plot(v_bx + 2, v_mark_y, white, 100)
+                plot(v_bx + 1, v_mark_y - 1, white, 100)
+            endif
+        endif
+    endfor v_i
+
+    end_frame
+endwhile

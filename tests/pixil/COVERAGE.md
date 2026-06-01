@@ -17,6 +17,7 @@
 | `test_parameter_commands.py` | `parameter_types.py` | minimal params for **all** commands |
 | `test_parameter_errors.py` | `parameter_types.py` | too few/many params, invalid conversions |
 | `test_expression_parser.py` | `expression_parser.py` | colors, format_parameter, escape, draw_text |
+| `test_sprite_identifier_parameters.py` | `math_functions.py`, `expression_parser.py`, `loop_compiler.py` | sprite names with embedded `v_` (e.g. inv_bullet) not treated as math; Space Invaders show_sprite regression |
 | `test_jit_compiler.py` | `jit_compiler/` | dormant-path guard (JIT off in production) |
 | `test_loop_compiler.py` | `loop_compiler.py` | compile/run mplot grids, draw_* in loops, elseif, array assign, `begin_frame(false)`, Chladni-style frame+plot, reject call in loops |
 | `test_draw_batch_protocol.py` | `draw_batch_protocol.py`, `draw_batch_dispatch.py` | pack/unpack plot+shapes, string coords (plot/mplot), submission order |

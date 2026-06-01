@@ -15,8 +15,8 @@ from .timer_manager import (initialize_timer, is_time_expired, clear_timer,
                           get_remaining_time, force_timer_expired)
 from .cli import validate_time_format, validate_debug_level, parse_args
 from .array_manager import PixilArray
-from .terminal_handler import (initialize_terminal, start_terminal, 
-                             stop_terminal, check_spacebar_throttled)
+from .terminal_handler import (initialize_terminal, start_terminal,
+                             stop_terminal, consume_skip_request)
 # NEW: Import VariableRegistry for optimized variable storage
 from .variable_registry import VariableRegistry, load_script_lines
 
@@ -63,7 +63,7 @@ __all__ = [
     'initialize_terminal',
     'start_terminal', 
     'stop_terminal',
-    'check_spacebar_throttled',
+    'consume_skip_request',
     # Variable registry for optimized variable storage
     'VariableRegistry',
     'load_script_lines',

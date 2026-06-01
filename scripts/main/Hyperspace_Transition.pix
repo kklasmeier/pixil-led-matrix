@@ -1,0 +1,285 @@
+# ============================================================
+# HYPERSPACE TRANSITION
+# ============================================================
+# Cruise: drifting star dots. Warp: radial streak lines from
+# the void edge. Each star keeps a fixed 3D lane (no field
+# resets). Wraps are desynced and streaks persist through
+# respawn so lines flow continuously — not random batches.
+# ============================================================
+
+throttle(0)
+fps(60)
+
+v_num_stars = 60
+v_center_x = 32
+v_center_y = 32
+v_min_z = 2
+v_max_z = 36
+
+v_speed_cruise = 0.55
+v_speed_hyper = 8.0
+v_void_r = 4
+
+v_cruise_len = 300
+v_ramp_up = 240
+v_hold_hyper = 60
+v_ramp_down = 240
+v_cycle_len = v_cruise_len + v_ramp_up + v_hold_hyper + v_ramp_down
+
+v_cycle_t = 0
+v_phase = 0
+v_ramp_t = 0.0
+v_mix = 0.0
+v_hyper = 0.0
+v_star_speed = 0.55
+v_void_eff = 0.0
+v_ring_bright = 0
+v_persp = 0
+v_depth_frac = 0.0
+v_bright = 0
+v_color = 0
+v_dx = 0
+v_dy = 0
+v_dist = 0
+v_tail_draw = 0
+v_tail_target = 0
+v_sx1 = 0
+v_sy1 = 0
+v_div = 0
+v_skip = 0
+v_dist_sq = 0
+v_void_sq = 0
+v_line_bright = 0
+v_i = 0
+v_px = 0
+v_py = 0
+v_adx = 0
+v_ady = 0
+v_void_fill = 0
+v_z_span = 0
+v_on_screen = 0
+
+create_array(v_sx, v_num_stars)
+create_array(v_sy, v_num_stars)
+create_array(v_sz, v_num_stars)
+create_array(v_tail_len, v_num_stars)
+
+define_sprite(space_backdrop, 64, 64)
+    draw_rectangle(0, 0, 64, 64, black, 100, true)
+endsprite
+
+def init_stars {
+    v_z_span = v_max_z - v_min_z
+    for v_i in (0, v_num_stars - 1, 1)
+        v_sx[v_i] = random(-20, 20, 1)
+        v_sy[v_i] = random(-20, 20, 1)
+        v_sz[v_i] = v_min_z + (v_i * 13 + 5) % v_z_span
+        v_tail_len[v_i] = 0
+    endfor v_i
+}
+
+def update_cycle {
+    v_cycle_t = v_cycle_t + 1
+    if v_cycle_t >= v_cycle_len then
+        v_cycle_t = 0
+    endif
+
+    v_phase = 0
+    v_mix = 0.0
+    v_hyper = 0.0
+
+    if v_cycle_t < v_cruise_len then
+        v_phase = 0
+        v_hyper = 0.0
+    endif
+
+    if v_cycle_t >= v_cruise_len and v_cycle_t < v_cruise_len + v_ramp_up then
+        v_phase = 1
+        v_ramp_t = (v_cycle_t - v_cruise_len) / v_ramp_up
+        v_mix = v_ramp_t
+        v_mix = v_mix * v_mix * (3.0 - 2.0 * v_mix)
+        v_hyper = v_mix
+    endif
+
+    if v_cycle_t >= v_cruise_len + v_ramp_up and v_cycle_t < v_cruise_len + v_ramp_up + v_hold_hyper then
+        v_phase = 2
+        v_hyper = 1.0
+    endif
+
+    if v_cycle_t >= v_cruise_len + v_ramp_up + v_hold_hyper and v_cycle_t < v_cycle_len then
+        v_phase = 3
+        v_ramp_t = (v_cycle_t - v_cruise_len - v_ramp_up - v_hold_hyper) / v_ramp_down
+        v_mix = 1.0 - v_ramp_t
+        v_mix = v_mix * v_mix * (3.0 - 2.0 * v_mix)
+        v_hyper = v_mix
+    endif
+
+    v_star_speed = v_speed_cruise + v_hyper * (v_speed_hyper - v_speed_cruise)
+
+    v_void_eff = v_void_r * v_hyper * v_hyper
+
+    v_ring_bright = int(v_hyper * 32)
+    if v_ring_bright > 100 then
+        v_ring_bright = 100
+    endif
+}
+
+def draw_star {
+    v_sz[v_i] = v_sz[v_i] - v_star_speed
+
+    v_persp = v_max_z / v_sz[v_i]
+
+    v_tail_target = int(v_hyper * v_hyper * v_persp * 5.2)
+    if v_tail_target > 26 then
+        v_tail_target = 26
+    endif
+
+    if v_sz[v_i] < v_min_z then
+        v_sz[v_i] = v_max_z
+        if v_hyper > 0.2 then
+            v_tail_len[v_i] = v_tail_target
+        else
+            v_tail_len[v_i] = 0
+        endif
+    endif
+
+    if v_tail_len[v_i] < v_tail_target then
+        v_tail_len[v_i] = v_tail_len[v_i] + 0.35 + v_hyper * 0.45
+    endif
+    if v_tail_len[v_i] > v_tail_target then
+        v_tail_len[v_i] = v_tail_len[v_i] - 0.35
+    endif
+    if v_tail_len[v_i] < 0 then
+        v_tail_len[v_i] = 0
+    endif
+
+    v_px = int(v_sx[v_i] * v_persp) + v_center_x
+    v_py = int(v_sy[v_i] * v_persp) + v_center_y
+
+    v_on_screen = 0
+    if v_px >= 0 and v_px <= 63 and v_py >= 0 and v_py <= 63 then
+        v_on_screen = 1
+    endif
+
+    if v_on_screen == 1 then
+        v_dx = v_px - v_center_x
+        v_dy = v_py - v_center_y
+        v_dist_sq = v_dx * v_dx + v_dy * v_dy
+
+        v_skip = 0
+        if v_void_eff > 0.2 then
+            v_void_sq = v_void_eff * v_void_eff
+            if v_dist_sq < v_void_sq then
+                v_skip = 1
+            endif
+        endif
+
+        if v_skip == 0 then
+            v_depth_frac = (v_max_z - v_sz[v_i]) / (v_max_z - v_min_z)
+            v_bright = 16 + int(v_depth_frac * v_depth_frac * 78)
+            v_bright = v_bright + int(v_hyper * 12)
+            if v_bright > 99 then
+                v_bright = 99
+            endif
+            if v_bright < 10 then
+                v_bright = 10
+            endif
+
+            v_color = 88 + int(v_depth_frac * 10) - int(v_hyper * 16)
+            if v_color < 58 then
+                v_color = 58
+            endif
+            if v_color > 99 then
+                v_color = 99
+            endif
+
+            v_tail_draw = int(v_tail_len[v_i])
+            if v_tail_draw > 26 then
+                v_tail_draw = 26
+            endif
+
+            v_adx = abs(v_dx)
+            v_ady = abs(v_dy)
+            v_div = v_adx
+            if v_ady > v_div then
+                v_div = v_ady
+            endif
+            if v_div < 8 then
+                v_div = 8
+            endif
+
+            v_line_bright = int(v_bright * (0.45 + v_hyper * 0.55))
+            if v_line_bright > 99 then
+                v_line_bright = 99
+            endif
+            if v_line_bright < 12 then
+                v_line_bright = 12
+            endif
+
+            if v_hyper < 0.15 then
+                plot(v_px, v_py, v_color, v_bright)
+            endif
+
+            if v_hyper >= 0.15 and v_tail_draw >= 1 then
+                v_sx1 = v_px - int(v_dx * v_tail_draw / v_div)
+                v_sy1 = v_py - int(v_dy * v_tail_draw / v_div)
+                if v_void_eff > 0.2 then
+                    v_dist = sqrt(v_dist_sq)
+                    if v_dist > v_void_eff then
+                        v_sx1 = v_center_x + int(v_dx * v_void_eff / v_dist)
+                        v_sy1 = v_center_y + int(v_dy * v_void_eff / v_dist)
+                    endif
+                endif
+                if v_sx1 < 0 then
+                    v_sx1 = 0
+                endif
+                if v_sx1 > 63 then
+                    v_sx1 = 63
+                endif
+                if v_sy1 < 0 then
+                    v_sy1 = 0
+                endif
+                if v_sy1 > 63 then
+                    v_sy1 = 63
+                endif
+                if v_sx1 != v_px or v_sy1 != v_py then
+                    draw_line(v_sx1, v_sy1, v_px, v_py, v_color, v_line_bright)
+                endif
+            endif
+
+            if v_hyper >= 0.15 and v_hyper < 0.35 and v_tail_draw < 2 then
+                plot(v_px, v_py, v_color, v_bright)
+            endif
+        endif
+    endif
+}
+
+call init_stars
+set_background(space_backdrop, 0)
+sync_queue
+
+print("Hyperspace Transition - continuous streaks, void center")
+
+while true then
+    begin_frame
+
+    call update_cycle
+
+    for v_i in (0, v_num_stars - 1, 1)
+        call draw_star
+    endfor v_i
+
+    if v_ring_bright > 2 then
+        v_void_fill = int(v_void_r * v_hyper)
+        if v_void_fill < 1 then
+            v_void_fill = 1
+        endif
+        if v_void_fill > v_void_r then
+            v_void_fill = v_void_r
+        endif
+        draw_circle(v_center_x, v_center_y, v_void_fill, black, 100, true)
+        draw_circle(v_center_x, v_center_y, v_void_fill, teal, v_ring_bright, false)
+    endif
+
+    end_frame
+endwhile

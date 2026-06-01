@@ -131,6 +131,8 @@ FAST_INT_ARRAY_PATTERN = re.compile(r'^int\s*\(\s*(v_\w+)\[(v_\w+)\]\s*\)$')
 MATH_EXPR_PATTERN = re.compile(r'[\+\-\*/\(\)]|v_\w+|\d+\.?\d*')
 ARRAY_ACCESS_PATTERN = re.compile(r'(v_\w+)\[([^[\]]*(?:\[[^[\]]*\][^[\]]*)*)\]')
 VARIABLE_PATTERN = re.compile(r'v_\w+')
+# Variable reference inside a larger expression (excludes inv_bullet-style identifiers)
+PIXIL_VAR_IN_EXPR_PATTERN = re.compile(r'(?<![a-zA-Z])v_\w+')
 ARRAY_INDEX_PATTERN = re.compile(r'(v_\w+)\[([^\[\]]+)\]')
 CONCAT_ARRAY_PATTERN = re.compile(r'(v_\w+)\[(.+?)\]')
 

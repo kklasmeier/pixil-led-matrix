@@ -1,0 +1,285 @@
+# ============================================================
+# STARFIELD + HYPERSPACE
+# ============================================================
+# One dial v_hyper (0..1) drives everything in lockstep:
+# star speed, trail length, void, ring, tint, spawn spread.
+# Linear ramp over time so the middle of acceleration already
+# looks like a blend — not "slow stars" then "hyperspace".
+# ============================================================
+
+throttle(0)
+fps(60)
+
+v_num_stars = 60
+v_edge_stars = 22
+v_center_x = 32
+v_center_y = 32
+v_min_z = 2
+v_max_z = 36
+v_void_r = 3
+
+v_speed_cruise = 0.38
+v_speed_hyper = 5.0
+
+v_cycle_len = 840
+v_ramp_up = 360
+v_hold_hyper = 90
+v_ramp_down = 270
+
+v_cycle_t = 0
+v_mix = 0.0
+v_hyper = 0.0
+v_star_speed = 0.4
+v_streak_scale = 0.0
+v_void_eff = 0.0
+v_ring_bright = 0
+v_linear = 0.0
+v_depth_bright = 0
+v_cruise_bright = 0
+
+create_array(v_sx, v_num_stars)
+create_array(v_sy, v_num_stars)
+create_array(v_sz, v_num_stars)
+
+v_i = 0
+v_persp = 0
+v_px = 0
+v_py = 0
+v_bright = 0
+v_color = 0
+v_dx = 0
+v_dy = 0
+v_dist = 0
+v_tlen = 0
+v_flen = 0
+v_sx1 = 0
+v_sy1 = 0
+v_ex1 = 0
+v_ey1 = 0
+v_div = 0
+v_ramp_t = 0
+v_skip = 0
+v_spawn = 0
+v_roll = 0
+v_edge_plot = 0
+v_line_bright = 0
+
+define_sprite(space_backdrop, 64, 64)
+    draw_rectangle(0, 0, 64, 64, black, 100, true)
+endsprite
+
+def init_stars {
+    for v_i in (0, v_num_stars - 1, 1)
+        v_sz[v_i] = random(v_min_z, v_max_z, 1)
+        v_sx[v_i] = random(-20, 20, 1)
+        v_sy[v_i] = random(-20, 20, 1)
+    endfor v_i
+}
+
+def inside_void {
+    v_skip = 0
+    if v_void_eff > 0.25 then
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        if v_dist < v_void_eff then
+            v_skip = 1
+        endif
+    endif
+}
+
+def clip_to_void_edge {
+    v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+    if v_dist > v_void_eff and v_void_eff > 0.25 then
+        v_sx1 = v_center_x + int(v_dx * v_void_eff / v_dist)
+        v_sy1 = v_center_y + int(v_dy * v_void_eff / v_dist)
+    endif
+}
+
+def update_cycle {
+    v_cycle_t = v_cycle_t + 1
+    if v_cycle_t >= v_cycle_len then
+        v_cycle_t = 0
+        call init_stars
+    endif
+
+    v_mix = 0.0
+    if v_cycle_t < v_ramp_up then
+        v_mix = v_cycle_t / v_ramp_up
+    endif
+    if v_cycle_t >= v_ramp_up and v_cycle_t < v_ramp_up + v_hold_hyper then
+        v_mix = 1.0
+    endif
+    if v_cycle_t >= v_ramp_up + v_hold_hyper and v_cycle_t < v_ramp_up + v_hold_hyper + v_ramp_down then
+        v_ramp_t = v_cycle_t - v_ramp_up - v_hold_hyper
+        v_mix = 1.0 - (v_ramp_t / v_ramp_down)
+    endif
+
+    v_hyper = v_mix
+
+    v_star_speed = v_speed_cruise + v_hyper * (v_speed_hyper - v_speed_cruise)
+    v_streak_scale = v_hyper * 16.0
+    v_void_eff = v_void_r * v_hyper
+
+    v_ring_bright = int(v_hyper * 28)
+    if v_ring_bright > 100 then
+        v_ring_bright = 100
+    endif
+}
+
+def draw_star {
+    v_persp = v_max_z / v_sz[v_i]
+    v_px = int(v_sx[v_i] * v_persp) + v_center_x
+    v_py = int(v_sy[v_i] * v_persp) + v_center_y
+
+    v_depth_bright = int((v_max_z - v_sz[v_i]) / v_max_z * 88) + 12
+    v_cruise_bright = 55 + int(v_persp * 5)
+    v_bright = int(v_cruise_bright + v_hyper * (v_depth_bright - v_cruise_bright))
+    if v_bright > 99 then
+        v_bright = 99
+    endif
+    if v_bright < 14 then
+        v_bright = 14
+    endif
+
+    v_color = 99 - int(v_hyper * 34)
+    if v_color < 50 then
+        v_color = 50
+    endif
+
+    if v_px >= 0 and v_px <= 63 and v_py >= 0 and v_py <= 63 then
+        v_dx = v_px - v_center_x
+        v_dy = v_py - v_center_y
+        call inside_void
+        if v_skip == 0 then
+            v_div = 8
+            if v_dx < 0 then
+                if 0 - v_dx > v_div then
+                    v_div = 0 - v_dx
+                endif
+            else
+                if v_dx > v_div then
+                    v_div = v_dx
+                endif
+            endif
+            if v_dy < 0 then
+                if 0 - v_dy > v_div then
+                    v_div = 0 - v_dy
+                endif
+            else
+                if v_dy > v_div then
+                    v_div = v_dy
+                endif
+            endif
+            if v_div < 1 then
+                v_div = 1
+            endif
+
+            v_tlen = int(v_streak_scale * v_persp / 4)
+            if v_tlen > 24 then
+                v_tlen = 24
+            endif
+            v_flen = int(v_streak_scale * v_persp / 11)
+            if v_flen > 8 then
+                v_flen = 8
+            endif
+
+            v_edge_plot = 0
+            v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+            if v_hyper > 0.5 and v_dist > 22 then
+                v_edge_plot = 1
+            endif
+
+            v_line_bright = int(20 + v_hyper * (v_bright - 20))
+            if v_line_bright > 99 then
+                v_line_bright = 99
+            endif
+
+            plot(v_px, v_py, v_color, v_bright)
+
+            if v_tlen >= 1 then
+                v_sx1 = v_px - int(v_dx * v_tlen / v_div)
+                v_sy1 = v_py - int(v_dy * v_tlen / v_div)
+                v_ex1 = v_px + int(v_dx * v_flen / v_div)
+                v_ey1 = v_py + int(v_dy * v_flen / v_div)
+                if v_void_eff > 0.25 then
+                    call clip_to_void_edge
+                endif
+                if v_sx1 < 0 then
+                    v_sx1 = 0
+                endif
+                if v_sx1 > 63 then
+                    v_sx1 = 63
+                endif
+                if v_sy1 < 0 then
+                    v_sy1 = 0
+                endif
+                if v_sy1 > 63 then
+                    v_sy1 = 63
+                endif
+                if v_ex1 < 0 then
+                    v_ex1 = 0
+                endif
+                if v_ex1 > 63 then
+                    v_ex1 = 63
+                endif
+                if v_ey1 < 0 then
+                    v_ey1 = 0
+                endif
+                if v_ey1 > 63 then
+                    v_ey1 = 63
+                endif
+                if v_sx1 != v_px or v_sy1 != v_py then
+                    draw_line(v_sx1, v_sy1, v_px, v_py, v_color, v_line_bright)
+                endif
+                if v_flen >= 1 then
+                    draw_line(v_px, v_py, v_ex1, v_ey1, v_color, v_line_bright - 10)
+                endif
+            endif
+
+            if v_edge_plot == 1 then
+                plot(v_px, v_py, v_color, v_bright)
+            endif
+        endif
+    endif
+}
+
+call init_stars
+set_background(space_backdrop, 0)
+sync_queue
+
+print("Starfield + Hyperspace (radial)")
+
+while true then
+    begin_frame
+
+    call update_cycle
+
+    for v_i in (0, v_num_stars - 1, 1)
+        v_sz[v_i] = v_sz[v_i] - v_star_speed
+        if v_sz[v_i] < v_min_z then
+            v_sz[v_i] = v_max_z
+            if v_i < v_edge_stars then
+                v_spawn = random(16, 22, 1)
+                v_sx[v_i] = random(0 - v_spawn, v_spawn, 1)
+                v_sy[v_i] = random(0 - v_spawn, v_spawn, 1)
+            else
+                v_spawn = 20 - int(v_hyper * 10)
+                if v_spawn < 10 then
+                    v_spawn = 10
+                endif
+                v_roll = random(0, 99, 1)
+                if v_roll < int(v_hyper * 36) then
+                    v_spawn = random(15, 22, 1)
+                endif
+                v_sx[v_i] = random(0 - v_spawn, v_spawn, 1)
+                v_sy[v_i] = random(0 - v_spawn, v_spawn, 1)
+            endif
+        endif
+        call draw_star
+    endfor v_i
+
+    if v_ring_bright > 2 then
+        draw_circle(v_center_x, v_center_y, v_void_r, cyan, v_ring_bright, false)
+    endif
+
+    end_frame
+endwhile

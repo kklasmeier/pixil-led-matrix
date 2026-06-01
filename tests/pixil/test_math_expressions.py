@@ -110,3 +110,6 @@ def test_has_math_expression_detects_operators():
     assert has_math_expression("v_x") is True
     assert has_math_expression('"hello"') is False
     assert has_math_expression("plain") is False
+    # Sprite / identifier names must not be treated as expressions
+    assert has_math_expression("inv_bullet") is False
+    assert has_math_expression("invader1") is False
