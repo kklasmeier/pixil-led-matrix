@@ -29,6 +29,12 @@ from pixil_utils import (ScriptManager, parse_args,
                         # Terminal handling
                         initialize_terminal, start_terminal,
                         stop_terminal)
+from pixil_utils.shutdown import (
+    PixilShutdownRequested,
+    request_shutdown,
+    shutdown_requested,
+    exit_pixil,
+)
 from pixil_utils.array_manager import PixilArray
 from pixil_utils.test_hooks import (
     is_test_mode,
@@ -1648,6 +1654,10 @@ def process_script(filename, execute_func=None):
             from pixil_utils.math_functions import set_current_script_line
             set_current_script_line(current_command)
    
+            if shutdown_requested():
+                normal_exit = False
+                raise PixilShutdownRequested()
+
             if is_time_expired():
                 normal_exit = False
                 break
@@ -1755,6 +1765,8 @@ def process_script(filename, execute_func=None):
             elif (proc_match := PROCEDURE_CALL_PATTERN.match(line)):
                 proc_name = proc_match.group(1)   # ✅ safe, because we already checked proc_match
                 invoke_procedure(proc_name)
+                if shutdown_requested():
+                    raise PixilShutdownRequested()
 
             # Frame buffer commands
             elif line.startswith('begin_frame'):
@@ -1806,8 +1818,9 @@ def process_script(filename, execute_func=None):
                     iteration_count = 0
                     while ((step > 0 and current_value <= end + epsilon) or 
                         (step < 0 and current_value >= end - epsilon)):
-                        if is_time_expired():
-                            print(f"Line {line_number}: Breaking for loop due to timer expiration")
+                        if shutdown_requested() or is_time_expired():
+                            if is_time_expired() and not shutdown_requested():
+                                print(f"Line {line_number}: Breaking for loop due to timer expiration")
                             break
                         variables[loop_var] = current_value
                         from pixil_utils.loop_compiler import LoopBreak
@@ -1820,6 +1833,9 @@ def process_script(filename, execute_func=None):
                         if iteration_count > 1000000:
                             print(f"Line {line_number}: WARNING: Loop iteration count exceeded 1,000,000. Breaking loop.")
                             break
+
+                if shutdown_requested():
+                    raise PixilShutdownRequested()
 
             # while looping
             elif (while_match := WHILE_LOOP_PATTERN.match(line)):
@@ -1858,8 +1874,8 @@ def process_script(filename, execute_func=None):
                     run_compiled_while_body(compiled_while, condition, _get_compiled_ctx())
                 else:
                     while evaluate_condition(condition, variables):
-                        if is_time_expired():
-                            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        if shutdown_requested() or is_time_expired():
+                            if DEBUG_LEVEL >= DEBUG_VERBOSE and is_time_expired() and not shutdown_requested():
                                 debug_print("Breaking while loop due to timer expiration", DEBUG_VERBOSE)
                             break
                         if DEBUG_LEVEL >= DEBUG_VERBOSE:
@@ -1869,6 +1885,9 @@ def process_script(filename, execute_func=None):
                             process_lines(iter(loop_block))
                         except LoopBreak:
                             break
+
+                if shutdown_requested():
+                    raise PixilShutdownRequested()
 
             elif (if_match := IF_PATTERN.match(line)):
                 condition = if_match.group(1)   # ✅ safe, Pylance knows if_match isn’t None
@@ -2151,10 +2170,15 @@ def process_script(filename, execute_func=None):
             process_lines(iter(script_lines))
         except LoopBreak:
             pass
+        if shutdown_requested():
+            normal_exit = False
+            raise PixilShutdownRequested()
         if normal_exit:
             print("Script completed normally - sync queue run")
             debug_print("Script completed normally, adding sync_queue", DEBUG_SUMMARY)
             _capture_test_buffer_if_needed()
+    except PixilShutdownRequested:
+        normal_exit = False
     except Exception:
         _test_exit_code = 1
         raise
@@ -2166,126 +2190,25 @@ def process_script(filename, execute_func=None):
             import builtins
             builtins.print = _orig_print
         debug_print("\n1. Starting cleanup sequence...", DEBUG_CONCISE)
-        
-        # Get initial queue size
-        initial_queue_size = queue_instance.command_queue.qsize()
-        debug_print(f"   Initial queue size: {initial_queue_size}", DEBUG_SUMMARY)
-        
-        # Drain the queue
-        debug_print("3. Draining command queue...", DEBUG_CONCISE)
-        drained_commands = 0
-        target_drain = initial_queue_size  # We want to drain this many commands
-        
-        while drained_commands < target_drain:
-            try:
-                queue_instance.command_queue.get_nowait()
-                drained_commands += 1
-                
-                # Progress update every 500 commands
-                if drained_commands % 500 == 0:
-                    remaining = queue_instance.command_queue.qsize()
-                    debug_print(f"   Progress: {drained_commands} drained, {remaining} remaining", DEBUG_SUMMARY)
-                    
-            except Empty:
-                # If queue reports empty but we haven't hit our target
-                current_size = queue_instance.command_queue.qsize()
-                if current_size > 0:
-                    debug_print(f"   Queue reported empty but still has {current_size} items, retrying...", DEBUG_SUMMARY)
-                    time.sleep(0.1)  # Brief pause before retry
-                    continue
-                else:
-                    break
 
-        debug_print(f"   Final drain count: {drained_commands} of {initial_queue_size} commands", DEBUG_SUMMARY)
-        if is_test_mode():
-            time.sleep(0.05)
-        else:
-            time.sleep(0.5)  # Brief pause after draining
-        # Do cleanup
-        debug_print("4. Executing cleanup commands...", DEBUG_CONCISE)
-        execute_command('fps(0)')
-        execute_command('end_frame')
-        execute_command('clear')
-        execute_command('dispose_all_sprites()')
-        execute_command('sync_queue')
-
-        # Wait for cleanup
-        debug_print("5. Waiting for cleanup completion...", DEBUG_CONCISE)
-        cleanup_cooldown = 0.15 if is_test_mode() else 0.5
-        queue_instance.wait_for_completion(cooldown=cleanup_cooldown)
-        
-        debug_print("Cleanup sequence completed", DEBUG_CONCISE)
+        if not shutdown_requested():
+            cleanup_cooldown = 0.15 if is_test_mode() else 0.3
+            queue_instance.script_transition_cleanup(cooldown=cleanup_cooldown)
+            debug_print("Cleanup sequence completed", DEBUG_CONCISE)
         gc.collect()
         
     debug_print("Script processing completed", DEBUG_CONCISE)
 
-    execution_reason = "complete" if normal_exit else "interrupted"
-    report_metrics(execution_reason, script_name, script_start_time)
+    if not shutdown_requested():
+        execution_reason = "complete" if normal_exit else "interrupted"
+        report_metrics(execution_reason, script_name, script_start_time)
     
 def signal_handler(signum, frame):
-    """Handle interrupt signal with graceful display cleanup"""
-    print("\nInitiating graceful shutdown sequence...")
-    # Report metrics with "interrupted" reason
-    # NEW: Report metrics with script info if available
-    if 'script_start_time' in globals() and 'script_name' in globals():
-        report_metrics("interrupted", script_name, script_start_time)
-    else:
-        report_metrics("interrupted")
-
-    # Check if in headless mode
-    if is_headless():
-        print("\nHeadless mode shutdown initiated...")
-        # Simplified, non-interactive cleanup
-        report_metrics("interrupted")
-        if queue_instance:
-            queue_instance.put_command('clear', force_instant=True)
-            queue_instance.stop_consumer()
-        sys.exit(0)
-    else:
-        # Your existing interactive cleanup code
-        print("\nInitiating graceful shutdown sequence...")
-        # Rest of your existing function...
-
-    try:
-        if queue_instance:
-            print("1. Draining existing command queue...")
-            drained_commands = 0
-            #while not queue_instance.command_queue.empty():
-            #    try:
-            #        queue_instance.command_queue.get_nowait()
-            #        drained_commands += 1
-            #    except Empty:
-            #        break
-            print(f"   Drained {drained_commands} commands from queue")
-
-            print("2. Sending cleanup commands...")
-            print("   - Clearing display")
-            queue_instance.put_command('clear', force_instant=True)
-            
-            print("3. Waiting 2 seconds for cleanup commands to complete...")
-            #queue_instance.wait_until_empty()
-            time.sleep(.4)
-            print("   Less than 2 more seconds...")
-            time.sleep(.4)
-            print("   Less than 1 more seconds...")
-            time.sleep(.4)
-
-            print("   Cleanup commands completed")
-            
-            print("4. Initiating consumer shutdown...")
-            queue_instance.stop_consumer()  # This sends __SHUTDOWN__ command
-            print("   Consumer shutdown signal sent")
-            
-        if queue_monitor:
-            print("5. Stopping queue monitor...")
-            queue_monitor.stop()
-            print("   Queue monitor stopped")
-            
-    except Exception as e:
-        print(f"ERROR during shutdown sequence: {str(e)}")
-    finally:
-        print("Shutdown sequence complete.")
-        sys.exit(0)
+    """Request shutdown on Ctrl+C; main thread performs cleanup."""
+    if not shutdown_requested():
+        request_shutdown()
+        sys.stdout.write("\nStopping...\n")
+        sys.stdout.flush()
 
 def clear_all_caches_between_scripts():
     """Clear all optimization caches between scripts."""
@@ -2353,14 +2276,21 @@ if __name__ == '__main__':
         
         # Main execution loop
         while True:
+            if shutdown_requested():
+                break
+
             scripts = script_manager.get_script_queue()
             
             # Single script mode
             if script_manager.is_single_script():
                 initialize_timer(args.duration)
                 start_time = time.time()
-                process_script(scripts[0], execute_command)
-                # Wait for queue to empty and cooldown
+                try:
+                    process_script(scripts[0], execute_command)
+                except PixilShutdownRequested:
+                    pass
+                if shutdown_requested():
+                    break
                 queue_instance.wait_for_completion()
                 end_time = time.time()
                 print(f"\nComplete execution time: {end_time - start_time:.3f} seconds")
@@ -2372,43 +2302,41 @@ if __name__ == '__main__':
                 initialize_terminal()
                 start_terminal()
                 while scripts:
-                    current_script = scripts.pop()
+                    if shutdown_requested():
+                        break
 
-                    # Clear display between scripts
-                    queue_instance.put_command('clear', force_instant=True)
-                    queue_instance.put_command('dispose_all_sprites()', force_instant=True)
-                    queue_instance.wait_until_empty()
+                    current_script = scripts.pop()
 
                     print(f"Current script: {current_script}...")
                     initialize_timer(args.duration)
-                    process_script(current_script, execute_command)
-                    queue_instance.wait_for_completion()
+                    try:
+                        process_script(current_script, execute_command)
+                    except PixilShutdownRequested:
+                        pass
+                    if shutdown_requested():
+                        break
                     clear_timer()
                     clear_all_caches_between_scripts() 
             finally:
                 stop_terminal()
                 
             # Exit if not wildcard, otherwise continue with reshuffled scripts
-            if not script_manager.is_wildcard:
+            if not script_manager.is_wildcard or shutdown_requested():
                 break
                 
-    except KeyboardInterrupt:
-        print("\nForce stopping...")
-        if queue_monitor:
-            queue_monitor.stop()
-        if queue_instance:
-            queue_instance.cleanup()
-        print("Stopped.")
-        sys.exit(0)
+    except PixilShutdownRequested:
+        pass
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
     finally:
+        if shutdown_requested():
+            exit_pixil(queue_instance, queue_monitor)
         try:
             if queue_monitor:
                 queue_monitor.stop()
             if queue_instance:
-                queue_instance.cleanup()
+                queue_instance.stop_consumer_graceful()
             stop_terminal()
-        except:
+        except Exception:
             sys.exit(1)

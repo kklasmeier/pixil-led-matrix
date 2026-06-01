@@ -86,6 +86,17 @@ def test_consume_skip_request():
     assert th.consume_skip_request() is False
 
 
+def test_shutdown_request_and_reset():
+    from pixil_utils import shutdown as sd
+
+    sd.reset_shutdown()
+    assert sd.shutdown_requested() is False
+    sd.request_shutdown()
+    assert sd.shutdown_requested() is True
+    sd.reset_shutdown()
+    assert sd.shutdown_requested() is False
+
+
 def test_set_profile_only_working_keeps_jit_off():
     opt.set_profile_only_working()
     assert opt.ENABLE_JIT is False

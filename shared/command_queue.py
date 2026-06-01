@@ -46,24 +46,90 @@ class MatrixCommandQueue:
         )
         self._consumer_process.start()
         
-    def stop_consumer(self):
-        """Stop the consumer process"""
+    def discard_pending(self) -> int:
+        """Drop unprocessed commands from the producer-side queue."""
+        discarded = 0
+        while True:
+            try:
+                self.command_queue.get_nowait()
+                discarded += 1
+            except Empty:
+                break
+        return discarded
+
+    def put_command_priority(self, command: str) -> None:
+        """Enqueue with zero delay; discard backlog if the queue is full."""
+        from pixil_utils.shutdown import PixilShutdownRequested, shutdown_requested
+
+        command_tuple = (command, 0)
+        while True:
+            if shutdown_requested():
+                raise PixilShutdownRequested()
+            try:
+                self.command_queue.put_nowait(command_tuple)
+                self.last_command_time = time.time() * 1000
+                return
+            except Full:
+                self.discard_pending()
+
+    def _kill_consumer_process(self, timeout: float = 1.0) -> None:
+        """Stop the consumer subprocess immediately."""
         if self._consumer_process is None:
             return
-            
-        # Send special shutdown command with no delay
-        self.put_command("__SHUTDOWN__", force_instant=True)
-        
-        # Wait for process to end with timeout
-        self._consumer_process.join(timeout=2.0)  # Give it 2 seconds to shut down
-        
-        # If it's still running after timeout, terminate it
-        if self._consumer_process.is_alive():
-            print("Consumer process did not shut down gracefully, forcing termination")
-            self._consumer_process.terminate()
-            self._consumer_process.join(timeout=1.0)
-            
-        self._consumer_process = None
+        try:
+            if self._consumer_process.is_alive():
+                self._consumer_process.terminate()
+                self._consumer_process.join(timeout=timeout)
+                if self._consumer_process.is_alive():
+                    self._consumer_process.kill()
+                    self._consumer_process.join(timeout=0.5)
+        except Exception:
+            pass
+        finally:
+            self._consumer_process = None
+            self._running = False
+
+    def reset_for_next_script(self, timeout: float = 3.0) -> None:
+        """
+        Drop all pending commands and restart the consumer.
+
+        Producer-side discard alone is not enough: the consumer may already be
+        executing or holding thousands of dequeued plot/draw commands. Restarting
+        the consumer process abandons that work immediately.
+        """
+        self.discard_pending()
+        self._kill_consumer_process()
+        self.discard_pending()
+        self.last_command_time = time.time() * 1000
+        self.start_consumer()
+        for cmd in ('fps(0)', 'clear', 'dispose_all_sprites()'):
+            self.put_command_priority(cmd)
+        self.wait_until_empty(timeout=timeout)
+
+    def script_transition_cleanup(self, cooldown: float = 0.3) -> None:
+        """Discard backlog and reset display for the next script."""
+        self.reset_for_next_script()
+        time.sleep(cooldown)
+
+    def stop_consumer_graceful(self, timeout: float = 2.0) -> None:
+        """Clear display and stop the consumer process."""
+        if self._consumer_process is None:
+            return
+
+        self.discard_pending()
+        try:
+            for cmd in ('clear', 'dispose_all_sprites()', '__SHUTDOWN__'):
+                self.put_command_priority(cmd)
+            self._consumer_process.join(timeout=timeout)
+        except Exception:
+            pass
+
+        if self._consumer_process is not None and self._consumer_process.is_alive():
+            self._kill_consumer_process(timeout=1.0)
+
+    def stop_consumer(self):
+        """Stop the consumer process"""
+        self.stop_consumer_graceful()
         
     def _calculate_delay(self) -> float:
         """
@@ -92,12 +158,16 @@ class MatrixCommandQueue:
                 self.on_queue_pause()
         
         # Keep trying with backoff
+        from pixil_utils.shutdown import PixilShutdownRequested, shutdown_requested
+
         while True:
+            if shutdown_requested():
+                raise PixilShutdownRequested()
             try:
                 time.sleep(BACKOFF_SLEEP)
                 self.command_queue.put_nowait(command_tuple)
                 self.last_command_time = time.time() * 1000
-                
+
                 # Successfully added, notify metrics
                 if hasattr(self, 'on_queue_resume') and callable(self.on_queue_resume):
                     self.on_queue_resume()
@@ -187,7 +257,11 @@ class MatrixCommandQueue:
         time.sleep(0.1) # Put a short wait here so the queue has enough time to see any new commands added.
         try:
             start_time = time.time()
+            from pixil_utils.shutdown import shutdown_requested
+
             while not self.is_empty():
+                if shutdown_requested():
+                    return False
                 if timeout is not None and time.time() - start_time > timeout:
                     return False
                 time.sleep(0.1)
@@ -226,28 +300,16 @@ class MatrixCommandQueue:
     def cleanup(self):
         """Clean up resources"""
         try:
-            # Just stop the consumer immediately on interrupt
-            self.stop_consumer_force()
-        except:
-            pass
+            self.stop_consumer_graceful()
+        except Exception:
+            try:
+                self.stop_consumer_force()
+            except Exception:
+                pass
 
     def stop_consumer_force(self):
         """Force stop the consumer process without waiting"""
-        if self._consumer_process is None:
-            return
-            
-        try:
-            # Force terminate the process
-            self._consumer_process.terminate()
-            # Brief wait for termination
-            self._consumer_process.join(timeout=0.5)
-            if self._consumer_process.is_alive():
-                self._consumer_process.kill()
-        except:
-            pass
-        finally:
-            self._consumer_process = None
-            self._running = False
+        self._kill_consumer_process(timeout=0.5)
 
 class QueueManager:
     """Singleton manager for the command queue"""

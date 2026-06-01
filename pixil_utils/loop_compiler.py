@@ -1083,8 +1083,10 @@ def run_compiled_while_body(
     condition: str,
     ctx: ExecContext,
 ) -> None:
+    from pixil_utils.shutdown import shutdown_requested
+
     while True:
-        if ctx.is_expired():
+        if shutdown_requested() or ctx.is_expired():
             break
         if not ctx.eval_cond(condition):
             break
@@ -1105,10 +1107,12 @@ def run_compiled_loop_body(
     step: float,
     ctx: ExecContext,
 ) -> None:
+    from pixil_utils.shutdown import shutdown_requested
+
     epsilon = 1e-10
     current = start
     while (step > 0 and current <= end + epsilon) or (step < 0 and current >= end - epsilon):
-        if ctx.is_expired():
+        if shutdown_requested() or ctx.is_expired():
             break
         ctx.variables.set(loop_var, current)
         try:
