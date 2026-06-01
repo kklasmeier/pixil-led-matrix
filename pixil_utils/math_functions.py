@@ -26,6 +26,12 @@ from .regex_patterns import (
     ARRAY_INDEX_PATTERN, CONCAT_ARRAY_PATTERN, RANDOM_PATTERN, RANDOM_WITH_VARS_PATTERN,
     FAST_SIN_PATTERN, FAST_COS_PATTERN, FAST_RADIANS_PATTERN, FAST_SQRT_PATTERN,
     FAST_SQRT_SUM_SQ_PATTERN, FAST_ABS_PATTERN, FAST_INT_ARRAY_PATTERN,
+    FAST_INT_VAR_DIV_NUM_PATTERN,
+    FAST_ARRAY_PLUS_ARRAY_PATTERN, FAST_ARRAY_MINUS_ARRAY_PATTERN,
+    FAST_ARRAY_PLUS_NUM_PATTERN, FAST_ARRAY_MINUS_NUM_PATTERN,
+    FAST_ARRAY_MUL_NUM_PATTERN, FAST_ARRAY_DIV_NUM_PATTERN,
+    FAST_ARRAY_MUL_NUM_DIV_VAR_PATTERN, FAST_NUM_MINUS_ARRAY_MUL_NUM_DIV_VAR_PATTERN,
+    FAST_VAR_MUL_NUM_PLUS_VAR_PATTERN,
 )
 
 _EXPR_CACHE = OrderedDict()
@@ -520,6 +526,148 @@ def try_fast_arithmetic(expr: str, variables: Union[Dict[str, Any], VariableRegi
             except (ValueError, TypeError, ZeroDivisionError):
                 pass
 
+    # v_var * number + v_var (e.g. v_cy * 8 + v_cx)
+    match = FAST_VAR_MUL_NUM_PLUS_VAR_PATTERN.match(expr)
+    if match:
+        var1, number, var2 = match.groups()
+        if var1 in variables and var2 in variables:
+            try:
+                result = float(variables[var1]) * float(number) + float(variables[var2])
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(
+                        f"Fast var mul add: {var1} * {number} + {var2} = {result}",
+                        DEBUG_VERBOSE,
+                    )
+                return result
+            except (ValueError, TypeError):
+                pass
+
+    return None
+
+
+def _fast_read_array(
+    variables: Union[Dict[str, Any], VariableRegistry, None],
+    array_name: str,
+    index_var: str,
+) -> Optional[Any]:
+    """Read v_array[v_index] using registry fast path when available."""
+    if variables is None:
+        return None
+    try:
+        if isinstance(variables, VariableRegistry):
+            if array_name not in variables or index_var not in variables:
+                return None
+            return variables.fast_array_access(array_name, index_var)
+        if array_name in variables and index_var in variables:
+            arr = variables[array_name]
+            idx = int(float(variables[index_var]))
+            return arr[idx]
+    except (KeyError, TypeError, IndexError, AttributeError, ValueError):
+        return None
+    return None
+
+
+def try_fast_array_arithmetic(
+    expr: str,
+    variables: Union[Dict[str, Any], VariableRegistry, None] = None,
+) -> Optional[Union[int, float]]:
+    """
+    Fast paths for v_a[v_i] op v_b[v_j] and v_a[v_i] op number.
+    Common in particle loops (position += field vector, age += 1, / 100).
+    """
+    match = FAST_ARRAY_PLUS_ARRAY_PATTERN.match(expr)
+    if match:
+        a1, i1, a2, i2 = match.groups()
+        v1 = _fast_read_array(variables, a1, i1)
+        v2 = _fast_read_array(variables, a2, i2)
+        if v1 is not None and v2 is not None:
+            return float(v1) + float(v2)
+
+    match = FAST_ARRAY_MINUS_ARRAY_PATTERN.match(expr)
+    if match:
+        a1, i1, a2, i2 = match.groups()
+        v1 = _fast_read_array(variables, a1, i1)
+        v2 = _fast_read_array(variables, a2, i2)
+        if v1 is not None and v2 is not None:
+            return float(v1) - float(v2)
+
+    match = FAST_ARRAY_PLUS_NUM_PATTERN.match(expr)
+    if match:
+        arr, idx, number = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None:
+            return float(val) + float(number)
+
+    match = FAST_ARRAY_MINUS_NUM_PATTERN.match(expr)
+    if match:
+        arr, idx, number = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None:
+            return float(val) - float(number)
+
+    match = FAST_ARRAY_MUL_NUM_PATTERN.match(expr)
+    if match:
+        arr, idx, number = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None:
+            return float(val) * float(number)
+
+    match = FAST_ARRAY_DIV_NUM_PATTERN.match(expr)
+    if match:
+        arr, idx, number = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None:
+            divisor = float(number)
+            if divisor != 0:
+                return float(val) / divisor
+
+    match = FAST_ARRAY_MUL_NUM_DIV_VAR_PATTERN.match(expr)
+    if match:
+        arr, idx, number, div_var = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None and variables is not None and div_var in variables:
+            try:
+                divisor = float(variables[div_var])
+                if divisor != 0:
+                    return float(val) * float(number) / divisor
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+
+    match = FAST_NUM_MINUS_ARRAY_MUL_NUM_DIV_VAR_PATTERN.match(expr)
+    if match:
+        base, arr, idx, number, div_var = match.groups()
+        val = _fast_read_array(variables, arr, idx)
+        if val is not None and variables is not None and div_var in variables:
+            try:
+                divisor = float(variables[div_var])
+                if divisor != 0:
+                    return float(base) - float(val) * float(number) / divisor
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+
+    return None
+
+
+def try_fast_int_var_div(
+    expr: str,
+    variables: Union[Dict[str, Any], VariableRegistry, None] = None,
+) -> Optional[int]:
+    """Fast path for int(v_x / 8) — grid cell from float coordinate."""
+    match = FAST_INT_VAR_DIV_NUM_PATTERN.match(expr)
+    if not match:
+        return None
+    var_name, number = match.groups()
+    if variables is None or var_name not in variables:
+        return None
+    try:
+        divisor = float(number)
+        if divisor != 0:
+            return int(float(variables[var_name]) / divisor)
+    except (ValueError, TypeError, ZeroDivisionError):
+        pass
+    return None
+
+
 def try_fast_random(expr: str, variables: Union[Dict[str, Any], VariableRegistry, None] = None) -> Optional[Union[int, float]]:
     """
     Fast path for random(min, max, decimals) with literal numbers or simple variables.
@@ -711,14 +859,21 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
                 debug_print(f"Fast number hit: {expr} = {fast_result}", DEBUG_VERBOSE)
             return fast_result
         
-        # int(v_array[v_index])
-        if expr.startswith('int(') and '[' in expr:
-            fast_result = try_fast_int_array(expr, variables)
+        # int(v_array[v_index]) or int(v_x / 8)
+        if expr.startswith('int('):
+            fast_result = try_fast_int_var_div(expr, variables)
             if fast_result is not None:
                 _FAST_MATH_HITS += 1
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Fast int array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                    debug_print(f"Fast int div hit: {expr} = {fast_result}", DEBUG_VERBOSE)
                 return fast_result
+            if '[' in expr:
+                fast_result = try_fast_int_array(expr, variables)
+                if fast_result is not None:
+                    _FAST_MATH_HITS += 1
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(f"Fast int array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                    return fast_result
 
         # Try simple array access (v_array[v_index])
         if '[' in expr and ']' in expr and expr.count('[') == 1:
@@ -727,6 +882,15 @@ def evaluate_math_expression(expr: str, variables: Union[Dict[str, Any], Variabl
                 _FAST_MATH_HITS += 1
                 if DEBUG_LEVEL >= DEBUG_VERBOSE:
                     debug_print(f"Fast array hit: {expr} = {fast_result}", DEBUG_VERBOSE)
+                return fast_result
+
+        # v_a[v_i] op v_b[v_j] / number (particle sim hot paths)
+        if '[' in expr and ']' in expr:
+            fast_result = try_fast_array_arithmetic(expr, variables)
+            if fast_result is not None:
+                _FAST_MATH_HITS += 1
+                if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                    debug_print(f"Fast array arithmetic hit: {expr} = {fast_result}", DEBUG_VERBOSE)
                 return fast_result
         
         # Try simple arithmetic

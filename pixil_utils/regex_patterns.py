@@ -122,6 +122,40 @@ FAST_SQRT_SUM_SQ_PATTERN = re.compile(
 )
 FAST_ABS_PATTERN = re.compile(r'^abs\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*\)$')
 FAST_INT_ARRAY_PATTERN = re.compile(r'^int\s*\(\s*(v_\w+)\[(v_\w+)\]\s*\)$')
+# int(v_x / 8) — grid cell index from float position
+FAST_INT_VAR_DIV_NUM_PATTERN = re.compile(r'^int\s*\(\s*(v_\w+)\s*/\s*(-?\d*\.?\d+)\s*\)$')
+
+# Array element arithmetic (particle sim hot paths)
+FAST_ARRAY_PLUS_ARRAY_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*\+\s*(v_\w+)\[(v_\w+)\]$'
+)
+FAST_ARRAY_MINUS_ARRAY_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*-\s*(v_\w+)\[(v_\w+)\]$'
+)
+FAST_ARRAY_PLUS_NUM_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*\+\s*(-?\d*\.?\d+)$'
+)
+FAST_ARRAY_MINUS_NUM_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*-\s*(-?\d*\.?\d+)$'
+)
+FAST_ARRAY_MUL_NUM_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*\*\s*(-?\d*\.?\d+)$'
+)
+FAST_ARRAY_DIV_NUM_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*/\s*(-?\d*\.?\d+)$'
+)
+# v_age[v_p] * 50 / v_max_age
+FAST_ARRAY_MUL_NUM_DIV_VAR_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\]\s*\*\s*(-?\d*\.?\d+)\s*/\s*(v_\w+)$'
+)
+# 100 - v_age[v_p] * 50 / v_max_age
+FAST_NUM_MINUS_ARRAY_MUL_NUM_DIV_VAR_PATTERN = re.compile(
+    r'^(-?\d*\.?\d+)\s*-\s*(v_\w+)\[(v_\w+)\]\s*\*\s*(-?\d*\.?\d+)\s*/\s*(v_\w+)$'
+)
+# v_cy * 8 + v_cx — field grid linear index
+FAST_VAR_MUL_NUM_PLUS_VAR_PATTERN = re.compile(
+    r'^(v_\w+)\s*\*\s*(-?\d*\.?\d+)\s*\+\s*(v_\w+)$'
+)
 
 # =============================================================================
 # Other
