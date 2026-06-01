@@ -5,7 +5,7 @@
 # patterns. Uses burnout system for efficient trail rendering.
 # ============================================================================
 
-throttle(0.2)
+throttle(0)
 
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
 fps(60)
@@ -29,7 +29,8 @@ v_max_age = 200
 
 # Burnout time in milliseconds - how long pixel trails persist
 # Range: 500-3000 (lower = short tails, higher = long ghostly trails)
-v_burnout = 4000
+# Tuned for fps(60); was 4000 at slower throttle(0.2) pacing
+v_burnout = 1200
 
 # Duration of each sequence in frames before switching
 # Range: 300-1200 (at full speed, roughly 10-40 seconds per sequence)
@@ -53,7 +54,7 @@ v_spawn_mode = 0
 #   2 = Dual Vortex Aurora   7 = Wave Motion
 #   3 = Horizontal Forest    8 = Chaos Field
 #   4 = Radial Burst         9 = Serpentine
-v_debug_sequence = 9
+v_debug_sequence = -1
 
 # Tier 2 smoke: minimal frames, no shuffle/setup prints (fps/throttle forced off in Pixil)
 if get_system("test_mode") == 1 then
@@ -74,10 +75,12 @@ create_array(v_px, 80)
 create_array(v_py, 80)
 create_array(v_age, 80)
 
-# Precomputed 8x8 vector field (64 angle values)
+# Precomputed 8x8 vector field (64 angle values + unit movement vectors)
 create_array(v_field_angle, 64)
+create_array(v_field_vx, 64)
+create_array(v_field_vy, 64)
 
-# Color palette (8 colors per sequence)
+# Color palette (8 named colors per sequence)
 create_array(v_pal, 8, string)
 
 # Sequence order array (for randomized playback)
@@ -87,6 +90,9 @@ create_array(v_seq_order, 10)
 v_sequence_idx = 0
 v_current_seq = 0
 v_frame = 0
+# Color index mode: 0=age, 1=radial, 2=diagonal, 3=inverted radial
+v_color_mode = 0
+v_color_scale = 25
 
 # ----------------------------------------------------------------------------
 # PALETTES
@@ -334,6 +340,14 @@ def field_serpentine {
 # ----------------------------------------------------------------------------
 # PARTICLE INIT
 # ----------------------------------------------------------------------------
+def sync_field_vectors {
+    for v_i in (0, 63, 1)
+        v_a = v_field_angle[v_i]
+        v_field_vx[v_i] = cos(v_a) * v_particle_speed
+        v_field_vy[v_i] = sin(v_a) * v_particle_speed
+    endfor v_i
+}
+
 def init_particles {
     v_last_particle = v_num_particles - 1
     for v_i in (0, v_last_particle, 1)
@@ -381,6 +395,7 @@ def setup_sequence {
     # Reset max_age and spawn_mode to defaults (some sequences override)
     v_max_age = 200
     v_spawn_mode = 0
+    v_color_mode = 0
     
     print(f"=== SEQUENCE {v_current_seq} (index {v_sequence_idx} of 9) ===")
     
@@ -400,6 +415,7 @@ def setup_sequence {
         call palette_fire
         v_particle_speed = 90
         v_spawn_mode = 1
+        v_color_mode = 1
         v_max_age = 120
         print("Field: Spiral - outward rotating flow")
         print("Palette: Fire")
@@ -432,6 +448,7 @@ def setup_sequence {
         call palette_sunset
         v_particle_speed = 110
         v_spawn_mode = 1
+        v_color_mode = 1
         v_max_age = 100
         print("Field: Radial Burst - spiraling outward from center")
         print("Palette: Sunset")
@@ -444,8 +461,8 @@ def setup_sequence {
         call palette_ice
         v_particle_speed = 130
         v_spawn_mode = 3
+        v_color_mode = 2
         print("Field: Diagonal Rain - 45 degree fall with ripples")
-        print("Palette: Ice")
         print("Palette: Ice")
         print(f"Speed: {v_particle_speed}")
     endif
@@ -456,6 +473,7 @@ def setup_sequence {
         call palette_toxic
         v_particle_speed = 70
         v_spawn_mode = 4
+        v_color_mode = 3
         v_max_age = 150
         print("Field: Converge - all particles flow to center")
         print("Palette: Toxic")
@@ -498,6 +516,8 @@ def setup_sequence {
     print(f"Burnout: {v_burnout}ms")
     print("")
     
+    v_color_scale = v_max_age / 8
+    call sync_field_vectors
     call init_particles
 }
 
@@ -507,7 +527,10 @@ def fast_smoke_init {
     call palette_ocean
     v_particle_speed = 100
     v_spawn_mode = 0
+    v_color_mode = 0
     v_max_age = 200
+    v_color_scale = v_max_age / 8
+    call sync_field_vectors
     call init_particles
 }
 
@@ -516,39 +539,22 @@ def fast_smoke_init {
 # ----------------------------------------------------------------------------
 
 def simulation_frame {
-    # Calculate loop bound once per frame
+    begin_frame(true)
+    
     v_last_p = v_num_particles - 1
     
-    # Update and render each particle
     for v_p in (0, v_last_p, 1)
-        # Get display position
         v_x = v_px[v_p] / 100
         v_y = v_py[v_p] / 100
         
-        # Get field cell (8x8 grid, so divide by 8)
-        v_cx = int(v_x / 8)
-        v_cy = int(v_y / 8)
-        if v_cx > 7 then
-            v_cx = 7
-        endif
-        if v_cy > 7 then
-            v_cy = 7
-        endif
-        if v_cx < 0 then
-            v_cx = 0
-        endif
-        if v_cy < 0 then
-            v_cy = 0
-        endif
+        v_cx = max(0, min(7, int(v_x / 8)))
+        v_cy = max(0, min(7, int(v_y / 8)))
         
-        # Get angle and move
         v_fidx = v_cy * 8 + v_cx
-        v_ang = v_field_angle[v_fidx]
-        v_px[v_p] = v_px[v_p] + cos(v_ang) * v_particle_speed
-        v_py[v_p] = v_py[v_p] + sin(v_ang) * v_particle_speed
+        v_px[v_p] = v_px[v_p] + v_field_vx[v_fidx]
+        v_py[v_p] = v_py[v_p] + v_field_vy[v_fidx]
         v_age[v_p] = v_age[v_p] + 1
         
-        # Check bounds and respawn (use tighter bounds to prevent edge sticking)
         v_respawn = 0
         if v_px[v_p] < 100 or v_px[v_p] > 6300 then
             v_respawn = 1
@@ -559,7 +565,6 @@ def simulation_frame {
         if v_age[v_p] > v_max_age then
             v_respawn = 1
         endif
-        # For converge mode, respawn when particle reaches center
         if v_spawn_mode == 4 then
             v_cdx = v_px[v_p] - 3200
             v_cdy = v_py[v_p] - 3200
@@ -570,8 +575,7 @@ def simulation_frame {
         endif
         
         if v_respawn == 1 then
-            # Spawn mode 0: edges (default for most sequences)
-            if v_spawn_mode == 0 then
+            if v_spawn_mode == 0 or v_spawn_mode == 4 then
                 v_edge = random(0, 3, 0)
                 if v_edge == 0 then
                     v_px[v_p] = 150
@@ -590,17 +594,14 @@ def simulation_frame {
                     v_py[v_p] = 6250
                 endif
             endif
-            # Spawn mode 1: center (for radial burst)
             if v_spawn_mode == 1 then
                 v_px[v_p] = random(2500, 3900, 0)
                 v_py[v_p] = random(2500, 3900, 0)
             endif
-            # Spawn mode 2: random anywhere (for chaos/turbulent)
             if v_spawn_mode == 2 then
                 v_px[v_p] = random(500, 5900, 0)
                 v_py[v_p] = random(500, 5900, 0)
             endif
-            # Spawn mode 3: top-left edge (for diagonal rain)
             if v_spawn_mode == 3 then
                 v_edge = random(0, 1, 0)
                 if v_edge == 0 then
@@ -612,51 +613,25 @@ def simulation_frame {
                     v_py[v_p] = random(100, 6300, 0)
                 endif
             endif
-            # Spawn mode 4: edges (for converge - same as mode 0)
-            if v_spawn_mode == 4 then
-                v_edge = random(0, 3, 0)
-                if v_edge == 0 then
-                    v_px[v_p] = 150
-                    v_py[v_p] = random(500, 5900, 0)
-                endif
-                if v_edge == 1 then
-                    v_px[v_p] = 6250
-                    v_py[v_p] = random(500, 5900, 0)
-                endif
-                if v_edge == 2 then
-                    v_px[v_p] = random(500, 5900, 0)
-                    v_py[v_p] = 150
-                endif
-                if v_edge == 3 then
-                    v_px[v_p] = random(500, 5900, 0)
-                    v_py[v_p] = 6250
-                endif
-            endif
             v_age[v_p] = 0
+            v_x = v_px[v_p] / 100
+            v_y = v_py[v_p] / 100
         endif
         
-        # Render with burnout for trail effect
-        v_x = v_px[v_p] / 100
-        v_y = v_py[v_p] / 100
         if v_x >= 0 and v_x < 64 and v_y >= 0 and v_y < 64 then
-            # Color based on distance from center for radial burst, age for others
-            if v_spawn_mode == 1 then
+            if v_color_mode == 1 then
                 v_dx = v_x - 32
                 v_dy = v_y - 32
                 v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
                 v_cidx = v_dist / 5.7
-            elseif v_spawn_mode == 3 then
-                # Color based on diagonal position (x + y) for rain effect
-                v_diag = v_x + v_y
-                v_cidx = v_diag / 16
-            elseif v_spawn_mode == 4 then
-                # Inverted distance - bright at edges, intense at center
+            elseif v_color_mode == 2 then
+                v_cidx = (v_x + v_y) / 16
+            elseif v_color_mode == 3 then
                 v_dx = v_x - 32
                 v_dy = v_y - 32
                 v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
                 v_cidx = 7 - v_dist / 5.7
             else
-                v_color_scale = v_max_age / 8
                 v_cidx = v_age[v_p] / v_color_scale
             endif
             if v_cidx > 7 then
@@ -665,24 +640,21 @@ def simulation_frame {
             if v_cidx < 0 then
                 v_cidx = 0
             endif
-            v_col = v_pal[v_cidx]
             v_bright = 100 - v_age[v_p] * 50 / v_max_age
             if v_bright < 30 then
                 v_bright = 30
             endif
-            mplot(v_x, v_y, v_col, v_bright, v_burnout, fade)
+            mplot(int(v_x), int(v_y), v_pal[v_cidx], v_bright, v_burnout, fade)
         endif
     endfor v_p
     
-    mflush()
+    end_frame
     
-    # Sequence change
     v_frame = v_frame + 1
     if v_frame > v_sequence_duration then
         v_frame = 0
         v_sequence_idx = v_sequence_idx + 1
         
-        # Reshuffle after all 10 sequences played
         if v_sequence_idx >= v_total_sequences then
             v_sequence_idx = 0
             call shuffle_sequences
