@@ -73,8 +73,33 @@ class RGB_Api:
         self.text_renderer = TextRenderer(self)
         self.burnout_manager = ThreadedBurnoutManager(self)
         self.burnout_manager.start()
-                
+        self._drain_checker = None
+        self._shutdown_checker = None
+
         debug("RGB_Api initialization complete", Level.INFO, Component.SYSTEM)
+
+    def set_drain_checker(self, checker) -> None:
+        """Optional callable returning True when queued commands should be swallowed."""
+        self._drain_checker = checker
+
+    def set_shutdown_checker(self, checker) -> None:
+        """Optional callable returning True when the consumer should exit immediately."""
+        self._shutdown_checker = checker
+
+    def drain_abort_requested(self) -> bool:
+        """True while the consumer should stop executing queued draw commands."""
+        if self._shutdown_checker is not None:
+            try:
+                if self._shutdown_checker():
+                    return True
+            except Exception:
+                pass
+        if self._drain_checker is None:
+            return False
+        try:
+            return bool(self._drain_checker())
+        except Exception:
+            return False
 
     def set_fps(self, fps: float) -> None:
         """Set maximum display refresh rate. fps<=0 disables pacing (full speed)."""
@@ -229,31 +254,21 @@ class RGB_Api:
                 # No Fill(0,0,0) needed — background provides the base
 
             else:
-                # --- ORIGINAL NO-BACKGROUND PATH (unchanged) ---
-                # Draw all visible sprites to the current canvas (before swap)
+                # --- NO-BACKGROUND PATH ---
+                # Blit completed frame to canvas, then swap once (no per-draw SetPixel).
+                self._blit_array_to_canvas(self._drawing_buffer_for_display())
+
                 for sprite_name, instance_id in self.sprite_manager.z_order:
                     instance = self.sprite_manager.get_instance(sprite_name, instance_id)
                     if instance and instance.visible:
                         self.copy_sprite_to_buffer(instance, self.canvas)
 
-                # Swap
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-                # Prepare back buffer for next frame
-                if USE_PIL_FOR_FRAME_MODE:
-                    pil_image = Image.fromarray(self.drawing_buffer, mode='RGB')
-                    self.canvas.SetImage(pil_image)
-                else:
-                    for y in range(self.matrix.height):
-                        for x in range(self.matrix.width):
-                            r, g, b = self.drawing_buffer[y, x]
-                            self.canvas.SetPixel(x, y, int(r), int(g), int(b))
-
+                self.canvas.Fill(0, 0, 0)
                 if self.preserve_frame_changes:
                     for x, y, r, g, b in self.current_command_pixels:
                         self.canvas.SetPixel(x, y, r, g, b)
-                else:
-                    self.canvas.Fill(0, 0, 0)  # Prepares back buffer
 
             self.current_command_pixels.clear()
             self.frame_mode = False
@@ -287,11 +302,29 @@ class RGB_Api:
 #            self.frame_mode = False
 #            self.preserve_frame_changes = False
 
+    def _drawing_buffer_for_display(self) -> np.ndarray:
+        """Copy drawing_buffer with transparent sentinel pixels converted to black."""
+        display_buf = self.drawing_buffer.copy()
+        sentinel_mask = np.all(display_buf == TRANSPARENT_COLOR, axis=2)
+        display_buf[sentinel_mask] = (0, 0, 0)
+        return display_buf
+
+    def _blit_array_to_canvas(self, display_buf: np.ndarray) -> None:
+        """Push a full RGB array to the current canvas."""
+        if USE_PIL_FOR_FRAME_MODE:
+            self.canvas.SetImage(Image.fromarray(display_buf, mode='RGB'))
+        else:
+            for y in range(self.matrix.height):
+                for x in range(self.matrix.width):
+                    r, g, b = display_buf[y, x]
+                    self.canvas.SetPixel(x, y, int(r), int(g), int(b))
+
     def _draw_to_buffers(self, x: int, y: int, r: int, g: int, b: int):
         if 0 <= x < self.matrix.width and 0 <= y < self.matrix.height:
             self.drawing_buffer[y, x] = [r, g, b]
-            self.canvas.SetPixel(x, y, r, g, b)
+            # Standard frame mode: accumulate in drawing_buffer only; end_frame presents once.
             if not self.frame_mode or self.preserve_frame_changes:
+                self.canvas.SetPixel(x, y, r, g, b)
                 self.current_command_pixels.append((x, y, r, g, b))
 
     def _maybe_swap_buffer(self):
@@ -358,11 +391,7 @@ class RGB_Api:
             # Get RGB color
             rgb_color = self._get_color(color, intensity if intensity is not None else 100)
             
-            # Write directly to buffers (bypass bounds check since we already validated)
-            self.drawing_buffer[y, x] = [rgb_color[0], rgb_color[1], rgb_color[2]]
-            self.canvas.SetPixel(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
-            if not self.frame_mode or self.preserve_frame_changes:
-                self.current_command_pixels.append((x, y, rgb_color[0], rgb_color[1], rgb_color[2]))
+            self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
             
             # Only collect burnout data if burnout is specified and >= 0
             if burnout is not None and burnout >= 0:
@@ -878,11 +907,41 @@ class RGB_Api:
         self.drawing_buffer[:] = TRANSPARENT_COLOR
         self.canvas.Fill(0, 0, 0)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        if not self.frame_mode:
-            self.canvas.Fill(0, 0, 0)
+        self.canvas.Fill(0, 0, 0)
+        self.frame_mode = False
+        self.preserve_frame_changes = False
         self.background_manager.hide_all()
         self.burnout_manager.clear_all()
         self.current_command_pixels.clear()
+        self.grid_dirty[:] = False
+
+    def blackout_display(self) -> None:
+        """Force every pixel off; used when exiting so the panel is not left lit."""
+        self.reset_fps()
+        if self.frame_mode:
+            try:
+                self.end_frame()
+            except Exception:
+                self.frame_mode = False
+                self.preserve_frame_changes = False
+
+        self.burnout_manager.stop()
+        self.burnout_manager.clear_all()
+        self.background_manager.hide_all()
+        try:
+            self.sprite_manager.dispose_all_sprites()
+        except Exception:
+            pass
+
+        self.frame_mode = False
+        self.preserve_frame_changes = False
+        self.current_command_pixels.clear()
+        self.drawing_buffer[:] = TRANSPARENT_COLOR
+        self.grid_dirty[:] = False
+
+        for _ in range(2):
+            self.canvas.Fill(0, 0, 0)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def pump_fade_display(self, min_interval: float = 0.033, force: bool = False) -> None:
         """Push burnout fade updates to the physical LEDs (non-frame mode only).
@@ -918,8 +977,10 @@ class RGB_Api:
         refresh_interval = 0.05  # Refresh display every 50ms
         
         while time.time() < end_time:
+            if self.drain_abort_requested():
+                break
             current_time = time.time()
-            
+
             if current_time - last_refresh_time >= refresh_interval:
                 self.pump_fade_display(min_interval=0, force=True)
                 last_refresh_time = current_time
@@ -1202,6 +1263,9 @@ class RGB_Api:
         if not command.strip():
             debug("Empty command received, ignoring", Level.WARNING, Component.COMMAND)
             return
+        if self.drain_abort_requested():
+            debug("Skipping command during fast drain", Level.DEBUG, Component.COMMAND)
+            return
         if not hasattr(self, 'command_executor'):
             debug("Creating new CommandExecutor instance", Level.DEBUG, Component.COMMAND)
             self.command_executor = CommandExecutor(self)
@@ -1272,15 +1336,9 @@ class RGB_Api:
         """Clean up resources."""
         print("\nStarting RGB_Api instance cleanup...")
         try:
-            self.reset_fps()
-            if self.frame_mode:
-                print("RGB_Api cleanup: ending frame mode")
-                self.end_frame()
-            print("RGB_Api cleanup: clearing display")
-            self.clear()
-            print("RGB_Api cleanup: stopping burnout manager")
-            self.burnout_manager.stop()
-            print("RGB_Api cleanup: burnout manager stopped")
+            print("RGB_Api cleanup: blacking out display")
+            self.blackout_display()
+            print("RGB_Api cleanup: blackout complete")
         except Exception as e:
             print(f"ERROR during RGB_Api cleanup: {str(e)}")
         finally:

@@ -380,6 +380,30 @@ def test_loop_draw_circle_compiles_and_invokes_run_command():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
+def test_loop_draw_circle_accepts_numeric_filled_literals():
+    """Scripts often pass 0/1 for filled; compiled path must match convert_to_type('bool')."""
+    flags.ENABLE_COMPILED_LOOPS = True
+    block = [
+        "draw_circle(10, 10, 4, yellow, 40, 0)",
+        "draw_circle(20, 20, 4, yellow, 40, 1)",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+
+    circles = []
+
+    def capture_draw_circle(x, y, radius, color, intensity, filled, burnout=None, burnout_mode=None):
+        circles.append(filled)
+
+    variables = VariableRegistry()
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, draw_circle_fn=capture_draw_circle,
+    )
+    run_compiled_block(compiled, ctx)
+    assert circles == [False, True]
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
 def test_loop_elseif_draw_shape_branches():
     """Expanding_Circles-style shape dispatch in a compiled loop."""
     flags.ENABLE_COMPILED_LOOPS = True

@@ -95,7 +95,7 @@ endfor v_i
 # PROCEDURES
 # ============================================
 
-# Calculate ball positions from angles
+# Ball positions follow a simple pendulum arc (x/y may go off-panel)
 def calc_positions {
     for v_i in (0, v_num_balls - 1, 1)
         v_rad = radians(v_angle[v_i])
@@ -124,14 +124,19 @@ def draw_frame {
 # Draw strings and balls
 def draw_cradle {
     for v_i in (0, v_num_balls - 1, 1)
-        # Draw string
+        v_bx = round(v_ball_x[v_i])
+        v_by = round(v_ball_y[v_i])
+        
+        # Draw string (line clip handles off-panel endpoints)
         draw_line(v_anchor_x[v_i], v_anchor_y, v_ball_x[v_i], v_ball_y[v_i] - v_ball_radius, gray, 50)
         
-        # Draw ball with highlight for 3D effect
-        v_bx = int(v_ball_x[v_i])
-        v_by = int(v_ball_y[v_i])
-        draw_circle(v_bx, v_by, v_ball_radius, v_ball_color[v_i], 90, true)
-        draw_circle(v_bx - 1, v_by - 1, v_ball_radius - 3, white, 40, true)
+        # Skip ball when off-panel; negative x would clamp to 0 and stick on left edge
+        if v_bx >= 0 and v_bx + v_ball_radius > 0 and v_bx - v_ball_radius < 64 then
+            draw_circle(v_bx, v_by, v_ball_radius, v_ball_color[v_i], 90, true)
+            if v_bx >= 1 then
+                draw_circle(v_bx - 1, v_by - 1, v_ball_radius - 3, white, 40, true)
+            endif
+        endif
     endfor v_i
 }
 
@@ -147,17 +152,15 @@ def update_physics {
         v_angle[v_i] = v_angle[v_i] + v_angular_vel[v_i]
     endfor v_i
     
-    # Collision detection and momentum transfer
+    # Collision detection and momentum transfer (only on impact, not every overlap)
     for v_i in (0, v_num_balls - 2, 1)
         v_j = v_i + 1
         
-        # Calculate positions
         v_rad_i = radians(v_angle[v_i])
         v_rad_j = radians(v_angle[v_j])
         v_x_i = v_anchor_x[v_i] + sin(v_rad_i) * v_string_length
         v_x_j = v_anchor_x[v_j] + sin(v_rad_j) * v_string_length
         
-        # Check for collision
         v_dist = v_x_j - v_x_i
         v_min_dist = v_ball_radius * 2 + 1
         
@@ -176,18 +179,15 @@ def update_physics {
 }
 
 # Animate lifting balls to target positions
-# Returns 1 when all balls have reached their targets
 def update_lift {
     v_all_reached = 1
     
     for v_i in (0, v_num_balls - 1, 1)
         v_diff = v_target_angle[v_i] - v_angle[v_i]
         
-        # Check if we need to move
         if abs(v_diff) > 0.5 then
             v_all_reached = 0
             
-            # Move toward target
             if v_diff > 0 then
                 v_angle[v_i] = v_angle[v_i] + v_lift_speed
                 if v_angle[v_i] > v_target_angle[v_i] then
@@ -202,7 +202,6 @@ def update_lift {
         endif
     endfor v_i
     
-    # If all reached, switch to physics state
     if v_all_reached == 1 then
         v_state = 1
     endif
@@ -341,38 +340,28 @@ while v_running == 1 then
         
         # Update based on state
         if v_state == 0 then
-            # Lifting phase
             call update_lift
         else
-            # Physics phase
             call update_physics
         endif
         
-        # Calculate display positions
         call calc_positions
-        
-        # Draw the cradle
         call draw_cradle
         
-        # Display mode name at bottom
         draw_text(2, 56, v_mode_names[v_mode], tiny64_font, 8, cyan, 60)
         
     end_frame
     
-    # Only count timer during physics phase
     if v_state == 1 then
         v_mode_timer = v_mode_timer + 1
     endif
     
-    # Check for mode change
     if v_mode_timer >= v_mode_duration then
         v_mode_timer = 0
         v_mode = v_mode + 1
         if v_mode >= v_num_modes then
             v_mode = 0
         endif
-        
-        # Setup new mode (starts lift animation)
         call setup_current_mode
     endif
     

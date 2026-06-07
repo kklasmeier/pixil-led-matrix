@@ -5,6 +5,7 @@ Signal handler only sets a flag; the main thread performs cleanup and exit.
 """
 
 import os
+import sys
 
 _ctrl_c_requested = False
 
@@ -43,7 +44,9 @@ def exit_pixil(queue_instance=None, queue_monitor=None) -> None:
 
     if queue_instance is not None:
         try:
-            queue_instance.stop_consumer_graceful()
+            sys.stdout.write("Clearing display...\n")
+            sys.stdout.flush()
+            queue_instance.shutdown_display(timeout=4.0)
         except Exception:
             try:
                 queue_instance.stop_consumer_force()

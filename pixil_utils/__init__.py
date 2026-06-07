@@ -11,8 +11,9 @@ from .file_manager import PixilFileManager
 from .parameter_types import PARAMETER_TYPES, get_parameter_type, convert_to_type, validate_command_params
 from .expression_parser import format_parameter
 from .script_manager import ScriptManager
-from .timer_manager import (initialize_timer, is_time_expired, clear_timer, 
-                          get_remaining_time, force_timer_expired)
+from .timer_manager import (initialize_timer, is_time_expired, clear_timer,
+                          get_remaining_time, force_timer_expired,
+                          announce_script_start)
 from .cli import validate_time_format, validate_debug_level, parse_args
 from .array_manager import PixilArray
 from .terminal_handler import (initialize_terminal, start_terminal,
@@ -53,6 +54,7 @@ __all__ = [
     'clear_timer',
     'get_remaining_time',
     'force_timer_expired',
+    'announce_script_start',
     # cli
     'validate_time_format', 
     'validate_debug_level',

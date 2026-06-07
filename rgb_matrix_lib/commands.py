@@ -58,7 +58,10 @@ class CommandExecutor:
         if not command:
             debug("Empty command received, ignoring", Level.WARNING, Component.COMMAND)
             return
-                
+        if self.api.drain_abort_requested():
+            debug("Skipping command during fast drain", Level.DEBUG, Component.COMMAND)
+            return
+
         debug(f"Processing command: {command}", Level.DEBUG, Component.COMMAND)
 
         try:
@@ -520,10 +523,14 @@ class CommandExecutor:
             Level.DEBUG, Component.COMMAND)
         
         try:
+            if self.api.drain_abort_requested():
+                return
             # Decode binary data
             binary_data = decode_buffer(encoded_data)
             plots = list(unpack_mplot_batch(binary_data))
-            
+            if self.api.drain_abort_requested():
+                return
+
             # Single atomic operation
             self.api.plot_batch(plots)
             
@@ -545,6 +552,8 @@ class CommandExecutor:
             binary_data = decode_draw_buffer(encoded_data)
             count = 0
             for cmd_name, args in unpack_draw_batch(binary_data):
+                if self.api.drain_abort_requested():
+                    break
                 handler = self.command_handlers.get(cmd_name)
                 if handler is None:
                     raise ValueError(f"draw_batch unknown command: {cmd_name}")
@@ -570,6 +579,8 @@ class CommandExecutor:
             binary_data = decode_sprite_buffer(encoded_data)
             count = 0
             for cmd_name, args in unpack_sprite_batch(binary_data):
+                if self.api.drain_abort_requested():
+                    break
                 handler = self.command_handlers.get(cmd_name)
                 if handler is None:
                     raise ValueError(f"sprite_batch unknown command: {cmd_name}")

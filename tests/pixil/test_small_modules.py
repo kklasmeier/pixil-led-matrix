@@ -36,6 +36,38 @@ def test_validate_debug_level_invalid():
         validate_debug_level("LOUD")
 
 
+def test_announce_script_start_with_duration(capsys):
+    import datetime
+
+    timer.clear_timer()
+    fixed = datetime.datetime(2026, 6, 7, 14, 30, 0)
+
+    class FakeDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed
+
+    timer.datetime.datetime = FakeDatetime
+    timer.announce_script_start("/path/to/Solar_system.pix", 30)
+    out = capsys.readouterr().out
+    assert "Current script: /path/to/Solar_system.pix..." in out
+    assert "Started: 2026-06-07 14:30:00" in out
+    assert "Expected end: 2026-06-07 14:30:30" in out
+    assert timer.get_remaining_time() == pytest.approx(30.0, abs=1.0)
+    timer.clear_timer()
+
+
+def test_announce_script_start_unlimited(capsys):
+    timer.clear_timer()
+    timer.announce_script_start("/path/to/Spiral.pix", None)
+    out = capsys.readouterr().out
+    assert "Current script: /path/to/Spiral.pix..." in out
+    assert "Started:" in out
+    assert "Expected end:" not in out
+    assert timer.get_remaining_time() is None
+    timer.clear_timer()
+
+
 def test_timer_expiry(monkeypatch):
     timer.clear_timer()
     now = [1000.0]

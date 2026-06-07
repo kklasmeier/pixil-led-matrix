@@ -101,6 +101,94 @@ def _coord_uint16(value: Any) -> int:
 DEFAULT_PANEL_WIDTH = 64
 DEFAULT_PANEL_HEIGHT = 64
 
+
+def center_radius_visible_on_panel(
+    x_center: Any,
+    y_center: Any,
+    radius: Any,
+    width: int = DEFAULT_PANEL_WIDTH,
+    height: int = DEFAULT_PANEL_HEIGHT,
+) -> bool:
+    """
+    True when a center+radius shape should be drawn on the panel.
+
+    Negative centers cannot be encoded in the batch protocol (_coord_uint16
+    clamps them to 0), which pins off-screen shapes to the left/top edge.
+    """
+    xc = int(float(x_center))
+    yc = int(float(y_center))
+    r = int(float(radius))
+    if r <= 0:
+        return False
+    if xc < 0 or yc < 0:
+        return False
+    if xc + r <= 0 or yc + r <= 0:
+        return False
+    if xc - r >= width or yc - r >= height:
+        return False
+    return True
+
+
+def circle_visible_on_panel(
+    x_center: Any,
+    y_center: Any,
+    radius: Any,
+    width: int = DEFAULT_PANEL_WIDTH,
+    height: int = DEFAULT_PANEL_HEIGHT,
+) -> bool:
+    """Alias for center_radius_visible_on_panel (circles)."""
+    return center_radius_visible_on_panel(x_center, y_center, radius, width, height)
+
+
+def ellipse_visible_on_panel(
+    x_center: Any,
+    y_center: Any,
+    x_radius: Any,
+    y_radius: Any,
+    width: int = DEFAULT_PANEL_WIDTH,
+    height: int = DEFAULT_PANEL_HEIGHT,
+) -> bool:
+    """
+    True when an ellipse should be drawn on the panel.
+
+    Uses max(x_radius, y_radius) as a conservative bound (matches rgb_matrix_lib).
+    """
+    xr = int(float(x_radius))
+    yr = int(float(y_radius))
+    if xr <= 0 and yr <= 0:
+        return False
+    bound = max(xr, yr)
+    return center_radius_visible_on_panel(x_center, y_center, bound, width, height)
+
+
+def clip_rectangle(
+    x: Any,
+    y: Any,
+    rect_width: Any,
+    rect_height: Any,
+    panel_width: int = DEFAULT_PANEL_WIDTH,
+    panel_height: int = DEFAULT_PANEL_HEIGHT,
+) -> Optional[Tuple[int, int, int, int]]:
+    """
+    Clip a rectangle to the panel.
+
+    Returns (x, y, width, height) for the visible portion, or None when fully
+    outside. Avoids clamping negative origins to 0 while keeping full width.
+    """
+    left = int(float(x))
+    top = int(float(y))
+    w = int(float(rect_width))
+    h = int(float(rect_height))
+    if w <= 0 or h <= 0:
+        return None
+    right = min(left + w, panel_width)
+    bottom = min(top + h, panel_height)
+    clipped_left = max(left, 0)
+    clipped_top = max(top, 0)
+    if right <= clipped_left or bottom <= clipped_top:
+        return None
+    return clipped_left, clipped_top, right - clipped_left, bottom - clipped_top
+
 _INSIDE, _LEFT, _RIGHT, _BOTTOM, _TOP = 0, 1, 2, 4, 8
 
 
@@ -226,6 +314,10 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         fill = args[6] if len(args) > 6 else False
         burnout = args[7] if len(args) > 7 else None
         burnout_mode = args[8] if len(args) > 8 else "instant"
+        clipped = clip_rectangle(x, y, w, h)
+        if clipped is None:
+            return b""
+        x, y, w, h = clipped
         payload = struct.pack(
             _RECT_FMT,
             _coord_uint16(x), _coord_uint16(y), _coord_uint16(w), _coord_uint16(h),
@@ -243,6 +335,8 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         fill = args[5] if len(args) > 5 else False
         burnout = args[6] if len(args) > 6 else None
         burnout_mode = args[7] if len(args) > 7 else "instant"
+        if not circle_visible_on_panel(x, y, radius):
+            return b""
         payload = struct.pack(
             _CIRCLE_FMT,
             _coord_uint16(x), _coord_uint16(y), _coord_uint16(radius),
@@ -261,6 +355,8 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         fill = args[7] if len(args) > 7 else False
         burnout = args[8] if len(args) > 8 else None
         burnout_mode = args[9] if len(args) > 9 else "instant"
+        if not center_radius_visible_on_panel(x, y, radius):
+            return b""
         payload = struct.pack(
             _POLYGON_FMT,
             _coord_uint16(x), _coord_uint16(y), _coord_uint16(radius), _coord_uint16(sides),
@@ -280,6 +376,8 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         rotation = float(args[7]) if len(args) > 7 else 0.0
         burnout = args[8] if len(args) > 8 else None
         burnout_mode = args[9] if len(args) > 9 else "instant"
+        if not ellipse_visible_on_panel(xc, yc, xr, yr):
+            return b""
         payload = struct.pack(
             _ELLIPSE_FMT,
             _coord_uint16(xc), _coord_uint16(yc), _coord_uint16(xr), _coord_uint16(yr),
@@ -298,6 +396,10 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         fill = args[7] if len(args) > 7 else False
         burnout = args[8] if len(args) > 8 else None
         burnout_mode = args[9] if len(args) > 9 else "instant"
+        clipped = clip_line_segment(x1, y1, x2, y2)
+        if clipped is None:
+            return b""
+        x1, y1, x2, y2 = clipped
         payload = struct.pack(
             _ARC_FMT,
             _coord_uint16(x1), _coord_uint16(y1), _coord_uint16(x2), _coord_uint16(y2),
@@ -437,6 +539,11 @@ __all__ = [
     "OP_POLYGON",
     "OP_ELLIPSE",
     "OP_ARC",
+    "center_radius_visible_on_panel",
+    "circle_visible_on_panel",
+    "ellipse_visible_on_panel",
+    "clip_rectangle",
+    "clip_line_segment",
     "pack_draw_op",
     "pack_plot_record",
     "unpack_draw_batch",

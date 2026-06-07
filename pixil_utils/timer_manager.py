@@ -3,8 +3,11 @@ Timer management utilities for Pixil script runner.
 Handles script duration tracking and timer state.
 """
 
+import datetime
 import time
 from .debug import debug_print, DEBUG_VERBOSE
+
+_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # Global timer state
 end_time = None
@@ -66,6 +69,23 @@ def clear_timer():
     timer_expired = False
     debug_print("Timer cleared", DEBUG_VERBOSE)
 
+def announce_script_start(script_path, duration_seconds=None):
+    """
+    Initialize the per-script timer and print start / expected end times.
+
+    Args:
+        script_path: Path to the script being started
+        duration_seconds: Run duration in seconds, or None for unlimited
+    """
+    initialize_timer(duration_seconds)
+
+    start = datetime.datetime.now()
+    print(f"Current script: {script_path}...")
+    print(f"Started: {start.strftime(_DATETIME_FORMAT)}")
+    if duration_seconds is not None:
+        end = start + datetime.timedelta(seconds=duration_seconds)
+        print(f"Expected end: {end.strftime(_DATETIME_FORMAT)}")
+
 def get_remaining_time():
     """
     Get remaining time in seconds.
@@ -86,5 +106,6 @@ __all__ = [
     'initialize_timer',
     'is_time_expired',
     'clear_timer',
-    'get_remaining_time'
+    'get_remaining_time',
+    'announce_script_start',
 ]

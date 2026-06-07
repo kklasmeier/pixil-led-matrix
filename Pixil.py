@@ -21,9 +21,9 @@ from pixil_utils.parameter_types import (
     expand_legacy_shape_params,
 )
 from pixil_utils.expression_parser import format_parameter
-from pixil_utils import (ScriptManager, parse_args, 
+from pixil_utils import (ScriptManager, parse_args,
                         # Timer management
-                        initialize_timer, is_time_expired, clear_timer, force_timer_expired,
+                        announce_script_start, is_time_expired, clear_timer, force_timer_expired,
                         # Debug management 
                         set_debug_level,
                         # Terminal handling
@@ -2193,8 +2193,13 @@ def process_script(filename, execute_func=None):
 
         if not shutdown_requested():
             cleanup_cooldown = 0.15 if is_test_mode() else 0.3
+            flush_draw_buffer_commands()
+            flush_sprite_buffer_commands()
             queue_instance.script_transition_cleanup(cooldown=cleanup_cooldown)
             debug_print("Cleanup sequence completed", DEBUG_CONCISE)
+        else:
+            flush_draw_buffer_commands()
+            flush_sprite_buffer_commands()
         gc.collect()
         
     debug_print("Script processing completed", DEBUG_CONCISE)
@@ -2203,10 +2208,14 @@ def process_script(filename, execute_func=None):
         execution_reason = "complete" if normal_exit else "interrupted"
         report_metrics(execution_reason, script_name, script_start_time)
     
+_stopping_message_sent = False
+
 def signal_handler(signum, frame):
     """Request shutdown on Ctrl+C; main thread performs cleanup."""
-    if not shutdown_requested():
-        request_shutdown()
+    global _stopping_message_sent
+    request_shutdown()
+    if not _stopping_message_sent:
+        _stopping_message_sent = True
         sys.stdout.write("\nStopping...\n")
         sys.stdout.flush()
 
@@ -2283,7 +2292,7 @@ if __name__ == '__main__':
             
             # Single script mode
             if script_manager.is_single_script():
-                initialize_timer(args.duration)
+                announce_script_start(scripts[0], args.duration)
                 start_time = time.time()
                 try:
                     process_script(scripts[0], execute_command)
@@ -2307,8 +2316,7 @@ if __name__ == '__main__':
 
                     current_script = scripts.pop()
 
-                    print(f"Current script: {current_script}...")
-                    initialize_timer(args.duration)
+                    announce_script_start(current_script, args.duration)
                     try:
                         process_script(current_script, execute_command)
                     except PixilShutdownRequested:
@@ -2336,7 +2344,7 @@ if __name__ == '__main__':
             if queue_monitor:
                 queue_monitor.stop()
             if queue_instance:
-                queue_instance.stop_consumer_graceful()
+                queue_instance.shutdown_display(timeout=4.0)
             stop_terminal()
         except Exception:
             sys.exit(1)

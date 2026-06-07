@@ -1,4 +1,4 @@
-from multiprocessing import Queue, Process
+from multiprocessing import Queue, Process, Event, Value
 import time
 from typing import Optional
 import threading
@@ -9,6 +9,7 @@ class MatrixCommandQueue:
     
     def __init__(self, queue_size: int = 5000):
         """Initialize command queue with specified size"""
+        self._queue_size = queue_size
         self.command_queue = Queue(maxsize=queue_size)
         # Consumer -> main: buffer fingerprint after __test_snapshot__
         self._test_snapshot_reply: Queue = Queue(maxsize=1)
@@ -16,6 +17,12 @@ class MatrixCommandQueue:
         self._running = False
         self.last_command_time = time.time() * 1000  # Convert to milliseconds
         self.throttle_factor = 1.0  # Add throttle factor, default to 1.0 (normal speed)
+        self._drain_requested = Event()
+        self._drain_complete = Event()
+        self._drain_swallowed = Value('i', 0)
+        self._reset_complete = Event()
+        self._shutdown_complete = Event()
+        self._force_shutdown = Event()
 
     def set_pause_callbacks(self, on_pause=None, on_resume=None):
         """Set callbacks for queue pause/resume events."""
@@ -57,12 +64,13 @@ class MatrixCommandQueue:
                 break
         return discarded
 
-    def put_command_priority(self, command: str) -> None:
-        """Enqueue with zero delay; discard backlog if the queue is full."""
+    def put_command_priority(self, command: str, timeout: float = 2.0) -> None:
+        """Enqueue a control command with zero delay; wait for space if the queue is full."""
         from pixil_utils.shutdown import PixilShutdownRequested, shutdown_requested
 
         command_tuple = (command, 0)
-        while True:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
             if shutdown_requested():
                 raise PixilShutdownRequested()
             try:
@@ -71,15 +79,41 @@ class MatrixCommandQueue:
                 return
             except Full:
                 self.discard_pending()
+                time.sleep(0.002)
+        raise TimeoutError(f"Could not enqueue priority command: {command}")
 
-    def _kill_consumer_process(self, timeout: float = 1.0) -> None:
-        """Stop the consumer subprocess immediately."""
+    def _recreate_command_queue(self) -> None:
+        """
+        Replace queue IPC objects after the consumer exits.
+
+        Killing the consumer leaves the old pipe/feeder state in the parent;
+        a new consumer then sees an empty queue while the producer sees Full.
+        """
+        self.command_queue = Queue(maxsize=self._queue_size)
+        self._test_snapshot_reply = Queue(maxsize=1)
+
+    def _kill_consumer_process(self, timeout: float = 1.0, graceful: bool = False) -> None:
+        """Stop the consumer subprocess."""
         if self._consumer_process is None:
             return
         try:
             if self._consumer_process.is_alive():
-                self._consumer_process.terminate()
-                self._consumer_process.join(timeout=timeout)
+                if graceful:
+                    try:
+                        self.command_queue.put_nowait(('__SHUTDOWN__', 0))
+                        self._consumer_process.join(timeout=timeout)
+                    except Full:
+                        self.discard_pending()
+                        try:
+                            self.command_queue.put_nowait(('__SHUTDOWN__', 0))
+                            self._consumer_process.join(timeout=timeout)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                if self._consumer_process.is_alive():
+                    self._consumer_process.terminate()
+                    self._consumer_process.join(timeout=timeout)
                 if self._consumer_process.is_alive():
                     self._consumer_process.kill()
                     self._consumer_process.join(timeout=0.5)
@@ -89,43 +123,191 @@ class MatrixCommandQueue:
             self._consumer_process = None
             self._running = False
 
+    def request_fast_drain(self, timeout: float = 1.0) -> int:
+        """
+        Ask the consumer to swallow pending commands without executing them.
+
+        Returns:
+            Number of commands swallowed, or -1 if the consumer did not finish in time.
+        """
+        if self._consumer_process is None or not self._consumer_process.is_alive():
+            return 0
+
+        self._drain_complete.clear()
+        self._drain_swallowed.value = 0
+        self._drain_requested.set()
+        try:
+            self.put_command_priority('__DRAIN__')
+        except Exception:
+            self._drain_requested.clear()
+            return -1
+
+        if not self._drain_complete.wait(timeout=timeout):
+            self._drain_requested.clear()
+            return -1
+        self._drain_requested.clear()
+        return self._drain_swallowed.value
+
+    def _sleep_delay_interruptible(self, delay_ms: float) -> bool:
+        """Sleep for delay_ms; return True if drain or shutdown was requested."""
+        if delay_ms <= 0:
+            return self._drain_requested.is_set() or self._force_shutdown.is_set()
+        end = time.perf_counter() + (delay_ms / 1000.0)
+        while time.perf_counter() < end:
+            if self._drain_requested.is_set() or self._force_shutdown.is_set():
+                return True
+            time.sleep(min(0.001, end - time.perf_counter()))
+        return self._drain_requested.is_set() or self._force_shutdown.is_set()
+
+    def _consumer_blackout_and_exit(self, api_instance) -> None:
+        """Black out the matrix and signal shutdown completion to the main process."""
+        try:
+            api_instance.blackout_display()
+        except Exception as blackout_err:
+            print(
+                f"[QUEUE] Blackout error: {blackout_err}",
+                flush=True,
+            )
+        self._shutdown_complete.set()
+
+    def _apply_script_reset(self, api_instance) -> None:
+        """Reset matrix state between scripts (consumer process only)."""
+        api_instance.reset_fps()
+        if api_instance.frame_mode:
+            try:
+                api_instance.end_frame()
+            except Exception:
+                api_instance.frame_mode = False
+                api_instance.preserve_frame_changes = False
+        api_instance.clear()
+        api_instance.dispose_all_sprites()
+
+    def _wait_for_script_reset(self, timeout: float = 3.0) -> bool:
+        """Block until the consumer finishes an atomic script reset."""
+        self._reset_complete.clear()
+        try:
+            self.put_command_priority('__SCRIPT_RESET__', timeout=min(timeout, 2.0))
+        except TimeoutError:
+            return False
+        return self._reset_complete.wait(timeout=timeout)
+
+    def _perform_fast_drain(self, pending_command: Optional[str] = None) -> bool:
+        """
+        Swallow up to queue_size commands without executing them.
+
+        Returns True if __SHUTDOWN__ was encountered.
+        """
+        swallowed = 0
+        if pending_command and pending_command not in ('__DRAIN__', '__SHUTDOWN__'):
+            swallowed += 1
+
+        while swallowed < self._queue_size:
+            try:
+                command, _delay = self.command_queue.get_nowait()
+            except Empty:
+                break
+            if command == '__SHUTDOWN__':
+                self._drain_swallowed.value = swallowed
+                self._drain_requested.clear()
+                self._drain_complete.set()
+                return True
+            swallowed += 1
+
+        self._drain_swallowed.value = swallowed
+        self._drain_requested.clear()
+        self._drain_complete.set()
+        return False
+
+    def prepare_for_next_script(self, timeout: float = 3.0) -> None:
+        """
+        Prepare the display for the next script without restarting the consumer.
+
+        Drops producer-side backlog, fast-drains the consumer queue, then runs
+        real reset commands on the matrix.
+        """
+        if self._consumer_process is None or not self._consumer_process.is_alive():
+            self.last_command_time = time.time() * 1000
+            self.start_consumer()
+
+        self.discard_pending()
+        swallowed = self.request_fast_drain(timeout=1.0)
+        if swallowed < 0:
+            print("[QUEUE] Warning: fast drain timed out; restarting consumer")
+            self.reset_for_next_script(timeout=timeout)
+            return
+
+        self.last_command_time = time.time() * 1000
+        if not self._wait_for_script_reset(timeout=timeout):
+            print("[QUEUE] Warning: script reset not acknowledged; restarting consumer")
+            self.reset_for_next_script(timeout=timeout)
+            return
+
     def reset_for_next_script(self, timeout: float = 3.0) -> None:
         """
-        Drop all pending commands and restart the consumer.
+        Emergency fallback: kill and restart the consumer, then reset the display.
 
-        Producer-side discard alone is not enough: the consumer may already be
-        executing or holding thousands of dequeued plot/draw commands. Restarting
-        the consumer process abandons that work immediately.
+        Used only when fast drain fails or the consumer is unresponsive.
         """
         self.discard_pending()
-        self._kill_consumer_process()
+        self._kill_consumer_process(graceful=True)
         self.discard_pending()
+        self._recreate_command_queue()
         self.last_command_time = time.time() * 1000
         self.start_consumer()
-        for cmd in ('fps(0)', 'clear', 'dispose_all_sprites()'):
-            self.put_command_priority(cmd)
-        self.wait_until_empty(timeout=timeout)
+        if self._consumer_process is None or not self._consumer_process.is_alive():
+            print("[QUEUE] Warning: consumer failed to start after script transition")
+        if not self._wait_for_script_reset(timeout=timeout):
+            print("[QUEUE] Warning: reset commands not drained before next script")
 
     def script_transition_cleanup(self, cooldown: float = 0.3) -> None:
         """Discard backlog and reset display for the next script."""
-        self.reset_for_next_script()
+        self.prepare_for_next_script()
         time.sleep(cooldown)
 
-    def stop_consumer_graceful(self, timeout: float = 2.0) -> None:
-        """Clear display and stop the consumer process."""
+    def _run_emergency_blackout(self, timeout: float = 4.0) -> None:
+        from rgb_matrix_lib.emergency_blackout import spawn_emergency_blackout
+
+        spawn_emergency_blackout(timeout=timeout)
+
+    def shutdown_display(self, timeout: float = 5.0) -> None:
+        """
+        Clear the LED matrix and stop the consumer (Ctrl+C / final exit).
+
+        Sets a force-shutdown flag the consumer polls immediately (does not
+        require queue space). If the consumer does not black out in time it is
+        killed and a fresh process clears the panel.
+        """
         if self._consumer_process is None:
+            self._run_emergency_blackout()
             return
 
+        self._force_shutdown.set()
+        self._drain_requested.clear()
+        self._shutdown_complete.clear()
         self.discard_pending()
-        try:
-            for cmd in ('clear', 'dispose_all_sprites()', '__SHUTDOWN__'):
-                self.put_command_priority(cmd)
-            self._consumer_process.join(timeout=timeout)
-        except Exception:
-            pass
+
+        blackout_ok = False
+        if self._consumer_process.is_alive():
+            blackout_ok = self._shutdown_complete.wait(timeout=timeout)
+            self._consumer_process.join(timeout=1.0)
 
         if self._consumer_process is not None and self._consumer_process.is_alive():
-            self._kill_consumer_process(timeout=1.0)
+            self._kill_consumer_process(timeout=1.0, graceful=False)
+            blackout_ok = False
+
+        self._force_shutdown.clear()
+
+        if not blackout_ok:
+            time.sleep(0.25)
+            self._run_emergency_blackout(timeout=timeout)
+
+        self._recreate_command_queue()
+        self._consumer_process = None
+        self._running = False
+
+    def stop_consumer_graceful(self, timeout: float = 4.0) -> None:
+        """Clear display and stop the consumer process."""
+        self.shutdown_display(timeout=timeout)
 
     def stop_consumer(self):
         """Stop the consumer process"""
@@ -177,22 +359,43 @@ class MatrixCommandQueue:
 
     def _consumer_loop(self):
         """Main consumer loop that processes commands with timing"""
+        api_instance = None
         try:
             # Initialize RGB matrix in consumer process only
             from rgb_matrix_lib.api import get_api_instance
             api_instance = get_api_instance()
-            #print(f"[{datetime.now()}] [QUEUE] Consumer process started with API instance")
-            
+            api_instance.set_drain_checker(self._drain_requested.is_set)
+            api_instance.set_shutdown_checker(self._force_shutdown.is_set)
+
             while True:
+                if self._force_shutdown.is_set():
+                    self._consumer_blackout_and_exit(api_instance)
+                    break
+
                 try:
                     # Get command tuple with timeout
                     command, delay = self.command_queue.get(timeout=0.01)
-                    #print(f"[{datetime.now()}] [QUEUE] Consumer got command: {command} (delay: {delay}ms)")
-                    
-                    # Check for shutdown command
-                    if command == "__SHUTDOWN__":
-                        print("[QUEUE] Received shutdown command")
+
+                    if self._force_shutdown.is_set():
+                        self._consumer_blackout_and_exit(api_instance)
                         break
+
+                    # Legacy queue-based shutdown (still honoured if enqueued)
+                    if command == "__SHUTDOWN__":
+                        self._consumer_blackout_and_exit(api_instance)
+                        break
+
+                    if command == "__SCRIPT_RESET__":
+                        self._apply_script_reset(api_instance)
+                        self._reset_complete.set()
+                        continue
+
+                    if command == "__DRAIN__" or self._drain_requested.is_set():
+                        if self._perform_fast_drain(
+                            None if command == "__DRAIN__" else command,
+                        ):
+                            break
+                        continue
 
                     # Test harness: capture drawing buffer fingerprint (consumer process)
                     if command == "__test_snapshot__":
@@ -214,30 +417,50 @@ class MatrixCommandQueue:
                                 flush=True,
                             )
                         continue
-                    
-                    # Wait for specified delay
+
+                    if self._drain_requested.is_set():
+                        if self._perform_fast_drain(command):
+                            break
+                        continue
+
+                    # Wait for specified delay (interruptible when drain/shutdown requested)
                     if delay > 0:
-                        time.sleep(delay / 1000.0)
-                        
-                    # Execute command
-                    #print(f"[{datetime.now()}] [QUEUE] Executing command: {command}")
+                        if self._sleep_delay_interruptible(delay):
+                            if self._force_shutdown.is_set():
+                                self._consumer_blackout_and_exit(api_instance)
+                                break
+                            if self._perform_fast_drain(command):
+                                break
+                            continue
+
+                    if self._drain_requested.is_set():
+                        if self._perform_fast_drain(command):
+                            break
+                        continue
+
                     api_instance.execute_command(command)
-                    #print(f"[{datetime.now()}] [QUEUE] Finished executing: {command}")
-                    
+
                 except Empty:
-                    # Between commands: push burnout fade to LEDs (plot fade needs this)
+                    if self._force_shutdown.is_set():
+                        self._consumer_blackout_and_exit(api_instance)
+                        break
+                    if self._drain_requested.is_set():
+                        if self._perform_fast_drain():
+                            break
+                        continue
                     try:
-                        api_instance.pump_fade_display()
+                        if not api_instance.drain_abort_requested():
+                            api_instance.pump_fade_display()
                     except AttributeError:
                         pass
                     continue
-                except Exception as e:
-                    #print(f"[{datetime.now()}] [QUEUE] Error processing command: {e}")
+                except Exception:
                     continue
-                    
+
         finally:
-            #print(f"[{datetime.now()}] [QUEUE] Consumer loop ending, cleaning up")
-            if api_instance:
+            if api_instance is not None:
+                api_instance.set_drain_checker(None)
+                api_instance.set_shutdown_checker(None)
                 api_instance.cleanup()
 
     def is_empty(self) -> bool:

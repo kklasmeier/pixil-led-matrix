@@ -156,6 +156,13 @@ def _eval_bool_literal(bool_expr: str, compiled: Optional[Any], ctx: "ExecContex
         return True
     if lower == "false":
         return False
+    # Legacy scripts use 0/1 for filled; non-compiled path uses convert_to_type('bool').
+    try:
+        if "." in s:
+            return float(s) != 0.0
+        return int(s) != 0
+    except ValueError:
+        pass
     if s.startswith("v_") or has_math_expression(s):
         result = _eval_expression(s, compiled, ctx)
         if isinstance(result, bool):

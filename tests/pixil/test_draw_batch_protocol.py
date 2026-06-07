@@ -6,7 +6,11 @@ from shared.draw_batch_protocol import (
     OP_LINE,
     OP_PLOT,
     OP_RECT,
+    center_radius_visible_on_panel,
+    circle_visible_on_panel,
     clip_line_segment,
+    clip_rectangle,
+    ellipse_visible_on_panel,
     encode_buffer,
     decode_buffer,
     pack_draw_op,
@@ -117,6 +121,93 @@ def test_plot_negative_coords_clamped():
     rec = pack_draw_op("plot", [-5, 80, "white", 100])
     cmds = list(unpack_draw_batch(rec))
     assert cmds[0][1][:2] == (0, 80)
+
+
+def test_draw_circle_negative_center_skipped():
+    """Negative centers clamp to x=0 and pin circles on the left edge."""
+    assert circle_visible_on_panel(-5, 32, 4) is False
+    rec = pack_draw_op("draw_circle", [-5, 32, 4, "gold", 90, True, None, "instant"])
+    assert rec == b""
+
+
+def test_draw_circle_partially_off_left_with_positive_center():
+    assert circle_visible_on_panel(2, 32, 4) is True
+    rec = pack_draw_op("draw_circle", [2, 32, 4, "gold", 90, True, None, "instant"])
+    assert rec
+    cmds = list(unpack_draw_batch(rec))
+    assert cmds[0][1][:3] == (2, 32, 4)
+
+
+def test_draw_circle_fully_off_right_skipped():
+    assert circle_visible_on_panel(68, 32, 4) is False
+    rec = pack_draw_op("draw_circle", [68, 32, 4, "gold", 90, True, None, "instant"])
+    assert rec == b""
+
+
+def test_draw_rectangle_partially_off_left_clipped():
+    assert clip_rectangle(-5, 10, 20, 10) == (0, 10, 15, 10)
+    rec = pack_draw_op(
+        "draw_rectangle",
+        [-5, 10, 20, 10, "blue", 80, True, None, "instant"],
+    )
+    cmds = list(unpack_draw_batch(rec))
+    assert cmds[0][1][:4] == (0, 10, 15, 10)
+
+
+def test_draw_rectangle_fully_off_screen_skipped():
+    assert clip_rectangle(-20, 10, 10, 10) is None
+    rec = pack_draw_op(
+        "draw_rectangle",
+        [-20, 10, 10, 10, "blue", 80, True, None, "instant"],
+    )
+    assert rec == b""
+
+
+def test_draw_polygon_negative_center_skipped():
+    assert center_radius_visible_on_panel(-5, 32, 6) is False
+    rec = pack_draw_op(
+        "draw_polygon",
+        [-5, 32, 6, 5, "green", 80, 0.0, False, None, "instant"],
+    )
+    assert rec == b""
+
+
+def test_draw_ellipse_negative_center_skipped():
+    assert ellipse_visible_on_panel(-5, 32, 8, 4) is False
+    rec = pack_draw_op(
+        "draw_ellipse",
+        [-5, 32, 8, 4, "purple", 80, False, 0.0, None, "instant"],
+    )
+    assert rec == b""
+
+
+def test_draw_ellipse_partially_on_panel():
+    assert ellipse_visible_on_panel(4, 32, 8, 4) is True
+    rec = pack_draw_op(
+        "draw_ellipse",
+        [4, 32, 8, 4, "purple", 80, False, 0.0, None, "instant"],
+    )
+    assert rec
+    cmds = list(unpack_draw_batch(rec))
+    assert cmds[0][1][:4] == (4, 32, 8, 4)
+
+
+def test_draw_arc_negative_endpoint_clipped():
+    rec = pack_draw_op(
+        "draw_arc",
+        [32, 32, -10, 70, 5.0, "orange", 80, False, None, "instant"],
+    )
+    assert rec
+    cmds = list(unpack_draw_batch(rec))
+    assert cmds[0][1][:4] == (32, 32, 0, 61)
+
+
+def test_draw_arc_fully_outside_skipped():
+    rec = pack_draw_op(
+        "draw_arc",
+        [-200, -200, -150, -150, 5.0, "orange", 80, False, None, "instant"],
+    )
+    assert rec == b""
 
 
 def test_mplot_via_pack_draw_op():
