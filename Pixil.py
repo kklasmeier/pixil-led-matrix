@@ -1535,6 +1535,54 @@ def process_script(filename, execute_func=None):
                 parts.append(str(burnout_mode))
         store_frame_command(f"draw_circle({', '.join(parts)})")
 
+    def _compiled_draw_polygon(
+        x, y, radius, sides, color, intensity=100, rotation=0.0, filled=False,
+        burnout=None, burnout_mode=None,
+    ):
+        """Compiled draw_polygon(): batch in frame mode; flush immediately otherwise."""
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        filled_flag = bool(filled)
+        if _use_draw_batch_for('draw_polygon'):
+            _append_to_draw_batch(
+                'draw_polygon',
+                [x, y, radius, sides, final_color, intensity, rotation, filled_flag, burnout, burnout_mode],
+            )
+            return
+        parts = [
+            str(x), str(y), str(radius), str(sides), str(final_color), str(intensity),
+            str(rotation), str(filled_flag).lower(),
+        ]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"draw_polygon({', '.join(parts)})")
+
+    def _compiled_draw_arc(
+        x1, y1, x2, y2, bulge, color, intensity=100, filled=False,
+        burnout=None, burnout_mode=None,
+    ):
+        """Compiled draw_arc(): batch in frame mode; flush immediately otherwise."""
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        filled_flag = bool(filled)
+        if _use_draw_batch_for('draw_arc'):
+            _append_to_draw_batch(
+                'draw_arc',
+                [x1, y1, x2, y2, bulge, final_color, intensity, filled_flag, burnout, burnout_mode],
+            )
+            return
+        parts = [
+            str(x1), str(y1), str(x2), str(y2), str(bulge), str(final_color),
+            str(intensity), str(filled_flag).lower(),
+        ]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"draw_arc({', '.join(parts)})")
+
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
         global mplot_buffer, mplot_count, draw_buffer, draw_count
         if not (0 <= x <= 63 and 0 <= y <= 63):
@@ -1619,6 +1667,8 @@ def process_script(filename, execute_func=None):
                 plot_fn=_compiled_plot,
                 draw_line_fn=_compiled_draw_line,
                 draw_circle_fn=_compiled_draw_circle,
+                draw_polygon_fn=_compiled_draw_polygon,
+                draw_arc_fn=_compiled_draw_arc,
             )
         return compiled_ctx_pool.get()
 

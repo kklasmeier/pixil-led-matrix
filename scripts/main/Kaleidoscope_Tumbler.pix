@@ -24,7 +24,7 @@ v_wedge_intensity = 25
 throttle(0.6)
 
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
-fps(60)
+fps(30)
 
 # ============================================================
 # CONSTANTS
@@ -947,9 +947,7 @@ while 1 == 1 then
         call update_objects
         call update_bloom_contract
         call draw_frame
-        rest(v_frame_delay)
     endfor v_frame
     
     call fade_out
-    print("Sequence complete...")
 endwhile

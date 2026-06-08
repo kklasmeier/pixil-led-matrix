@@ -5,10 +5,11 @@ Parses a block once into a small statement tree, then runs it without re-dispatc
 lines through process_lines.
 
 Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
-       if/elseif/else, break, mplot(...), plot(...) (fast path), draw_line/draw_circle
-       (fast path), other draw_* via CommandStmt.
+       if/elseif/else, break, mplot(...), plot(...) (fast path), draw_line/draw_circle/
+       draw_polygon/draw_arc (fast path), other draw_* via CommandStmt.
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
-            begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon, etc.
+            begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon,
+            draw_arc, etc.
 Unsupported constructs cause compile failure and interpreter fallback.
 """
 
@@ -49,6 +50,7 @@ COMPILED_PROC_CALLS = 0
 
 _FRAME_COMMANDS = frozenset({
     "draw_line", "draw_circle", "draw_rectangle", "plot", "draw_ellipse", "draw_polygon",
+    "draw_arc",
 })
 _FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background", "clear"})
 _FRAME_MISC_COMMANDS = frozenset({"fps"})
@@ -204,6 +206,8 @@ class ExecContext:
     plot: Optional[Callable[..., None]] = None
     draw_line: Optional[Callable[..., None]] = None
     draw_circle: Optional[Callable[..., None]] = None
+    draw_polygon: Optional[Callable[..., None]] = None
+    draw_arc: Optional[Callable[..., None]] = None
 
 
 # Backward-compatible alias
@@ -536,6 +540,130 @@ class DrawCircleStmt(Statement):
 
 
 @dataclass
+class DrawPolygonStmt(Statement):
+    """Fast compiled path for draw_polygon(x, y, radius, sides, color, [intensity], rotation, filled, ...)."""
+
+    x_expr: str
+    y_expr: str
+    radius_expr: str
+    sides_expr: str
+    color_expr: str
+    intensity_expr: str
+    rotation_expr: str
+    filled_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x: Optional[Any] = field(default=None, repr=False)
+    compiled_y: Optional[Any] = field(default=None, repr=False)
+    compiled_radius: Optional[Any] = field(default=None, repr=False)
+    compiled_sides: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_rotation: Optional[Any] = field(default=None, repr=False)
+    compiled_filled: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x = int(float(_eval_expression(self.x_expr, self.compiled_x, ctx)))
+        y = int(float(_eval_expression(self.y_expr, self.compiled_y, ctx)))
+        radius = int(float(_eval_expression(self.radius_expr, self.compiled_radius, ctx)))
+        sides = int(float(_eval_expression(self.sides_expr, self.compiled_sides, ctx)))
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        rotation = float(_eval_expression(self.rotation_expr, self.compiled_rotation, ctx))
+        filled = _eval_bool_literal(self.filled_expr, self.compiled_filled, ctx)
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        draw_fn = ctx.draw_polygon
+        if draw_fn is None:
+            if ctx.run_command is None:
+                raise RuntimeError("draw_polygon not configured")
+            args = [
+                self.x_expr, self.y_expr, self.radius_expr, self.sides_expr, self.color_expr,
+                self.intensity_expr, self.rotation_expr, self.filled_expr,
+            ]
+            if self.burnout_expr is not None:
+                args.append(self.burnout_expr)
+                if self.burnout_mode_expr is not None:
+                    args.append(self.burnout_mode_expr)
+            ctx.run_command("draw_polygon", args)
+            return
+        if burnout is not None or burnout_mode is not None:
+            draw_fn(x, y, radius, sides, color, intensity, rotation, filled, burnout, burnout_mode)
+        else:
+            draw_fn(x, y, radius, sides, color, intensity, rotation, filled)
+
+
+@dataclass
+class DrawArcStmt(Statement):
+    """Fast compiled path for draw_arc(x1, y1, x2, y2, bulge, color, [intensity], filled, ...)."""
+
+    x1_expr: str
+    y1_expr: str
+    x2_expr: str
+    y2_expr: str
+    bulge_expr: str
+    color_expr: str
+    intensity_expr: str
+    filled_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x1: Optional[Any] = field(default=None, repr=False)
+    compiled_y1: Optional[Any] = field(default=None, repr=False)
+    compiled_x2: Optional[Any] = field(default=None, repr=False)
+    compiled_y2: Optional[Any] = field(default=None, repr=False)
+    compiled_bulge: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_filled: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x1 = int(float(_eval_expression(self.x1_expr, self.compiled_x1, ctx)))
+        y1 = int(float(_eval_expression(self.y1_expr, self.compiled_y1, ctx)))
+        x2 = int(float(_eval_expression(self.x2_expr, self.compiled_x2, ctx)))
+        y2 = int(float(_eval_expression(self.y2_expr, self.compiled_y2, ctx)))
+        bulge = float(_eval_expression(self.bulge_expr, self.compiled_bulge, ctx))
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        filled = _eval_bool_literal(self.filled_expr, self.compiled_filled, ctx)
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        draw_fn = ctx.draw_arc
+        if draw_fn is None:
+            if ctx.run_command is None:
+                raise RuntimeError("draw_arc not configured")
+            args = [
+                self.x1_expr, self.y1_expr, self.x2_expr, self.y2_expr, self.bulge_expr,
+                self.color_expr, self.intensity_expr, self.filled_expr,
+            ]
+            if self.burnout_expr is not None:
+                args.append(self.burnout_expr)
+                if self.burnout_mode_expr is not None:
+                    args.append(self.burnout_mode_expr)
+            ctx.run_command("draw_arc", args)
+            return
+        if burnout is not None or burnout_mode is not None:
+            draw_fn(x1, y1, x2, y2, bulge, color, intensity, filled, burnout, burnout_mode)
+        else:
+            draw_fn(x1, y1, x2, y2, bulge, color, intensity, filled)
+
+
+@dataclass
 class CallStmt(Statement):
     proc_name: str
 
@@ -634,6 +762,109 @@ def _parse_draw_circle(line: str) -> Optional[DrawCircleStmt]:
         _precompile_expression(args[1]),
         _precompile_expression(args[2]),
         _precompile_expression(args[3]),
+        _precompile_expression(intensity_expr),
+        _precompile_expression(filled_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_draw_polygon(line: str) -> Optional[DrawPolygonStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "draw_polygon":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 5:
+        return None
+    args = list(args)
+    if len(args) == 7 and _is_bool_token(args[6]):
+        args.insert(5, "100")
+
+    intensity_expr = "100"
+    rotation_expr = "0"
+    filled_expr = "false"
+    burnout_expr = None
+    burnout_mode_expr = None
+
+    if len(args) == 5:
+        pass
+    elif len(args) == 6:
+        if _is_bool_token(args[5]):
+            filled_expr = args[5].strip()
+        else:
+            intensity_expr = args[5].strip() or "100"
+    elif len(args) == 7:
+        intensity_expr = args[5].strip() or "100"
+        rotation_expr = args[6].strip() if args[6].strip() else "0"
+    elif len(args) >= 8:
+        intensity_expr = args[5].strip() or "100"
+        rotation_expr = args[6].strip() if args[6].strip() else "0"
+        filled_expr = args[7].strip()
+        burnout_expr = args[8].strip() if len(args) > 8 and args[8].strip() else None
+        burnout_mode_expr = args[9].strip() if len(args) > 9 and args[9].strip() else None
+    else:
+        return None
+
+    return DrawPolygonStmt(
+        args[0], args[1], args[2], args[3], args[4], intensity_expr, rotation_expr, filled_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(args[4]),
+        _precompile_expression(intensity_expr),
+        _precompile_expression(rotation_expr),
+        _precompile_expression(filled_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_draw_arc(line: str) -> Optional[DrawArcStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "draw_arc":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 6:
+        return None
+
+    intensity_expr = "100"
+    filled_expr = "false"
+    burnout_expr = None
+    burnout_mode_expr = None
+
+    if len(args) == 6:
+        pass
+    elif len(args) == 7:
+        if _is_bool_token(args[6]):
+            filled_expr = args[6].strip()
+        else:
+            intensity_expr = args[6].strip() or "100"
+    elif len(args) == 8:
+        intensity_expr = args[6].strip() or "100"
+        filled_expr = args[7].strip()
+    elif len(args) >= 9:
+        intensity_expr = args[6].strip() or "100"
+        filled_expr = args[7].strip()
+        burnout_expr = args[8].strip() if args[8].strip() else None
+        burnout_mode_expr = args[9].strip() if len(args) > 9 and args[9].strip() else None
+    else:
+        return None
+
+    return DrawArcStmt(
+        args[0], args[1], args[2], args[3], args[4], args[5], intensity_expr, filled_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(args[4]),
+        _precompile_expression(args[5]),
         _precompile_expression(intensity_expr),
         _precompile_expression(filled_expr),
         _precompile_expression(burnout_expr) if burnout_expr else None,
@@ -971,6 +1202,18 @@ def _parse_block(
             i += 1
             continue
 
+        draw_polygon_stmt = _parse_draw_polygon(line)
+        if draw_polygon_stmt is not None:
+            statements.append(draw_polygon_stmt)
+            i += 1
+            continue
+
+        draw_arc_stmt = _parse_draw_arc(line)
+        if draw_arc_stmt is not None:
+            statements.append(draw_arc_stmt)
+            i += 1
+            continue
+
         arr = _parse_array_assign(line)
         if arr is not None:
             if not allow_bare_call and not allow_array_assign:
@@ -1141,6 +1384,8 @@ def make_loop_context(
     plot_fn: Optional[Callable[..., None]] = None,
     draw_line_fn: Optional[Callable[..., None]] = None,
     draw_circle_fn: Optional[Callable[..., None]] = None,
+    draw_polygon_fn: Optional[Callable[..., None]] = None,
+    draw_arc_fn: Optional[Callable[..., None]] = None,
 ) -> ExecContext:
     def eval_expr(expr: str) -> Any:
         return evaluate_math_expression(expr, variables)
@@ -1162,6 +1407,8 @@ def make_loop_context(
         plot=plot_fn,
         draw_line=draw_line_fn,
         draw_circle=draw_circle_fn,
+        draw_polygon=draw_polygon_fn,
+        draw_arc=draw_arc_fn,
     )
 
 
@@ -1170,7 +1417,8 @@ class ReusableLoopContext:
 
     __slots__ = (
         "_variables", "_mplot_fn", "_is_expired", "_call_procedure", "_run_command",
-        "_plot_fn", "_draw_line_fn", "_draw_circle_fn", "_ctx",
+        "_plot_fn", "_draw_line_fn", "_draw_circle_fn", "_draw_polygon_fn", "_draw_arc_fn",
+        "_ctx",
     )
 
     def __init__(
@@ -1184,6 +1432,8 @@ class ReusableLoopContext:
         plot_fn: Optional[Callable[..., None]] = None,
         draw_line_fn: Optional[Callable[..., None]] = None,
         draw_circle_fn: Optional[Callable[..., None]] = None,
+        draw_polygon_fn: Optional[Callable[..., None]] = None,
+        draw_arc_fn: Optional[Callable[..., None]] = None,
     ) -> None:
         self._variables = variables
         self._mplot_fn = mplot_fn
@@ -1193,6 +1443,8 @@ class ReusableLoopContext:
         self._plot_fn = plot_fn
         self._draw_line_fn = draw_line_fn
         self._draw_circle_fn = draw_circle_fn
+        self._draw_polygon_fn = draw_polygon_fn
+        self._draw_arc_fn = draw_arc_fn
         self._ctx: Optional[ExecContext] = None
 
     def get(self) -> ExecContext:
@@ -1206,6 +1458,8 @@ class ReusableLoopContext:
                 plot_fn=self._plot_fn,
                 draw_line_fn=self._draw_line_fn,
                 draw_circle_fn=self._draw_circle_fn,
+                draw_polygon_fn=self._draw_polygon_fn,
+                draw_arc_fn=self._draw_arc_fn,
             )
         return self._ctx
 
