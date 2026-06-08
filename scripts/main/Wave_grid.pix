@@ -35,7 +35,7 @@ while 1 then
         if random(0, 100, 0) > 50 then
             v_frame_mode = 0
         else
-            v_frame_mode = 0
+            v_frame_mode = 1
         endif
         
         # Random variations
@@ -86,11 +86,11 @@ while 1 then
                 mplot(v_x, v_y, v_color_base, v_intensity, random(v_burnout_min, v_burnout_max, 0))
             else
                 mplot(v_x, v_y, v_color_base, v_intensity, 5000)
-                v_rest_time = 3.5
+                v_rest_time = 1.5
             endif
         endfor v_y
         mflush
-        rest(0.05)
+        rest(0.001)
     endfor v_x
 
     if v_frame_mode == 1 then

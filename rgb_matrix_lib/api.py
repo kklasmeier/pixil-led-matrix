@@ -255,8 +255,12 @@ class RGB_Api:
 
             else:
                 # --- NO-BACKGROUND PATH ---
-                # Blit completed frame to canvas, then swap once (no per-draw SetPixel).
-                self._blit_array_to_canvas(self._drawing_buffer_for_display())
+                # Standard frames accumulate in drawing_buffer only; blit once before swap.
+                # Preserve frames SetPixel incrementally onto the back buffer during the
+                # frame — blitting the sparse drawing_buffer here would paint transparent
+                # areas black and flash (Color_Mandala). Swap the canvas as-built instead.
+                if not self.preserve_frame_changes:
+                    self._blit_array_to_canvas(self._drawing_buffer_for_display())
 
                 for sprite_name, instance_id in self.sprite_manager.z_order:
                     instance = self.sprite_manager.get_instance(sprite_name, instance_id)
@@ -265,10 +269,13 @@ class RGB_Api:
 
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-                self.canvas.Fill(0, 0, 0)
                 if self.preserve_frame_changes:
-                    for x, y, r, g, b in self.current_command_pixels:
-                        self.canvas.SetPixel(x, y, r, g, b)
+                    # Seed the back buffer with the full accumulated drawing_buffer so
+                    # the next preserve layer builds on every prior layer, not just the
+                    # last frame's pixels.
+                    self._blit_array_to_canvas(self._drawing_buffer_for_display())
+                else:
+                    self.canvas.Fill(0, 0, 0)
 
             self.current_command_pixels.clear()
             self.frame_mode = False

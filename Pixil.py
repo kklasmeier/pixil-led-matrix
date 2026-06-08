@@ -581,6 +581,7 @@ def process_script(filename, execute_func=None):
     compiled_procedures = {}
     sprite_context = SpriteContext()  # Add sprite context
     frame_commands = []  # Add frame command buffer
+    pending_begin_frame: Optional[str] = None  # Deferred until end_frame flush
     in_frame_mode = False  # Add frame mode tracking
 
     # Define helper functions after variables are initialized
@@ -691,10 +692,14 @@ def process_script(filename, execute_func=None):
     def flush_frame_commands():
         """Execute frame commands before end_frame.
 
+        begin_frame is deferred from start_frame_buffer so it queues with draw_batch
+        (avoids consumer frame_mode gap while the producer builds the batch).
+
         draw_batch/sprite_batch are appended at end_frame flush time, after
         commands like draw_text were already queued in frame_commands — run
         batches first so HUD/text drawn on top of the grid.
         """
+        nonlocal pending_begin_frame
         draw_batches: list[str] = []
         sprite_batches: list[str] = []
         plot_batches: list[str] = []
@@ -708,13 +713,18 @@ def process_script(filename, execute_func=None):
                 plot_batches.append(cmd)
             else:
                 other.append(cmd)
-        for cmd in draw_batches + sprite_batches + plot_batches + other:
+        ordered: list[str] = []
+        if pending_begin_frame is not None:
+            ordered.append(pending_begin_frame)
+            pending_begin_frame = None
+        ordered.extend(draw_batches + sprite_batches + plot_batches + other)
+        for cmd in ordered:
             queue.put_command(cmd, force_instant=True)
         frame_commands.clear()
 
     def start_frame_buffer(preserve: bool = False):
         """Begin matrix frame and batch draw commands until end_frame."""
-        nonlocal in_frame_mode
+        nonlocal in_frame_mode, pending_begin_frame
         global mplot_buffer, mplot_count, draw_buffer, draw_count, sprite_buffer, sprite_count
         frame_commands.clear()
         mplot_buffer.clear()
@@ -723,7 +733,7 @@ def process_script(filename, execute_func=None):
         draw_count = 0
         sprite_buffer.clear()
         sprite_count = 0
-        execute_command(f'begin_frame({str(preserve).lower()})')
+        pending_begin_frame = f'begin_frame({str(preserve).lower()})'
         in_frame_mode = True
 
     def finish_frame_buffer():
