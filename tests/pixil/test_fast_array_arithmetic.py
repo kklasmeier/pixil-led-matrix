@@ -6,6 +6,7 @@ from pixil_utils.array_manager import PixilArray
 from pixil_utils.math_functions import (
     evaluate_math_expression,
     try_fast_array_arithmetic,
+    try_fast_array_access,
     try_fast_int_var_div,
     try_fast_arithmetic,
 )
@@ -98,3 +99,35 @@ def test_age_brightness_expr(particle_vars):
 
 def test_array_access_still_works(particle_vars):
     assert evaluate_math_expression("v_pal[v_cidx]", particle_vars) == "cyan"
+
+
+def test_fast_array_index_literal_offset():
+    reg = VariableRegistry()
+    reg.register("v_idx")
+    reg.register("v_u")
+    arr = PixilArray(4)
+    arr[0] = 1.0
+    arr[1] = 2.0
+    arr[2] = 3.0
+    reg.set("v_u", arr)
+    reg.set("v_idx", 2)
+
+    assert try_fast_array_access("v_u[v_idx - 1]", reg) == 2.0
+    assert try_fast_array_access("v_u[v_idx + 1]", reg) == 0.0
+    assert evaluate_math_expression("v_u[v_idx - 1]", reg) == 2.0
+
+
+def test_fast_array_index_var_stride_offset():
+    reg = VariableRegistry()
+    for name in ("v_idx", "v_size", "v_u"):
+        reg.register(name)
+    arr = PixilArray(9)
+    for i in range(9):
+        arr[i] = float(i)
+    reg.set("v_u", arr)
+    reg.set("v_idx", 5)
+    reg.set("v_size", 3)
+
+    assert try_fast_array_access("v_u[v_idx - v_size]", reg) == 2.0
+    assert try_fast_array_access("v_u[v_idx + v_size]", reg) == 8.0
+    assert evaluate_math_expression("v_u[v_idx - v_size]", reg) == 2.0

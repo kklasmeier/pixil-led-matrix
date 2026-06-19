@@ -19,6 +19,7 @@ from .optimization_flags import ENABLE_FAST_MATH, ENABLE_EXPRESSION_CACHE, ENABL
 from .regex_patterns import (
     SIMPLE_ADD_PATTERN, SIMPLE_SUB_PATTERN, SIMPLE_MUL_PATTERN,
     SIMPLE_DIV_PATTERN, SIMPLE_MOD_PATTERN, SIMPLE_ARRAY_ACCESS_PATTERN,
+    FAST_ARRAY_INDEX_OFFSET_PATTERN, FAST_ARRAY_INDEX_VAR_OFFSET_PATTERN,
     NUMBER_PATTERN, VAR_ADD_VAR_PATTERN, VAR_MUL_VAR_PATTERN,
     VAR_SUB_VAR_PATTERN, VAR_DIV_VAR_PATTERN,
     NUM_PLUS_VAR_PATTERN, NUM_SUB_VAR_PATTERN, NUM_MUL_VAR_PATTERN, NUM_DIV_VAR_PATTERN,
@@ -326,6 +327,43 @@ def try_fast_array_access(expr: str, variables) -> Optional[Union[int, float, st
     """
     Handle simple array access with VariableRegistry optimization.
     """
+    match = FAST_ARRAY_INDEX_OFFSET_PATTERN.match(expr)
+    if match:
+        array_name, index_var, op, number = match.groups()
+        if isinstance(variables, VariableRegistry):
+            if array_name in variables and index_var in variables:
+                try:
+                    offset = int(float(number))
+                    if op == '-':
+                        offset = -offset
+                    result = variables.fast_array_access_offset(array_name, index_var, offset)
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(
+                            f"Fast array offset access: {array_name}[{index_var}{op}{number}] = {result}",
+                            DEBUG_VERBOSE,
+                        )
+                    return result
+                except (ValueError, TypeError, IndexError, AttributeError, KeyError):
+                    pass
+
+    match = FAST_ARRAY_INDEX_VAR_OFFSET_PATTERN.match(expr)
+    if match:
+        array_name, index_var, op, offset_var = match.groups()
+        if isinstance(variables, VariableRegistry):
+            if array_name in variables and index_var in variables and offset_var in variables:
+                try:
+                    result = variables.fast_array_access_index_op_var(
+                        array_name, index_var, op, offset_var,
+                    )
+                    if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                        debug_print(
+                            f"Fast array var-offset access: {array_name}[{index_var}{op}{offset_var}] = {result}",
+                            DEBUG_VERBOSE,
+                        )
+                    return result
+                except (ValueError, TypeError, IndexError, AttributeError, KeyError):
+                    pass
+
     match = SIMPLE_ARRAY_ACCESS_PATTERN.match(expr)
     if match:
         array_name, index_var = match.groups()

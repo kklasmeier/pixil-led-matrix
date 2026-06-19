@@ -6,7 +6,7 @@ lines through process_lines.
 
 Loops: nested for (literal bounds folded at compile time), v_ assignments, array assigns,
        if/elseif/else, break, mplot(...), plot(...) (fast path), draw_line/draw_circle/
-       draw_polygon/draw_arc (fast path), other draw_* via CommandStmt.
+       draw_rectangle/draw_polygon/draw_arc (fast path), other draw_* via CommandStmt.
 Procedures: loops plus array assign, if/elseif/else, call/bare proc name,
             begin_frame, end_frame, mflush, plot, draw_line, draw_circle, draw_polygon,
             draw_arc, etc.
@@ -208,6 +208,7 @@ class ExecContext:
     draw_circle: Optional[Callable[..., None]] = None
     draw_polygon: Optional[Callable[..., None]] = None
     draw_arc: Optional[Callable[..., None]] = None
+    draw_rectangle: Optional[Callable[..., None]] = None
 
 
 # Backward-compatible alias
@@ -602,6 +603,65 @@ class DrawPolygonStmt(Statement):
 
 
 @dataclass
+class DrawRectangleStmt(Statement):
+    """Fast compiled path for draw_rectangle(x, y, w, h, color, [intensity], filled, ...)."""
+
+    x_expr: str
+    y_expr: str
+    width_expr: str
+    height_expr: str
+    color_expr: str
+    intensity_expr: str
+    filled_expr: str
+    burnout_expr: Optional[str] = None
+    burnout_mode_expr: Optional[str] = None
+    compiled_x: Optional[Any] = field(default=None, repr=False)
+    compiled_y: Optional[Any] = field(default=None, repr=False)
+    compiled_width: Optional[Any] = field(default=None, repr=False)
+    compiled_height: Optional[Any] = field(default=None, repr=False)
+    compiled_color: Optional[Any] = field(default=None, repr=False)
+    compiled_intensity: Optional[Any] = field(default=None, repr=False)
+    compiled_filled: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout: Optional[Any] = field(default=None, repr=False)
+    compiled_burnout_mode: Optional[Any] = field(default=None, repr=False)
+
+    def run(self, ctx: ExecContext) -> None:
+        x = int(float(_eval_expression(self.x_expr, self.compiled_x, ctx)))
+        y = int(float(_eval_expression(self.y_expr, self.compiled_y, ctx)))
+        width = int(float(_eval_expression(self.width_expr, self.compiled_width, ctx)))
+        height = int(float(_eval_expression(self.height_expr, self.compiled_height, ctx)))
+        color = _eval_mplot_color(self.color_expr, self.compiled_color, ctx)
+        intensity = int(float(_eval_expression(self.intensity_expr, self.compiled_intensity, ctx)))
+        filled = _eval_bool_literal(self.filled_expr, self.compiled_filled, ctx)
+        burnout = None
+        if self.burnout_expr is not None:
+            burnout = int(float(_eval_expression(self.burnout_expr, self.compiled_burnout, ctx)))
+        burnout_mode = None
+        if self.burnout_mode_expr is not None:
+            burnout_mode = _eval_burnout_mode(
+                self.burnout_mode_expr, self.compiled_burnout_mode, ctx,
+            )
+        draw_fn = ctx.draw_rectangle
+        if draw_fn is None:
+            if ctx.run_command is None:
+                raise RuntimeError("draw_rectangle not configured")
+            args = [
+                self.x_expr, self.y_expr, self.width_expr, self.height_expr,
+                self.color_expr, self.intensity_expr, self.filled_expr,
+            ]
+            if self.burnout_expr is not None:
+                args.append(self.burnout_expr)
+                if self.burnout_mode_expr is not None:
+                    args.append(self.burnout_mode_expr)
+            ctx.run_command("draw_rectangle", args)
+            return
+        if burnout is not None or burnout_mode is not None:
+            draw_fn(x, y, width, height, color, intensity, filled, burnout, burnout_mode)
+        else:
+            draw_fn(x, y, width, height, color, intensity, filled)
+
+
+@dataclass
 class DrawArcStmt(Statement):
     """Fast compiled path for draw_arc(x1, y1, x2, y2, bulge, color, [intensity], filled, ...)."""
 
@@ -817,6 +877,42 @@ def _parse_draw_polygon(line: str) -> Optional[DrawPolygonStmt]:
         _precompile_expression(args[4]),
         _precompile_expression(intensity_expr),
         _precompile_expression(rotation_expr),
+        _precompile_expression(filled_expr),
+        _precompile_expression(burnout_expr) if burnout_expr else None,
+        _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
+    )
+
+
+def _parse_draw_rectangle(line: str) -> Optional[DrawRectangleStmt]:
+    match = COMMAND_PATTERN.match(line)
+    if not match or match.group(1) != "draw_rectangle":
+        return None
+    from .parameter_types import split_command_parameters
+
+    args = split_command_parameters(match.group(2))
+    if len(args) < 5:
+        return None
+    if _is_bool_token(args[5]):
+        intensity_expr = "100"
+        filled_expr = args[5].strip()
+        burnout_expr = args[6].strip() if len(args) > 6 and args[6].strip() else None
+        burnout_mode_expr = args[7].strip() if len(args) > 7 and args[7].strip() else None
+    elif len(args) >= 7:
+        intensity_expr = args[5].strip() if args[5].strip() else "100"
+        filled_expr = args[6].strip()
+        burnout_expr = args[7].strip() if len(args) > 7 and args[7].strip() else None
+        burnout_mode_expr = args[8].strip() if len(args) > 8 and args[8].strip() else None
+    else:
+        return None
+    return DrawRectangleStmt(
+        args[0], args[1], args[2], args[3], args[4], intensity_expr, filled_expr,
+        burnout_expr, burnout_mode_expr,
+        _precompile_expression(args[0]),
+        _precompile_expression(args[1]),
+        _precompile_expression(args[2]),
+        _precompile_expression(args[3]),
+        _precompile_expression(args[4]),
+        _precompile_expression(intensity_expr),
         _precompile_expression(filled_expr),
         _precompile_expression(burnout_expr) if burnout_expr else None,
         _precompile_expression(burnout_mode_expr) if burnout_mode_expr else None,
@@ -1202,6 +1298,12 @@ def _parse_block(
             i += 1
             continue
 
+        draw_rectangle_stmt = _parse_draw_rectangle(line)
+        if draw_rectangle_stmt is not None:
+            statements.append(draw_rectangle_stmt)
+            i += 1
+            continue
+
         draw_polygon_stmt = _parse_draw_polygon(line)
         if draw_polygon_stmt is not None:
             statements.append(draw_polygon_stmt)
@@ -1386,6 +1488,7 @@ def make_loop_context(
     draw_circle_fn: Optional[Callable[..., None]] = None,
     draw_polygon_fn: Optional[Callable[..., None]] = None,
     draw_arc_fn: Optional[Callable[..., None]] = None,
+    draw_rectangle_fn: Optional[Callable[..., None]] = None,
 ) -> ExecContext:
     def eval_expr(expr: str) -> Any:
         return evaluate_math_expression(expr, variables)
@@ -1409,6 +1512,7 @@ def make_loop_context(
         draw_circle=draw_circle_fn,
         draw_polygon=draw_polygon_fn,
         draw_arc=draw_arc_fn,
+        draw_rectangle=draw_rectangle_fn,
     )
 
 
@@ -1418,6 +1522,7 @@ class ReusableLoopContext:
     __slots__ = (
         "_variables", "_mplot_fn", "_is_expired", "_call_procedure", "_run_command",
         "_plot_fn", "_draw_line_fn", "_draw_circle_fn", "_draw_polygon_fn", "_draw_arc_fn",
+        "_draw_rectangle_fn",
         "_ctx",
     )
 
@@ -1434,6 +1539,7 @@ class ReusableLoopContext:
         draw_circle_fn: Optional[Callable[..., None]] = None,
         draw_polygon_fn: Optional[Callable[..., None]] = None,
         draw_arc_fn: Optional[Callable[..., None]] = None,
+        draw_rectangle_fn: Optional[Callable[..., None]] = None,
     ) -> None:
         self._variables = variables
         self._mplot_fn = mplot_fn
@@ -1445,6 +1551,7 @@ class ReusableLoopContext:
         self._draw_circle_fn = draw_circle_fn
         self._draw_polygon_fn = draw_polygon_fn
         self._draw_arc_fn = draw_arc_fn
+        self._draw_rectangle_fn = draw_rectangle_fn
         self._ctx: Optional[ExecContext] = None
 
     def get(self) -> ExecContext:
@@ -1460,6 +1567,7 @@ class ReusableLoopContext:
                 draw_circle_fn=self._draw_circle_fn,
                 draw_polygon_fn=self._draw_polygon_fn,
                 draw_arc_fn=self._draw_arc_fn,
+                draw_rectangle_fn=self._draw_rectangle_fn,
             )
         return self._ctx
 

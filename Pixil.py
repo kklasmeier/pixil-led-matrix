@@ -1593,6 +1593,30 @@ def process_script(filename, execute_func=None):
                 parts.append(str(burnout_mode))
         store_frame_command(f"draw_arc({', '.join(parts)})")
 
+    def _compiled_draw_rectangle(
+        x, y, width, height, color, intensity=100, filled=False,
+        burnout=None, burnout_mode=None,
+    ):
+        """Compiled draw_rectangle(): batch in frame mode; flush immediately otherwise."""
+        from shared.mplot_protocol import normalize_mplot_color
+        final_color = normalize_mplot_color(color)
+        filled_flag = bool(filled)
+        if _use_draw_batch_for('draw_rectangle'):
+            _append_to_draw_batch(
+                'draw_rectangle',
+                [x, y, width, height, final_color, intensity, filled_flag, burnout, burnout_mode],
+            )
+            return
+        parts = [
+            str(x), str(y), str(width), str(height), str(final_color), str(intensity),
+            str(filled_flag).lower(),
+        ]
+        if burnout is not None:
+            parts.append(str(burnout))
+            if burnout_mode is not None:
+                parts.append(str(burnout_mode))
+        store_frame_command(f"draw_rectangle({', '.join(parts)})")
+
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
         global mplot_buffer, mplot_count, draw_buffer, draw_count
         if not (0 <= x <= 63 and 0 <= y <= 63):
@@ -1679,6 +1703,7 @@ def process_script(filename, execute_func=None):
                 draw_circle_fn=_compiled_draw_circle,
                 draw_polygon_fn=_compiled_draw_polygon,
                 draw_arc_fn=_compiled_draw_arc,
+                draw_rectangle_fn=_compiled_draw_rectangle,
             )
         return compiled_ctx_pool.get()
 

@@ -14,6 +14,14 @@ import re
 # Simple array access: v_array[v_index]
 FAST_SIMPLE_ARRAY_PATTERN = re.compile(r'^(v_\w+)\[(v_\w+)\]$')
 
+# Grid sim hot paths: v_array[v_index - 1], v_array[v_index + v_size]
+FAST_ARRAY_INDEX_OFFSET_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\s*([+\-])\s*(-?\d*\.?\d+)\]$'
+)
+FAST_ARRAY_INDEX_VAR_OFFSET_PATTERN = re.compile(
+    r'^(v_\w+)\[(v_\w+)\s*([+\-])\s*(v_\w+)\]$'
+)
+
 # Variable + number arithmetic: v_var + 5, v_x + 2.5
 FAST_VAR_PLUS_NUM_PATTERN = re.compile(r'^(v_\w+)\s*\+\s*(-?\d*\.?\d+)$')
 

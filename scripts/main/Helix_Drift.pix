@@ -1,0 +1,151 @@
+# Helix Drift — continual outward spiral from center
+# Dynamic thickness (thin/thick/thin), trail modes, and color drift
+
+fps(60)
+throttle(0)
+
+v_center_x = 32
+v_center_y = 32
+v_turn = 0.5
+v_spiral_b = 0.32
+v_theta_step = 0.14
+v_points_per_frame = 6
+v_max_radius = 46
+
+# Thickness oscillation (thin -> thick -> thin)
+v_thickness_time = 0
+v_thickness_speed = 0.015
+
+# Color drift
+v_base_color = 25
+v_color_speed = 0.04
+v_color_mode = 0
+
+# Trail behavior (0=solid until clear, 1=short fade, 2=medium, 3=long, 4=ghost snap)
+v_trail_mode = 2
+v_burnout = 1500
+v_last_trail_mode = 2
+
+# Periodic variation
+v_effect_timer = 0
+v_effect_interval = 200
+v_spin_dir = 1
+v_sequence_count = 0
+v_needs_clear = 0
+
+while true then
+    v_effect_timer = v_effect_timer + 1
+    if v_effect_timer >= v_effect_interval then
+        v_effect_timer = 0
+        v_effect_interval = random(120, 280, 0)
+
+        v_trail_mode = random(0, 4, 0)
+        if v_trail_mode == 0 then
+            v_burnout = -1
+        elseif v_trail_mode == 1 then
+            v_burnout = random(250, 550, 0)
+        elseif v_trail_mode == 2 then
+            v_burnout = random(900, 1800, 0)
+        elseif v_trail_mode == 3 then
+            v_burnout = random(1400, 2400, 0)
+        else
+            v_burnout = random(80, 180, 0)
+        endif
+
+        if random(0, 100, 0) > 45 then
+            v_color_mode = 0
+        else
+            v_color_mode = 1
+        endif
+
+        v_color_speed = random(1, 35, 1) / 100
+        v_thickness_speed = random(8, 25, 1) / 1000
+        v_theta_step = random(10, 18, 1) / 100
+        v_points_per_frame = random(4, 10, 0)
+        v_spiral_b = random(26, 42, 1) / 100
+    endif
+
+    if v_trail_mode != v_last_trail_mode then
+        v_needs_clear = 1
+        v_sequence_count = 0
+        v_last_trail_mode = v_trail_mode
+    endif
+
+    if v_needs_clear == 1 then
+        clear()
+        v_needs_clear = 0
+    endif
+
+    v_thickness_time = v_thickness_time + v_thickness_speed
+    v_thickness_wave = sin(v_thickness_time)
+    v_arm_half = floor((v_thickness_wave + 1) * 2)
+
+    v_base_color = v_base_color + v_color_speed
+    if v_base_color > 99 then
+        v_base_color = 1
+    endif
+
+    begin_frame(true)
+
+    for v_i in (0, v_points_per_frame - 1, 1) then
+        v_turn = v_turn + v_theta_step
+        v_radius = v_spiral_b * v_turn
+        v_theta = v_turn * v_spin_dir
+
+        if v_radius > v_max_radius then
+            v_sequence_count = v_sequence_count + 1
+            if v_sequence_count >= 2 then
+                v_needs_clear = 1
+                v_sequence_count = 0
+            endif
+            if random(0, 99, 0) < 75 then
+                v_spin_dir = 1
+            else
+                v_spin_dir = -1
+            endif
+            v_turn = 0.5
+            break
+        endif
+
+        v_x = v_center_x + v_radius * cos(v_theta)
+        v_y = v_center_y + v_radius * sin(v_theta)
+        v_perp_x = cos(v_theta + 1.5708)
+        v_perp_y = sin(v_theta + 1.5708)
+
+        v_head_glow = 1 - v_radius / v_max_radius
+        v_base_intensity = 45 + v_head_glow * 55
+
+        for v_w in (-v_arm_half, v_arm_half, 1) then
+            v_px = v_x + v_w * v_perp_x
+            v_py = v_y + v_w * v_perp_y
+
+            if v_px >= 0 and v_px <= 63 and v_py >= 0 and v_py <= 63 then
+                if v_color_mode == 0 then
+                    v_plot_color = v_base_color
+                else
+                    v_plot_color = v_base_color + v_theta * 2.5 + v_radius * 0.8
+                    if v_plot_color > 99 then
+                        v_plot_color = v_plot_color - 98
+                    endif
+                    if v_plot_color < 1 then
+                        v_plot_color = v_plot_color + 98
+                    endif
+                endif
+
+                v_edge_fade = abs(v_w) * 12
+                v_intensity = v_base_intensity - v_edge_fade
+                if v_intensity < 25 then
+                    v_intensity = 25
+                endif
+
+                if v_trail_mode == 0 then
+                    plot(v_px, v_py, v_plot_color, v_intensity)
+                else
+                    plot(v_px, v_py, v_plot_color, v_intensity, v_burnout, fade)
+                endif
+            endif
+        endfor v_w
+    endfor v_i
+
+    end_frame
+endwhile

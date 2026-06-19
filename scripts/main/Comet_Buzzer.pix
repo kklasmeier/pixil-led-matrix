@@ -1,0 +1,344 @@
+# Comet Buzzer — a small comet buzzes randomly, then traces random shape outlines
+# Faded burnout trails reveal each shape before dissolving back into chaos
+
+fps(60)
+throttle(0)
+
+v_tau = 6.28318
+v_x = 32
+v_y = 32
+v_vx = 1.4
+v_vy = -1.1
+v_color = random(1, 99, 0)
+v_color_drift = random(2, 6, 0) / 10
+v_trail_burnout = random(700, 1200, 0)
+
+# 0 = random buzz, 1 = shape outline trace
+v_mode = 0
+v_mode_timer = 0
+v_mode_duration = random(140, 260, 0)
+
+# Shape parameters
+v_shape_type = 0
+v_shape_cx = 32
+v_shape_cy = 32
+v_shape_size = 14
+v_shape_sides = 5
+v_shape_rot = 0
+v_shape_angle = 0
+v_shape_speed = 0.22
+v_shape_laps = 0
+v_shape_target_laps = 3
+v_shape_hold = 0
+v_shape_hold_timer = 0
+v_shape_hw = 14
+v_shape_hh = 9
+v_shape_ry = 9
+v_cross_sw = 5
+v_cross_hw = 14
+v_cross_sh = 20
+v_cross_arm_y = -7
+v_tx = 32
+v_ty = 32
+v_prev_x = 32
+v_prev_y = 32
+
+def pick_new_shape {
+    v_shape_type = random(0, 6, 0)
+    v_shape_cx = random(18, 46, 0)
+    v_shape_cy = random(18, 46, 0)
+    v_shape_size = random(10, 20, 0)
+    v_shape_sides = random(3, 8, 0)
+    v_shape_rot = random(0, 628, 0) / 100
+    v_shape_angle = random(0, 628, 0) / 100
+    v_shape_laps = 0
+    v_shape_target_laps = random(5, 8, 0)
+    v_shape_hold = random(140, 260, 0)
+    v_shape_hold_timer = 0
+    v_shape_speed = random(16, 28, 0) / 100
+    v_shape_hw = v_shape_size
+    v_shape_hh = floor(v_shape_size * random(55, 85, 0) / 100)
+    v_shape_ry = floor(v_shape_size * random(55, 85, 0) / 100)
+    v_cross_sw = max(2, floor(v_shape_size / 3))
+    v_cross_hw = v_shape_size
+    v_cross_sh = v_shape_size + floor(v_shape_size / 2)
+    v_cross_arm_y = -floor(v_shape_size / 2)
+    v_trail_burnout = random(1400, 2400, 0)
+}
+
+def enter_random_mode {
+    v_mode = 0
+    v_mode_timer = 0
+    v_mode_duration = random(120, 280, 0)
+    v_vx = random(-25, 25, 1) / 10
+    v_vy = random(-25, 25, 1) / 10
+    v_trail_burnout = random(500, 1000, 0)
+}
+
+def enter_shape_mode {
+    v_mode = 1
+    v_mode_timer = 0
+    call pick_new_shape
+}
+
+def get_cross_vertex {
+    if v_vert_i == 0 then
+        v_cx_local = 0
+        v_cy_local = -v_cross_sh
+    endif
+    if v_vert_i == 1 then
+        v_cx_local = -v_cross_sw
+        v_cy_local = -v_cross_sh
+    endif
+    if v_vert_i == 2 then
+        v_cx_local = -v_cross_sw
+        v_cy_local = v_cross_arm_y - v_cross_sw
+    endif
+    if v_vert_i == 3 then
+        v_cx_local = -v_cross_hw
+        v_cy_local = v_cross_arm_y - v_cross_sw
+    endif
+    if v_vert_i == 4 then
+        v_cx_local = -v_cross_hw
+        v_cy_local = v_cross_arm_y + v_cross_sw
+    endif
+    if v_vert_i == 5 then
+        v_cx_local = -v_cross_sw
+        v_cy_local = v_cross_arm_y + v_cross_sw
+    endif
+    if v_vert_i == 6 then
+        v_cx_local = -v_cross_sw
+        v_cy_local = v_cross_sh
+    endif
+    if v_vert_i == 7 then
+        v_cx_local = v_cross_sw
+        v_cy_local = v_cross_sh
+    endif
+    if v_vert_i == 8 then
+        v_cx_local = v_cross_sw
+        v_cy_local = v_cross_arm_y + v_cross_sw
+    endif
+    if v_vert_i == 9 then
+        v_cx_local = v_cross_hw
+        v_cy_local = v_cross_arm_y + v_cross_sw
+    endif
+    if v_vert_i == 10 then
+        v_cx_local = v_cross_hw
+        v_cy_local = v_cross_arm_y - v_cross_sw
+    endif
+    if v_vert_i == 11 then
+        v_cx_local = v_cross_sw
+        v_cy_local = v_cross_arm_y - v_cross_sw
+    endif
+    if v_vert_i == 12 then
+        v_cx_local = v_cross_sw
+        v_cy_local = -v_cross_sh
+    endif
+}
+
+def get_shape_target {
+    if v_shape_type == 0 then
+        v_tx = v_shape_cx + v_shape_size * cos(v_shape_angle + v_shape_rot)
+        v_ty = v_shape_cy + v_shape_size * sin(v_shape_angle + v_shape_rot)
+    endif
+
+    if v_shape_type == 1 then
+        v_p = v_shape_angle / v_tau
+        v_edge = floor(v_p * 4)
+        if v_edge >= 4 then
+            v_edge = 3
+        endif
+        v_t = v_p * 4 - v_edge
+        if v_edge == 0 then
+            v_tx = v_shape_cx - v_shape_hw + v_t * 2 * v_shape_hw
+            v_ty = v_shape_cy - v_shape_hh
+        endif
+        if v_edge == 1 then
+            v_tx = v_shape_cx + v_shape_hw
+            v_ty = v_shape_cy - v_shape_hh + v_t * 2 * v_shape_hh
+        endif
+        if v_edge == 2 then
+            v_tx = v_shape_cx + v_shape_hw - v_t * 2 * v_shape_hw
+            v_ty = v_shape_cy + v_shape_hh
+        endif
+        if v_edge == 3 then
+            v_tx = v_shape_cx - v_shape_hw
+            v_ty = v_shape_cy + v_shape_hh - v_t * 2 * v_shape_hh
+        endif
+    endif
+
+    if v_shape_type == 2 then
+        v_sides = 3
+        v_seg = v_shape_angle / v_tau * v_sides
+        v_seg_i = floor(v_seg)
+        v_frac = v_seg - v_seg_i
+        v_a1 = v_shape_rot + v_seg_i * v_tau / v_sides
+        v_a2 = v_shape_rot + (v_seg_i + 1) * v_tau / v_sides
+        v_x1 = v_shape_cx + v_shape_size * cos(v_a1)
+        v_y1 = v_shape_cy + v_shape_size * sin(v_a1)
+        v_x2 = v_shape_cx + v_shape_size * cos(v_a2)
+        v_y2 = v_shape_cy + v_shape_size * sin(v_a2)
+        v_tx = v_x1 + (v_x2 - v_x1) * v_frac
+        v_ty = v_y1 + (v_y2 - v_y1) * v_frac
+    endif
+
+    if v_shape_type == 3 then
+        v_sides = v_shape_sides
+        v_seg = v_shape_angle / v_tau * v_sides
+        v_seg_i = floor(v_seg)
+        v_frac = v_seg - v_seg_i
+        v_a1 = v_shape_rot + v_seg_i * v_tau / v_sides
+        v_a2 = v_shape_rot + (v_seg_i + 1) * v_tau / v_sides
+        v_x1 = v_shape_cx + v_shape_size * cos(v_a1)
+        v_y1 = v_shape_cy + v_shape_size * sin(v_a1)
+        v_x2 = v_shape_cx + v_shape_size * cos(v_a2)
+        v_y2 = v_shape_cy + v_shape_size * sin(v_a2)
+        v_tx = v_x1 + (v_x2 - v_x1) * v_frac
+        v_ty = v_y1 + (v_y2 - v_y1) * v_frac
+    endif
+
+    if v_shape_type == 4 then
+        v_points = 10
+        v_seg = v_shape_angle / v_tau * v_points
+        v_seg_i = floor(v_seg)
+        v_frac = v_seg - v_seg_i
+        v_a1 = v_shape_rot + v_seg_i * v_tau / v_points
+        v_a2 = v_shape_rot + (v_seg_i + 1) * v_tau / v_points
+        if v_seg_i % 2 == 0 then
+            v_r1 = v_shape_size
+            v_r2 = v_shape_size * 0.42
+        else
+            v_r1 = v_shape_size * 0.42
+            v_r2 = v_shape_size
+        endif
+        v_x1 = v_shape_cx + v_r1 * cos(v_a1)
+        v_y1 = v_shape_cy + v_r1 * sin(v_a1)
+        v_x2 = v_shape_cx + v_r2 * cos(v_a2)
+        v_y2 = v_shape_cy + v_r2 * sin(v_a2)
+        v_tx = v_x1 + (v_x2 - v_x1) * v_frac
+        v_ty = v_y1 + (v_y2 - v_y1) * v_frac
+    endif
+
+    if v_shape_type == 5 then
+        v_tx = v_shape_cx + v_shape_size * cos(v_shape_angle + v_shape_rot)
+        v_ty = v_shape_cy + v_shape_ry * sin(v_shape_angle + v_shape_rot)
+    endif
+
+    if v_shape_type == 6 then
+        v_nseg = 13
+        v_seg = v_shape_angle / v_tau * v_nseg
+        v_seg_i = floor(v_seg)
+        if v_seg_i >= v_nseg then
+            v_seg_i = v_nseg - 1
+        endif
+        v_frac = v_seg - v_seg_i
+        v_vert_i = v_seg_i
+        call get_cross_vertex
+        v_x1 = v_cx_local
+        v_y1 = v_cy_local
+        v_vert_i = v_seg_i + 1
+        if v_vert_i >= v_nseg then
+            v_vert_i = 0
+        endif
+        call get_cross_vertex
+        v_x2 = v_cx_local
+        v_y2 = v_cy_local
+        v_lx1 = v_x1 + (v_x2 - v_x1) * v_frac
+        v_ly1 = v_y1 + (v_y2 - v_y1) * v_frac
+        v_cos_r = cos(v_shape_rot)
+        v_sin_r = sin(v_shape_rot)
+        v_tx = v_shape_cx + v_lx1 * v_cos_r - v_ly1 * v_sin_r
+        v_ty = v_shape_cy + v_lx1 * v_sin_r + v_ly1 * v_cos_r
+    endif
+}
+
+def update_random {
+    v_vx = v_vx + random(-35, 35, 1) / 100
+    v_vy = v_vy + random(-35, 35, 1) / 100
+    v_vx = min(35, max(-35, v_vx * 10)) / 10
+    v_vy = min(35, max(-35, v_vy * 10)) / 10
+
+    v_x = v_x + v_vx
+    v_y = v_y + v_vy
+
+    if v_x < 1 then
+        v_x = 1
+        v_vx = abs(v_vx) + random(5, 20, 1) / 10
+    endif
+    if v_x > 62 then
+        v_x = 62
+        v_vx = -abs(v_vx) - random(5, 20, 1) / 10
+    endif
+    if v_y < 1 then
+        v_y = 1
+        v_vy = abs(v_vy) + random(5, 20, 1) / 10
+    endif
+    if v_y > 62 then
+        v_y = 62
+        v_vy = -abs(v_vy) - random(5, 20, 1) / 10
+    endif
+}
+
+def update_shape {
+    call get_shape_target
+
+    v_prev_x = v_x
+    v_prev_y = v_y
+    v_dx = v_tx - v_x
+    v_dy = v_ty - v_y
+    v_x = v_x + v_dx * 0.55 + random(-12, 12, 1) / 10
+    v_y = v_y + v_dy * 0.55 + random(-12, 12, 1) / 10
+    v_vx = v_x - v_prev_x
+    v_vy = v_y - v_prev_y
+
+    v_shape_angle = v_shape_angle + v_shape_speed
+    if v_shape_angle >= v_tau then
+        v_shape_angle = v_shape_angle - v_tau
+        v_shape_laps = v_shape_laps + 1
+    endif
+}
+
+def draw_comet {
+    v_tail_x = v_x - v_vx * 0.8
+    v_tail_y = v_y - v_vy * 0.8
+    v_tail2_x = v_x - v_vx * 1.6
+    v_tail2_y = v_y - v_vy * 1.6
+
+    if v_tail_x >= 0 and v_tail_x <= 63 and v_tail_y >= 0 and v_tail_y <= 63 then
+        plot(v_tail2_x, v_tail2_y, v_color, 35, v_trail_burnout, fade)
+        plot(v_tail_x, v_tail_y, v_color, 60, v_trail_burnout, fade)
+    endif
+
+    plot(v_x, v_y, v_color, 100, v_trail_burnout, fade)
+    plot(v_x, v_y, white, 100, 180, fade)
+}
+
+call enter_random_mode
+
+while true then
+    v_mode_timer = v_mode_timer + 1
+
+    if v_mode == 0 then
+        call update_random
+        if v_mode_timer >= v_mode_duration then
+            call enter_shape_mode
+        endif
+    else
+        call update_shape
+        if v_shape_laps >= v_shape_target_laps then
+            v_shape_hold_timer = v_shape_hold_timer + 1
+            if v_shape_hold_timer >= v_shape_hold then
+                call enter_random_mode
+            endif
+        endif
+    endif
+
+    v_color = v_color + v_color_drift
+    if v_color > 99 then
+        v_color = 1
+    endif
+
+    begin_frame(true)
+        call draw_comet
+    end_frame
+endwhile

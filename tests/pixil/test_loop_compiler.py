@@ -380,6 +380,38 @@ def test_loop_draw_circle_compiles_and_invokes_run_command():
     flags.ENABLE_COMPILED_LOOPS = False
 
 
+def test_loop_draw_rectangle_compiles_and_invokes_fast_path():
+    flags.ENABLE_COMPILED_LOOPS = True
+    from pixil_utils.loop_compiler import DrawRectangleStmt
+
+    block = [
+        "draw_rectangle(v_px, v_py, 2, 2, v_color, v_intensity, true)",
+    ]
+    compiled = try_compile_loop_block(block)
+    assert compiled is not None
+    assert isinstance(compiled.statements[0], DrawRectangleStmt)
+
+    rects = []
+
+    def capture_draw_rectangle(
+        x, y, width, height, color, intensity, filled, burnout=None, burnout_mode=None,
+    ):
+        rects.append((x, y, width, height, color, intensity, filled))
+
+    variables = VariableRegistry()
+    variables.scan_and_register(["v_px", "v_py", "v_color", "v_intensity", "v_x"])
+    variables.set("v_px", 10)
+    variables.set("v_py", 12)
+    variables.set("v_color", 42)
+    variables.set("v_intensity", 80)
+    ctx = make_loop_context(
+        variables, lambda *a: None, lambda: False, draw_rectangle_fn=capture_draw_rectangle,
+    )
+    run_compiled_block(compiled, ctx)
+    assert rects == [(10, 12, 2, 2, 42, 80, True)]
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
 def test_loop_draw_circle_accepts_numeric_filled_literals():
     """Scripts often pass 0/1 for filled; compiled path must match convert_to_type('bool')."""
     flags.ENABLE_COMPILED_LOOPS = True

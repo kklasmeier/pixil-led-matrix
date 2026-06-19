@@ -112,6 +112,31 @@ class VariableRegistry:
         
         # Array access using PixilArray's optimized __getitem__
         return array_obj[int(index_val)]
+
+    def fast_array_access_offset(
+        self, array_name: str, index_var_name: str, offset: int,
+    ) -> Any:
+        """v_array[v_index + offset] with a literal offset (e.g. v_idx - 1)."""
+        array_obj = self.values[self.name_to_index[array_name]]
+        index_val = int(self.values[self.name_to_index[index_var_name]]) + offset
+        return array_obj[index_val]
+
+    def fast_array_access_index_op_var(
+        self,
+        array_name: str,
+        index_var_name: str,
+        op: str,
+        offset_var_name: str,
+    ) -> Any:
+        """v_array[v_index - v_stride] style access for grid neighbors."""
+        array_obj = self.values[self.name_to_index[array_name]]
+        index_val = int(self.values[self.name_to_index[index_var_name]])
+        offset_val = int(self.values[self.name_to_index[offset_var_name]])
+        if op == '-':
+            index_val = index_val - offset_val
+        else:
+            index_val = index_val + offset_val
+        return array_obj[index_val]
     
     def fast_array_assign(self, array_name: str, index_var_name: str, value: Any) -> None:
         """
