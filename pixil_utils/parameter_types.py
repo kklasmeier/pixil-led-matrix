@@ -183,7 +183,18 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'rate', 'type': 'float', 'position': 0}
     ],
     'clear': [],
-    'sync_queue': []
+    'sync_queue': [],
+    'grid_step': [
+        {'name': 'program', 'type': 'str', 'position': 0},
+    ],
+    'field_render': [
+        {'name': 'program', 'type': 'str', 'position': 0},
+    ],
+    'grid_fill': [
+        {'name': 'array', 'type': 'str', 'position': 0},
+        {'name': 'value', 'type': 'float', 'position': 1},
+    ],
+    'chladni_step': [],
 }
 
 # Cache the parameter types

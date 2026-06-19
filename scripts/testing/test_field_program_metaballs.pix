@@ -1,7 +1,6 @@
-# Metaballs — field_program / NumPy path
-
-throttle(0)
+# Metaballs via field_program
 fps(60)
+throttle(0)
 
 v_num_balls = 5
 create_array(v_pos_x, v_num_balls)
@@ -32,10 +31,6 @@ field_program metaballs {
 }
 
 while true then
-    begin_frame
-        field_render(metaballs)
-    end_frame
-
     for v_i in (0, v_num_balls - 1, 1)
         v_pos_x[v_i] = v_pos_x[v_i] + v_vel_x[v_i]
         v_pos_y[v_i] = v_pos_y[v_i] + v_vel_y[v_i]
@@ -46,4 +41,8 @@ while true then
             v_vel_y[v_i] = -v_vel_y[v_i]
         endif
     endfor v_i
+
+    begin_frame
+        field_render(metaballs)
+    end_frame
 endwhile

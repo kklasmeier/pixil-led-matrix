@@ -58,7 +58,7 @@ from pixil_utils.regex_patterns import (
     FAST_VAR_ADD_VAR_PATTERN, FAST_VAR_MUL_VAR_PATTERN,
     # Legacy patterns  
     ARRAY_CREATE_PATTERN, ARRAY_ASSIGN_PATTERN, SPRITE_DEF_PATTERN, COMMAND_PATTERN,
-    SPRITE_OP_PATTERN, PROCEDURE_DEF_PATTERN, PROCEDURE_CALL_PATTERN, FRAME_PARAM_PATTERN,
+    SPRITE_OP_PATTERN, PROCEDURE_DEF_PATTERN, GRID_PROGRAM_DEF_PATTERN, FIELD_PROGRAM_DEF_PATTERN, PROCEDURE_CALL_PATTERN, FRAME_PARAM_PATTERN,
     FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN
 )
 
@@ -579,6 +579,8 @@ def process_script(filename, execute_func=None):
 
     procedures = {}
     compiled_procedures = {}
+    grid_programs = {}
+    field_programs = {}
     sprite_context = SpriteContext()  # Add sprite context
     frame_commands = []  # Add frame command buffer
     pending_begin_frame: Optional[str] = None  # Deferred until end_frame flush
@@ -1845,6 +1847,58 @@ def process_script(filename, execute_func=None):
                     debug_print(f"Procedure compiled: {proc_name}", DEBUG_SUMMARY)
                 else:
                     debug_print(f"Procedure defined: {proc_name}", DEBUG_SUMMARY)
+
+            elif (grid_prog_match := GRID_PROGRAM_DEF_PATTERN.match(line)):
+                prog_name = grid_prog_match.group(1)
+                from pixil_utils.grid_field_compiler import (
+                    collect_brace_block_lines,
+                    compile_grid_program,
+                )
+                body_lines = collect_brace_block_lines(line_generator)
+                grid_programs[prog_name] = compile_grid_program(prog_name, body_lines)
+                debug_print(f"grid_program defined: {prog_name}", DEBUG_SUMMARY)
+
+            elif (field_prog_match := FIELD_PROGRAM_DEF_PATTERN.match(line)):
+                prog_name = field_prog_match.group(1)
+                from pixil_utils.grid_field_compiler import (
+                    collect_brace_block_lines,
+                    compile_field_program,
+                )
+                body_lines = collect_brace_block_lines(line_generator)
+                field_programs[prog_name] = compile_field_program(prog_name, body_lines)
+                debug_print(f"field_program defined: {prog_name}", DEBUG_SUMMARY)
+
+            elif (grid_reset_match := re.match(r'grid_reset\((\w+)\)', line)):
+                prog_name = grid_reset_match.group(1)
+                from pixil_utils.grid_engine import reset_grid_runtime
+                reset_grid_runtime(prog_name)
+
+            # grid_step / field_render / grid_fill
+            elif (grid_step_match := re.match(r'grid_step\((\w+)\)', line)):
+                prog_name = grid_step_match.group(1)
+                if prog_name not in grid_programs:
+                    raise ValueError(f"Unknown grid_program: {prog_name}")
+                from pixil_utils.grid_engine import run_grid_step
+                run_grid_step(grid_programs[prog_name], variables, _append_to_draw_batch)
+
+            elif (field_render_match := re.match(r'field_render\((\w+)\)', line)):
+                prog_name = field_render_match.group(1)
+                if prog_name not in field_programs:
+                    raise ValueError(f"Unknown field_program: {prog_name}")
+                from pixil_utils.grid_engine import run_field_render
+                run_field_render(field_programs[prog_name], variables, _append_to_draw_batch)
+
+            elif line == 'chladni_step' or line == 'chladni_step()':
+                from pixil_utils.chladni_engine import run_chladni_step
+                run_chladni_step(
+                    variables, "v_px", "v_py", "v_n_scale", "v_m_scale", _append_to_draw_batch
+                )
+
+            elif (grid_fill_match := re.match(r'grid_fill\((v_\w+),\s*(.+)\)', line)):
+                array_name = grid_fill_match.group(1)
+                fill_value = float(evaluate_math_expression(grid_fill_match.group(2).strip(), variables))
+                from pixil_utils.grid_engine import grid_fill
+                grid_fill(variables, array_name, fill_value)
 
             # Procedure call
             elif (proc_match := PROCEDURE_CALL_PATTERN.match(line)):

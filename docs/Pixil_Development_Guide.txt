@@ -17,6 +17,7 @@ TABLE OF CONTENTS
 7. Common Modification Patterns
 8. Testing Changes
 9. Performance Considerations
+10. Native Grid and Field Programs
 
 ================================================================================
 1. SYSTEM OVERVIEW
@@ -68,6 +69,26 @@ Content renders in this order (back to front):
 2. Drawing Buffer (plot, draw_circle, etc.)
 3. Sprites (with z-index ordering)
 
+NATIVE GRID / FIELD PROGRAMS (PRODUCER-SIDE)
+--------------------------------------------
+Tier-2 acceleration for full-grid sims and distance fields. Unlike draw_*
+commands, grid_step / field_render / chladni_step run entirely in the
+producer (Pixil.py + pixil_utils) using NumPy. They do not queue per-cell
+work to rgb_matrix_lib; they append mplot / draw_rectangle calls into the
+current frame draw batch via _append_to_draw_batch.
+
+Flow:
+  Parse time:  grid_program / field_program blocks -> compiled specs (AST)
+  Run time:    grid_step(name) / field_render(name) -> NumPy step/render
+               -> append_draw("mplot", ...) -> end_frame draw_batch
+
+Pixil arrays (v_grid, v_u, etc.) remain the script-facing state. The engine
+keeps double-buffered NumPy copies keyed by program name; grid_reset(name)
+drops cached runtime after the script reseeds arrays directly.
+
+Script syntax reference: Pixil_Scripting_Guide.txt section 19.
+Example scripts: scripts/main/game_of_life.pix, Blob.pix, scripts/testing/test_grid_program_*.pix
+
 ================================================================================
 3. FILE MAP
 ================================================================================
@@ -92,6 +113,10 @@ Content renders in this order (back to front):
 │   ├── timer_manager.py     # Script duration tracking
 │   ├── variable_registry.py # Variable storage and management
 │   ├── test_hooks.py        # PIXIL_TEST_MODE metrics (no cost when unset)
+│   ├── grid_expr.py         # Expression AST + NumPy eval for grid/field blocks
+│   ├── grid_field_compiler.py # Parse grid_program / field_program blocks
+│   ├── grid_engine.py       # NumPy step/render for grid_step / field_render
+│   ├── chladni_engine.py    # Vectorized Chladni particle step (chladni_step)
 │   └── jit_compiler/        # JIT compilation for math expressions
 │       ├── __init__.py
 │       ├── bytecode.py      # Bytecode instruction definitions
@@ -203,6 +228,26 @@ STEP 4: Update documentation
 ----------------------------
 Add the new command to Pixil_Scripting_Guide.txt.
 
+PRODUCER-SIDE COMMANDS (no rgb_matrix_lib changes)
+--------------------------------------------------
+grid_program, field_program, grid_step, field_render, grid_fill, grid_reset,
+and chladni_step are handled entirely in Pixil.py + pixil_utils. They use
+_append_to_draw_batch (same path as plot/mplot inside begin_frame) rather
+than command_queue tuples.
+
+To add or modify these:
+1. Block parsing: pixil_utils/grid_field_compiler.py (if block syntax changes)
+2. Expression language: pixil_utils/grid_expr.py (new builtins / operators)
+3. Execution/render: pixil_utils/grid_engine.py or chladni_engine.py
+4. Pixil.py: dispatch near grid_prog_match / grid_step_match (line ~1850+)
+5. regex_patterns.py: GRID_PROGRAM_DEF_PATTERN, FIELD_PROGRAM_DEF_PATTERN
+6. parameter_types.py: grid_step, field_render, grid_fill, chladni_step
+7. Tier 1 tests: tests/pixil/test_grid_field_compiler.py, test_grid_engine.py
+8. Pixil_Scripting_Guide.txt section 19
+
+Do NOT add per-effect hard-coded functions in rgb_matrix_lib for these —
+keep simulation logic in pixil_utils so scripts stay declarative.
+
 FPS COMMAND (reference implementation)
 --------------------------------------
 fps(rate) is handled in rgb_matrix_lib (not Pixil sleep):
@@ -243,6 +288,15 @@ Here's how a command flows through the system:
    - Matrix buffer is sent to hardware
    - LED matrix updates
 
+NATIVE GRID/FIELD PATH (producer only — steps 2–4 skipped for simulation)
+-------------------------------------------------------------------------
+1. grid_step(conway) or field_render(voronoi) parsed in Pixil.py
+2. grid_engine.run_grid_step / run_field_render executes NumPy on flat arrays
+3. Engine calls append_draw("mplot", [x, y, color, intensity]) per pixel/cell
+4. end_frame packs append_draw calls into draw_batch -> queue -> consumer
+
+grid_fill and grid_reset touch Pixil arrays / engine cache only (no draw).
+
 EXPRESSION EVALUATION
 ---------------------
 Math expressions go through the JIT compiler:
@@ -258,6 +312,12 @@ Files involved:
 - pixil_utils/jit_compiler/compiler.py - Compilation
 - pixil_utils/jit_compiler/vm.py - Execution
 - pixil_utils/jit_compiler/cache.py - Caching
+
+Grid/field block expressions use a separate evaluator (not the JIT VM):
+- pixil_utils/grid_expr.py - parse_expr(), eval_expr(), GridEvalContext,
+  FieldEvalContext
+- Compiled at script load into ExprNode trees (grid_field_compiler.py)
+- Evaluated each step/render over full NumPy field arrays
 
 ================================================================================
 6. KEY COMPONENTS
@@ -298,6 +358,41 @@ JIT COMPILER (pixil_utils/jit_compiler/)
 - Supports variables, arrays, all math functions
 - Significant performance improvement for complex scripts
 
+NATIVE GRID/FIELD ENGINES (pixil_utils/grid_*.py, chladni_engine.py)
+----------------------------------------------------------------------
+grid_field_compiler.py
+  - compile_grid_program() / compile_field_program() -> dataclass specs
+  - collect_brace_block_lines() — brace-depth tracking for nested step/draw
+    blocks (fixes "Unclosed block" when inner { } present)
+  - StepBlock, GridDrawSpec, FieldProgram dataclasses
+
+grid_expr.py
+  - Separate expression language for per-cell formulas (not Pixil JIT)
+  - Grid builtins: lap(), at(), neighbors(), neighbors4(), below_avg(),
+    random_field(), grid_x, grid_y
+  - Field builtins: sum_sites(), site vars dx/dy/dist2/weight/phase/active
+  - Shared: clamp, where, min, max, abs, floor, sin, cos, sqrt, pow
+  - sum_sites() must be handled before generic call arg evaluation (KeyError
+    on dist2 if args are pre-evaluated without site context)
+
+grid_engine.py
+  - Module-level _RUNTIME dict: per-program double buffers + active_idx
+  - run_grid_step(): execute step blocks, swap buffers, write back to PixilArray,
+    render draw block -> append_draw
+  - run_field_render(): voronoi / metaballs / formula modes
+  - grid_fill(), reset_grid_runtime()
+  - Draw modes: palette, fill, fire, expr (grid); signed / plot_if (field)
+
+chladni_engine.py
+  - Specialized particle engine (not grid_program) — 75 particles
+  - run_chladni_step() reads v_px, v_py, v_n_scale, v_m_scale; writes back
+    positions; colors by settlement value
+
+Pixil.py wiring (~line 1851):
+  - grid_programs{}, field_programs{} dicts at parse time
+  - grid_step(name), field_render(name), grid_reset(name), grid_fill(arr, val)
+  - chladni_step / chladni_step()
+
 ================================================================================
 7. COMMON MODIFICATION PATTERNS
 ================================================================================
@@ -331,6 +426,37 @@ ADDING A CONTROL STRUCTURE
 2. Handle block nesting correctly
 3. Test with nested structures
 
+EXTENDING GRID/FIELD EXPRESSIONS
+---------------------------------
+1. Add function name to _FIELD_FUNCS / _SCALAR_FUNCS or call handler in
+   grid_expr.py eval_expr() "call" branch
+2. Wire GridEvalContext or FieldEvalContext helper if needed (grid_engine.py
+   _execute_step_block / _eval_value_formula)
+3. Add unit tests in tests/pixil/test_grid_field_compiler.py (parse/eval) and
+   tests/pixil/test_grid_engine.py (end-to-end step/render)
+
+ADDING A GRID draw MODE
+-----------------------
+1. Extend GridDrawSpec + _parse_draw_body() in grid_field_compiler.py
+2. Implement render branch in grid_engine._render_grid()
+3. Document draw directive in Pixil_Scripting_Guide.txt section 19
+4. Add compiler + engine tests; optional scripts/testing/*.pix smoke
+
+ADDING A FIELD mode
+-------------------
+1. Extend FieldProgram.mode handling in compile_field_program() if new header
+2. Branch in run_field_render() or _eval_value_formula() in grid_engine.py
+3. Tests + scripting guide + example script in scripts/main/
+
+ADDING A SPECIALIZED ENGINE (e.g. particles)
+--------------------------------------------
+When logic is not a full-grid or site-sum field (like Chladni):
+1. New module under pixil_utils/ (e.g. chladni_engine.py)
+2. Single run_*_step(variables, ..., append_draw) entry point
+3. Pixil.py elif dispatch; parameter_types.py entry
+4. tests/pixil/test_<engine>.py
+Prefer grid_program / field_program when the effect fits the expression model.
+
 ================================================================================
 8. TESTING CHANGES
 ================================================================================
@@ -354,10 +480,11 @@ Tier 2 — .pix smoke scripts on real matrix
 
 ```bash
 ./run setup-tests           # Once: apt install python3-pytest
-./run test                  # Tier 1 only (~320 tests, <2s)
+./run test                  # Tier 1 only (~580+ tests, <2s)
 ./run test-scripts          # Tier 2 only (manifest scripts)
 ./run test-all              # Tier 1 then Tier 2 (recommended on Pi)
 ./run test -- -v -k jit     # Extra pytest args (Tier 1 only)
+./run test -- -k grid       # Grid/field compiler + engine tests only
 ```
 
 Pixil on hardware (not the test harness): sudo python3 Pixil.py ...
@@ -366,11 +493,22 @@ WHEN TO ADD WHICH KIND OF TEST
 ------------------------------
 Change in...                         Add...
 math, conditions, params, JIT        Tier 1 test in tests/pixil/test_<topic>.py
+grid/field compiler or engine        tests/pixil/test_grid_field_compiler.py,
+                                     test_grid_engine.py, test_chladni_engine.py
 new/changed drawing on matrix        Tier 2 script in scripts/testing/ + manifest
 parser bug you can assert in Python  Tier 1 first; optional Tier 2 smoke .pix
 live clock or runtime on screen        Tier 2 with "volatile" (no buffer golden)
 
 See tests/pixil/COVERAGE.md for which modules each Tier 1 file covers.
+
+Grid/field Tier 1 tests (no hardware):
+  test_grid_field_compiler.py — block parsing, nested braces, AST compile
+  test_grid_engine.py         — life blinker, gray-scott step, voronoi/metaballs
+                                render, grid_fill, grid_reset
+  test_chladni_engine.py      — chladni value + step draws
+
+Example Tier 2 / manual on Pi:
+  ./run main/game_of_life.pix
 
 TIER 2: TEST MODE (PIXIL_TEST_MODE)
 -----------------------------------
@@ -500,6 +638,10 @@ RENDERING PERFORMANCE
 - Without frames: mplot/mflush (or draw_batch via mflush) for many pixels
 - Minimize per-pixel queue traffic outside frame mode
 - Use numpy for array operations where applicable
+- grid_program / field_program: move per-cell Pixil loops into NumPy in producer;
+  one grid_step/field_render per frame instead of thousands of plot() calls
+- grid_reset only when script mutates arrays outside grid_step (reseeding)
+- chladni_step: replaces 75-particle inner loop; still O(particles) in Python
 
 QUEUE MANAGEMENT
 ----------------
@@ -531,12 +673,107 @@ p.sort_stats('cumulative').print_stats(20)
 ```
 
 ================================================================================
+10. NATIVE GRID AND FIELD PROGRAMS
+================================================================================
+
+This section is the developer counterpart to Pixil_Scripting_Guide.txt §19.
+
+DESIGN GOALS
+------------
+- Scripts stay declarative: formulas in .pix blocks, not new C/Python per effect
+- Hot paths vectorized in NumPy on the producer (Pi CPU bound)
+- Reuse existing draw_batch / end_frame presentation path
+- Pixil handles orchestration (seeding, presets, UI text, mode changes)
+
+MODULE RESPONSIBILITIES
+-----------------------
+
+pixil_utils/grid_field_compiler.py
+  Parse block bodies into GridProgram / FieldProgram specs.
+  Key function: collect_brace_block_lines() — must track brace depth so inner
+  step { } and draw { } blocks do not terminate the outer program block early.
+
+pixil_utils/grid_expr.py
+  Expression parser (tokenize -> AST) and NumPy evaluator.
+  Two contexts:
+    GridEvalContext  — step blocks, grid draw expr mode
+    FieldEvalContext — value { } blocks, plot_if/color/opacity
+
+pixil_utils/grid_engine.py
+  Runtime execution:
+    _RUNTIME[name] -> double-buffered fields, active_idx per field
+    _execute_step_block — requires <field>_next assignment per step block
+    _render_grid — palette | fill | fire | expr
+    _eval_value_formula — formula + metaballs modes; sum_sites loops sites
+    _render_voronoi — dedicated voronoi mode (no value block)
+    run_grid_step / run_field_render — public entry points
+
+pixil_utils/chladni_engine.py
+  Particle-based exception: not expressible as grid_program (sparse particles).
+  Fixed variable names wired in Pixil.py (v_px, v_py, v_n_scale, v_m_scale).
+
+PIXIL.PY INTEGRATION
+--------------------
+At script load (once per program name):
+  grid_program <name> { ... }  -> grid_programs[name] = compile_grid_program(...)
+  field_program <name> { ... } -> field_programs[name] = compile_field_program(...)
+
+Per frame (inside begin_frame/end_frame):
+  grid_step(name)    -> run_grid_step(spec, variables, _append_to_draw_batch)
+  field_render(name) -> run_field_render(spec, variables, _append_to_draw_batch)
+  chladni_step()     -> run_chladni_step(variables, ..., _append_to_draw_batch)
+
+After direct array mutation in Pixil:
+  grid_reset(name)   -> reset_grid_runtime(name)  # drop _RUNTIME[name]
+
+ARRAY LAYOUT
+------------
+Grid fields are flat PixilArray length size*size, row-major:
+  index = y * size + x
+grid_x / grid_y in expressions use 0 .. size-1 per cell.
+cell directive scales output: each logical cell draws as cell x cell pixels.
+
+BOUNDARY MODES (grid_program)
+-----------------------------
+clamp — edge replication for lap/neighbors (default)
+wrap  — toroidal np.roll for lap/neighbors
+
+FIELD MODES (field_program)
+---------------------------
+voronoi   — nearest-site map; optional edges, site_colors array
+metaballs — built-in sum (weight^2 / dist2); then plot_if/color/opacity
+formula   — value { } block; use sum_sites(expr) for site accumulation
+
+COMMON BUGS WHEN EXTENDING
+--------------------------
+- "Unclosed block" — brace collector stopped at inner }; use depth tracking
+- KeyError dist2 in sum_sites — evaluate sum_sites before pre-evaluating args
+- Field size mismatch — PixilArray.size must equal size*size for grid fields
+- Missing v_field_next — step block must assign final output to <field>_next
+- Stale simulation after reseed — script must call grid_reset(name)
+- grid_reset not in PARAMETER_TYPES — only used as direct regex match in Pixil.py
+
+REFERENCE IMPLEMENTATIONS
+-------------------------
+  game_of_life.pix           — minimal grid_program (fill draw)
+  Reaction_Diffusion.pix     — multi-field + palette draw + grid_reset
+  Fractal_Fire.pix           — fire draw mode + below_avg + random_field
+  Voronoi_Pattern.pix        — field_program voronoi mode
+  Metaballs_Effect.pix       — formula + plot_if threshold
+  Blob.pix                   — sum_sites + signed rendering
+  Chladni_Patterns.pix       — chladni_step particle path
+
+================================================================================
 KEY FILES QUICK REFERENCE
 ================================================================================
 
 To modify...                    Edit...
 -----------                     -------
 Command parsing                 Pixil.py
+Grid/field block compile        pixil_utils/grid_field_compiler.py
+Grid/field expression eval      pixil_utils/grid_expr.py
+Grid/field NumPy execution      pixil_utils/grid_engine.py
+Chladni particle step           pixil_utils/chladni_engine.py
 Command execution               rgb_matrix_lib/commands.py
 Shape drawing                   rgb_matrix_lib/drawing_objects.py
 Sprite system                   rgb_matrix_lib/sprite.py

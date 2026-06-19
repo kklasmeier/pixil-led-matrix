@@ -1,0 +1,71 @@
+# Gray-Scott reaction-diffusion via grid_program
+fps(30)
+throttle(0)
+
+v_size = 32
+v_cell = 2
+v_du = 0.16
+v_dv = 0.08
+v_f = 0.0545
+v_k = 0.062
+v_dt = 1.0
+v_color_base = 20
+
+create_array(v_u, 1024, numeric)
+create_array(v_v, 1024, numeric)
+
+grid_fill(v_u, 1)
+grid_fill(v_v, 0)
+
+v_si = 400
+v_u[v_si] = 0.5
+v_v[v_si] = 0.8
+v_si = 401
+v_u[v_si] = 0.5
+v_v[v_si] = 0.8
+v_si = 432
+v_u[v_si] = 0.5
+v_v[v_si] = 0.8
+v_si = 433
+v_u[v_si] = 0.5
+v_v[v_si] = 0.8
+
+grid_program gray_scott {
+    size v_size
+    cell v_cell
+    fields v_u, v_v
+    steps 2
+    boundary clamp
+
+    step v_u {
+        v_lap_u = lap(v_u)
+        v_uvv = at(v_u) * at(v_v) * at(v_v)
+        v_u_next = at(v_u) + v_dt * (v_du * v_lap_u - v_uvv + v_f * (1 - at(v_u)))
+        v_u_next = clamp(v_u_next, 0, 1)
+    }
+
+    step v_v {
+        v_lap_v = lap(v_v)
+        v_uvv = at(v_u) * at(v_v) * at(v_v)
+        v_v_next = at(v_v) + v_dt * (v_dv * v_lap_v + v_uvv - (v_f + v_k) * at(v_v))
+        v_v_next = clamp(v_v_next, 0, 1)
+    }
+
+    draw {
+        palette_field v_v
+        color_base v_color_base
+        color_scale 65
+        intensity_base 28
+        intensity_scale 72
+    }
+}
+
+while true then
+    begin_frame
+        grid_step(gray_scott)
+    end_frame
+    v_color_base = v_color_base + 0.1
+    if v_color_base > 99 then
+        v_color_base = 1
+    endif
+endwhile

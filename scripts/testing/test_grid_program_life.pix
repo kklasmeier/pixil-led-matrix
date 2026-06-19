@@ -1,0 +1,42 @@
+# Game of Life via grid_program
+fps(60)
+throttle(0)
+
+v_size = 32
+v_cell = 2
+create_array(v_grid, 1024)
+
+grid_fill(v_grid, 0)
+
+for v_i in (0, 1023, 1)
+    v_rand = random(0, 10, 0)
+    if v_rand < 2 then
+        v_grid[v_i] = 1
+    endif
+endfor v_i
+
+grid_program conway {
+    size v_size
+    cell v_cell
+    fields v_grid
+    steps 1
+    boundary wrap
+
+    step v_grid {
+        v_n = neighbors(v_grid)
+        v_alive = at(v_grid) == 1
+        v_grid_next = where(v_alive and (v_n == 2 or v_n == 3), 1, where(v_n == 3, 1, 0))
+    }
+
+    draw {
+        fill_field v_grid
+        fill_color cyan
+        fill_intensity 90
+    }
+}
+
+while true then
+    begin_frame
+        grid_step(conway)
+    end_frame
+endwhile

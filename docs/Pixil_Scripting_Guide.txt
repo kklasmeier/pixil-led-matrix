@@ -33,7 +33,8 @@ TABLE OF CONTENTS
 16. Debugging
 17. Common Errors and Troubleshooting
 18. Performance Tips
-19. Script Examples
+19. Native Grid and Field Programs
+20. Script Examples
 
 To run a script:
 1. ssh pi@192.168.1.58
@@ -62,6 +63,20 @@ for v_i in (0, 63, 1)
     rest(0.05)
 endfor v_i
 ```
+
+Native simulations (grid_program / field_program / chladni_step):
+```
+grid_program life { size 32 cell 2 fields v_grid steps 1 boundary clamp
+    step v_grid { v_n = neighbors(v_grid)
+        v_grid_next = where(v_n == 3, 1, where(at(v_grid)==1 and v_n==2, 1, 0)) }
+    draw { fill_field v_grid fill_color cyan fill_intensity 90 } }
+while true then
+    begin_frame
+        grid_step(life)
+    end_frame
+endwhile
+```
+See section 19 for full syntax.
 
 ================================================================================
 2. DRAWING COMMANDS
@@ -1460,6 +1475,8 @@ GENERAL TIPS
 3. Use burnout instead of manually clearing pixels
 4. Prefer simpler shapes when possible (circles are more expensive than rectangles)
 5. Use fps() to cap display refresh rate; use throttle() only for legacy queue tuning
+6. For full-grid sims or distance fields, use grid_program / field_program (section 19)
+   instead of per-cell Pixil loops
 
 LOOP OPTIMIZATION
 -----------------
@@ -1522,8 +1539,320 @@ for v_i in (0, 60, 1)
     rest(0.05)
 endfor v_i
 
+NATIVE GRID / FIELD PROGRAMS
+----------------------------
+For full-grid simulations (cellular automata, reaction-diffusion, fire) or
+distance-field effects (Voronoi, metaballs, ripples), use grid_program and
+field_program instead of per-cell Pixil loops. Setup and orchestration stay in
+Pixil; the hot step/render runs vectorized in NumPy. See section 19.
+
 ================================================================================
-19. SCRIPT EXAMPLES
+19. NATIVE GRID AND FIELD PROGRAMS
+================================================================================
+
+Native grid and field programs accelerate simulations and distance-field
+effects on the 64x64 matrix. Pixil handles seeding, mode changes, and UI;
+the engine runs the per-frame math in NumPy and draws via the normal frame
+batch (mplot / draw_rectangle inside grid_step / field_render).
+
+WHEN TO USE
+-----------
+Use grid_program for neighbor-based grid simulations:
+- Cellular automata (Game of Life)
+- Reaction-diffusion (Gray-Scott)
+- Fire / heat propagation
+- Any rule that updates every cell from neighbors
+
+Use field_program for per-pixel formulas over moving sites:
+- Voronoi diagrams
+- Metaballs
+- Ripple tanks / wave interference (sum_sites over sources)
+
+Use chladni_step for the Chladni particle effect (see below) — it is
+particle-based, not a full-grid program.
+
+Keep plain Pixil loops when logic is not expressible in the expression
+language, or when only a handful of objects are updated per frame.
+
+OVERVIEW
+--------
+1. Create and seed v_ arrays in Pixil (as usual)
+2. Define a program block once (grid_program or field_program)
+3. Each frame: call grid_step(name) or field_render(name) inside begin_frame
+4. After reseeding arrays, call grid_reset(name) so the engine reloads data
+
+Program names are user-defined (like procedure names): conway, gray_scott,
+voronoi_anim, metaballs, etc.
+
+GRID_PROGRAM
+------------
+
+Definition syntax:
+
+grid_program <name> {
+    size <scalar>
+    cell <scalar>
+    fields <array> [, <array> ...]
+    steps <scalar>
+    boundary clamp | wrap
+
+    step <field_array> {
+        <assignments>
+    }
+
+    draw {
+        <draw directives>
+    }
+}
+
+Directives
+----------
+size      Grid dimension (e.g. 32 for 32x32, 64 for 64x64). Array length must
+          be size * size.
+cell      Pixels per grid cell when drawing (1 = 1:1, 2 = each cell is 2x2).
+fields    One or more flat numeric arrays (row-major: index = y * size + x).
+steps     Simulation substeps per grid_step() call (usually 1).
+boundary  clamp — edges use edge values; wrap — toroidal neighbors.
+
+Step blocks
+-----------
+Each step block updates one field. Assignments are expressions evaluated over
+the whole grid at once. The final value for the field MUST be assigned to
+<field>_next (e.g. step v_grid { ... v_grid_next = ... }).
+
+Inside step expressions you can use:
+- at(v_field)           Current cell value of a field
+- lap(v_field)          4-neighbor Laplacian
+- neighbors(v_field)    Count of alive neighbors (8-connected, value > 0.5)
+- neighbors4(v_field)   Count of alive neighbors (4-connected)
+- below_avg(v_field)    Average of cell below and its horizontal neighbors
+- random_field(lo, hi)  Per-cell random values in range
+- grid_x, grid_y        Per-cell coordinates (0 .. size-1)
+- clamp(val, lo, hi)    Clip values
+- where(cond, a, b)     Per-cell conditional (like np.where)
+- min, max, abs, floor  Element-wise math
+- sin, cos, sqrt, pow   Element-wise math
+- v_* scalars           Any Pixil numeric variable (v_dt, v_f, etc.)
+- and, or, not, ==, !=, <, >, <=, >=
+
+Example — Conway's Game of Life (see scripts/main/game_of_life.pix):
+
+grid_program conway {
+    size v_size
+    cell v_cell_size
+    fields v_grid
+    steps 1
+    boundary clamp
+
+    step v_grid {
+        v_n = neighbors(v_grid)
+        v_alive = at(v_grid) == 1
+        v_grid_next = where(v_alive and (v_n == 2 or v_n == 3), 1, where(v_n == 3, 1, 0))
+    }
+
+    draw {
+        fill_field v_grid
+        fill_color cyan
+        fill_intensity 90
+    }
+}
+
+Draw block modes (grid_program)
+-------------------------------
+palette — Map a field to rotating palette colors and intensity:
+    palette_field v_v
+    color_base v_color_base      # or literal
+    color_scale 65
+    intensity_base 28
+    intensity_scale 72
+
+fill — Plot solid color where field > 0.5:
+    fill_field v_grid
+    fill_color cyan
+    fill_intensity 90
+
+fire — Heat-based fire colors (black → red → orange → yellow):
+    fire_field v_heat
+
+expr — Custom per-cell plot with expressions:
+    plot_if <expr>
+    color <expr>
+    opacity <expr>
+
+Grid commands
+-------------
+grid_step(name)       Run step(s), render draw block, queue pixels for frame
+grid_fill(v_arr, val) Fill a flat grid array with a constant (fast reseed)
+grid_reset(name)      Discard cached engine state after you modify arrays
+                      directly in Pixil (required after reseed / preset change)
+
+Typical animation loop:
+
+while true then
+    begin_frame
+        grid_step(conway)
+    end_frame
+endwhile
+
+After reseeding v_grid in Pixil:
+
+grid_reset(conway)
+
+FIELD_PROGRAM
+-------------
+
+Definition syntax:
+
+field_program <name> {
+    size <scalar>
+    sites <x_array>, <y_array>
+    [weights <array>]
+    [phases <array>]
+    [active <array>]
+    mode voronoi | metaballs | formula
+
+    # formula mode only:
+    value {
+        <assignments>
+    }
+
+    # optional rendering (formula / metaballs):
+    [plot_if <expr>]
+    [color <expr>]
+    [opacity <expr>]
+    [signed true]
+    [peak_color <color or v_var>]
+    [trough_color <color or v_var>]
+    [intensity_scale <scalar>]
+
+    # voronoi mode only:
+    [site_colors <array>]
+    [edges true]
+    [edge_ratio <scalar>]
+    [edge_color <color>]
+    [edge_opacity <scalar>]
+    [fill_opacity <scalar>]
+}
+
+Modes
+-----
+voronoi   Nearest-site coloring with optional edge lines. Uses sites arrays
+          only; no value block. Move sites in Pixil between field_render calls.
+
+metaballs Built-in sum of (weight^2 / dist2) over sites. Optional weights
+          array per site. Use plot_if / color / opacity for threshold coloring.
+
+formula   Custom per-pixel value via value { } block. Use sum_sites(expr) to
+          accumulate a formula over all active sites.
+
+Site variables inside sum_sites(expr)
+-------------------------------------
+dx, dy     Offset from current site to pixel
+dist2      Squared distance to site
+weight     Site weight (from weights array, or 1)
+phase      Site phase (from phases array, or 0)
+active     1 if site is active, 0 if disabled
+
+Grid variables in value blocks: grid_x, grid_y (full 64x64 or size x size).
+Pixil scalars (v_time, v_wavelength, etc.) work as in grid_program.
+
+The last assignment in value { } is the field result (e.g. v_height = ...).
+
+Signed rendering (ripples / waves)
+----------------------------------
+signed true with peak_color / trough_color / intensity_scale draws positive
+values in peak_color and negative in trough_color. Intensity scales with
+abs(value). See scripts/main/Blob.pix.
+
+Formula + threshold (metaballs style)
+-------------------------------------
+field_program metaballs {
+    size 64
+    sites v_pos_x, v_pos_y
+    weights v_radius
+    mode formula
+    value {
+        v_sum = sum_sites((weight * weight) / max(dist2, 1))
+    }
+    plot_if v_sum > 1
+    color min(v_sum * 15, 95)
+    opacity 75
+}
+
+Field command
+-------------
+field_render(name)    Evaluate field and queue pixels for the current frame
+
+Move site positions in Pixil each frame, then call field_render again. No
+grid_reset is needed for field programs — they read arrays fresh each render.
+
+CHLADNI_STEP (PARTICLE ENGINE)
+------------------------------
+Chladni patterns use 75 sand particles, not a full grid. The dedicated command
+replaces the per-particle inner loop:
+
+chladni_step()
+
+Required Pixil state (same as Chladni_Patterns.pix):
+- v_px, v_py          Particle position arrays (75 elements)
+- v_n_scale, v_m_scale  Current mode scales (v_n * v_scale, v_m * v_scale)
+
+Setup, mode cycling, and scatter logic stay in Pixil; each frame:
+
+begin_frame(false)
+    draw_rectangle(0, 0, 64, 64, dark_gray, 40, false)
+    chladni_step()
+end_frame
+
+See scripts/main/Chladni_Patterns.pix.
+
+WORKFLOW PATTERN
+----------------
+# 1. Arrays and constants in Pixil
+v_size = 32
+create_array(v_grid, v_size * v_size)
+# ... seed v_grid ...
+
+# 2. Define program (once, at script load)
+grid_program my_sim { ... }
+
+# 3. Frame loop
+fps(60)
+while true then
+    begin_frame
+        grid_step(my_sim)
+    end_frame
+endwhile
+
+# 4. After direct array edits
+v_grid[v_i] = 1
+grid_reset(my_sim)
+
+REFERENCE SCRIPTS
+-----------------
+  game_of_life.pix           grid_program
+  Reaction_Diffusion.pix     grid_program
+  Fractal_Fire.pix           grid_program
+  Voronoi_Pattern.pix        field_program
+  Metaballs_Effect.pix       field_program
+  Blob.pix                   field_program
+  Chladni_Patterns.pix       chladni_step
+
+Test examples: scripts/testing/test_grid_program_*.pix,
+scripts/testing/test_field_program_metaballs.pix
+
+COMMON PITFALLS
+---------------
+- Array size must equal size * size for grid_program fields
+- Every step block needs an assignment to <field>_next
+- Call grid_reset(name) after reseeding arrays outside grid_step
+- field_program sites requires two arrays: sites v_px, v_py
+- Expression identifiers must be v_ scalars, field names, or engine builtins
+- grid_program / field_program blocks use brace nesting; inner { } in step/draw
+  blocks are supported
+
+================================================================================
+20. SCRIPT EXAMPLES
 ================================================================================
 
 SIMPLE BOUNCING BALL
