@@ -1,0 +1,132 @@
+# Brian's Brain — 3-state cellular automaton (grid_program / NumPy path)
+# States: 0 dead, 1 firing, 0.2 refractory (neighbors count only firing > 0.5)
+
+v_size = 32
+v_cell_size = 2
+
+create_array(v_grid, v_size * v_size)
+
+throttle(0)
+fps(20)
+
+v_color_fire = 50
+v_color_ref = 12
+v_opacity_fire = 95
+v_opacity_ref = 38
+v_fire_count = 0
+v_active_count = 0
+v_spark_interval = 28
+v_check_interval = 45
+v_min_firing = 10
+
+def randomize_field {
+    for v_i in (0, v_size * v_size - 1, 1)
+        if random(0, 100, 0) < 5 then
+            v_grid[v_i] = 1
+        else
+            v_grid[v_i] = 0
+        endif
+    endfor v_i
+    grid_reset(brain)
+}
+
+def count_activity {
+    v_fire_count = 0
+    v_active_count = 0
+    for v_i in (0, v_size * v_size - 1, 1)
+        if v_grid[v_i] > 0.5 then
+            v_fire_count = v_fire_count + 1
+        endif
+        if v_grid[v_i] > 0.05 then
+            v_active_count = v_active_count + 1
+        endif
+    endfor v_i
+}
+
+def inject_sparks {
+    for v_s in (0, 3, 1)
+        v_idx = random(0, v_size * v_size - 1, 0)
+        if v_grid[v_idx] < 0.05 then
+            v_grid[v_idx] = 1
+        endif
+    endfor v_s
+    grid_reset(brain)
+}
+
+def inject_blob {
+    v_gx = random(3, v_size - 4, 0)
+    v_gy = random(3, v_size - 4, 0)
+    v_rad = random(1, 3, 0)
+    for v_dy in (-v_rad, v_rad, 1)
+        v_sy = v_gy + v_dy
+        if v_sy >= 0 and v_sy < v_size then
+            for v_dx in (-v_rad, v_rad, 1)
+                v_sx = v_gx + v_dx
+                if v_sx >= 0 and v_sx < v_size then
+                    if random(0, 100, 0) < 70 then
+                        v_grid[v_sy * v_size + v_sx] = 1
+                    endif
+                endif
+            endfor v_dx
+        endif
+    endfor v_dy
+    grid_reset(brain)
+}
+
+v_generation = 0
+
+grid_program brain {
+    size v_size
+    cell v_cell_size
+    fields v_grid
+    steps 1
+    boundary clamp
+
+    step v_grid {
+        v_s = at(v_grid)
+        v_n = neighbors(v_grid)
+        v_grid_next = where(v_s > 0.5, 0.2, where(v_s > 0.05, 0, where(v_n == 2, 1, 0)))
+    }
+
+    draw {
+        plot_if at(v_grid) > 0.05
+        color where(at(v_grid) > 0.5, v_color_fire, v_color_ref)
+        opacity where(at(v_grid) > 0.5, v_opacity_fire, v_opacity_ref)
+    }
+}
+
+call randomize_field
+
+while true then
+    begin_frame
+        grid_step(brain)
+        draw_rectangle(0, 0, 18, 8, black, 100, true)
+        draw_text(2, 2, int(v_generation), tiny64_font, 8, white, 100)
+    end_frame
+
+    v_generation = v_generation + 1
+
+    if v_generation % 90 == 0 then
+        v_color_fire = random(20, 80, 0)
+        v_color_ref = v_color_fire - 15
+        if v_color_ref < 1 then
+            v_color_ref = 1
+        endif
+    endif
+
+    if v_generation % v_spark_interval == 0 then
+        call inject_sparks
+        v_spark_interval = random(22, 38, 0)
+    endif
+
+    if v_generation % v_check_interval == 0 then
+        call count_activity
+        if v_fire_count < v_min_firing or v_active_count < 25 then
+            call inject_blob
+        endif
+        if v_fire_count < 4 then
+            call randomize_field
+        endif
+        v_check_interval = random(40, 70, 0)
+    endif
+endwhile

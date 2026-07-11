@@ -1,0 +1,74 @@
+# Plasma Tunnel — field_program formula / NumPy path
+# Concentric ring tunnel; no 1/r term (avoids center spike)
+
+fps(60)
+throttle(0)
+
+v_time = 0
+v_time_step = 0.2
+v_intensity_scale = 55
+v_palette_timer = 0
+v_palette_interval = 900
+
+create_array(v_dummy_x, 1)
+create_array(v_dummy_y, 1)
+v_dummy_x[0] = 32
+v_dummy_y[0] = 32
+
+v_peak_color = "cyan"
+v_trough_color = "navy"
+
+field_program plasma_tunnel {
+    size 64
+    sites v_dummy_x, v_dummy_y
+    mode formula
+    signed true
+    peak_color v_peak_color
+    trough_color v_trough_color
+    intensity_scale v_intensity_scale
+
+    value {
+        v_dx = grid_x - 32
+        v_dy = grid_y - 32
+        v_r = sqrt(v_dx * v_dx + v_dy * v_dy)
+        v_ring1 = sin(v_r / 3 - v_time * 5)
+        v_ring2 = sin(v_r / 6 - v_time * 3) * 0.5
+        v_warp = sin(v_dx * 0.2 + v_dy * 0.2 - v_time * 4) * sin(v_r / 10) * 0.3
+        v_edge = max(1 - v_r / 42, 0.3)
+        v_height = (v_ring1 + v_ring2 + v_warp) * v_edge
+    }
+}
+
+while true then
+    begin_frame
+        field_render(plasma_tunnel)
+    end_frame
+
+    v_time = v_time + v_time_step
+
+    v_palette_timer = v_palette_timer + 1
+    if v_palette_timer >= v_palette_interval then
+        v_palette_timer = 0
+        v_palette_interval = random(700, 1200, 0)
+        v_scheme = random(1, 6, 0)
+        if v_scheme == 1 then
+            v_peak_color = "cyan"
+            v_trough_color = "navy"
+        elseif v_scheme == 2 then
+            v_peak_color = "magenta"
+            v_trough_color = "purple"
+        elseif v_scheme == 3 then
+            v_peak_color = "lime"
+            v_trough_color = "forest_green"
+        elseif v_scheme == 4 then
+            v_peak_color = "gold"
+            v_trough_color = "orange"
+        elseif v_scheme == 5 then
+            v_peak_color = "azure"
+            v_trough_color = "royal_blue"
+        else
+            v_peak_color = "white"
+            v_trough_color = "indigo"
+        endif
+    endif
+endwhile

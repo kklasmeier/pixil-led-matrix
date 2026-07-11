@@ -1567,6 +1567,7 @@ Use field_program for per-pixel formulas over moving sites:
 - Voronoi diagrams
 - Metaballs
 - Ripple tanks / wave interference (sum_sites over sources)
+- Escape-time fractals (Mandelbrot / Julia via escape_iter / escape_zoom)
 
 Use chladni_step for the Chladni particle effect (see below) — it is
 particle-based, not a full-grid program.
@@ -1762,7 +1763,58 @@ Signed rendering (ripples / waves)
 ----------------------------------
 signed true with peak_color / trough_color / intensity_scale draws positive
 values in peak_color and negative in trough_color. Intensity scales with
-abs(value). See scripts/main/Blob.pix.
+abs(value). See scripts/main/Blob.pix and scripts/main/Plasma_Tunnel.pix.
+
+Escape-time fractals (Mandelbrot / Julia)
+-----------------------------------------
+For Mandelbrot and Julia sets, use mode formula with escape builtins in the
+value { } block. These iterate z = z^2 + c per pixel in NumPy (no per-cell
+Pixil loops). formula mode still requires a sites line — use one-element dummy
+arrays if the field does not use moving sites (see Plasma_Tunnel.pix).
+
+Builtins (field_program value / plot_if / color / opacity expressions):
+
+  escape_iter(c_re, c_im, max_iter)
+      Mandelbrot: z0 = 0, c = per-pixel (c_re, c_im).
+
+  escape_iter(c_re, c_im, max_iter, z0_re, z0_im)
+      Julia: c = constant (c_re, c_im), z0 = per-pixel (z0_re, z0_im).
+
+  escape_zoom(anchor_re, anchor_im, dc_re, dc_im, max_iter)
+      Deep-zoom Mandelbrot helper. c = anchor + dc per pixel. Uses direct
+      evaluation when |dc| is large (wide view) and perturbation when |dc| is
+      tiny (extreme zoom without float cancellation on anchor + offset).
+
+  escape_perturb(anchor_re, anchor_im, dc_re, dc_im, max_iter)
+      Low-level perturbation path used by escape_zoom. Scripts normally call
+      escape_zoom instead.
+
+Typical coordinate setup (map grid to complex plane, zoom with v_scale and
+optional v_depth renormalization):
+
+    v_dx = grid_x - v_half
+    v_dy = grid_y - v_half
+    v_eff = v_scale * pow(10, v_depth)
+    v_dc_re = v_dx / v_eff
+    v_dc_im = v_dy / v_eff
+    v_iter = escape_zoom(v_anchor_re, v_anchor_im, v_dc_re, v_dc_im, v_max_iter)
+
+Render escaped pixels only (interior of the set has v_iter == max_iter):
+
+    plot_if v_iter < v_max_iter - 1
+    color clamp(sin(v_iter * 0.68 + v_stop_idx * 1.7 + v_hue_phase + grid_x * 0.1) * 47 + 52, 1, 99)
+    opacity 80
+
+plot_if, color, and opacity expressions may use grid_x, grid_y, v_iter (from the
+value block result), and any v_ scalars (v_hue_phase, v_depth, v_stop_idx, etc.).
+
+Guided tour pattern (scripts/main/Mandelbrot_Zoom.pix):
+  Store landmark coordinates in v_stop_re[] / v_stop_im[] arrays. For each stop:
+  reset v_scale to a wide value (new fractal shape visible), zoom in, then
+  advance to the next waypoint before the view becomes all-interior (black).
+  Cap max_iter as zoom deepens; increase v_hue_phase on each stop for color bloom.
+
+See scripts/main/Mandelbrot_Zoom.pix for a full working example.
 
 Formula + threshold (metaballs style)
 -------------------------------------
@@ -1806,6 +1858,30 @@ end_frame
 
 See scripts/main/Chladni_Patterns.pix.
 
+INK_STEP (PARTICLE ENGINE)
+--------------------------
+Ink in Water uses 60 diffusing ink particles per drop. The dedicated command
+replaces update_particles + draw_particles:
+
+ink_step()
+
+Required Pixil state (set before each drop's animation loop):
+- v_px, v_py, v_vx, v_vy, v_intensity, v_alive, v_curve_x, v_curve_y
+- v_drop_x, v_drop_y (spawn center for swirl)
+- v_drift_x, v_drift_y, v_swirl_active, v_swirl_strength, v_swirl_dir
+- v_fade_rate, v_color_bright, v_color_mid, v_color_dark
+
+After each call, v_any_alive is 1 if any particle remains, else 0.
+Spawn, palette, and behavior selection stay in Pixil:
+
+while v_any_alive == 1 then
+    begin_frame
+        ink_step()
+    end_frame
+endwhile
+
+See scripts/main/Ink_In_Water.pix.
+
 WORKFLOW PATTERN
 ----------------
 # 1. Arrays and constants in Pixil
@@ -1831,15 +1907,23 @@ grid_reset(my_sim)
 REFERENCE SCRIPTS
 -----------------
   game_of_life.pix           grid_program
+  game_of_life_highres.pix   grid_program (64x64, cell 1)
   Reaction_Diffusion.pix     grid_program
   Fractal_Fire.pix           grid_program
+  Brians_Brain.pix           grid_program (multi-state CA, expr draw)
+  Wireworld.pix              grid_program (4-state CA, expr draw)
   Voronoi_Pattern.pix        field_program
   Metaballs_Effect.pix       field_program
-  Blob.pix                   field_program
+  Blob.pix                   field_program (signed sum_sites)
+  Plasma_Tunnel.pix          field_program (formula signed, dummy sites)
+  Orbiting_Ripples.pix       field_program (sum_sites moving sources)
+  Mandelbrot_Zoom.pix        field_program (escape_zoom fractal tour)
   Chladni_Patterns.pix       chladni_step
+  Ink_In_Water.pix           ink_step
 
 Test examples: scripts/testing/test_grid_program_*.pix,
 scripts/testing/test_field_program_metaballs.pix
+tests/pixil/test_fractal_escape.py
 
 COMMON PITFALLS
 ---------------

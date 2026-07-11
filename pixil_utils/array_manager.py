@@ -1,6 +1,6 @@
 # array_manager.py
 from typing import Union, Any, Dict, Optional, Literal
-from .debug import debug_print, DEBUG_VERBOSE
+from .debug import debug_print, DEBUG_VERBOSE, DEBUG_LEVEL
 
 ArrayType = Literal['numeric', 'string']
 
@@ -26,14 +26,14 @@ class PixilArray:
         # Fast path for common case (int index within bounds)
         if isinstance(index, int) and 0 <= index < self.size:
             value = self.data[index]
-            if DEBUG_VERBOSE:
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
                 debug_print(f"Getting array[{index}] = {value}", DEBUG_VERBOSE)
             return value
             
         # Fall back to validation for edge cases
         index = self._validate_index(index)
         value = self.data[index]
-        if DEBUG_VERBOSE:
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
             debug_print(f"Getting array[{index}] = {value}", DEBUG_VERBOSE)
         return value
 

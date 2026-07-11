@@ -390,6 +390,49 @@ def eval_expr(node: ExprNode, ctx: Union[GridEvalContext, FieldEvalContext]) -> 
         if name == "pow" and len(args) == 2:
             a, b = _broadcast(args[0], args[1])
             return np.power(a, b)
+        if name == "escape_iter":
+            from .fractal_escape import escape_iter as _escape_iter
+
+            if len(args) == 3:
+                c_re, c_im, max_iter = args
+                return _escape_iter(_to_array(c_re), _to_array(c_im), int(max_iter))
+            if len(args) == 5:
+                c_re, c_im, max_iter, z0_re, z0_im = args
+                return _escape_iter(
+                    _to_array(c_re),
+                    _to_array(c_im),
+                    int(max_iter),
+                    z0_re=_to_array(z0_re),
+                    z0_im=_to_array(z0_im),
+                )
+            raise ValueError("escape_iter() expects 3 args (Mandelbrot) or 5 args (Julia)")
+        if name == "burning_ship_iter" and len(args) == 3:
+            from .fractal_escape import burning_ship_iter as _burning_ship_iter
+
+            c_re, c_im, max_iter = args
+            return _burning_ship_iter(_to_array(c_re), _to_array(c_im), int(max_iter))
+        if name == "escape_perturb" and len(args) == 5:
+            from .fractal_escape import escape_perturb as _escape_perturb
+
+            anchor_re, anchor_im, dc_re, dc_im, max_iter = args
+            return _escape_perturb(
+                float(_to_array(anchor_re).ravel()[0]),
+                float(_to_array(anchor_im).ravel()[0]),
+                _to_array(dc_re),
+                _to_array(dc_im),
+                int(max_iter),
+            )
+        if name == "escape_zoom" and len(args) == 5:
+            from .fractal_escape import escape_zoom as _escape_zoom
+
+            anchor_re, anchor_im, dc_re, dc_im, max_iter = args
+            return _escape_zoom(
+                float(_to_array(anchor_re).ravel()[0]),
+                float(_to_array(anchor_im).ravel()[0]),
+                _to_array(dc_re),
+                _to_array(dc_im),
+                int(max_iter),
+            )
         raise ValueError(f"Unknown or invalid call: {name}")
     raise ValueError(f"Unknown node kind {kind}")
 

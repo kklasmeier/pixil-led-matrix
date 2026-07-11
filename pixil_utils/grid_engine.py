@@ -408,6 +408,12 @@ def run_grid_step(
     _render_grid(program, rt, variables, append_draw)
 
 
+def _array_values(arr: Any) -> np.ndarray:
+    if hasattr(arr, "data"):
+        return np.asarray(arr.data, dtype=np.float64)
+    return np.asarray([arr[i] for i in range(arr.size)], dtype=np.float64)
+
+
 def _site_arrays(
     variables: Any,
     xs_name: str,
@@ -419,20 +425,17 @@ def _site_arrays(
     xs = _get_array(variables, xs_name)
     ys = _get_array(variables, ys_name)
     n = xs.size
-    px = np.asarray([xs[i] for i in range(n)], dtype=np.float64)
-    py = np.asarray([ys[i] for i in range(n)], dtype=np.float64)
+    px = _array_values(xs)
+    py = _array_values(ys)
     weights = None
     if weights_name:
-        w_arr = _get_array(variables, weights_name)
-        weights = np.asarray([w_arr[i] for i in range(n)], dtype=np.float64)
+        weights = _array_values(_get_array(variables, weights_name))
     phases = None
     if phases_name:
-        p_arr = _get_array(variables, phases_name)
-        phases = np.asarray([p_arr[i] for i in range(n)], dtype=np.float64)
+        phases = _array_values(_get_array(variables, phases_name))
     active = None
     if active_name:
-        a_arr = _get_array(variables, active_name)
-        active = np.asarray([a_arr[i] for i in range(n)], dtype=np.float64)
+        active = _array_values(_get_array(variables, active_name))
     return px, py, weights, phases, active, n
 
 
@@ -571,48 +574,70 @@ def _render_field_signed(
     variables: Any,
     size: int,
     append_draw: Callable[[str, List[Any]], None],
-) -> None:
+    draw_buffer: Optional[bytearray] = None,
+) -> int:
+    from shared.mplot_protocol import get_color_id
+
     peak = _resolve_color_name(program.peak_color, variables)
     trough = _resolve_color_name(program.trough_color, variables)
+    peak_id = get_color_id(peak)
+    trough_id = get_color_id(trough)
     scale = resolve_scalar(program.intensity_scale, variables)
-    grid = value_grid
-    for y in range(size):
-        for x in range(size):
-            h = grid[y, x]
-            intensity = int(np.clip(abs(h) * scale, 0, 99))
-            if intensity <= 0:
-                continue
-            color = peak if h > 0 else trough
-            append_draw("mplot", [x, y, color, intensity])
+    h = value_grid
+    intensities = np.clip(np.abs(h) * scale, 0, 99).astype(np.uint8)
+    mask = intensities > 0
+    if not np.any(mask):
+        return 0
+    ys, xs = np.nonzero(mask)
+    hs = h[mask]
+    ints = intensities[mask]
+    color_ids = np.where(hs > 0, peak_id, trough_id)
+
+    if draw_buffer is not None:
+        from pixil_utils.draw_batch_dispatch import append_mplot_bulk
+
+        return append_mplot_bulk(draw_buffer, xs, ys, color_ids, ints)
+
+    for i in range(len(xs)):
+        color = peak if hs[i] > 0 else trough
+        append_draw("mplot", [int(xs[i]), int(ys[i]), color, int(ints[i])])
+    return len(xs)
 
 
 def run_field_render(
     program: FieldProgram,
     variables: Any,
     append_draw: Callable[[str, List[Any]], None],
-) -> None:
+    draw_buffer: Optional[bytearray] = None,
+) -> int:
     size = resolve_size(program.size, variables)
 
     if program.mode == "voronoi":
         _render_voronoi(program, variables, size, append_draw)
-        return
+        return 0
 
     value_grid = _eval_value_formula(program, variables, size)
 
     if program.signed:
-        _render_field_signed(program, value_grid, variables, size, append_draw)
-        return
+        return _render_field_signed(
+            program, value_grid, variables, size, append_draw, draw_buffer
+        )
 
     flat = value_grid.ravel()
     result_name = program.value_result or "v_sum"
     scalars = _build_scalars(variables)
-    temps = {result_name: flat, "v_sum": flat}
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float64)
+    grid_vars = {"grid_x": xs, "grid_y": ys}
+    iter_grid = _reshape(flat, size)
+    temps: Dict[str, np.ndarray] = {result_name: iter_grid, "v_sum": iter_grid}
+    if result_name != "v_iter":
+        temps["v_iter"] = iter_grid
     ctx = FieldEvalContext(
         scalars=scalars,
         temps=temps,
         site_vars={},
-        grid_vars={},
-        sum_sites_fn=lambda _e: flat,
+        grid_vars=grid_vars,
+        sum_sites_fn=lambda _e: iter_grid,
     )
 
     if program.plot_if is not None:
@@ -642,6 +667,7 @@ def run_field_render(
             color: Any = int(round(color_val))
             intensity = int(np.clip(opacity_grid[y, x], 0, 100))
             append_draw("mplot", [x, y, color, intensity])
+    return 0
 
 
 def reset_grid_runtime(name: Optional[str] = None) -> None:

@@ -596,6 +596,7 @@ def process_script(filename, execute_func=None):
         force_instant = any([
             cmd == 'begin_frame',
             cmd == 'end_frame',
+            cmd == 'clear',
             cmd == 'sync_queue',
             cmd == '__test_snapshot__',
             cmd.startswith('define_sprite'),
@@ -1653,6 +1654,10 @@ def process_script(filename, execute_func=None):
             finish_frame_buffer()
         elif cmd_name == 'clear':
             execute_command('clear')
+        elif cmd_name == 'sync_queue':
+            execute_command('sync_queue')
+            queue.wait_until_empty()
+            queue.last_command_time = time.time() * 1000
         elif cmd_name == 'mflush':
             from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
             if ENABLE_DRAW_BATCH:
@@ -1731,6 +1736,7 @@ def process_script(filename, execute_func=None):
     def process_lines(line_generator):
         nonlocal normal_exit  # Track script exit status
         global current_command, _metrics, _VAR_FORMAT_CACHE
+        global mplot_buffer, mplot_count, draw_buffer, draw_count
     
         for line_number, line in enumerate(line_generator, 1):
             # Increment line counter
@@ -1886,13 +1892,20 @@ def process_script(filename, execute_func=None):
                 if prog_name not in field_programs:
                     raise ValueError(f"Unknown field_program: {prog_name}")
                 from pixil_utils.grid_engine import run_field_render
-                run_field_render(field_programs[prog_name], variables, _append_to_draw_batch)
+                n_drawn = run_field_render(
+                    field_programs[prog_name], variables, _append_to_draw_batch, draw_buffer
+                )
+                draw_count += n_drawn
 
             elif line == 'chladni_step' or line == 'chladni_step()':
                 from pixil_utils.chladni_engine import run_chladni_step
                 run_chladni_step(
                     variables, "v_px", "v_py", "v_n_scale", "v_m_scale", _append_to_draw_batch
                 )
+
+            elif line == 'ink_step' or line == 'ink_step()':
+                from pixil_utils.ink_engine import run_ink_step
+                run_ink_step(variables, _append_to_draw_batch)
 
             elif (grid_fill_match := re.match(r'grid_fill\((v_\w+),\s*(.+)\)', line)):
                 array_name = grid_fill_match.group(1)
@@ -2157,7 +2170,6 @@ def process_script(filename, execute_func=None):
                         raise
                 # Handle mplot command
                 elif line.startswith('mplot('):
-                    global mplot_buffer, mplot_count, draw_buffer, draw_count
                     command_match = COMMAND_PATTERN.match(line)
                     if command_match:
                         try:

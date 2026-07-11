@@ -3,6 +3,7 @@
 import sys
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 if "rgbmatrix" not in sys.modules:
@@ -74,3 +75,16 @@ def test_standard_end_frame_blits_before_swap(api_no_background):
         api.end_frame()
     assert call_order == ["blit", "swap"]
     api.canvas.Fill.assert_called_once_with(0, 0, 0)
+
+
+def test_standard_begin_frame_does_not_clear_visible_canvas(api_no_background):
+    """Avoid black flash while draw_batch is still building the next frame."""
+    from rgb_matrix_lib.utils import TRANSPARENT_COLOR
+
+    api = api_no_background
+    api.frame_mode = False
+    api.preserve_frame_changes = False
+    api.drawing_buffer = np.full((64, 64, 3), (1, 2, 3), dtype=np.uint8)
+    api.begin_frame(False)
+    api.canvas.Fill.assert_not_called()
+    assert np.all(api.drawing_buffer == TRANSPARENT_COLOR)

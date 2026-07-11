@@ -195,6 +195,7 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'value', 'type': 'float', 'position': 1},
     ],
     'chladni_step': [],
+    'ink_step': [],
 }
 
 # Cache the parameter types

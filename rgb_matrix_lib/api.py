@@ -217,7 +217,9 @@ class RGB_Api:
         self.preserve_frame_changes = preserve_changes
         if not preserve_changes:
             self.drawing_buffer[:] = TRANSPARENT_COLOR  # Fresh drawing buffer each frame
-            self.canvas.Fill(0, 0, 0)    # Clears the current canvas if not preserving
+            # Do not clear the visible canvas here. Standard end_frame blits the full
+            # drawing_buffer (transparent -> black) before swap, so an early Fill would
+            # only flash black while the producer/consumer finishes the draw batch.
 
     def end_frame(self):
         if self.frame_mode:

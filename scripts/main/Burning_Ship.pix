@@ -1,0 +1,126 @@
+# Burning Ship — field_program / burning_ship_iter
+# Slow zoom tour through the hull, deck detail, and mini-ship copies
+
+fps(30)
+throttle(0)
+
+v_field_size = 64
+v_half = 32
+v_max_iter = 88
+v_hue_phase = 0
+v_hue_drift = 0.12
+
+v_num_stops = 6
+v_stop_idx = 0
+v_morph_t = 1
+v_morph_speed = 0.0038
+v_zoom_in = 1.024
+
+create_array(v_stop_re, v_num_stops)
+create_array(v_stop_im, v_num_stops)
+create_array(v_stop_scale, v_num_stops)
+create_array(v_dummy_x, 1)
+create_array(v_dummy_y, 1)
+
+v_stop_re[0] = -1.75
+v_stop_im[0] = -0.08
+v_stop_scale[0] = 46
+v_stop_re[1] = -1.765
+v_stop_im[1] = -0.09
+v_stop_scale[1] = 52
+v_stop_re[2] = -1.754
+v_stop_im[2] = -0.095
+v_stop_scale[2] = 58
+v_stop_re[3] = -0.402
+v_stop_im[3] = -0.59
+v_stop_scale[3] = 44
+v_stop_re[4] = -1.735
+v_stop_im[4] = -0.125
+v_stop_scale[4] = 50
+v_stop_re[5] = -1.782
+v_stop_im[5] = -0.045
+v_stop_scale[5] = 48
+
+v_center_re = v_stop_re[0]
+v_center_im = v_stop_im[0]
+v_from_re = v_center_re
+v_from_im = v_center_im
+v_to_re = v_stop_re[1]
+v_to_im = v_stop_im[1]
+v_from_scale = v_stop_scale[0]
+v_to_scale = v_stop_scale[1]
+v_scale = v_from_scale
+
+v_dummy_x[0] = v_half
+v_dummy_y[0] = v_half
+
+def advance_stop {
+    v_stop_idx = v_stop_idx + 1
+    if v_stop_idx >= v_num_stops then
+        v_stop_idx = 0
+    endif
+    v_from_re = v_center_re
+    v_from_im = v_center_im
+    v_from_scale = v_scale
+    v_to_re = v_stop_re[v_stop_idx]
+    v_to_im = v_stop_im[v_stop_idx]
+    v_to_scale = v_stop_scale[v_stop_idx]
+    v_morph_t = 0
+    v_hue_phase = v_hue_phase + 1.8
+    if v_hue_phase > 6.28 then
+        v_hue_phase = v_hue_phase - 6.28
+    endif
+}
+
+field_program burning_ship {
+    size v_field_size
+    sites v_dummy_x, v_dummy_y
+    mode formula
+
+    value {
+        v_dx = grid_x - v_half
+        v_dy = grid_y - v_half
+        v_re = v_dx / v_scale + v_center_re
+        v_im = v_dy / v_scale + v_center_im
+        v_iter = burning_ship_iter(v_re, v_im, v_max_iter)
+    }
+
+    plot_if v_iter < v_max_iter
+    color clamp(sin(v_iter * 0.62 + v_hue_phase + grid_x * 0.08 + grid_y * 0.05) * 38 + 58, 1, 99)
+    opacity clamp(55 + sin(v_iter * 0.4 + v_hue_phase * 0.7 + v_morph_t * 2.5) * 28, 30, 98)
+}
+
+while true then
+    if v_morph_t < 1 then
+        v_morph_t = v_morph_t + v_morph_speed
+        if v_morph_t > 1 then
+            v_morph_t = 1
+        endif
+        v_ease = sin(v_morph_t * 1.57)
+        v_center_re = v_from_re + (v_to_re - v_from_re) * v_ease
+        v_center_im = v_from_im + (v_to_im - v_from_im) * v_ease
+        v_scale = v_from_scale + (v_to_scale - v_from_scale) * v_ease
+    else
+        v_scale = v_scale * v_zoom_in
+        if v_scale > v_to_scale * 5.5 then
+            call advance_stop
+        endif
+    endif
+
+    if v_scale > 320 then
+        v_max_iter = 104
+    elseif v_scale > 140 then
+        v_max_iter = 96
+    else
+        v_max_iter = 88
+    endif
+
+    v_hue_phase = v_hue_phase + v_hue_drift
+    if v_hue_phase > 6.28 then
+        v_hue_phase = v_hue_phase - 6.28
+    endif
+
+    begin_frame
+        field_render(burning_ship)
+    end_frame
+endwhile

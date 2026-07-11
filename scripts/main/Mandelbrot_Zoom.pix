@@ -1,0 +1,147 @@
+# Mandelbrot tour — hop between mini-fractal landmarks, zoom into each, then discover the next
+# Each stop: wide view of a new structure → zoom in for detail → advance to next waypoint
+
+fps(30)
+throttle(0)
+
+v_field_size = 64
+v_half = 32
+v_max_iter = 96
+v_hue_phase = 0
+v_hue_drift = 0.16
+
+v_num_stops = 6
+v_stop_idx = 0
+v_frames_on_stop = 0
+v_frames_max = 420
+
+v_anchor_re = -0.75
+v_anchor_im = 0.0
+v_base_re = -0.75
+v_base_im = 0.0
+
+v_scale = 58.0
+v_depth = 0
+v_zoom_in = 1.022
+
+create_array(v_stop_re, v_num_stops)
+create_array(v_stop_im, v_num_stops)
+create_array(v_dummy_x, 1)
+create_array(v_dummy_y, 1)
+
+v_stop_re[0] = -0.75
+v_stop_im[0] = 0.0
+v_stop_re[1] = -0.743643887
+v_stop_im[1] = 0.131825904
+v_stop_re[2] = -0.743212
+v_stop_im[2] = 0.132789
+v_stop_re[3] = -0.74284
+v_stop_im[3] = 0.13341
+v_stop_re[4] = -0.761574
+v_stop_im[4] = 0.0847595
+v_stop_re[5] = -1.25066
+v_stop_im[5] = 0.02012
+
+v_dummy_x[0] = v_half
+v_dummy_y[0] = v_half
+
+def begin_stop {
+    v_anchor_re = v_stop_re[v_stop_idx]
+    v_anchor_im = v_stop_im[v_stop_idx]
+    v_base_re = v_anchor_re
+    v_base_im = v_anchor_im
+    v_scale = 58.0
+    v_depth = 0
+    v_wobble = 0
+    v_frames_on_stop = 0
+    v_hue_phase = v_hue_phase + 5.5
+    v_max_iter = 96
+}
+
+def advance_stop {
+    v_stop_idx = v_stop_idx + 1
+    if v_stop_idx >= v_num_stops then
+        v_stop_idx = 0
+    endif
+    call begin_stop
+}
+
+def tune_iter_depth {
+    v_max_iter = 88 + v_depth * 18
+    if v_scale > 800 then
+        v_max_iter = v_max_iter + 20
+    endif
+    if v_scale > 2000 then
+        v_max_iter = v_max_iter + 20
+    endif
+    if v_max_iter > 200 then
+        v_max_iter = 200
+    endif
+    v_hue_drift = 0.12 + v_stop_idx * 0.04
+}
+
+def renormalize_scale {
+    if v_scale > 4000 then
+        v_depth = v_depth + 3
+        v_scale = v_scale / 1000
+        v_hue_phase = v_hue_phase + 1.8
+    endif
+}
+
+def creep_anchor {
+    v_wobble = v_wobble + 0.09
+    v_eff = v_scale * pow(10, v_depth)
+    v_anchor_re = v_base_re + cos(v_wobble) * 1.5 / v_eff
+    v_anchor_im = v_base_im + sin(v_wobble * 1.21) * 1.5 / v_eff
+}
+
+def maybe_advance_stop {
+    v_ready = 0
+    if v_stop_idx == 0 and v_scale > 520 then
+        v_ready = 1
+    endif
+    if v_stop_idx > 0 and v_scale > 2800 then
+        v_ready = 1
+    endif
+    if v_frames_on_stop > v_frames_max then
+        v_ready = 1
+    endif
+    if v_ready == 1 then
+        call advance_stop
+    endif
+}
+
+field_program mandelbrot {
+    size v_field_size
+    sites v_dummy_x, v_dummy_y
+    mode formula
+
+    value {
+        v_dx = grid_x - v_half
+        v_dy = grid_y - v_half
+        v_eff = v_scale * pow(10, v_depth)
+        v_dc_re = v_dx / v_eff
+        v_dc_im = v_dy / v_eff
+        v_iter = escape_zoom(v_anchor_re, v_anchor_im, v_dc_re, v_dc_im, v_max_iter)
+    }
+
+    plot_if v_iter < v_max_iter - 1
+    color clamp(sin(v_iter * 0.68 + v_stop_idx * 1.7 + v_hue_phase + grid_x * 0.1 + grid_y * 0.07) * 47 + 52, 1, 99)
+    opacity clamp(sin(v_iter * 0.28 + v_hue_phase * 0.55) * 24 + 70, 38, 99)
+}
+
+call begin_stop
+
+while true then
+    begin_frame
+        field_render(mandelbrot)
+    end_frame
+
+    v_scale = v_scale * v_zoom_in
+    v_hue_phase = v_hue_phase + v_hue_drift
+    v_frames_on_stop = v_frames_on_stop + 1
+    call creep_anchor
+    call renormalize_scale
+    call tune_iter_depth
+    call maybe_advance_stop
+endwhile

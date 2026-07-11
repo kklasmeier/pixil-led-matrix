@@ -1,0 +1,62 @@
+# Conway's Game of Life — high resolution (64x64, 1 pixel per cell)
+
+v_size = 64
+v_cell_size = 1
+v_cells = 4096
+v_max = 63
+
+create_array(v_grid, v_cells)
+
+throttle(0)
+fps(60)
+
+for v_i in (0, v_cells - 1, 1)
+    if random(0, 100, 0) < 2 then
+        v_grid[v_i] = 1
+    else
+        v_grid[v_i] = 0
+    endif
+endfor v_i
+
+v_generation = 0
+
+grid_program conway_hr {
+    size v_size
+    cell v_cell_size
+    fields v_grid
+    steps 1
+    boundary clamp
+
+    step v_grid {
+        v_n = neighbors(v_grid)
+        v_alive = at(v_grid) == 1
+        v_grid_next = where(v_alive and (v_n == 2 or v_n == 3), 1, where(v_n == 3, 1, 0))
+    }
+
+    draw {
+        fill_field v_grid
+        fill_color cyan
+        fill_intensity 90
+    }
+}
+
+while true then
+    begin_frame
+        grid_step(conway_hr)
+        draw_rectangle(0, 0, 14, 8, black, 100, true)
+        draw_text(2, 2, int(v_generation), tiny64_font, 8, white, 100)
+    end_frame
+
+    v_generation = v_generation + 1
+
+    if v_generation % 150 == 0 then
+        v_gx = random(4, v_max - 8, 0)
+        v_gy = random(4, v_max - 8, 0)
+        v_grid[v_gy * v_size + (v_gx + 1)] = 1
+        v_grid[(v_gy + 1) * v_size + (v_gx + 2)] = 1
+        v_grid[(v_gy + 2) * v_size + v_gx] = 1
+        v_grid[(v_gy + 2) * v_size + (v_gx + 1)] = 1
+        v_grid[(v_gy + 2) * v_size + (v_gx + 2)] = 1
+        grid_reset(conway_hr)
+    endif
+endwhile

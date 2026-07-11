@@ -1,0 +1,108 @@
+# Julia Morph — field_program / escape_iter (5-arg Julia)
+# Smoothly morphs c through classic Julia constants; spectral colors drift with the morph
+
+fps(30)
+throttle(0)
+
+v_field_size = 64
+v_half = 32
+v_max_iter = 96
+v_scale = 40.0
+v_hue_phase = 0
+v_hue_drift = 0.14
+
+v_num_stops = 8
+v_stop_idx = 0
+v_morph_t = 0
+v_morph_speed = 0.0045
+
+create_array(v_stop_re, v_num_stops)
+create_array(v_stop_im, v_num_stops)
+create_array(v_dummy_x, 1)
+create_array(v_dummy_y, 1)
+
+v_stop_re[0] = -0.8
+v_stop_im[0] = 0.156
+v_stop_re[1] = -0.7269
+v_stop_im[1] = 0.1889
+v_stop_re[2] = -0.4
+v_stop_im[2] = 0.6
+v_stop_re[3] = -0.123
+v_stop_im[3] = 0.745
+v_stop_re[4] = 0.285
+v_stop_im[4] = 0.01
+v_stop_re[5] = -0.70176
+v_stop_im[5] = -0.3842
+v_stop_re[6] = 0.355
+v_stop_im[6] = 0.355
+v_stop_re[7] = -0.62772
+v_stop_im[7] = 0.42193
+
+v_from_re = v_stop_re[0]
+v_from_im = v_stop_im[0]
+v_to_re = v_stop_re[1]
+v_to_im = v_stop_im[1]
+v_c_re = v_from_re
+v_c_im = v_from_im
+
+v_dummy_x[0] = v_half
+v_dummy_y[0] = v_half
+
+def advance_stop {
+    v_stop_idx = v_stop_idx + 1
+    if v_stop_idx >= v_num_stops then
+        v_stop_idx = 0
+    endif
+    v_from_re = v_stop_re[v_stop_idx]
+    v_from_im = v_stop_im[v_stop_idx]
+    v_next = v_stop_idx + 1
+    if v_next >= v_num_stops then
+        v_next = 0
+    endif
+    v_to_re = v_stop_re[v_next]
+    v_to_im = v_stop_im[v_next]
+    v_morph_t = 0
+    v_hue_phase = v_hue_phase + 2.4
+    if v_hue_phase > 6.28 then
+        v_hue_phase = v_hue_phase - 6.28
+    endif
+}
+
+field_program julia_morph {
+    size v_field_size
+    sites v_dummy_x, v_dummy_y
+    mode formula
+
+    value {
+        v_dx = grid_x - v_half
+        v_dy = grid_y - v_half
+        v_z0_re = v_dx / v_scale
+        v_z0_im = v_dy / v_scale
+        v_iter = escape_iter(v_c_re, v_c_im, v_max_iter, v_z0_re, v_z0_im)
+    }
+
+    plot_if v_iter < v_max_iter
+    color clamp(sin(v_iter * 0.78 + v_hue_phase + v_morph_t * 3.14 + grid_x * 0.09 + grid_y * 0.07) * 47 + 51, 1, 99)
+    opacity clamp(62 + sin(v_iter * 0.45 + v_hue_phase * 0.5 + v_morph_t * 2.0) * 22, 35, 95)
+}
+
+while true then
+    v_morph_t = v_morph_t + v_morph_speed
+    if v_morph_t >= 1 then
+        call advance_stop
+    endif
+
+    v_ease = sin(v_morph_t * 1.57)
+    v_c_re = v_from_re + (v_to_re - v_from_re) * v_ease
+    v_c_im = v_from_im + (v_to_im - v_from_im) * v_ease
+
+    v_scale = 38 + sin(v_morph_t * 6.28 + v_stop_idx) * 4
+    v_hue_phase = v_hue_phase + v_hue_drift
+    if v_hue_phase > 6.28 then
+        v_hue_phase = v_hue_phase - 6.28
+    endif
+
+    begin_frame
+        field_render(julia_morph)
+    end_frame
+endwhile

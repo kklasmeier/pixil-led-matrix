@@ -551,14 +551,32 @@ class CommandExecutor:
         try:
             binary_data = decode_draw_buffer(encoded_data)
             count = 0
+            plot_batch: list = []
+
+            def flush_plots() -> None:
+                nonlocal count
+                if not plot_batch:
+                    return
+                if self.api.drain_abort_requested():
+                    plot_batch.clear()
+                    return
+                self.api.plot_batch(plot_batch)
+                count += len(plot_batch)
+                plot_batch.clear()
+
             for cmd_name, args in unpack_draw_batch(binary_data):
                 if self.api.drain_abort_requested():
                     break
+                if cmd_name == "plot":
+                    plot_batch.append(args)
+                    continue
+                flush_plots()
                 handler = self.command_handlers.get(cmd_name)
                 if handler is None:
                     raise ValueError(f"draw_batch unknown command: {cmd_name}")
                 handler(*args)
                 count += 1
+            flush_plots()
             debug(
                 f"Successfully executed draw_batch with {count} ops in order",
                 Level.DEBUG,

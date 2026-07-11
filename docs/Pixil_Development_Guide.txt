@@ -117,6 +117,7 @@ Example scripts: scripts/main/game_of_life.pix, Blob.pix, scripts/testing/test_g
 │   ├── grid_field_compiler.py # Parse grid_program / field_program blocks
 │   ├── grid_engine.py       # NumPy step/render for grid_step / field_render
 │   ├── chladni_engine.py    # Vectorized Chladni particle step (chladni_step)
+│   ├── ink_engine.py        # Ink-in-water particle step (ink_step)
 │   └── jit_compiler/        # JIT compilation for math expressions
 │       ├── __init__.py
 │       ├── bytecode.py      # Bytecode instruction definitions
@@ -231,7 +232,7 @@ Add the new command to Pixil_Scripting_Guide.txt.
 PRODUCER-SIDE COMMANDS (no rgb_matrix_lib changes)
 --------------------------------------------------
 grid_program, field_program, grid_step, field_render, grid_fill, grid_reset,
-and chladni_step are handled entirely in Pixil.py + pixil_utils. They use
+and chladni_step and ink_step are handled entirely in Pixil.py + pixil_utils. They use
 _append_to_draw_batch (same path as plot/mplot inside begin_frame) rather
 than command_queue tuples.
 
@@ -241,7 +242,7 @@ To add or modify these:
 3. Execution/render: pixil_utils/grid_engine.py or chladni_engine.py
 4. Pixil.py: dispatch near grid_prog_match / grid_step_match (line ~1850+)
 5. regex_patterns.py: GRID_PROGRAM_DEF_PATTERN, FIELD_PROGRAM_DEF_PATTERN
-6. parameter_types.py: grid_step, field_render, grid_fill, chladni_step
+6. parameter_types.py: grid_step, field_render, grid_fill, chladni_step, ink_step
 7. Tier 1 tests: tests/pixil/test_grid_field_compiler.py, test_grid_engine.py
 8. Pixil_Scripting_Guide.txt section 19
 
@@ -392,6 +393,7 @@ Pixil.py wiring (~line 1851):
   - grid_programs{}, field_programs{} dicts at parse time
   - grid_step(name), field_render(name), grid_reset(name), grid_fill(arr, val)
   - chladni_step / chladni_step()
+  - ink_step / ink_step()
 
 ================================================================================
 7. COMMON MODIFICATION PATTERNS
@@ -698,6 +700,15 @@ pixil_utils/grid_expr.py
   Two contexts:
     GridEvalContext  — step blocks, grid draw expr mode
     FieldEvalContext — value { } blocks, plot_if/color/opacity
+  Field builtins include sum_sites(expr) and escape-time fractals:
+    escape_iter, escape_perturb, escape_zoom (see fractal_escape.py)
+
+pixil_utils/fractal_escape.py
+  Vectorized escape-time iteration for Mandelbrot / Julia fractals.
+    escape_iter     — standard z = z^2 + c (Mandelbrot or Julia)
+    escape_perturb  — perturbation around anchor + dc (deep zoom)
+    escape_zoom     — auto-selects direct vs perturb from |dc| magnitude
+  Used by field_program formula blocks via grid_expr eval_expr().
 
 pixil_utils/grid_engine.py
   Runtime execution:
@@ -706,6 +717,7 @@ pixil_utils/grid_engine.py
     _render_grid — palette | fill | fire | expr
     _eval_value_formula — formula + metaballs modes; sum_sites loops sites
     _render_voronoi — dedicated voronoi mode (no value block)
+    run_field_render — plot_if/color/opacity get grid_x, grid_y, v_iter temps
     run_grid_step / run_field_render — public entry points
 
 pixil_utils/chladni_engine.py
@@ -743,6 +755,35 @@ FIELD MODES (field_program)
 voronoi   — nearest-site map; optional edges, site_colors array
 metaballs — built-in sum (weight^2 / dist2); then plot_if/color/opacity
 formula   — value { } block; use sum_sites(expr) for site accumulation
+            escape_iter / escape_zoom for Mandelbrot/Julia (see below)
+
+ESCAPE-TIME FRACTALS (formula mode)
+-----------------------------------
+Implementation: pixil_utils/fractal_escape.py, wired in grid_expr.py.
+
+  escape_iter(c_re, c_im, max_iter)
+      Mandelbrot: c per-pixel, z0 = 0.
+
+  escape_iter(c_re, c_im, max_iter, z0_re, z0_im)
+      Julia: constant c, per-pixel z0.
+
+  escape_zoom(anchor_re, anchor_im, dc_re, dc_im, max_iter)
+      Recommended for zoom scripts. dc = (grid - center) / effective_scale.
+      Direct path when max(|dc|) > 0.002; else escape_perturb with overflow
+      guards and escape_iter fallback for remaining pixels.
+
+  escape_perturb(...)
+      Low-level; prefer escape_zoom in .pix scripts.
+
+field_program compiler still requires sites x_arr, y_arr even when sites are
+unused — provide 1-element dummy arrays (Plasma_Tunnel.pix, Mandelbrot_Zoom.pix).
+
+run_field_render exposes value-block results and grid_x/grid_y in the
+FieldEvalContext used for plot_if / color / opacity (so sin(v_iter + grid_x...)
+works).
+
+Reference: scripts/main/Mandelbrot_Zoom.pix (guided waypoint tour),
+tests/pixil/test_fractal_escape.py
 
 COMMON BUGS WHEN EXTENDING
 --------------------------
@@ -758,10 +799,16 @@ REFERENCE IMPLEMENTATIONS
   game_of_life.pix           — minimal grid_program (fill draw)
   Reaction_Diffusion.pix     — multi-field + palette draw + grid_reset
   Fractal_Fire.pix           — fire draw mode + below_avg + random_field
+  Brians_Brain.pix           — 3-state CA + expr draw (plot_if/color/opacity)
+  Wireworld.pix              — 4-state CA + expr draw
   Voronoi_Pattern.pix        — field_program voronoi mode
   Metaballs_Effect.pix       — formula + plot_if threshold
   Blob.pix                   — sum_sites + signed rendering
+  Plasma_Tunnel.pix          — formula signed ripples, dummy sites
+  Orbiting_Ripples.pix       — sum_sites orbital wave sources
+  Mandelbrot_Zoom.pix        — escape_zoom + waypoint tour + hue bloom
   Chladni_Patterns.pix       — chladni_step particle path
+  Ink_In_Water.pix           — ink_step particle path
 
 ================================================================================
 KEY FILES QUICK REFERENCE
@@ -772,8 +819,10 @@ To modify...                    Edit...
 Command parsing                 Pixil.py
 Grid/field block compile        pixil_utils/grid_field_compiler.py
 Grid/field expression eval      pixil_utils/grid_expr.py
+Escape-time fractals            pixil_utils/fractal_escape.py
 Grid/field NumPy execution      pixil_utils/grid_engine.py
 Chladni particle step           pixil_utils/chladni_engine.py
+Ink particle step               pixil_utils/ink_engine.py
 Command execution               rgb_matrix_lib/commands.py
 Shape drawing                   rgb_matrix_lib/drawing_objects.py
 Sprite system                   rgb_matrix_lib/sprite.py
