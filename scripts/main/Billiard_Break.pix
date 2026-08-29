@@ -1,0 +1,574 @@
+# Billiard Break
+# A top-down pool table: a purposeful power break, then the cue keeps
+# shooting until every object ball is pocketed. A scratch resets the rack.
+
+throttle(0)
+fps(30)
+
+# ---------- TABLE / PHYSICS ----------
+v_num_balls = 16
+v_ball_radius = 1.65
+v_ball_diameter = v_ball_radius * 2
+v_left = 5
+v_right = 58
+v_top = 5
+v_bottom = 58
+v_friction = 0.992
+v_cushion_bounce = 0.88
+v_collision_bounce = 0.97
+v_stop_speed = 0.025
+
+create_array(v_x, v_num_balls, numeric)
+create_array(v_y, v_num_balls, numeric)
+create_array(v_vx, v_num_balls, numeric)
+create_array(v_vy, v_num_balls, numeric)
+create_array(v_active, v_num_balls, numeric)
+create_array(v_wall_hit, v_num_balls, numeric)
+create_array(v_pair_hit, v_num_balls, numeric)
+create_array(v_color, v_num_balls, string)
+create_array(v_stripe, v_num_balls, numeric)
+create_array(v_hit_x, 12, numeric)
+create_array(v_hit_y, 12, numeric)
+create_array(v_hit_life, 12, numeric)
+v_hit_i = 0
+v_aim_dx = 1
+v_aim_dy = 0
+v_aim_power = 3.4
+v_object_left = 15
+v_target_x = 39
+v_target_y = 32
+v_best_score = -1000
+v_best_pocket_dist = 20
+v_best_cue_dist = 20
+v_break_side = 0
+
+create_array(v_pocket_x, 6, numeric)
+create_array(v_pocket_y, 6, numeric)
+v_pocket_x[0] = 4
+v_pocket_y[0] = 4
+v_pocket_x[1] = 32
+v_pocket_y[1] = 3
+v_pocket_x[2] = 59
+v_pocket_y[2] = 4
+v_pocket_x[3] = 4
+v_pocket_y[3] = 59
+v_pocket_x[4] = 32
+v_pocket_y[4] = 60
+v_pocket_x[5] = 59
+v_pocket_y[5] = 59
+
+# Ball palette: cue, seven solids, eight-ball, seven stripes.
+v_color[0] = "white"
+v_color[1] = "yellow"
+v_color[2] = "blue"
+v_color[3] = "red"
+v_color[4] = "purple"
+v_color[5] = "orange"
+v_color[6] = "green"
+v_color[7] = "maroon"
+v_color[8] = "dark_gray"
+v_color[9] = "yellow"
+v_color[10] = "blue"
+v_color[11] = "red"
+v_color[12] = "purple"
+v_color[13] = "orange"
+v_color[14] = "green"
+v_color[15] = "maroon"
+
+for v_i in (0, 15, 1)
+    v_stripe[v_i] = 0
+endfor v_i
+for v_i in (9, 15, 1)
+    v_stripe[v_i] = 1
+endfor v_i
+
+# ---------- RACK ----------
+def reset_table {
+    for v_i in (0, 15, 1)
+        v_active[v_i] = 1
+        v_vx[v_i] = 0
+        v_vy[v_i] = 0
+    endfor v_i
+
+    # Five-row triangle. Ball order intentionally mixes solids and stripes.
+    v_x[1] = 39
+    v_y[1] = 32
+
+    v_x[10] = 42.5
+    v_y[10] = 29.9
+    v_x[3] = 42.5
+    v_y[3] = 34.1
+
+    v_x[6] = 46
+    v_y[6] = 27.8
+    v_x[8] = 46
+    v_y[8] = 32
+    v_x[13] = 46
+    v_y[13] = 36.2
+
+    v_x[2] = 49.5
+    v_y[2] = 25.7
+    v_x[12] = 49.5
+    v_y[12] = 29.9
+    v_x[7] = 49.5
+    v_y[7] = 34.1
+    v_x[15] = 49.5
+    v_y[15] = 38.3
+
+    v_x[9] = 53
+    v_y[9] = 23.6
+    v_x[4] = 53
+    v_y[4] = 27.8
+    v_x[14] = 53
+    v_y[14] = 32
+    v_x[5] = 53
+    v_y[5] = 36.2
+    v_x[11] = 53
+    v_y[11] = 40.4
+
+    v_phase = 0
+    v_phase_frame = 0
+    v_quiet_frames = 0
+    v_rack_flash = 0
+    v_scratch = 0
+    v_hit_i = 0
+    for v_i in (0, 11, 1)
+        v_hit_life[v_i] = 0
+    endfor v_i
+
+    call setup_break
+}
+
+def setup_break {
+    # Power break: cue just off the centre line in the kitchen, aimed
+    # through the head ball. Alternate sides so racks vary without a wild lie.
+    v_active[0] = 1
+    v_vx[0] = 0
+    v_vy[0] = 0
+    v_x[0] = 13
+    if v_break_side == 0 then
+        v_y[0] = 28
+        v_break_side = 1
+    else
+        v_y[0] = 36
+        v_break_side = 0
+    endif
+    v_target_x = 39
+    v_target_y = 32
+    v_aim_power = 3.85
+    call aim_shot
+}
+
+def aim_shot {
+    v_aim_dx = v_target_x - v_x[0]
+    v_aim_dy = v_target_y - v_y[0]
+    v_aim_len = sqrt(v_aim_dx * v_aim_dx + v_aim_dy * v_aim_dy)
+    if v_aim_len < 1 then
+        v_aim_len = 1
+    endif
+    v_aim_dx = v_aim_dx / v_aim_len
+    v_aim_dy = v_aim_dy / v_aim_len
+}
+
+def count_object_balls {
+    v_object_left = 0
+    for v_i in (1, 15, 1)
+        if v_active[v_i] == 1 then
+            v_object_left = v_object_left + 1
+        endif
+    endfor v_i
+}
+
+def shot_line_blocked {
+    # Ignore v_skip_a and v_skip_b. Sets v_blocked if another ball sits on
+    # the segment from (v_line_x0, v_line_y0) to (v_line_x1, v_line_y1).
+    v_blocked = 0
+    v_ldx = v_line_x1 - v_line_x0
+    v_ldy = v_line_y1 - v_line_y0
+    v_llen2 = v_ldx * v_ldx + v_ldy * v_ldy
+    if v_llen2 < 0.25 then
+        v_blocked = 1
+    else
+        for v_ob in (0, 15, 1)
+            if v_blocked == 0 then
+                if v_active[v_ob] == 1 and v_ob != v_skip_a and v_ob != v_skip_b then
+                    v_px = v_x[v_ob] - v_line_x0
+                    v_py = v_y[v_ob] - v_line_y0
+                    v_t = (v_px * v_ldx + v_py * v_ldy) / v_llen2
+                    if v_t < 0 then
+                        v_t = 0
+                    endif
+                    if v_t > 1 then
+                        v_t = 1
+                    endif
+                    v_dx = v_x[v_ob] - (v_line_x0 + v_t * v_ldx)
+                    v_dy = v_y[v_ob] - (v_line_y0 + v_t * v_ldy)
+                    if v_dx * v_dx + v_dy * v_dy < 10 then
+                        v_blocked = 1
+                    endif
+                endif
+            endif
+        endfor v_ob
+    endif
+}
+
+def fallback_shot {
+    v_near_i = 1
+    v_near_d = 9999
+    for v_ball in (1, 15, 1)
+        if v_active[v_ball] == 1 then
+            v_dx = v_x[v_ball] - v_x[0]
+            v_dy = v_y[v_ball] - v_y[0]
+            v_d = v_dx * v_dx + v_dy * v_dy
+            if v_d < v_near_d then
+                v_near_d = v_d
+                v_near_i = v_ball
+            endif
+        endif
+    endfor v_ball
+
+    v_best_pk = 0
+    v_near_d = 9999
+    for v_pk in (0, 5, 1)
+        v_dx = v_pocket_x[v_pk] - v_x[v_near_i]
+        v_dy = v_pocket_y[v_pk] - v_y[v_near_i]
+        v_d = v_dx * v_dx + v_dy * v_dy
+        if v_d < v_near_d then
+            v_near_d = v_d
+            v_best_pk = v_pk
+        endif
+    endfor v_pk
+
+    v_pdx = v_pocket_x[v_best_pk] - v_x[v_near_i]
+    v_pdy = v_pocket_y[v_best_pk] - v_y[v_near_i]
+    v_plen = sqrt(v_pdx * v_pdx + v_pdy * v_pdy)
+    if v_plen < 1 then
+        v_plen = 1
+    endif
+    v_target_x = v_x[v_near_i] - v_pdx / v_plen * v_ball_diameter
+    v_target_y = v_y[v_near_i] - v_pdy / v_plen * v_ball_diameter
+    v_best_pocket_dist = v_plen
+    v_best_cue_dist = sqrt((v_target_x - v_x[0]) * (v_target_x - v_x[0]) + (v_target_y - v_y[0]) * (v_target_y - v_y[0]))
+}
+
+def setup_next_shot {
+    # Always strike the cue where it lies. A pocketed cue is a scratch
+    # and is handled in after_settle by resetting the rack.
+
+    # Pick the easiest pot: ghost-ball aim so the object ball is driven
+    # into a pocket, preferring open lines and shallow cuts.
+    v_best_score = -1000
+    for v_ball in (1, 15, 1)
+        if v_active[v_ball] == 1 then
+            for v_pk in (0, 5, 1)
+                v_pdx = v_pocket_x[v_pk] - v_x[v_ball]
+                v_pdy = v_pocket_y[v_pk] - v_y[v_ball]
+                v_plen = sqrt(v_pdx * v_pdx + v_pdy * v_pdy)
+                if v_plen > 2 then
+                    v_ndx = v_pdx / v_plen
+                    v_ndy = v_pdy / v_plen
+                    v_ghost_x = v_x[v_ball] - v_ndx * v_ball_diameter
+                    v_ghost_y = v_y[v_ball] - v_ndy * v_ball_diameter
+
+                    if v_ghost_x > 8 and v_ghost_x < 55 and v_ghost_y > 8 and v_ghost_y < 55 then
+                        v_odx = v_x[v_ball] - v_x[0]
+                        v_ody = v_y[v_ball] - v_y[0]
+                        v_olen = sqrt(v_odx * v_odx + v_ody * v_ody)
+                        if v_olen > 2 then
+                            v_align = (v_odx / v_olen) * v_ndx + (v_ody / v_olen) * v_ndy
+                            if v_align > 0.34 then
+                                v_line_x0 = v_x[0]
+                                v_line_y0 = v_y[0]
+                                v_line_x1 = v_ghost_x
+                                v_line_y1 = v_ghost_y
+                                v_skip_a = 0
+                                v_skip_b = v_ball
+                                call shot_line_blocked
+                                if v_blocked == 0 then
+                                    v_line_x0 = v_x[v_ball]
+                                    v_line_y0 = v_y[v_ball]
+                                    v_line_x1 = v_pocket_x[v_pk]
+                                    v_line_y1 = v_pocket_y[v_pk]
+                                    call shot_line_blocked
+                                    if v_blocked == 0 then
+                                        v_clen = sqrt((v_ghost_x - v_x[0]) * (v_ghost_x - v_x[0]) + (v_ghost_y - v_y[0]) * (v_ghost_y - v_y[0]))
+                                        v_score = v_align * 26 - v_plen * 0.18 - v_clen * 0.05
+                                        if v_plen < 14 then
+                                            v_score = v_score + 7
+                                        endif
+                                        if v_score > v_best_score then
+                                            v_best_score = v_score
+                                            v_target_x = v_ghost_x
+                                            v_target_y = v_ghost_y
+                                            v_best_pocket_dist = v_plen
+                                            v_best_cue_dist = v_clen
+                                        endif
+                                    endif
+                                endif
+                            endif
+                        endif
+                    endif
+                endif
+            endfor v_pk
+        endif
+    endfor v_ball
+
+    if v_best_score < -500 then
+        call fallback_shot
+    endif
+
+    v_aim_power = 2.35 + v_best_pocket_dist * 0.05 + v_best_cue_dist * 0.03
+    if v_aim_power > 3.7 then
+        v_aim_power = 3.7
+    endif
+    if v_aim_power < 2.45 then
+        v_aim_power = 2.45
+    endif
+    v_target_x = v_target_x + random(-0.12, 0.12, 2)
+    v_target_y = v_target_y + random(-0.12, 0.12, 2)
+    call aim_shot
+}
+
+def after_settle {
+    call count_object_balls
+    if v_scratch == 1 or v_active[0] == 0 then
+        v_phase = 2
+        v_phase_frame = 0
+    elseif v_object_left == 0 then
+        v_phase = 2
+        v_phase_frame = 0
+    else
+        call setup_next_shot
+        v_phase = 0
+        v_phase_frame = 0
+        v_quiet_frames = 0
+        v_rack_flash = 0
+    endif
+}
+
+# ---------- BILLIARDS RULES ----------
+# Integration and collision mechanics are generic particle primitives. Pocket
+# placement and deactivation remain here because they are rules of this show.
+def pocket_balls {
+    for v_i in (0, 15, 1)
+        if v_active[v_i] == 1 then
+            # Only balls near a top/bottom rail can reach a pocket. This broad
+            # phase keeps six show-specific pocket checks out of the hot path.
+            v_pocketed = 0
+            if v_y[v_i] < 8 then
+                if v_x[v_i] < 9 then
+                    if (v_x[v_i] - 4) * (v_x[v_i] - 4) + (v_y[v_i] - 4) * (v_y[v_i] - 4) < 11 then
+                        v_pocketed = 1
+                    endif
+                elseif v_x[v_i] > 54 then
+                    if (v_x[v_i] - 59) * (v_x[v_i] - 59) + (v_y[v_i] - 4) * (v_y[v_i] - 4) < 11 then
+                        v_pocketed = 1
+                    endif
+                elseif v_x[v_i] > 28 and v_x[v_i] < 36 then
+                    if (v_x[v_i] - 32) * (v_x[v_i] - 32) + (v_y[v_i] - 3) * (v_y[v_i] - 3) < 10 then
+                        v_pocketed = 1
+                    endif
+                endif
+            elseif v_y[v_i] > 55 then
+                if v_x[v_i] < 9 then
+                    if (v_x[v_i] - 4) * (v_x[v_i] - 4) + (v_y[v_i] - 59) * (v_y[v_i] - 59) < 11 then
+                        v_pocketed = 1
+                    endif
+                elseif v_x[v_i] > 54 then
+                    if (v_x[v_i] - 59) * (v_x[v_i] - 59) + (v_y[v_i] - 59) * (v_y[v_i] - 59) < 11 then
+                        v_pocketed = 1
+                    endif
+                elseif v_x[v_i] > 28 and v_x[v_i] < 36 then
+                    if (v_x[v_i] - 32) * (v_x[v_i] - 32) + (v_y[v_i] - 60) * (v_y[v_i] - 60) < 10 then
+                        v_pocketed = 1
+                    endif
+                endif
+            endif
+
+            if v_pocketed == 1 then
+                v_active[v_i] = 0
+                v_vx[v_i] = 0
+                v_vy[v_i] = 0
+                if v_i == 0 then
+                    v_scratch = 1
+                endif
+            endif
+        endif
+    endfor v_i
+}
+
+# ---------- DRAWING ----------
+def draw_table {
+    # Wood surround, green felt, cushion highlights.
+    draw_rectangle(0, 0, 64, 64, maroon, 65, true)
+    draw_rectangle(3, 3, 58, 58, green, 38, true)
+    draw_rectangle(5, 5, 54, 54, green, 72, false)
+    draw_line(7, 7, 56, 7, lime, 22)
+    draw_line(7, 56, 56, 56, lime, 18)
+
+    # Head string and foot spot.
+    draw_line(21, 6, 21, 57, white, 8)
+    plot(39, 32, white, 35)
+
+    # Pockets. dark_gray (not black) so they read as holes, not unlit pixels.
+    draw_circle(4, 4, 3, dark_gray, 22, true)
+    draw_circle(32, 3, 3, dark_gray, 22, true)
+    draw_circle(59, 4, 3, dark_gray, 22, true)
+    draw_circle(4, 59, 3, dark_gray, 22, true)
+    draw_circle(32, 60, 3, dark_gray, 22, true)
+    draw_circle(59, 59, 3, dark_gray, 22, true)
+}
+
+def draw_balls {
+    for v_i in (0, 15, 1)
+        if v_active[v_i] == 1 then
+            if v_stripe[v_i] == 1 then
+                draw_circle(v_x[v_i], v_y[v_i], 2, white, 95, true)
+                draw_line(v_x[v_i] - 1, v_y[v_i], v_x[v_i] + 1, v_y[v_i], v_color[v_i], 95)
+            else
+                if v_i == 8 then
+                    draw_circle(v_x[v_i], v_y[v_i], 2, v_color[v_i], 38, true)
+                else
+                    draw_circle(v_x[v_i], v_y[v_i], 2, v_color[v_i], 95, true)
+                endif
+            endif
+
+            # Specular glint makes each 4-pixel ball read as a sphere.
+            if v_i != 8 then
+                plot(v_x[v_i] - 1, v_y[v_i] - 1, white, 70)
+            else
+                plot(v_x[v_i], v_y[v_i], white, 28)
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_cue {
+    if v_phase == 0 and v_active[0] == 1 then
+        # The stick draws backward for 35 frames, then lunges into the cue ball.
+        if v_phase_frame < 35 then
+            v_pull = v_phase_frame * 0.12
+        else
+            v_pull = (55 - v_phase_frame) * 0.21
+        endif
+        if v_pull < 0 then
+            v_pull = 0
+        endif
+        v_cue_tip_x = v_x[0] - v_aim_dx * (2 + v_pull)
+        v_cue_tip_y = v_y[0] - v_aim_dy * (2 + v_pull)
+        v_cue_butt_x = v_cue_tip_x - v_aim_dx * 22
+        v_cue_butt_y = v_cue_tip_y - v_aim_dy * 22
+        draw_line(v_cue_butt_x, v_cue_butt_y, v_cue_tip_x, v_cue_tip_y, tan, 90)
+        plot(v_cue_tip_x, v_cue_tip_y, white, 100)
+    endif
+}
+
+def record_hits {
+    for v_i in (0, 15, 1)
+        if v_active[v_i] == 1 then
+            if v_pair_hit[v_i] > 0 or v_wall_hit[v_i] > 0 then
+                v_spd = abs(v_vx[v_i]) + abs(v_vy[v_i])
+                if v_spd > 0.35 then
+                    v_hit_x[v_hit_i] = v_x[v_i]
+                    v_hit_y[v_hit_i] = v_y[v_i]
+                    v_hit_life[v_hit_i] = 6
+                    v_hit_i = v_hit_i + 1
+                    if v_hit_i >= 12 then
+                        v_hit_i = 0
+                    endif
+                endif
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_hits {
+    for v_i in (0, 11, 1)
+        if v_hit_life[v_i] > 0 then
+            v_glow = v_hit_life[v_i] * 14
+            draw_circle(v_hit_x[v_i], v_hit_y[v_i], 2, white, v_glow, false)
+            plot(v_hit_x[v_i], v_hit_y[v_i], white, 100)
+            v_hit_life[v_i] = v_hit_life[v_i] - 1
+        endif
+    endfor v_i
+}
+
+# ---------- SHOW LOOP ----------
+call reset_table
+v_sync_counter = 0
+
+while 1 == 1 then
+    if v_phase == 0 then
+        v_phase_frame = v_phase_frame + 1
+        if v_phase_frame >= 55 then
+            if v_active[0] == 1 then
+                v_vx[0] = v_aim_dx * v_aim_power
+                v_vy[0] = v_aim_dy * v_aim_power
+            endif
+            v_phase = 1
+            v_phase_frame = 0
+        endif
+    elseif v_phase == 1 then
+        # General mechanics use reusable Pixil particle primitives. Pocket
+        # placement, cue effects, settling, and rendering stay in this script.
+        particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0, v_friction, v_stop_speed, v_num_balls)
+        call pocket_balls
+        if v_scratch == 1 then
+            v_phase = 2
+            v_phase_frame = 0
+        endif
+        particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, v_cushion_bounce, 0, v_wall_hit, v_num_balls)
+        particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_ball_radius, 1, v_collision_bounce, v_pair_hit, v_num_balls)
+
+        call record_hits
+        if v_pair_hit[0] > 0 then
+            v_rack_flash = 5
+        endif
+
+        # Settling is slow-changing; sample total speed every third frame.
+        v_phase_frame = v_phase_frame + 1
+        if v_phase_frame % 3 == 0 then
+            v_total_speed = 0
+            for v_i in (0, v_num_balls - 1, 1)
+                if v_active[v_i] == 1 then
+                    v_total_speed = v_total_speed + abs(v_vx[v_i]) + abs(v_vy[v_i])
+                endif
+            endfor v_i
+
+            if v_total_speed < 0.12 then
+                v_quiet_frames = v_quiet_frames + 1
+            else
+                v_quiet_frames = 0
+            endif
+
+            if v_quiet_frames > 20 then
+                call after_settle
+            endif
+        endif
+    else
+        v_phase_frame = v_phase_frame + 1
+        if v_phase_frame > 75 then
+            call reset_table
+        endif
+    endif
+
+    begin_frame
+        call draw_table
+        call draw_cue
+        call draw_balls
+        call draw_hits
+
+        if v_rack_flash > 0 and v_active[0] == 1 then
+            draw_circle(v_x[0], v_y[0], 3 + (5 - v_rack_flash), white, v_rack_flash * 12, false)
+            v_rack_flash = v_rack_flash - 1
+        endif
+    end_frame
+    # Keep only a tiny pipeline of frames. Synchronizing every frame prevents
+    # producer/display overlap; every third frame reaches 30 FPS while limiting
+    # visual latency to roughly 100 ms.
+    v_sync_counter = v_sync_counter + 1
+    if v_sync_counter >= 3 then
+        sync_queue
+        v_sync_counter = 0
+    endif
+endwhile

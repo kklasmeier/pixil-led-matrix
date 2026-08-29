@@ -1,6 +1,8 @@
 """Tests for script-transition queue reset (no LED hardware required)."""
 
-from shared.command_queue import MatrixCommandQueue
+import pytest
+
+from shared.command_queue import ConsumerRecoveryRequired, MatrixCommandQueue
 
 
 def test_recreate_command_queue_replaces_ipc_objects():
@@ -53,39 +55,25 @@ def test_prepare_for_next_script_uses_fast_drain_and_reset(monkeypatch):
 
 def test_prepare_for_next_script_falls_back_when_reset_not_acknowledged(monkeypatch):
     q = MatrixCommandQueue(queue_size=4)
-    fallback_calls = []
 
     monkeypatch.setattr(q, "discard_pending", lambda: 0)
     monkeypatch.setattr(q, "request_fast_drain", lambda timeout=1.0: 5)
     monkeypatch.setattr(q, "_wait_for_script_reset", lambda timeout=3.0: False)
-    monkeypatch.setattr(
-        q,
-        "reset_for_next_script",
-        lambda timeout=3.0: fallback_calls.append(timeout),
-    )
     q._consumer_process = type("P", (), {"is_alive": lambda self: True})()
 
-    q.prepare_for_next_script()
-
-    assert fallback_calls == [3.0]
+    with pytest.raises(ConsumerRecoveryRequired, match="script reset"):
+        q.prepare_for_next_script()
 
 
 def test_prepare_for_next_script_falls_back_when_drain_times_out(monkeypatch):
     q = MatrixCommandQueue(queue_size=4)
-    fallback_calls = []
 
     monkeypatch.setattr(q, "discard_pending", lambda: 0)
     monkeypatch.setattr(q, "request_fast_drain", lambda timeout=1.0: -1)
-    monkeypatch.setattr(
-        q,
-        "reset_for_next_script",
-        lambda timeout=3.0: fallback_calls.append(timeout),
-    )
     q._consumer_process = type("P", (), {"is_alive": lambda self: True})()
 
-    q.prepare_for_next_script()
-
-    assert fallback_calls == [3.0]
+    with pytest.raises(ConsumerRecoveryRequired, match="recovery"):
+        q.prepare_for_next_script()
 
 
 def test_perform_fast_drain_swallows_pending_command():
@@ -106,18 +94,25 @@ def test_sleep_delay_interruptible_detects_drain():
     assert q._sleep_delay_interruptible(500) is True
 
 
-def test_reset_for_next_script_recreates_queue_without_consumer(monkeypatch):
-    """Emergency fallback still replaces IPC after consumer death."""
+def test_reset_for_next_script_requires_full_process_restart():
+    """Partial consumer replacement is unsafe after queue transport failure."""
     q = MatrixCommandQueue(queue_size=4)
-    old_queue = q.command_queue
 
-    monkeypatch.setattr(q, "start_consumer", lambda: None)
-    monkeypatch.setattr(q, "_wait_for_script_reset", lambda timeout=3.0: True)
-    monkeypatch.setattr(q, "_kill_consumer_process", lambda *args, **kwargs: None)
+    with pytest.raises(ConsumerRecoveryRequired, match="recovery"):
+        q.reset_for_next_script()
 
-    q.reset_for_next_script()
 
-    assert q.command_queue is not old_queue
+def test_put_command_fails_instead_of_waiting_forever_on_full_queue():
+    q = MatrixCommandQueue(
+        queue_size=1,
+        queue_full_timeout=0.01,
+        consumer_heartbeat_timeout=60.0,
+    )
+    q.command_queue.put_nowait(("first", 0))
+    q._consumer_process = type("P", (), {"is_alive": lambda self: True})()
+
+    with pytest.raises(ConsumerRecoveryRequired, match="remained full"):
+        q.put_command("second")
 
 
 def test_shutdown_display_sets_force_shutdown_and_waits(monkeypatch):

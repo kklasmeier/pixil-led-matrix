@@ -1,0 +1,14 @@
+[Unit]
+Description=Pixil LED Matrix Show
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/Lightshow/git
+ExecStart=/usr/bin/python3 -u /home/pi/Lightshow/git/Pixil.py main/* -t 45:00
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

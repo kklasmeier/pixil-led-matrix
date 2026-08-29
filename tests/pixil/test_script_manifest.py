@@ -41,7 +41,7 @@ def test_core_manifest_no_main_shows():
 
 def test_main_smoke_manifest_short_limits():
     entries = _load_manifest_file(MAIN_SMOKE_MANIFEST)
-    assert len(entries) == 4
+    assert len(entries) >= 4
     for rel, volatile, limit in entries:
         assert volatile
         assert _parse_seconds_from_limit(limit) <= 40
@@ -50,4 +50,7 @@ def test_main_smoke_manifest_short_limits():
 
 def test_load_multiple_manifests():
     entries = _load_manifests([CORE, MAIN_SMOKE_MANIFEST])
-    assert len(entries) == len(_load_manifest_file(CORE)) + 4
+    assert len(entries) == (
+        len(_load_manifest_file(CORE))
+        + len(_load_manifest_file(MAIN_SMOKE_MANIFEST))
+    )

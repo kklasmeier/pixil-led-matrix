@@ -52,10 +52,19 @@ _FRAME_COMMANDS = frozenset({
     "draw_line", "draw_circle", "draw_rectangle", "plot", "draw_ellipse", "draw_polygon",
     "draw_arc",
 })
-_FRAME_NO_ARG = frozenset({"begin_frame", "end_frame", "mflush", "hide_background", "clear"})
+_FRAME_NO_ARG = frozenset({
+    "begin_frame", "end_frame", "mflush", "hide_background", "clear", "sync_queue",
+})
 _FRAME_MISC_COMMANDS = frozenset({"fps"})
+_PARTICLE_COMMANDS = frozenset({
+    "particle_integrate",
+    "particle_collide_bounds",
+    "particle_collide_circles",
+})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
-_FRAME_BUILTIN_NAMES = _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS
+_FRAME_BUILTIN_NAMES = (
+    _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS | _PARTICLE_COMMANDS
+)
 _SPRITE_COMMANDS = frozenset({"show_sprite", "move_sprite", "hide_sprite"})
 _BARE_CALL_RESERVED = frozenset(
     {"else", "break", "endif", "endfor", "endwhile", "endsprite", "then", "true", "false"}
@@ -1085,6 +1094,16 @@ def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
     if not match:
         return None
     cmd = match.group(1)
+    if cmd in _PARTICLE_COMMANDS:
+        from .parameter_types import split_command_parameters
+
+        inner = match.group(2)
+        args = (
+            [a.strip() for a in split_command_parameters(inner)]
+            if inner.strip()
+            else []
+        )
+        return CommandStmt(cmd, args)
     if cmd not in _FRAME_COMMANDS:
         return None
     args = [a.strip() for a in match.group(2).split(",")] if match.group(2).strip() else []

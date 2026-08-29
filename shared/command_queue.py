@@ -1,28 +1,47 @@
-from multiprocessing import Queue, Process, Event, Value
+import multiprocessing as mp
 import time
 from typing import Optional
 import threading
+import traceback
 from queue import Empty, Full
+
+
+class ConsumerRecoveryRequired(RuntimeError):
+    """The display worker is no longer safe to use; restart the Pixil process."""
+
 
 class MatrixCommandQueue:
     """Manages command queue between Pixil and RGB Matrix Library"""
     
-    def __init__(self, queue_size: int = 5000):
+    def __init__(
+        self,
+        queue_size: int = 5000,
+        queue_full_timeout: float = 10.0,
+        consumer_heartbeat_timeout: float = 10.0,
+    ):
         """Initialize command queue with specified size"""
+        # Forking after Python has created Queue feeder threads can leave those
+        # threads attached to pipes whose consumer was killed.  A spawned
+        # process begins with a clean interpreter and does not inherit them.
+        self._mp_context = mp.get_context("spawn")
         self._queue_size = queue_size
-        self.command_queue = Queue(maxsize=queue_size)
+        self._queue_full_timeout = queue_full_timeout
+        self._consumer_heartbeat_timeout = consumer_heartbeat_timeout
+        self.command_queue = self._mp_context.Queue(maxsize=queue_size)
         # Consumer -> main: buffer fingerprint after __test_snapshot__
-        self._test_snapshot_reply: Queue = Queue(maxsize=1)
-        self._consumer_process: Optional[Process] = None
+        self._test_snapshot_reply = self._mp_context.Queue(maxsize=1)
+        self._consumer_process: Optional[mp.Process] = None
         self._running = False
         self.last_command_time = time.time() * 1000  # Convert to milliseconds
         self.throttle_factor = 1.0  # Add throttle factor, default to 1.0 (normal speed)
-        self._drain_requested = Event()
-        self._drain_complete = Event()
-        self._drain_swallowed = Value('i', 0)
-        self._reset_complete = Event()
-        self._shutdown_complete = Event()
-        self._force_shutdown = Event()
+        self._drain_requested = self._mp_context.Event()
+        self._drain_complete = self._mp_context.Event()
+        self._drain_swallowed = self._mp_context.Value('i', 0)
+        self._reset_complete = self._mp_context.Event()
+        self._shutdown_complete = self._mp_context.Event()
+        self._force_shutdown = self._mp_context.Event()
+        self._consumer_failed = self._mp_context.Event()
+        self._consumer_heartbeat = self._mp_context.Value('d', time.monotonic())
 
     def set_pause_callbacks(self, on_pause=None, on_resume=None):
         """Set callbacks for queue pause/resume events."""
@@ -45,10 +64,14 @@ class MatrixCommandQueue:
     def start_consumer(self):
         """Start the consumer process"""
         if self._consumer_process is not None:
-            raise RuntimeError("Consumer process already running")
+            if self._consumer_process.is_alive():
+                raise RuntimeError("Consumer process already running")
+            self._consumer_process = None
             
         self._running = True
-        self._consumer_process = Process(
+        self._consumer_failed.clear()
+        self._consumer_heartbeat.value = time.monotonic()
+        self._consumer_process = self._mp_context.Process(
             target=self._consumer_loop,
         )
         self._consumer_process.start()
@@ -89,8 +112,23 @@ class MatrixCommandQueue:
         Killing the consumer leaves the old pipe/feeder state in the parent;
         a new consumer then sees an empty queue while the producer sees Full.
         """
-        self.command_queue = Queue(maxsize=self._queue_size)
-        self._test_snapshot_reply = Queue(maxsize=1)
+        self.command_queue = self._mp_context.Queue(maxsize=self._queue_size)
+        self._test_snapshot_reply = self._mp_context.Queue(maxsize=1)
+
+    def _consumer_is_healthy(self) -> bool:
+        """Return whether the worker is alive and has recently made progress."""
+        if self._consumer_process is None or not self._consumer_process.is_alive():
+            return False
+        if self._consumer_failed.is_set():
+            return False
+        return (
+            time.monotonic() - self._consumer_heartbeat.value
+            <= self._consumer_heartbeat_timeout
+        )
+
+    def _raise_recovery_required(self, reason: str) -> None:
+        print(f"[QUEUE] Fatal: {reason}; restarting Pixil is required", flush=True)
+        raise ConsumerRecoveryRequired(reason)
 
     def _kill_consumer_process(self, timeout: float = 1.0, graceful: bool = False) -> None:
         """Stop the consumer subprocess."""
@@ -153,10 +191,13 @@ class MatrixCommandQueue:
         if delay_ms <= 0:
             return self._drain_requested.is_set() or self._force_shutdown.is_set()
         end = time.perf_counter() + (delay_ms / 1000.0)
-        while time.perf_counter() < end:
+        while True:
+            remaining = end - time.perf_counter()
+            if remaining <= 0:
+                break
             if self._drain_requested.is_set() or self._force_shutdown.is_set():
                 return True
-            time.sleep(min(0.001, end - time.perf_counter()))
+            time.sleep(min(0.001, remaining))
         return self._drain_requested.is_set() or self._force_shutdown.is_set()
 
     def _consumer_blackout_and_exit(self, api_instance) -> None:
@@ -238,26 +279,19 @@ class MatrixCommandQueue:
 
         self.last_command_time = time.time() * 1000
         if not self._wait_for_script_reset(timeout=timeout):
-            print("[QUEUE] Warning: script reset not acknowledged; restarting consumer")
-            self.reset_for_next_script(timeout=timeout)
-            return
+            self._raise_recovery_required(
+                "script reset was not acknowledged by the display consumer"
+            )
 
     def reset_for_next_script(self, timeout: float = 3.0) -> None:
         """
-        Emergency fallback: kill and restart the consumer, then reset the display.
+        Legacy recovery entry point.
 
-        Used only when fast drain fails or the consumer is unresponsive.
+        Replacing only the consumer is unsafe: a Queue feeder thread in this
+        process can remain blocked on the old consumer pipe forever.  The
+        supervisor must restart the entire Pixil process instead.
         """
-        self.discard_pending()
-        self._kill_consumer_process(graceful=True)
-        self.discard_pending()
-        self._recreate_command_queue()
-        self.last_command_time = time.time() * 1000
-        self.start_consumer()
-        if self._consumer_process is None or not self._consumer_process.is_alive():
-            print("[QUEUE] Warning: consumer failed to start after script transition")
-        if not self._wait_for_script_reset(timeout=timeout):
-            print("[QUEUE] Warning: reset commands not drained before next script")
+        self._raise_recovery_required("display consumer recovery was requested")
 
     def script_transition_cleanup(self, cooldown: float = 0.3) -> None:
         """Discard backlog and reset display for the next script."""
@@ -342,11 +376,16 @@ class MatrixCommandQueue:
         # Keep trying with backoff
         from pixil_utils.shutdown import PixilShutdownRequested, shutdown_requested
 
-        while True:
+        deadline = time.monotonic() + self._queue_full_timeout
+        while time.monotonic() < deadline:
             if shutdown_requested():
                 raise PixilShutdownRequested()
+            if not self._consumer_is_healthy():
+                self._raise_recovery_required(
+                    "display consumer stopped making progress while the command queue was full"
+                )
             try:
-                time.sleep(BACKOFF_SLEEP)
+                time.sleep(min(BACKOFF_SLEEP, max(0, deadline - time.monotonic())))
                 self.command_queue.put_nowait(command_tuple)
                 self.last_command_time = time.time() * 1000
 
@@ -356,6 +395,9 @@ class MatrixCommandQueue:
                 return
             except Full:
                 continue
+        self._raise_recovery_required(
+            f"command queue remained full for {self._queue_full_timeout:.1f} seconds"
+        )
 
     def _consumer_loop(self):
         """Main consumer loop that processes commands with timing"""
@@ -439,6 +481,7 @@ class MatrixCommandQueue:
                         continue
 
                     api_instance.execute_command(command)
+                    self._consumer_heartbeat.value = time.monotonic()
 
                 except Empty:
                     if self._force_shutdown.is_set():
@@ -451,11 +494,18 @@ class MatrixCommandQueue:
                     try:
                         if not api_instance.drain_abort_requested():
                             api_instance.pump_fade_display()
+                        self._consumer_heartbeat.value = time.monotonic()
                     except AttributeError:
                         pass
                     continue
                 except Exception:
-                    continue
+                    self._consumer_failed.set()
+                    print(
+                        "[QUEUE] Consumer command failed; terminating worker:\n"
+                        + traceback.format_exc(),
+                        flush=True,
+                    )
+                    break
 
         finally:
             if api_instance is not None:
@@ -477,7 +527,10 @@ class MatrixCommandQueue:
         Returns:
             bool: True if queue became empty, False if timeout occurred
         """
-        time.sleep(0.1) # Put a short wait here so the queue has enough time to see any new commands added.
+        # multiprocessing.Queue hands data to a feeder thread asynchronously.
+        # A brief yield lets that thread publish a just-enqueued command without
+        # imposing the old 100 ms minimum latency on every frame sync.
+        time.sleep(0.002)
         try:
             start_time = time.time()
             from pixil_utils.shutdown import shutdown_requested
@@ -485,9 +538,13 @@ class MatrixCommandQueue:
             while not self.is_empty():
                 if shutdown_requested():
                     return False
+                if not self._consumer_is_healthy():
+                    self._raise_recovery_required(
+                        "display consumer stopped making progress while draining commands"
+                    )
                 if timeout is not None and time.time() - start_time > timeout:
                     return False
-                time.sleep(0.1)
+                time.sleep(0.002)
             return True
         except KeyboardInterrupt:
             return False  # Exit on interrupt

@@ -171,24 +171,30 @@ If animations become sluggish:
 
 To have Pixil start automatically when your Raspberry Pi boots:
 
-1. Create a systemd service file:
+1. Copy the included systemd unit:
 
 ```bash
-sudo nano /etc/systemd/system/pixil.service
+sudo cp deployment/pixil.service /etc/systemd/system/pixil.service
+sudo systemctl daemon-reload
 ```
 
-2. Add the following content (adjust paths as needed):
+The unit restarts Pixil five seconds after an unrecoverable display-consumer or
+queue failure. It is configured for `/home/pi/Lightshow/git`; if your checkout
+is elsewhere, edit the `WorkingDirectory` and `ExecStart` paths in
+`/etc/systemd/system/pixil.service`.
+
+Its contents are:
 
 ```
 [Unit]
-Description=Pixil LED Matrix Service
+Description=Pixil LED Matrix Show
 After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/home/pi/pixil-led-matrix
-ExecStart=/home/pi/pixil-led-matrix/python_venv/bin/python Pixil.py scripts/main/Starfield
-Restart=always
+WorkingDirectory=/home/pi/Lightshow/git
+ExecStart=/usr/bin/python3 -u /home/pi/Lightshow/git/Pixil.py main/* -t 45:00
+Restart=on-failure
 RestartSec=5
 
 [Install]

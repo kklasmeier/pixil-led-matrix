@@ -1667,6 +1667,9 @@ def process_script(filename, execute_func=None):
                 store_frame_command(f'plot_batch("{encoded_data}")')
                 mplot_buffer.clear()
                 mplot_count = 0
+        elif cmd_name.startswith('particle_'):
+            from pixil_utils.particle_commands import run_particle_command
+            run_particle_command(cmd_name, arg_exprs, variables)
         else:
             arg_str = ','.join(arg_exprs)
             args = validate_command_params(cmd_name, arg_str)
@@ -1906,6 +1909,10 @@ def process_script(filename, execute_func=None):
             elif line == 'ink_step' or line == 'ink_step()':
                 from pixil_utils.ink_engine import run_ink_step
                 run_ink_step(variables, _append_to_draw_batch)
+
+            elif line.startswith('particle_') and '(' in line:
+                from pixil_utils.particle_commands import run_particle_line
+                run_particle_line(line, variables)
 
             elif (grid_fill_match := re.match(r'grid_fill\((v_\w+),\s*(.+)\)', line)):
                 array_name = grid_fill_match.group(1)

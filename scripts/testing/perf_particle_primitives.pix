@@ -1,0 +1,53 @@
+# Particle primitive POC: native generic primitives.
+# Keep state, operation order, and frame count identical to the reference.
+
+throttle(0)
+fps(0)
+
+v_count = 16
+v_frames = 120
+v_radius = 1.5
+v_left = 3
+v_right = 60
+v_top = 3
+v_bottom = 60
+v_damping = 0.992
+v_wall_restitution = 0.88
+v_pair_restitution = 0.97
+v_sleep_speed = 0.01
+
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_vx, v_count, numeric)
+create_array(v_vy, v_count, numeric)
+create_array(v_active, v_count, numeric)
+create_array(v_wall_hit, v_count, numeric)
+create_array(v_pair_hit, v_count, numeric)
+
+# Deterministic 4x4 field; no random values so both POCs are comparable.
+for v_i in (0, v_count - 1, 1)
+    v_x[v_i] = 9 + (v_i % 4) * 14
+    v_y[v_i] = 9 + int(v_i / 4) * 14
+    v_vx[v_i] = ((v_i % 3) - 1) * 0.8
+    v_vy[v_i] = ((v_i % 5) - 2) * 0.35
+    if v_vx[v_i] == 0 then
+        v_vx[v_i] = 0.35
+    endif
+    v_active[v_i] = 1
+endfor v_i
+
+v_start_ms = get_system("runtime")
+
+for v_frame in (0, v_frames - 1, 1)
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0, v_damping, v_sleep_speed, v_count)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, v_wall_restitution, v_radius, v_wall_hit, v_count)
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_radius, 1, v_pair_restitution, v_pair_hit, v_count)
+endfor v_frame
+
+v_elapsed_ms = get_system("runtime") - v_start_ms
+v_checksum = 0
+for v_i in (0, v_count - 1, 1)
+    v_checksum = v_checksum + v_x[v_i] + v_y[v_i] + v_vx[v_i] + v_vy[v_i]
+endfor v_i
+
+print(f"PARTICLE_PERF variant=primitives frames={v_frames} elapsed_ms={v_elapsed_ms} checksum={v_checksum}")
