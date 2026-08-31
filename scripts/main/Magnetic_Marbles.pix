@@ -1,0 +1,244 @@
+# Magnetic Marbles
+# Charged glass marbles chase three moving magnetic poles. Pixil computes the
+# changing magnetic field; generic particle primitives handle motion, walls,
+# and marble-to-marble collisions.
+
+throttle(0)
+fps(30)
+
+v_count = 14
+v_magnet_count = 3
+v_radius = 1.35
+v_left = 2
+v_right = 61
+v_top = 2
+v_bottom = 61
+v_damping = 0.996
+v_wall_bounce = 0.91
+v_pair_bounce = 0.96
+v_field_strength = 0.72
+v_max_accel = 0.085
+v_core_radius = 11
+v_core_r2 = 121
+v_core_push = 0.68
+v_core_boost = 0.09
+
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_vx, v_count, numeric)
+create_array(v_vy, v_count, numeric)
+create_array(v_ax, v_count, numeric)
+create_array(v_ay, v_count, numeric)
+create_array(v_active, v_count, numeric)
+create_array(v_charge, v_count, numeric)
+create_array(v_wall_hit, v_count, numeric)
+create_array(v_pair_hit, v_count, numeric)
+
+create_array(v_mx, v_magnet_count, numeric)
+create_array(v_my, v_magnet_count, numeric)
+create_array(v_mp, v_magnet_count, numeric)
+
+create_array(v_flash_x, 12, numeric)
+create_array(v_flash_y, 12, numeric)
+create_array(v_flash_life, 12, numeric)
+v_flash_head = 0
+
+def reset_marbles {
+    for v_i in (0, v_count - 1, 1)
+        v_x[v_i] = random(7, 56, 1)
+        v_y[v_i] = random(7, 56, 1)
+        v_vx[v_i] = random(-0.65, 0.65, 2)
+        v_vy[v_i] = random(-0.65, 0.65, 2)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+        if v_i % 2 == 0 then
+            v_charge[v_i] = 1
+        else
+            v_charge[v_i] = -1
+        endif
+    endfor v_i
+
+    for v_i in (0, 11, 1)
+        v_flash_life[v_i] = 0
+    endfor v_i
+
+    v_mp[0] = 1
+    v_mp[1] = -1
+    v_mp[2] = 1
+    v_time = 0
+    v_mode_time = 0
+    v_field_strength = 0.72
+}
+
+def update_magnets {
+    # Three different orbits continually reshape the field.
+    v_mx[0] = 32 + cos(v_time * 0.71) * 19
+    v_my[0] = 32 + sin(v_time * 0.93) * 19
+    v_mx[1] = 32 + cos(v_time * 1.07 + 2.1) * 14
+    v_my[1] = 32 + sin(v_time * 0.79 + 2.1) * 23
+    v_mx[2] = 32 + cos(v_time * 0.53 + 4.2) * 23
+    v_my[2] = 32 + sin(v_time * 1.19 + 4.2) * 13
+}
+
+def calculate_field {
+    for v_i in (0, v_count - 1, 1)
+        v_fx = 0
+        v_fy = 0
+        for v_j in (0, v_magnet_count - 1, 1)
+            v_dx = v_mx[v_j] - v_x[v_i]
+            v_dy = v_my[v_j] - v_y[v_i]
+            # Softened inverse-square pull. Equal poles repel, opposites attract.
+            v_d2 = v_dx * v_dx + v_dy * v_dy + 18
+            v_dist = sqrt(v_d2)
+            v_force = -v_field_strength * v_charge[v_i] * v_mp[v_j] / v_d2
+            v_fx = v_fx + v_dx / v_dist * v_force
+            v_fy = v_fy + v_dy / v_dist * v_force
+        endfor v_j
+
+        v_mag = sqrt(v_fx * v_fx + v_fy * v_fy)
+        if v_mag > v_max_accel then
+            v_fx = v_fx / v_mag * v_max_accel
+            v_fy = v_fy / v_mag * v_max_accel
+        endif
+        v_ax[v_i] = v_fx
+        v_ay[v_i] = v_fy
+    endfor v_i
+}
+
+# Magnets always shove marbles out of their cores, regardless of charge.
+# This runs every frame so a marble cannot sit inside a moving pole.
+def push_from_magnets {
+    for v_i in (0, v_count - 1, 1)
+        for v_j in (0, v_magnet_count - 1, 1)
+            v_dx = v_x[v_i] - v_mx[v_j]
+            v_dy = v_y[v_i] - v_my[v_j]
+            v_d2 = v_dx * v_dx + v_dy * v_dy
+            if v_d2 < v_core_r2 then
+                if v_d2 < 0.25 then
+                    v_d2 = 0.25
+                endif
+                v_dist = sqrt(v_d2)
+                v_nx = v_dx / v_dist
+                v_ny = v_dy / v_dist
+                v_falloff = (v_core_radius - v_dist) / v_core_radius
+                v_push = v_core_push * v_falloff * v_falloff
+                v_ax[v_i] = v_ax[v_i] + v_nx * v_push
+                v_ay[v_i] = v_ay[v_i] + v_ny * v_push
+                v_boost = v_core_boost * v_falloff * v_falloff
+                v_vx[v_i] = v_vx[v_i] + v_nx * v_boost
+                v_vy[v_i] = v_vy[v_i] + v_ny * v_boost
+                # Bleed only inward speed so they curve off instead of bouncing.
+                v_inward = v_vx[v_i] * v_nx + v_vy[v_i] * v_ny
+                if v_inward < 0 then
+                    v_bleed = v_inward * 0.42 * v_falloff
+                    v_vx[v_i] = v_vx[v_i] - v_nx * v_bleed
+                    v_vy[v_i] = v_vy[v_i] - v_ny * v_bleed
+                endif
+            endif
+        endfor v_j
+    endfor v_i
+}
+
+def record_hits {
+    for v_i in (0, v_count - 1, 1)
+        if v_pair_hit[v_i] > 0 or v_wall_hit[v_i] > 0 then
+            v_speed = abs(v_vx[v_i]) + abs(v_vy[v_i])
+            if v_speed > 0.32 then
+                v_flash_x[v_flash_head] = v_x[v_i]
+                v_flash_y[v_flash_head] = v_y[v_i]
+                v_flash_life[v_flash_head] = 5
+                v_flash_head = v_flash_head + 1
+                if v_flash_head >= 12 then
+                    v_flash_head = 0
+                endif
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_field {
+    for v_j in (0, v_magnet_count - 1, 1)
+        if v_mp[v_j] > 0 then
+            draw_circle(v_mx[v_j], v_my[v_j], 3, red, 28, false)
+            draw_circle(v_mx[v_j], v_my[v_j], 1, orange, 90, true)
+        else
+            draw_circle(v_mx[v_j], v_my[v_j], 3, blue, 28, false)
+            draw_circle(v_mx[v_j], v_my[v_j], 1, cyan, 90, true)
+        endif
+        plot(v_mx[v_j], v_my[v_j], white, 100)
+    endfor v_j
+}
+
+def draw_marbles {
+    for v_i in (0, v_count - 1, 1)
+        # Manhattan speed is visually equivalent here and avoids 18 square
+        # roots in the drawing hot path.
+        v_speed = abs(v_vx[v_i]) + abs(v_vy[v_i])
+        v_bright = min(100, 62 + v_speed * 12)
+        if v_charge[v_i] > 0 then
+            draw_circle(v_x[v_i], v_y[v_i], v_radius, orange, v_bright, true)
+        else
+            draw_circle(v_x[v_i], v_y[v_i], v_radius, cyan, v_bright, true)
+        endif
+        plot(v_x[v_i] - 1, v_y[v_i] - 1, white, 62)
+    endfor v_i
+}
+
+def draw_flashes {
+    for v_i in (0, 11, 1)
+        if v_flash_life[v_i] > 0 then
+            draw_circle(v_flash_x[v_i], v_flash_y[v_i], 2, white, v_flash_life[v_i] * 13, false)
+            v_flash_life[v_i] = v_flash_life[v_i] - 1
+        endif
+    endfor v_i
+}
+
+call reset_marbles
+v_frame = 0
+v_sync_counter = 0
+
+while 1 == 1 then
+    call update_magnets
+    # The field changes slowly; reuse acceleration for three physics frames.
+    # The marbles still integrate and collide on every displayed frame.
+    if v_frame % 3 == 0 then
+        call calculate_field
+    endif
+    call push_from_magnets
+
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, v_damping, 0, v_count)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, v_wall_bounce, v_radius, v_wall_hit, v_count)
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_radius, 1, v_pair_bounce, v_pair_hit, v_count)
+    if v_frame % 2 == 0 then
+        call record_hits
+    endif
+
+    # Periodically reverse every pole for a dramatic field inversion.
+    v_mode_time = v_mode_time + 1
+    if v_mode_time >= 240 then
+        for v_j in (0, v_magnet_count - 1, 1)
+            v_mp[v_j] = -v_mp[v_j]
+        endfor v_j
+        v_mode_time = 0
+        v_field_strength = random(0.58, 0.88, 2)
+    endif
+
+    begin_frame
+        call draw_field
+        call draw_marbles
+        call draw_flashes
+    end_frame
+
+    v_time = v_time + 0.035
+    v_frame = v_frame + 1
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+
+    v_sync_counter = v_sync_counter + 1
+    if v_sync_counter >= 3 then
+        sync_queue
+        v_sync_counter = 0
+    endif
+endwhile

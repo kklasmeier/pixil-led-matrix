@@ -68,14 +68,25 @@ def particle_integrate(
     damping: float = 1.0,
     sleep_speed: float = 0.0,
     count: Optional[int] = None,
+    integration_mode: str = "post_move",
+    max_speed: Optional[ScalarOrSeq] = None,
 ) -> None:
-    """Advance active particles by one velocity-Verlet-free Euler step.
+    """Advance active particles by one Euler step.
 
-    For each active particle:
+    ``integration_mode`` is ``"post_move"`` (default) or ``"pre_move"``.
+    Post-move order:
       vx += ax; vy += ay
       x += vx; y += vy
       vx *= damping; vy *= damping
-      clamp |vx| / |vy| below sleep_speed to 0
+      clamp each velocity component to max_speed, if supplied
+
+    Pre-move order:
+      vx += ax; vy += ay
+      vx *= damping; vy *= damping
+      clamp each velocity component to max_speed, if supplied
+      x += vx; y += vy
+
+    In either mode, components below sleep_speed are set to 0 after moving.
 
     Inactive particles are left unchanged. Does not write a hit array.
     """
@@ -89,16 +100,39 @@ def particle_integrate(
     n = _count(x, y, vx, vy, active, count=count)
     damp = float(damping)
     sleep = float(sleep_speed)
+    mode = str(integration_mode).strip().lower()
+    if mode not in ("post_move", "pre_move"):
+        raise ValueError(
+            "particle_integrate: integration_mode must be "
+            f"'post_move' or 'pre_move' (got {integration_mode!r})"
+        )
+    pre_move = mode == "pre_move"
 
     for i in range(n):
         if not _is_active(ad, i):
             continue
         vxd[i] += _component(ax, i)
         vyd[i] += _component(ay, i)
-        xd[i] += vxd[i]
-        yd[i] += vyd[i]
-        vxd[i] *= damp
-        vyd[i] *= damp
+        if pre_move:
+            vxd[i] *= damp
+            vyd[i] *= damp
+        else:
+            xd[i] += vxd[i]
+            yd[i] += vyd[i]
+            vxd[i] *= damp
+            vyd[i] *= damp
+        if max_speed is not None:
+            limit = _component(max_speed, i)
+            if limit < 0.0:
+                raise ValueError(
+                    "particle_integrate: max_speed must be >= 0 "
+                    f"(got {limit})"
+                )
+            vxd[i] = max(-limit, min(limit, vxd[i]))
+            vyd[i] = max(-limit, min(limit, vyd[i]))
+        if pre_move:
+            xd[i] += vxd[i]
+            yd[i] += vyd[i]
         if abs(vxd[i]) < sleep:
             vxd[i] = 0.0
         if abs(vyd[i]) < sleep:
@@ -115,7 +149,7 @@ def particle_collide_bounds(
     right: float,
     top: float,
     bottom: float,
-    restitution: float = 1.0,
+    restitution: ScalarOrSeq = 1.0,
     radius: ScalarOrSeq = 0.0,
     hit: Optional[NumericSeq] = None,
     count: Optional[int] = None,
@@ -135,7 +169,6 @@ def particle_collide_bounds(
     )
     n = _count(x, y, vx, vy, active, count=count)
     hit_data = _zero_hit(hit, n)
-    bounce = float(restitution)
     left_b = float(left)
     right_b = float(right)
     top_b = float(top)
@@ -144,6 +177,7 @@ def particle_collide_bounds(
     for i in range(n):
         if not _is_active(ad, i):
             continue
+        bounce = _component(restitution, i)
         r = _component(radius, i)
         lo_x = left_b + r
         hi_x = right_b - r
@@ -173,6 +207,78 @@ def particle_collide_bounds(
             _mark_hit(hit_data, i)
 
 
+def particle_collide_circle_bounds(
+    x: NumericSeq,
+    y: NumericSeq,
+    vx: NumericSeq,
+    vy: NumericSeq,
+    active: NumericSeq,
+    center_x: float,
+    center_y: float,
+    boundary_radius: float,
+    restitution: ScalarOrSeq = 1.0,
+    radius: ScalarOrSeq = 0.0,
+    angular_speed: float = 0.0,
+    grip: float = 0.0,
+    hit: Optional[NumericSeq] = None,
+    count: Optional[int] = None,
+) -> None:
+    """Keep active particles inside a circular, optionally rotating boundary.
+
+    Particle centres are projected to ``boundary_radius - radius``. Outward
+    normal velocity is reflected by ``restitution``. ``grip`` moves tangential
+    velocity toward the wall velocity produced by signed ``angular_speed``.
+    """
+    xd, yd, vxd, vyd, ad = (
+        _data(x),
+        _data(y),
+        _data(vx),
+        _data(vy),
+        _data(active),
+    )
+    n = _count(x, y, vx, vy, active, count=count)
+    hit_data = _zero_hit(hit, n)
+    cx = float(center_x)
+    cy = float(center_y)
+    outer = max(0.0, float(boundary_radius))
+    omega = float(angular_speed)
+    wall_grip = float(grip)
+
+    for i in range(n):
+        if not _is_active(ad, i):
+            continue
+        bounce = _component(restitution, i)
+        limit = max(0.0, outer - _component(radius, i))
+        rx = xd[i] - cx
+        ry = yd[i] - cy
+        dist_sq = rx * rx + ry * ry
+        if dist_sq <= limit * limit:
+            continue
+
+        if dist_sq <= 1e-12:
+            nx, ny = 1.0, 0.0
+        else:
+            dist = math.sqrt(dist_sq)
+            nx, ny = rx / dist, ry / dist
+
+        xd[i] = cx + nx * limit
+        yd[i] = cy + ny * limit
+
+        normal_speed = vxd[i] * nx + vyd[i] * ny
+        if normal_speed > 0.0:
+            vxd[i] -= nx * normal_speed * (1.0 + bounce)
+            vyd[i] -= ny * normal_speed * (1.0 + bounce)
+
+        if wall_grip != 0.0 and omega != 0.0:
+            tx, ty = -ny, nx
+            tangent_speed = vxd[i] * tx + vyd[i] * ty
+            tangent_delta = (omega * limit - tangent_speed) * wall_grip
+            vxd[i] += tx * tangent_delta
+            vyd[i] += ty * tangent_delta
+
+        _mark_hit(hit_data, i)
+
+
 def particle_collide_circles(
     x: NumericSeq,
     y: NumericSeq,
@@ -181,7 +287,7 @@ def particle_collide_circles(
     active: NumericSeq,
     radius: ScalarOrSeq,
     mass: ScalarOrSeq = 1.0,
-    restitution: float = 1.0,
+    restitution: ScalarOrSeq = 1.0,
     hit: Optional[NumericSeq] = None,
     count: Optional[int] = None,
 ) -> int:
@@ -204,7 +310,6 @@ def particle_collide_circles(
     )
     n = _count(x, y, vx, vy, active, count=count)
     hit_data = _zero_hit(hit, n)
-    bounce = float(restitution)
     pair_hits = 0
 
     for i in range(n - 1):
@@ -263,6 +368,7 @@ def particle_collide_circles(
             relative = (vxd[j] - vxd[i]) * nx + (vyd[j] - vyd[i]) * ny
             if relative >= 0.0:
                 continue
+            bounce = min(_component(restitution, i), _component(restitution, j))
             impulse = -(1.0 + bounce) * relative / inv_sum
             vxd[i] -= (impulse * inv_i) * nx
             vyd[i] -= (impulse * inv_i) * ny
@@ -270,3 +376,143 @@ def particle_collide_circles(
             vyd[j] += (impulse * inv_j) * ny
 
     return pair_hits
+
+
+def _static_circle_candidate_grid(
+    obstacle_x: list,
+    obstacle_y: list,
+    obstacle_radius: ScalarOrSeq,
+    obstacle_count: int,
+    max_particle_radius: float,
+) -> tuple[dict[tuple[int, int], list[int]], float, float]:
+    """Build a transient uniform grid for generic static-circle queries."""
+    max_obstacle_radius = max(
+        (max(0.0, _component(obstacle_radius, j)) for j in range(obstacle_count)),
+        default=0.0,
+    )
+    reach = max_particle_radius + max_obstacle_radius
+    cell_size = max(1.0, reach)
+    grid: dict[tuple[int, int], list[int]] = {}
+
+    for j in range(obstacle_count):
+        obstacle_r = max(0.0, _component(obstacle_radius, j))
+        x0 = math.floor((float(obstacle_x[j]) - obstacle_r) / cell_size)
+        x1 = math.floor((float(obstacle_x[j]) + obstacle_r) / cell_size)
+        y0 = math.floor((float(obstacle_y[j]) - obstacle_r) / cell_size)
+        y1 = math.floor((float(obstacle_y[j]) + obstacle_r) / cell_size)
+        for cell_x in range(x0, x1 + 1):
+            for cell_y in range(y0, y1 + 1):
+                grid.setdefault((cell_x, cell_y), []).append(j)
+
+    return grid, cell_size, max_obstacle_radius
+
+
+def particle_collide_static_circles(
+    x: NumericSeq,
+    y: NumericSeq,
+    vx: NumericSeq,
+    vy: NumericSeq,
+    active: NumericSeq,
+    obstacle_x: NumericSeq,
+    obstacle_y: NumericSeq,
+    radius: ScalarOrSeq,
+    obstacle_radius: ScalarOrSeq,
+    restitution: ScalarOrSeq = 1.0,
+    hit: Optional[NumericSeq] = None,
+    count: Optional[int] = None,
+    obstacle_count: Optional[int] = None,
+    response: str = "impulse",
+) -> int:
+    """Bounce active particles off fixed circular obstacles.
+
+    The obstacles have infinite mass and are never modified. Overlapping
+    particles are projected to contact.
+
+    ``response`` is ``"impulse"`` (default) or ``"reflect"``:
+    - impulse: change velocity only while approaching; only the normal
+      component is scaled by restitution (tangent is kept).
+    - reflect: every overlap reflects the full velocity, then scales the
+      whole vector by restitution.
+
+    Returns the number of contacts resolved.
+    """
+    xd, yd, vxd, vyd, ad = (
+        _data(x),
+        _data(y),
+        _data(vx),
+        _data(vy),
+        _data(active),
+    )
+    oxd, oyd = _data(obstacle_x), _data(obstacle_y)
+    n = _count(x, y, vx, vy, active, count=count)
+    obstacles = _count(obstacle_x, obstacle_y, count=obstacle_count)
+    hit_data = _zero_hit(hit, n)
+    contacts = 0
+    mode = str(response).strip().lower()
+    if mode not in ("impulse", "reflect"):
+        raise ValueError(
+            "particle_collide_static_circles: response must be "
+            f"'impulse' or 'reflect' (got {response!r})"
+        )
+    full_reflect = mode == "reflect"
+    max_particle_radius = max(
+        (max(0.0, _component(radius, i)) for i in range(n)),
+        default=0.0,
+    )
+    obstacle_grid, cell_size, max_obstacle_radius = _static_circle_candidate_grid(
+        oxd, oyd, obstacle_radius, obstacles, max_particle_radius,
+    )
+
+    for i in range(n):
+        if not _is_active(ad, i):
+            continue
+        bounce = _component(restitution, i)
+        particle_r = _component(radius, i)
+        reach = max(0.0, particle_r) + max_obstacle_radius
+        # Positional correction can move the particle by up to ``reach``.
+        # Include that possible destination so subsequent contacts retain
+        # the original obstacle-index order within this call.
+        query_reach = reach * 2.0
+        x0 = math.floor((xd[i] - query_reach) / cell_size)
+        x1 = math.floor((xd[i] + query_reach) / cell_size)
+        y0 = math.floor((yd[i] - query_reach) / cell_size)
+        y1 = math.floor((yd[i] + query_reach) / cell_size)
+        candidate_indices = set()
+        for cell_x in range(x0, x1 + 1):
+            for cell_y in range(y0, y1 + 1):
+                candidate_indices.update(obstacle_grid.get((cell_x, cell_y), ()))
+        for j in sorted(candidate_indices):
+            min_dist = particle_r + _component(obstacle_radius, j)
+            dx = xd[i] - float(oxd[j])
+            if abs(dx) >= min_dist:
+                continue
+            dy = yd[i] - float(oyd[j])
+            if abs(dy) >= min_dist:
+                continue
+            dist_sq = dx * dx + dy * dy
+            if dist_sq >= min_dist * min_dist:
+                continue
+
+            contacts += 1
+            _mark_hit(hit_data, i)
+            if dist_sq <= 1e-12:
+                speed = math.hypot(vxd[i], vyd[i])
+                if speed > 1e-12:
+                    nx, ny = -vxd[i] / speed, -vyd[i] / speed
+                else:
+                    nx, ny = 1.0, 0.0
+            else:
+                dist = math.sqrt(dist_sq)
+                nx, ny = dx / dist, dy / dist
+
+            xd[i] = float(oxd[j]) + nx * min_dist
+            yd[i] = float(oyd[j]) + ny * min_dist
+            normal_speed = vxd[i] * nx + vyd[i] * ny
+            if full_reflect:
+                vxd[i] = (vxd[i] - 2.0 * normal_speed * nx) * bounce
+                vyd[i] = (vyd[i] - 2.0 * normal_speed * ny) * bounce
+            elif normal_speed < 0.0:
+                vxd[i] -= nx * normal_speed * (1.0 + bounce)
+                vyd[i] -= ny * normal_speed * (1.0 + bounce)
+
+    return contacts

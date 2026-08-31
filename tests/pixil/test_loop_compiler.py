@@ -16,6 +16,17 @@ from pixil_utils.array_manager import PixilArray
 import pixil_utils.optimization_flags as flags
 
 
+def test_compile_static_circle_particle_command():
+    flags.ENABLE_COMPILED_LOOPS = True
+    compiled = try_compile_loop_block([
+        "particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_ox, v_oy, 1, 1, 1, v_hit, 4, 8, reflect)",
+    ])
+
+    assert compiled is not None
+    assert isinstance(compiled.statements[0], CommandStmt)
+    flags.ENABLE_COMPILED_LOOPS = False
+
+
 def test_compile_metaballs_inner_structure():
     flags.ENABLE_COMPILED_LOOPS = True
     reset_loop_compiler_stats()

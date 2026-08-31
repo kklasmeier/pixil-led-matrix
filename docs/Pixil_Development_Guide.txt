@@ -89,6 +89,20 @@ drops cached runtime after the script reseeds arrays directly.
 Script syntax reference: Pixil_Scripting_Guide.txt section 19.
 Example scripts: scripts/main/game_of_life.pix, Blob.pix, scripts/testing/test_grid_program_*.pix
 
+GENERIC PARTICLE KERNELS (PRODUCER-SIDE)
+----------------------------------------
+particle_integrate / particle_collide_* run in the producer
+(pixil_utils/particle_engine.py via particle_commands.py). They mutate
+numeric arrays only — they do not draw and do not queue rgb_matrix_lib
+commands. Pixil.py dispatches them like other producer-side commands.
+
+Script syntax reference: Pixil_Scripting_Guide.txt section 20.
+Example scripts: Billiard_Break.pix, Particle_Tumbler.pix,
+Magnetic_Marbles.pix, Asteroid_Miner.pix, pachinko_machine_v2.pix,
+Galton_Board.pix, Hourglass_Marbles.pix. Optional response=reflect on
+static-circle collide uses full-velocity bounce then restitution scale
+(see Scripting Guide §20).
+
 ================================================================================
 3. FILE MAP
 ================================================================================
@@ -117,6 +131,8 @@ Example scripts: scripts/main/game_of_life.pix, Blob.pix, scripts/testing/test_g
 │   ├── grid_field_compiler.py # Parse grid_program / field_program blocks
 │   ├── grid_engine.py       # NumPy step/render for grid_step / field_render
 │   ├── chladni_engine.py    # Vectorized Chladni particle step (chladni_step)
+│   ├── particle_engine.py   # Generic particle kernels (integrate / collide)
+│   ├── particle_commands.py # Pixil dispatch for particle_* commands
 │   ├── ink_engine.py        # Ink-in-water particle step (ink_step)
 │   └── jit_compiler/        # JIT compilation for math expressions
 │       ├── __init__.py
@@ -450,7 +466,16 @@ ADDING A FIELD mode
 2. Branch in run_field_render() or _eval_value_formula() in grid_engine.py
 3. Tests + scripting guide + example script in scripts/main/
 
-ADDING A SPECIALIZED ENGINE (e.g. particles)
+ADDING GENERIC PARTICLE KERNELS
+-------------------------------
+1. Implement the kernel in pixil_utils/particle_engine.py (no drawing, no
+   show-specific rules)
+2. Wire validation/dispatch in pixil_utils/particle_commands.py
+3. Add PARAMETER_TYPES entry in pixil_utils/parameter_types.py
+4. Tests: tests/pixil/test_particle_engine.py and test_particle_commands.py
+5. Document the command in Pixil_Scripting_Guide.txt section 20
+
+ADDING A SPECIALIZED ENGINE (e.g. particles that draw)
 --------------------------------------------
 When logic is not a full-grid or site-sum field (like Chladni):
 1. New module under pixil_utils/ (e.g. chladni_engine.py)
@@ -497,6 +522,8 @@ Change in...                         Add...
 math, conditions, params, JIT        Tier 1 test in tests/pixil/test_<topic>.py
 grid/field compiler or engine        tests/pixil/test_grid_field_compiler.py,
                                      test_grid_engine.py, test_chladni_engine.py
+particle kernels                     tests/pixil/test_particle_engine.py,
+                                     test_particle_commands.py
 new/changed drawing on matrix        Tier 2 script in scripts/testing/ + manifest
 parser bug you can assert in Python  Tier 1 first; optional Tier 2 smoke .pix
 live clock or runtime on screen        Tier 2 with "volatile" (no buffer golden)
@@ -508,6 +535,10 @@ Grid/field Tier 1 tests (no hardware):
   test_grid_engine.py         — life blinker, gray-scott step, voronoi/metaballs
                                 render, grid_fill, grid_reset
   test_chladni_engine.py      — chladni value + step draws
+  test_particle_engine.py     — integrate / bounds / circle / static-peg kernels,
+                                including per-particle restitution arrays
+  test_particle_commands.py   — particle_* validation and dispatch, including
+                                restitution arrays as command arguments
 
 Example Tier 2 / manual on Pi:
   ./run main/game_of_life.pix
@@ -724,6 +755,16 @@ pixil_utils/chladni_engine.py
   Particle-based exception: not expressible as grid_program (sparse particles).
   Fixed variable names wired in Pixil.py (v_px, v_py, v_n_scale, v_m_scale).
 
+pixil_utils/particle_engine.py / particle_commands.py
+  Generic circle kernels: integrate, rect/circle bounds, particle-particle,
+  static obstacles. Restitution may be a scalar or per-particle array
+  (materials). Particle-particle pairs use min(restitution_i, restitution_j).
+  particle_integrate defaults to post_move order; optional pre_move order
+  damps and clamps velocity before movement.
+  particle_collide_static_circles optional response=reflect uses full-velocity
+  bounce then restitution scale; default response=impulse is approach-only.
+  Mutate arrays only; Pixil draws. See Scripting Guide §20.
+
 PIXIL.PY INTEGRATION
 --------------------
 At script load (once per program name):
@@ -822,6 +863,8 @@ Grid/field expression eval      pixil_utils/grid_expr.py
 Escape-time fractals            pixil_utils/fractal_escape.py
 Grid/field NumPy execution      pixil_utils/grid_engine.py
 Chladni particle step           pixil_utils/chladni_engine.py
+Generic particle kernels        pixil_utils/particle_engine.py,
+                                pixil_utils/particle_commands.py
 Ink particle step               pixil_utils/ink_engine.py
 Command execution               rgb_matrix_lib/commands.py
 Shape drawing                   rgb_matrix_lib/drawing_objects.py

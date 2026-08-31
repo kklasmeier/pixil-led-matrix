@@ -1,8 +1,9 @@
-# Galton Board (Bean Machine)
-# Balls fall through staggered pegs and build a bin histogram (bell curve).
-#
-# Bottom layout: 18 slots x 3px = 54px, each slot has 1px margin + 2px bar
-# Rubber-ball physics: pegs reflect velocity; balls zig-zag into bins
+# Galton Board (Bean Machine / Plinko)
+# Balls fall through a staggered peg field and build a bin histogram.
+# Integration uses particle_integrate pre_move + max_speed for classic motion.
+# Peg contacts use particle_collide_static_circles with response=reflect.
+# Side walls above the shelf, chute/bins, kicks, and sprites stay in Pixil.
+# 16 in-flight balls is the measured queue-stable maximum on this Pi.
 
 throttle(0)
 fps(60)
@@ -22,7 +23,8 @@ v_slot_w = 3
 v_bar_w = 2
 v_hist_height = 15
 
-v_max_balls = 3
+# 16 is the measured queue-stable maximum on this Pi.
+v_max_balls = 16
 v_drop_interval = 8
 
 v_gravity = 0.12
@@ -40,9 +42,6 @@ v_col_spacing = 4
 
 v_peg_radius = 0.5
 v_ball_radius = 0.5
-v_collision_dist = v_peg_radius + v_ball_radius
-v_coll_dist_sq = v_collision_dist * v_collision_dist
-v_coll_reject = v_collision_dist + 0.25
 
 v_drop_x = 32
 
@@ -70,6 +69,7 @@ create_array(v_ball_ix, v_max_balls, numeric)
 create_array(v_ball_iy, v_max_balls, numeric)
 create_array(v_ball_hidden, v_max_balls, numeric)
 create_array(v_ball_col, v_max_balls, numeric)
+create_array(v_peg_hit, v_max_balls, numeric)
 create_array(v_bin_count, v_num_bins, numeric)
 create_array(v_bin_height, v_num_bins, numeric)
 create_array(v_slot_x0, v_num_bins, numeric)
@@ -170,27 +170,15 @@ while 1 == 1 then
         endfor v_i
     endif
 
+    # Classic motion order is native: accelerate, damp, clamp each axis, then move.
+    particle_integrate(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, 0, v_gravity, v_air_friction, 0, v_max_balls, pre_move, v_max_v)
+
+    # The side walls apply only above the shelf; chute walls below remain scene logic.
     for v_i in (0, v_max_balls - 1, 1)
         if v_ball_active[v_i] == 1 then
-            v_vx = v_ball_vx[v_i] * v_air_friction
-            v_vy = (v_ball_vy[v_i] + v_gravity) * v_air_friction
-
-            if v_vx > v_max_v then
-                v_vx = v_max_v
-            endif
-            if v_vx < v_neg_max_v then
-                v_vx = v_neg_max_v
-            endif
-            if v_vy > v_max_v then
-                v_vy = v_max_v
-            endif
-            if v_vy < v_neg_max_v then
-                v_vy = v_neg_max_v
-            endif
-
-            v_x = v_ball_x[v_i] + v_vx
-            v_y = v_ball_y[v_i] + v_vy
-
+            v_x = v_ball_x[v_i]
+            v_y = v_ball_y[v_i]
+            v_vx = v_ball_vx[v_i]
             if v_y < v_floor_y then
                 if v_x < v_left then
                     v_x = v_left
@@ -202,54 +190,22 @@ while 1 == 1 then
                 endif
             endif
 
-            # Peg collisions: current row + motion row only (2 rows, not 3)
-            if v_y < v_floor_y then
-                v_row = int((v_y - v_peg_top) / v_row_spacing)
-                if v_row < 0 then
-                    v_row = 0
-                endif
-                if v_row > (v_peg_rows - 1) then
-                    v_row = v_peg_rows - 1
-                endif
+            v_ball_x[v_i] = v_x
+            v_ball_vx[v_i] = v_vx
+        endif
+    endfor v_i
 
-                if v_vy >= 0 then
-                    v_r0 = v_row
-                    v_r1 = v_row + 1
-                else
-                    v_r0 = v_row - 1
-                    v_r1 = v_row
-                endif
-                if v_r0 < 0 then
-                    v_r0 = 0
-                endif
-                if v_r1 > (v_peg_rows - 1) then
-                    v_r1 = v_peg_rows - 1
-                endif
+    particle_collide_static_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_peg_x, v_peg_y, v_ball_radius, v_peg_radius, v_bounce_damping, v_peg_hit, v_max_balls, v_peg_count, reflect)
 
-                for v_rr in (v_r0, v_r1, 1)
-                    v_ps = v_row_start[v_rr]
-                    v_pe = v_row_end[v_rr]
-                    for v_p in (v_ps, v_pe, 1)
-                        v_dx = v_x - v_peg_x[v_p]
-                        if v_dx <= v_coll_reject and v_dx >= -v_coll_reject then
-                            v_dy = v_y - v_peg_y[v_p]
-                            if v_dy <= v_coll_reject and v_dy >= -v_coll_reject then
-                                v_d2 = v_dx * v_dx + v_dy * v_dy
-                                if v_d2 > 0.01 and v_d2 < v_coll_dist_sq then
-                                    v_dist = sqrt(v_d2)
-                                    v_nx = v_dx / v_dist
-                                    v_ny = v_dy / v_dist
-                                    v_x = v_peg_x[v_p] + v_nx * v_collision_dist
-                                    v_y = v_peg_y[v_p] + v_ny * v_collision_dist
-                                    v_dot = v_vx * v_nx + v_vy * v_ny
-                                    v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
-                                    v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
-                                    v_vx = v_vx + random(-v_bounce_randomness, v_bounce_randomness, 2)
-                                endif
-                            endif
-                        endif
-                    endfor v_p
-                endfor v_rr
+    for v_i in (0, v_max_balls - 1, 1)
+        if v_ball_active[v_i] == 1 then
+            v_x = v_ball_x[v_i]
+            v_y = v_ball_y[v_i]
+            v_vx = v_ball_vx[v_i]
+            v_vy = v_ball_vy[v_i]
+
+            if v_peg_hit[v_i] > 0 then
+                v_vx = v_vx + random(-v_bounce_randomness, v_bounce_randomness, 2)
             endif
 
             # Bin chute: lock column at shelf, bounce off slot walls

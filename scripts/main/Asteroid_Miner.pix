@@ -1,0 +1,355 @@
+# Asteroid Miner
+# Drifting rocks collide and fracture into a fixed pool of smaller bodies.
+# Generic particle primitives handle motion and collisions; targeting, laser
+# mining, splitting, and scoring remain Pixil rules. Shots fire from the
+# bottom-left and bottom-right corners (no ship). Each field reset picks
+# wrap-around or edge-bounce for the whole sequence.
+
+throttle(0)
+fps(30)
+
+v_slots = 16
+v_start_rocks = 6
+v_min_radius = 0.8
+v_left = 2
+v_right = 61
+v_top = 2
+v_bottom = 61
+v_gun_left_x = 3
+v_gun_left_y = 63
+v_gun_right_x = 60
+v_gun_right_y = 63
+v_origin_x = v_gun_left_x
+v_origin_y = v_gun_left_y
+v_score = 0
+v_frame = 0
+v_laser_timer_l = 18
+v_laser_timer_r = 34
+v_laser_life_l = 0
+v_laser_life_r = 0
+v_laser_target = -1
+v_laser_lx = v_gun_left_x
+v_laser_ly = 20
+v_laser_rx = v_gun_right_x
+v_laser_ry = 20
+v_reset_timer = 0
+v_wrap_mode = 0
+
+create_array(v_x, v_slots, numeric)
+create_array(v_y, v_slots, numeric)
+create_array(v_vx, v_slots, numeric)
+create_array(v_vy, v_slots, numeric)
+create_array(v_radius, v_slots, numeric)
+create_array(v_mass, v_slots, numeric)
+create_array(v_active, v_slots, numeric)
+create_array(v_wall_hit, v_slots, numeric)
+create_array(v_pair_hit, v_slots, numeric)
+create_array(v_cooldown, v_slots, numeric)
+create_array(v_color, v_slots, string)
+
+create_array(v_spark_x, 10, numeric)
+create_array(v_spark_y, 10, numeric)
+create_array(v_spark_life, 10, numeric)
+v_spark_head = 0
+
+# Star positions must be filled outside define_sprite: for-loops inside a
+# sprite body are ignored, which used to leave a single random background pixel.
+v_num_stars = 32
+create_array(v_star_x, v_num_stars, numeric)
+create_array(v_star_y, v_num_stars, numeric)
+create_array(v_star_b, v_num_stars, numeric)
+for v_s in (0, v_num_stars - 1, 1)
+    v_star_x[v_s] = random(0, 63, 0)
+    v_star_y[v_s] = random(0, 63, 0)
+    # Depth: 28 is the current peak; dimmest stars are half of that.
+    v_star_b[v_s] = random(14, 28, 0)
+endfor v_s
+
+def reset_field {
+    for v_i in (0, v_slots - 1, 1)
+        v_active[v_i] = 0
+        v_vx[v_i] = 0
+        v_vy[v_i] = 0
+        v_radius[v_i] = 1
+        v_mass[v_i] = 1
+        v_cooldown[v_i] = 0
+        if v_i % 4 == 0 then
+            v_color[v_i] = "gray"
+        elseif v_i % 4 == 1 then
+            v_color[v_i] = "silver"
+        elseif v_i % 4 == 2 then
+            v_color[v_i] = "dark_gray"
+        else
+            v_color[v_i] = "tan"
+        endif
+    endfor v_i
+
+    for v_i in (0, v_start_rocks - 1, 1)
+        v_active[v_i] = 1
+        v_x[v_i] = random(8, 56, 1)
+        v_y[v_i] = random(7, 43, 1)
+        v_vx[v_i] = random(-0.72, 0.72, 2)
+        v_vy[v_i] = random(-0.58, 0.58, 2)
+        v_radius[v_i] = random(2.2, 3.5, 1)
+        v_mass[v_i] = v_radius[v_i] * v_radius[v_i]
+    endfor v_i
+
+    for v_i in (0, 9, 1)
+        v_spark_life[v_i] = 0
+    endfor v_i
+    v_laser_life_l = 0
+    v_laser_life_r = 0
+    v_laser_timer_l = 18
+    v_laser_timer_r = 34
+    v_reset_timer = 0
+    # 0 = bounce off walls, 1 = wrap to the opposite edge (whole sequence)
+    v_wrap_mode = random(0, 1, 0)
+}
+
+def add_spark {
+    v_spark_x[v_spark_head] = v_x[v_i]
+    v_spark_y[v_spark_head] = v_y[v_i]
+    v_spark_life[v_spark_head] = 7
+    v_spark_head = v_spark_head + 1
+    if v_spark_head >= 10 then
+        v_spark_head = 0
+    endif
+}
+
+def split_rock {
+    # v_i is the rock being mined or fractured.
+    if v_active[v_i] == 1 then
+        call add_spark
+        if v_radius[v_i] <= 1.15 then
+            v_active[v_i] = 0
+            v_vx[v_i] = 0
+            v_vy[v_i] = 0
+            v_score = v_score + 1
+        else
+            v_new_slot = -1
+            for v_j in (0, v_slots - 1, 1)
+                if v_new_slot < 0 and v_active[v_j] == 0 then
+                    v_new_slot = v_j
+                endif
+            endfor v_j
+
+            if v_new_slot >= 0 then
+                v_old_radius = v_radius[v_i]
+                v_old_vx = v_vx[v_i]
+                v_old_vy = v_vy[v_i]
+                v_new_radius = max(v_min_radius, v_old_radius * 0.72)
+                v_radius[v_i] = v_new_radius
+                v_mass[v_i] = v_new_radius * v_new_radius
+                v_cooldown[v_i] = 24
+
+                v_active[v_new_slot] = 1
+                v_radius[v_new_slot] = v_new_radius
+                v_mass[v_new_slot] = v_new_radius * v_new_radius
+                v_x[v_new_slot] = v_x[v_i] + v_new_radius * 1.15
+                v_y[v_new_slot] = v_y[v_i] - v_new_radius * 0.65
+                v_vx[v_i] = v_old_vx - 0.42
+                v_vy[v_i] = v_old_vy + 0.28
+                v_vx[v_new_slot] = v_old_vx + 0.42
+                v_vy[v_new_slot] = v_old_vy - 0.28
+                v_cooldown[v_new_slot] = 24
+                v_color[v_new_slot] = v_color[v_i]
+                v_score = v_score + 1
+            else
+                # A full pool still lets the laser chip rocks smaller.
+                v_radius[v_i] = max(v_min_radius, v_radius[v_i] * 0.82)
+                v_mass[v_i] = v_radius[v_i] * v_radius[v_i]
+                v_cooldown[v_i] = 18
+            endif
+        endif
+    endif
+}
+
+def wrap_asteroids {
+    # Toroidal wrap on the 64x64 display (centre can leave, then re-enter).
+    for v_i in (0, v_slots - 1, 1)
+        if v_active[v_i] == 1 then
+            if v_x[v_i] < 0 then
+                v_x[v_i] = v_x[v_i] + 64
+            endif
+            if v_x[v_i] >= 64 then
+                v_x[v_i] = v_x[v_i] - 64
+            endif
+            if v_y[v_i] < 0 then
+                v_y[v_i] = v_y[v_i] + 64
+            endif
+            if v_y[v_i] >= 64 then
+                v_y[v_i] = v_y[v_i] - 64
+            endif
+        endif
+    endfor v_i
+}
+
+def fracture_collisions {
+    # Only energetic impacts split rocks, and cooldown prevents chain-shattering.
+    for v_i in (0, v_slots - 1, 1)
+        if v_cooldown[v_i] > 0 then
+            v_cooldown[v_i] = v_cooldown[v_i] - 1
+        elseif v_active[v_i] == 1 and v_pair_hit[v_i] > 0 and v_radius[v_i] > 1.45 then
+            v_impact_speed = abs(v_vx[v_i]) + abs(v_vy[v_i])
+            if v_impact_speed > 1.05 then
+                call split_rock
+            endif
+        endif
+    endfor v_i
+}
+
+def choose_laser_target {
+    # Mine the largest available rock; distance from the firing corner
+    # breaks near-ties so each gun tends to cover its own side.
+    v_laser_target = -1
+    v_best_value = -1
+    for v_i in (0, v_slots - 1, 1)
+        if v_active[v_i] == 1 then
+            v_dx = v_x[v_i] - v_origin_x
+            v_dy = v_y[v_i] - v_origin_y
+            v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+            v_value = v_radius[v_i] * 20 - v_dist * 0.08
+            if v_value > v_best_value then
+                v_best_value = v_value
+                v_laser_target = v_i
+            endif
+        endif
+    endfor v_i
+}
+
+def fire_left_gun {
+    v_origin_x = v_gun_left_x
+    v_origin_y = v_gun_left_y
+    call choose_laser_target
+    if v_laser_target >= 0 then
+        v_laser_lx = v_x[v_laser_target]
+        v_laser_ly = v_y[v_laser_target]
+        v_laser_life_l = 4
+        v_i = v_laser_target
+        call split_rock
+    endif
+}
+
+def fire_right_gun {
+    v_origin_x = v_gun_right_x
+    v_origin_y = v_gun_right_y
+    call choose_laser_target
+    if v_laser_target >= 0 then
+        v_laser_rx = v_x[v_laser_target]
+        v_laser_ry = v_y[v_laser_target]
+        v_laser_life_r = 4
+        v_i = v_laser_target
+        call split_rock
+    endif
+}
+
+def count_asteroids {
+    v_asteroid_count = 0
+    for v_i in (0, v_slots - 1, 1)
+        if v_active[v_i] == 1 then
+            v_asteroid_count = v_asteroid_count + 1
+        endif
+    endfor v_i
+}
+
+def draw_stars {
+    for v_s in (0, v_num_stars - 1, 1)
+        plot(v_star_x[v_s], v_star_y[v_s], white, v_star_b[v_s])
+    endfor v_s
+}
+
+def draw_asteroids {
+    for v_i in (0, v_slots - 1, 1)
+        if v_active[v_i] == 1 then
+            if v_radius[v_i] > 1.3 then
+                draw_circle(v_x[v_i], v_y[v_i], v_radius[v_i], v_color[v_i], 78, true)
+                plot(v_x[v_i] - 1, v_y[v_i] - 1, white, 42)
+            else
+                # Frame-local plot prevents a mined fragment leaving a stale
+                # mplot pixel behind after its slot becomes inactive.
+                plot(v_x[v_i], v_y[v_i], v_color[v_i], 90)
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_shots {
+    if v_laser_life_l > 0 then
+        draw_line(v_gun_left_x, v_gun_left_y, v_laser_lx, v_laser_ly, cyan, 28 + v_laser_life_l * 15)
+        plot(v_gun_left_x, v_gun_left_y, white, 90)
+        plot(v_laser_lx, v_laser_ly, white, 100)
+        v_laser_life_l = v_laser_life_l - 1
+    endif
+    if v_laser_life_r > 0 then
+        draw_line(v_gun_right_x, v_gun_right_y, v_laser_rx, v_laser_ry, cyan, 28 + v_laser_life_r * 15)
+        plot(v_gun_right_x, v_gun_right_y, white, 90)
+        plot(v_laser_rx, v_laser_ry, white, 100)
+        v_laser_life_r = v_laser_life_r - 1
+    endif
+}
+
+def draw_sparks {
+    for v_i in (0, 9, 1)
+        if v_spark_life[v_i] > 0 then
+            v_bright = v_spark_life[v_i] * 13
+            draw_circle(v_spark_x[v_i], v_spark_y[v_i], 1, yellow, v_bright, false)
+            v_spark_life[v_i] = v_spark_life[v_i] - 1
+        endif
+    endfor v_i
+}
+
+call reset_field
+clear()
+v_sync_counter = 0
+
+while 1 == 1 then
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0, 0.9995, 0, v_slots)
+    if v_wrap_mode == 1 then
+        call wrap_asteroids
+    else
+        particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, 0.96, v_radius, v_wall_hit, v_slots)
+    endif
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_radius, v_mass, 0.88, v_pair_hit, v_slots)
+    call fracture_collisions
+
+    v_laser_timer_l = v_laser_timer_l - 1
+    if v_laser_timer_l <= 0 then
+        call fire_left_gun
+        v_laser_timer_l = random(28, 46, 0)
+    endif
+    v_laser_timer_r = v_laser_timer_r - 1
+    if v_laser_timer_r <= 0 then
+        call fire_right_gun
+        v_laser_timer_r = random(28, 46, 0)
+    endif
+
+    if v_frame % 30 == 0 then
+        call count_asteroids
+        if v_asteroid_count == 0 then
+            v_reset_timer = v_reset_timer + 1
+        else
+            v_reset_timer = 0
+        endif
+        if v_reset_timer >= 2 then
+            call reset_field
+        endif
+    endif
+
+    begin_frame
+        call draw_stars
+        call draw_asteroids
+        call draw_shots
+        call draw_sparks
+    end_frame
+
+    v_frame = v_frame + 1
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+
+    v_sync_counter = v_sync_counter + 1
+    if v_sync_counter >= 3 then
+        sync_queue
+        v_sync_counter = 0
+    endif
+endwhile

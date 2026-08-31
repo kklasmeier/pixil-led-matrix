@@ -34,7 +34,8 @@ TABLE OF CONTENTS
 17. Common Errors and Troubleshooting
 18. Performance Tips
 19. Native Grid and Field Programs
-20. Script Examples
+20. Particle Primitives
+21. Script Examples
 
 To run a script:
 1. ssh pi@192.168.1.58
@@ -77,6 +78,18 @@ while true then
 endwhile
 ```
 See section 19 for full syntax.
+
+Particle primitives (many moving circles: billiards, pachinko, asteroids):
+```
+create_array(v_x, 16, numeric)
+create_array(v_y, 16, numeric)
+create_array(v_vx, 16, numeric)
+create_array(v_vy, 16, numeric)
+create_array(v_active, 16, numeric)
+particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.15)
+particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 2, 61, 2, 61, 0.96, 1.5)
+```
+These mutate arrays in place and do not draw. See section 20.
 
 ================================================================================
 2. DRAWING COMMANDS
@@ -1546,6 +1559,12 @@ distance-field effects (Voronoi, metaballs, ripples), use grid_program and
 field_program instead of per-cell Pixil loops. Setup and orchestration stay in
 Pixil; the hot step/render runs vectorized in NumPy. See section 19.
 
+PARTICLE PRIMITIVES
+-------------------
+For many moving circles, use particle_integrate and the particle_collide_*
+commands instead of a per-particle physics loop. They mutate numeric arrays
+in the producer and do not draw. See section 20.
+
 ================================================================================
 19. NATIVE GRID AND FIELD PROGRAMS
 ================================================================================
@@ -1574,6 +1593,10 @@ particle-based, not a full-grid program.
 
 Keep plain Pixil loops when logic is not expressible in the expression
 language, or when only a handful of objects are updated per frame.
+
+For many independent circles (balls, rocks, marbles), use the particle
+primitives in section 20 instead of per-body Pixil physics. Those commands
+update arrays; they do not render pixels (unlike grid_step / chladni_step).
 
 OVERVIEW
 --------
@@ -1936,7 +1959,201 @@ COMMON PITFALLS
   blocks are supported
 
 ================================================================================
-20. SCRIPT EXAMPLES
+20. PARTICLE PRIMITIVES
+================================================================================
+
+Five producer-side commands advance many particles without a Pixil physics
+loop. They mutate numeric arrays in place and do not draw. Pixil still owns
+spawning, scoring, wrap-vs-bounce policy, random kicks, and rendering
+(plot, sprites, begin_frame).
+
+Use them when you have a pool of circles (balls, rocks, marbles). Keep a
+plain Pixil loop when you have only a few bodies or logic the kernels
+cannot express (open floor exit, torus wrap, peg-hit random kick).
+
+ARRAY CONTRACT
+--------------
+State arrays x, y, vx, vy, and active must:
+- Be numeric (create_array(v_x, n, numeric))
+- Have the same length
+- Use names starting with v_
+
+active[i] != 0 means particle i is simulated; 0 is skipped.
+Optional hit arrays are the same length as the state arrays. Each collide
+call that takes hit clears the whole hit array, then sets hit[i] = 1 for
+contacts this call.
+
+radius, mass, ax, ay, and restitution may be a numeric literal or a numeric
+array. When they are arrays, length must match the particles (or obstacles,
+for obstacle_radius).
+
+Optional count limits how many leading slots are processed (useful when
+the array is larger than the live pool). Omit it to use the full array.
+Do not pass a bare number in a slot that can be parsed as a hit array
+name — if you need count after restitution/radius, pass the hit array
+explicitly first.
+
+Y grows downward (display origin is top-left). Restitution 1 is elastic;
+values below 1 lose energy on bounce.
+
+MATERIALS (RESTITUTION)
+-----------------------
+Pass a per-particle numeric array as restitution so each body has its own
+elasticity (rubber vs metal vs soft polymer). The kernels do not store
+named materials — Pixil chooses values and optional colours/kicks.
+
+Suggested starting values (used by pachinko_machine_v2.pix):
+    rubber          0.95   lively bounce
+    metal           0.72   firmer, less elastic
+    soft polymer    0.42   absorbs most impact
+
+How contacts combine:
+- Walls and circular walls use that particle's restitution.
+- Pegs / static circles currently use the particle's restitution (pegs
+  are infinite-mass; there is no peg-material array yet).
+- Particle-particle pairs use the lower of the two values, so the
+  less-elastic material dominates energy loss.
+
+Sideways random kicks after a peg hit stay in Pixil. Scale the kick
+range with the same material if you want rubber to scatter more than
+soft polymer.
+
+Example:
+create_array(v_restitution, 24, numeric)
+v_restitution[0] = 0.95
+v_restitution[1] = 0.72
+v_restitution[2] = 0.42
+particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 4.5, 58.5, -1000, 1000, v_restitution, 0.5)
+particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_peg_x, v_peg_y, 0.5, 1, v_restitution, v_hit)
+
+Commands may be called inside or outside begin_frame; they only update
+variables. Draw afterwards.
+
+PARTICLE_INTEGRATE
+------------------
+particle_integrate(x, y, vx, vy, active, [ax], [ay], [damping], [sleep_speed],
+                   [count], [integration_mode], [max_speed])
+
+For each active particle:
+    vx += ax;  vy += ay
+    x  += vx;  y  += vy
+    vx *= damping;  vy *= damping
+    if |vx| or |vy| < sleep_speed, that component is set to 0
+
+Defaults: ax=0, ay=0, damping=1, sleep_speed=0.
+ax and ay may be scalars (same for every particle) or per-particle arrays.
+integration_mode defaults to post_move: accelerate, move, then damp. Pass
+pre_move to accelerate, damp, clamp, then move. max_speed is optional; when
+given (as a scalar or per-particle array), it caps each velocity component
+to +/- max_speed after damping. Both modes apply sleep_speed after moving.
+Does not write a hit array.
+
+Example — gravity, no air drag:
+particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.15)
+
+Example — damped, capped motion before movement:
+particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.12, 0.998, 0, v_count, pre_move, 2.5)
+
+PARTICLE_COLLIDE_BOUNDS
+-----------------------
+particle_collide_bounds(x, y, vx, vy, active, left, right, top, bottom,
+                        [restitution], [radius], [hit], [count])
+
+Bounce active centres off a rectangle. radius (scalar or array) insets the
+walls so a circle stays inside. Restitution is applied on the bounced axis
+(default 1) and may be a scalar or per-particle array.
+
+To leave an open floor (pachinko-style exit), set bottom far below the
+display (for example 1000) so balls are never floor-bounced; deactivate
+them in Pixil when y exceeds the exit line.
+
+Wrap-around is not a kernel option — implement wrap in Pixil, or skip this
+command that frame.
+
+Example — closed box, radius 1.65:
+particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 5, 58, 5, 58, 0.88, 1.65, v_hit)
+
+PARTICLE_COLLIDE_CIRCLE_BOUNDS
+------------------------------
+particle_collide_circle_bounds(x, y, vx, vy, active, center_x, center_y,
+                               boundary_radius, [restitution], [radius],
+                               [angular_speed], [grip], [hit], [count])
+
+Keep particles inside a circular wall. Centres are projected to
+boundary_radius - radius. Outward normal speed is reflected by
+restitution (default 1, scalar or per-particle array). Optional angular_speed
+and grip pull tangential velocity toward the rotating wall (tumbler / mixer).
+
+Example:
+particle_collide_circle_bounds(v_x, v_y, v_vx, v_vy, v_active, 32, 32, 28, 0.92, v_radius, 0.08, 0.35, v_hit)
+
+PARTICLE_COLLIDE_CIRCLES
+------------------------
+particle_collide_circles(x, y, vx, vy, active, radius, [mass], [restitution], [hit], [count])
+
+Resolve overlaps between active particles. Equal or unequal mass.
+Restitution defaults to 1 and may be a per-particle material array. A pair
+uses the lower value, so the less-elastic material controls energy loss.
+Returns (to the runtime) the pair count; scripts typically ignore it and
+read hit[] instead.
+
+Overlapping pairs are separated even if already moving apart. Impulse is
+applied only while approaching. Two fully stationary overlaps still get
+positional correction so a packed rack does not stay stuck.
+
+O(n^2) over the live prefix — fine for tens of bodies, expensive for
+hundreds without a smaller count.
+
+Example:
+particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_radius, v_mass, 0.97, v_hit)
+
+PARTICLE_COLLIDE_STATIC_CIRCLES
+-------------------------------
+particle_collide_static_circles(x, y, vx, vy, active, obstacle_x, obstacle_y,
+                                radius, obstacle_radius, [restitution],
+                                [hit], [count], [obstacle_count],
+                                [response])
+
+Bounce particles off fixed circular obstacles. Obstacles have infinite
+mass and are never moved. Overlaps are projected to contact.
+Restitution default 1. Restitution may be a per-particle material array.
+obstacle_count limits how many leading obstacles are used.
+
+response defaults to impulse (omit it): velocity changes only while
+approaching, and only the normal component is scaled by restitution
+(tangent is kept). Pass reflect for a full-velocity bounce: every overlap
+reflects the whole velocity, then scales that vector by restitution.
+That dissipates speed on contact instead of letting bodies slide along
+the obstacle.
+
+Random kicks after a hit stay in Pixil: read hit[] after the call.
+Pass a restitution array to give each body its own material bounce.
+
+Full-velocity bounce example:
+particle_collide_static_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_peg_x, v_peg_y, 0.5, 0.5, 0.82, v_peg_hit, 12, v_peg_count, reflect)
+
+Impulse example:
+particle_collide_static_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_peg_x, v_peg_y, 0.5, 1, v_ball_restitution, v_peg_hit, 24, v_num_pegs)
+
+TYPICAL FRAME
+-------------
+particle_integrate(...)
+particle_collide_bounds(...)          # or wrap in Pixil; not both
+particle_collide_static_circles(...)  # optional pegs
+particle_collide_circles(...)         # optional ball-ball
+# then Pixil: kicks, clamp speed, deactivate, draw
+
+Example shows:
+  scripts/main/Billiard_Break.pix
+  scripts/main/Particle_Tumbler.pix
+  scripts/main/Magnetic_Marbles.pix
+  scripts/main/Asteroid_Miner.pix
+  scripts/main/pachinko_machine_v2.pix
+  scripts/main/Galton_Board.pix
+  scripts/main/Hourglass_Marbles.pix
+
+================================================================================
+21. SCRIPT EXAMPLES
 ================================================================================
 
 SIMPLE BOUNCING BALL
@@ -2163,3 +2380,7 @@ My current list of scripts are:
 141. Watching Eyes - Cartoon animated eyes looking around and blinking
 142. Wave Grid - Undulating coordinate mesh animation
 143. Wormhole - Space-time tunnel visualization
+144. Asteroid Miner - Drifting rocks that collide, split, and get mined by corner lasers
+145. Pachinko Machine V2 - Same 24 boards as Pachinko Machine; particle primitives plus rubber/metal/soft-polymer balls (cyan/white/orange)
+146. Galton Board - Bean-machine histogram with 16 balls in flight (queue-stable max); pegs use response=reflect
+147. Hourglass Marbles - 24 mixed-material marbles collide, bounce through a sealed glass neck, pile up, and rotate back to the top

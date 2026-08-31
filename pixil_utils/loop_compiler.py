@@ -59,7 +59,9 @@ _FRAME_MISC_COMMANDS = frozenset({"fps"})
 _PARTICLE_COMMANDS = frozenset({
     "particle_integrate",
     "particle_collide_bounds",
+    "particle_collide_circle_bounds",
     "particle_collide_circles",
+    "particle_collide_static_circles",
 })
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
 _FRAME_BUILTIN_NAMES = (

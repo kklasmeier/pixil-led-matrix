@@ -1,9 +1,13 @@
 """Unit tests for generic particle kernels (no Pixil command wiring)."""
 
+import pytest
+
 from pixil_utils.array_manager import PixilArray
 from pixil_utils.particle_engine import (
     particle_collide_bounds,
+    particle_collide_circle_bounds,
     particle_collide_circles,
+    particle_collide_static_circles,
     particle_integrate,
 )
 
@@ -28,6 +32,34 @@ def test_integrate_moves_and_applies_acceleration_and_damping():
     assert y[0] == 12.0
     assert vx[0] == 0.5
     assert vy[0] == 1.0
+
+
+def test_integrate_pre_move_matches_damped_accelerated_step_with_component_cap():
+    x = _arr([10.0])
+    y = _arr([20.0])
+    vx = _arr([3.0])
+    vy = _arr([1.0])
+    active = _arr([1.0])
+
+    particle_integrate(
+        x, y, vx, vy, active,
+        ax=0.0, ay=2.0, damping=0.5,
+        integration_mode="pre_move", max_speed=1.25,
+    )
+
+    assert vx[0] == 1.25
+    assert vy[0] == 1.25
+    assert x[0] == 11.25
+    assert y[0] == 21.25
+
+
+def test_integrate_rejects_unknown_mode_and_negative_max_speed():
+    args = (_arr([0.0]), _arr([0.0]), _arr([1.0]), _arr([0.0]), _arr([1.0]))
+
+    with pytest.raises(ValueError, match="post_move' or 'pre_move"):
+        particle_integrate(*args, integration_mode="legacy")
+    with pytest.raises(ValueError, match="max_speed must be >= 0"):
+        particle_integrate(*args, max_speed=-1)
 
 
 def test_integrate_skips_inactive_and_sleeps_tiny_velocity():
@@ -83,6 +115,61 @@ def test_bounds_respects_radius_inset():
     assert vx[0] > 0
 
 
+def test_bounds_accepts_per_particle_restitution():
+    x = _arr([0.0, 0.0])
+    y = _arr([10.0, 20.0])
+    vx = _arr([-2.0, -2.0])
+    vy = _arr([0.0, 0.0])
+    active = _arr([1.0, 1.0])
+    restitution = _arr([0.9, 0.4])
+
+    particle_collide_bounds(
+        x, y, vx, vy, active,
+        left=5, right=58, top=5, bottom=58,
+        restitution=restitution,
+    )
+
+    assert vx[0] == pytest.approx(1.8)
+    assert vx[1] == pytest.approx(0.8)
+
+
+def test_circle_bounds_projects_and_bounces_outward_particle():
+    x = _arr([12.0])
+    y = _arr([0.0])
+    vx = _arr([2.0])
+    vy = _arr([0.0])
+    active = _arr([1.0])
+    hit = _arr([0.0])
+
+    particle_collide_circle_bounds(
+        x, y, vx, vy, active,
+        center_x=0, center_y=0, boundary_radius=10,
+        restitution=0.5, radius=1, hit=hit,
+    )
+
+    assert x[0] == 9.0
+    assert y[0] == 0.0
+    assert vx[0] == -1.0
+    assert hit[0] == 1.0
+
+
+def test_rotating_circle_bounds_applies_tangential_grip():
+    x = _arr([10.0])
+    y = _arr([0.0])
+    vx = _arr([0.0])
+    vy = _arr([0.0])
+    active = _arr([1.0])
+
+    particle_collide_circle_bounds(
+        x, y, vx, vy, active,
+        center_x=0, center_y=0, boundary_radius=9,
+        angular_speed=0.1, grip=0.5,
+    )
+
+    assert x[0] == 9.0
+    assert vy[0] == 0.45
+
+
 def test_circle_collision_transfers_equal_mass_velocity():
     x = _arr([20.0, 22.5])
     y = _arr([30.0, 30.0])
@@ -135,3 +222,140 @@ def test_heavier_particle_moves_less_on_impact():
     )
 
     assert abs(vx[1]) < abs(vx[0])
+
+
+def test_circle_collision_uses_lower_material_restitution():
+    x = _arr([20.0, 22.5])
+    y = _arr([30.0, 30.0])
+    vx = _arr([1.0, -1.0])
+    vy = _arr([0.0, 0.0])
+    active = _arr([1.0, 1.0])
+    restitution = _arr([0.95, 0.4])
+
+    particle_collide_circles(
+        x, y, vx, vy, active,
+        radius=1.65, mass=1.0, restitution=restitution,
+    )
+
+    assert vx[0] == pytest.approx(-0.4)
+    assert vx[1] == pytest.approx(0.4)
+
+
+def test_static_circle_projects_and_bounces_particle():
+    x = _arr([10.5])
+    y = _arr([10.0])
+    vx = _arr([-1.0])
+    vy = _arr([0.0])
+    active = _arr([1.0])
+    peg_x = _arr([10.0])
+    peg_y = _arr([10.0])
+    hit = _arr([0.0])
+
+    contacts = particle_collide_static_circles(
+        x, y, vx, vy, active, peg_x, peg_y,
+        radius=0.5, obstacle_radius=1.0, restitution=0.85, hit=hit,
+    )
+
+    assert contacts == 1
+    assert x[0] == 11.5
+    assert vx[0] == pytest.approx(0.85)
+    assert hit[0] == 1.0
+
+
+def test_static_circle_reflect_response_scales_full_velocity():
+    x = _arr([10.5])
+    y = _arr([10.0])
+    vx = _arr([-1.0])
+    vy = _arr([0.5])
+    active = _arr([1.0])
+    peg_x = _arr([10.0])
+    peg_y = _arr([10.0])
+
+    particle_collide_static_circles(
+        x, y, vx, vy, active, peg_x, peg_y,
+        radius=0.5, obstacle_radius=1.0, restitution=0.82,
+        response="reflect",
+    )
+
+    assert x[0] == 11.5
+    assert vx[0] == pytest.approx(0.82)
+    assert vy[0] == pytest.approx(0.41)
+
+
+def test_static_circle_rejects_unknown_response():
+    x = _arr([10.5])
+    y = _arr([10.0])
+    vx = _arr([-1.0])
+    vy = _arr([0.0])
+    active = _arr([1.0])
+    peg_x = _arr([10.0])
+    peg_y = _arr([10.0])
+
+    with pytest.raises(ValueError, match="impulse' or 'reflect"):
+        particle_collide_static_circles(
+            x, y, vx, vy, active, peg_x, peg_y,
+            radius=0.5, obstacle_radius=1.0, response="galton",
+        )
+
+
+def test_static_circle_accepts_per_particle_restitution():
+    x = _arr([10.5, 20.5])
+    y = _arr([10.0, 20.0])
+    vx = _arr([-1.0, -1.0])
+    vy = _arr([0.0, 0.0])
+    active = _arr([1.0, 1.0])
+    peg_x = _arr([10.0, 20.0])
+    peg_y = _arr([10.0, 20.0])
+    restitution = _arr([0.95, 0.35])
+
+    particle_collide_static_circles(
+        x, y, vx, vy, active, peg_x, peg_y,
+        radius=0.5, obstacle_radius=1.0,
+        restitution=restitution,
+    )
+
+    assert vx[0] == pytest.approx(0.95)
+    assert vx[1] == pytest.approx(0.35)
+
+
+def test_static_circle_handles_large_sparse_obstacle_pool_with_array_radii():
+    x = _arr([50.5])
+    y = _arr([50.0])
+    vx = _arr([-1.0])
+    vy = _arr([0.0])
+    active = _arr([1.0])
+    peg_x = _arr([float(i * 10) for i in range(100)])
+    peg_y = _arr([200.0] * 100)
+    peg_radius = _arr([0.25] * 100)
+    peg_x[73] = 50.0
+    peg_y[73] = 50.0
+    peg_radius[73] = 1.0
+
+    contacts = particle_collide_static_circles(
+        x, y, vx, vy, active, peg_x, peg_y,
+        radius=0.5, obstacle_radius=peg_radius, restitution=0.8,
+    )
+
+    assert contacts == 1
+    assert x[0] == pytest.approx(51.5)
+    assert vx[0] == pytest.approx(0.8)
+
+
+def test_static_circle_respects_active_and_obstacle_count():
+    x = _arr([10.5, 20.5])
+    y = _arr([10.0, 20.0])
+    vx = _arr([-1.0, -1.0])
+    vy = _arr([0.0, 0.0])
+    active = _arr([0.0, 1.0])
+    peg_x = _arr([10.0, 20.0])
+    peg_y = _arr([10.0, 20.0])
+    hit = _arr([1.0, 1.0])
+
+    contacts = particle_collide_static_circles(
+        x, y, vx, vy, active, peg_x, peg_y,
+        radius=0.5, obstacle_radius=1.0, hit=hit, obstacle_count=1,
+    )
+
+    assert contacts == 0
+    assert hit[0] == 0.0
+    assert hit[1] == 0.0

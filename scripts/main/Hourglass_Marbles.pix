@@ -1,0 +1,417 @@
+# Hourglass Marbles
+# Mixed-material marbles drain through a narrow glass neck, collide, pile up,
+# then ride a visible 180-degree turn back to the top for the next cycle.
+
+throttle(0)
+fps(30)
+
+v_count = 24
+v_ball_radius = 0.72
+v_wall_radius = 0.78
+v_wall_spacing = 1.25
+v_safety_bounce = 0.68
+v_gravity = 0.065
+v_air = 0.998
+v_pair_bounce = 0.72
+v_max_speed = 1.5
+v_neg_max_speed = -1.5
+v_inset = 0.55
+
+v_cx = 31.5
+v_cy = 31.5
+v_top = 5
+v_bot = 58
+v_left_rim = 12
+v_right_rim = 51
+v_neck_y0 = 29
+v_neck_y1 = 34
+# Drawn neck walls at 29 and 34 → interior pixels 30..33, centered on 31.5.
+# Collision beads sit 0.5px outside those lines so ball+wall radius does
+# not eat the leftmost interior column.
+v_neck_l = 29
+v_neck_r = 34
+v_hit_l = 28.5
+v_hit_r = 34.5
+
+v_wall_max = 190
+v_turn_frames = 72
+v_empty_hold = 50
+v_phase = 0
+v_phase_frame = 0
+v_empty_frames = 0
+v_shell_angle = 0
+
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_vx, v_count, numeric)
+create_array(v_vy, v_count, numeric)
+create_array(v_active, v_count, numeric)
+create_array(v_restitution, v_count, numeric)
+create_array(v_color, v_count, string)
+create_array(v_pair_hit, v_count, numeric)
+create_array(v_wall_hit, v_count, numeric)
+create_array(v_wall_x, v_wall_max, numeric)
+create_array(v_wall_y, v_wall_max, numeric)
+
+def add_wall_segment {
+    v_dx = v_x1 - v_x0
+    v_dy = v_y1 - v_y0
+    v_len = sqrt(v_dx * v_dx + v_dy * v_dy)
+    v_steps = int(v_len / v_wall_spacing)
+    if v_steps < 1 then
+        v_steps = 1
+    endif
+    for v_s in (0, v_steps, 1)
+        if v_w < v_wall_max then
+            v_t = v_s / v_steps
+            v_wall_x[v_w] = v_x0 + v_dx * v_t
+            v_wall_y[v_w] = v_y0 + v_dy * v_t
+            v_w = v_w + 1
+        endif
+    endfor v_s
+}
+
+# Overlapping beads along every glass edge, including the caps.
+v_w = 0
+v_x0 = v_left_rim
+v_y0 = v_top - 1.2
+v_x1 = v_right_rim
+v_y1 = v_top - 1.2
+call add_wall_segment
+v_x0 = v_left_rim
+v_y0 = v_bot + 1.2
+v_x1 = v_right_rim
+v_y1 = v_bot + 1.2
+call add_wall_segment
+v_x0 = v_left_rim
+v_y0 = v_top
+v_x1 = v_hit_l
+v_y1 = v_neck_y0
+call add_wall_segment
+v_x0 = v_right_rim
+v_y0 = v_top
+v_x1 = v_hit_r
+v_y1 = v_neck_y0
+call add_wall_segment
+v_x0 = v_hit_l
+v_y0 = v_neck_y0
+v_x1 = v_hit_l
+v_y1 = v_neck_y1
+call add_wall_segment
+v_x0 = v_hit_r
+v_y0 = v_neck_y0
+v_x1 = v_hit_r
+v_y1 = v_neck_y1
+call add_wall_segment
+v_x0 = v_hit_l
+v_y0 = v_neck_y1
+v_x1 = v_left_rim
+v_y1 = v_bot
+call add_wall_segment
+v_x0 = v_hit_r
+v_y0 = v_neck_y1
+v_x1 = v_right_rim
+v_y1 = v_bot
+call add_wall_segment
+v_wall_count = v_w
+
+def reset_marbles {
+    # Three loose rows keep individual marbles visible instead of forming
+    # a fluid-looking block.
+    for v_i in (0, v_count - 1, 1)
+        v_row = int(v_i / 8)
+        v_col = v_i % 8
+        v_y[v_i] = 8 + v_row * 3.1
+        v_half = 13 - v_row * 2.2
+        v_x[v_i] = v_cx + (v_col - 3.5) * (v_half / 3.5)
+        v_vx[v_i] = random(-0.14, 0.14, 2)
+        v_vy[v_i] = 0
+        v_active[v_i] = 1
+
+        v_material = v_i % 3
+        if v_material == 0 then
+            v_restitution[v_i] = 0.94
+            v_color[v_i] = "cyan"
+        elseif v_material == 1 then
+            v_restitution[v_i] = 0.76
+            v_color[v_i] = "white"
+        else
+            v_restitution[v_i] = 0.52
+            v_color[v_i] = "orange"
+        endif
+    endfor v_i
+}
+
+def glass_bounds_at_y {
+    # Left/right interior edge of the glass at v_qy.
+    if v_qy <= v_neck_y0 then
+        v_t = (v_qy - v_top) / (v_neck_y0 - v_top)
+        if v_t < 0 then
+            v_t = 0
+        endif
+        if v_t > 1 then
+            v_t = 1
+        endif
+        v_gl = v_left_rim + (v_neck_l - v_left_rim) * v_t
+        v_gr = v_right_rim + (v_neck_r - v_right_rim) * v_t
+    elseif v_qy < v_neck_y1 then
+        v_gl = v_neck_l
+        v_gr = v_neck_r
+    else
+        v_t = (v_qy - v_neck_y1) / (v_bot - v_neck_y1)
+        if v_t < 0 then
+            v_t = 0
+        endif
+        if v_t > 1 then
+            v_t = 1
+        endif
+        v_gl = v_neck_l + (v_left_rim - v_neck_l) * v_t
+        v_gr = v_neck_r + (v_right_rim - v_neck_r) * v_t
+    endif
+}
+
+def contain_marbles {
+    # Safety net: if a marble tunnels through a bead gap, pull it back inside.
+    for v_i in (0, v_count - 1, 1)
+        v_qy = v_y[v_i]
+        if v_qy < v_top + v_inset then
+            v_y[v_i] = v_top + v_inset
+            if v_vy[v_i] < 0 then
+                v_vy[v_i] = -v_vy[v_i] * v_safety_bounce
+            endif
+            v_qy = v_y[v_i]
+        endif
+        if v_qy > v_bot - v_inset then
+            v_y[v_i] = v_bot - v_inset
+            if v_vy[v_i] > 0 then
+                v_vy[v_i] = -v_vy[v_i] * v_safety_bounce
+            endif
+            v_qy = v_y[v_i]
+        endif
+
+        call glass_bounds_at_y
+        v_min_x = v_gl + v_inset
+        v_max_x = v_gr - v_inset
+        if v_min_x > v_max_x then
+            v_mid = (v_gl + v_gr) / 2
+            v_min_x = v_mid
+            v_max_x = v_mid
+        endif
+
+        if v_x[v_i] < v_min_x then
+            v_x[v_i] = v_min_x
+            if v_vx[v_i] < 0 then
+                v_vx[v_i] = -v_vx[v_i] * v_safety_bounce
+            endif
+        endif
+        if v_x[v_i] > v_max_x then
+            v_x[v_i] = v_max_x
+            if v_vx[v_i] > 0 then
+                v_vx[v_i] = -v_vx[v_i] * v_safety_bounce
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_rotated_segment {
+    v_dx1 = v_lx1 - v_cx
+    v_dy1 = v_ly1 - v_cy
+    v_dx2 = v_lx2 - v_cx
+    v_dy2 = v_ly2 - v_cy
+    v_rx1 = v_cx + v_dx1 * cos(v_shell_angle) - v_dy1 * sin(v_shell_angle)
+    v_ry1 = v_cy + v_dx1 * sin(v_shell_angle) + v_dy1 * cos(v_shell_angle)
+    v_rx2 = v_cx + v_dx2 * cos(v_shell_angle) - v_dy2 * sin(v_shell_angle)
+    v_ry2 = v_cy + v_dx2 * sin(v_shell_angle) + v_dy2 * cos(v_shell_angle)
+    draw_line(v_rx1, v_ry1, v_rx2, v_ry2, v_line_color, v_line_brightness)
+}
+
+def draw_hourglass {
+    # Dark outer rails behind the bright front edges add depth.
+    v_line_color = "dark_gray"
+    v_line_brightness = 65
+    v_lx1 = 8
+    v_ly1 = v_top - 2
+    v_lx2 = 55
+    v_ly2 = v_top - 2
+    call draw_rotated_segment
+    v_lx1 = 8
+    v_ly1 = v_bot + 2
+    v_lx2 = 55
+    v_ly2 = v_bot + 2
+    call draw_rotated_segment
+    v_lx1 = v_left_rim - 1
+    v_ly1 = v_top
+    v_lx2 = v_neck_l - 1
+    v_ly2 = v_neck_y0
+    call draw_rotated_segment
+    v_lx1 = v_right_rim + 1
+    v_ly1 = v_top
+    v_lx2 = v_neck_r + 1
+    v_ly2 = v_neck_y0
+    call draw_rotated_segment
+    v_lx1 = v_neck_l - 1
+    v_ly1 = v_neck_y1
+    v_lx2 = v_left_rim - 1
+    v_ly2 = v_bot
+    call draw_rotated_segment
+    v_lx1 = v_neck_r + 1
+    v_ly1 = v_neck_y1
+    v_lx2 = v_right_rim + 1
+    v_ly2 = v_bot
+    call draw_rotated_segment
+
+    # Bright front rails and glass edges.
+    v_line_color = "light_gray"
+    v_line_brightness = 82
+    v_lx1 = v_left_rim
+    v_ly1 = v_top
+    v_lx2 = v_right_rim
+    v_ly2 = v_top
+    call draw_rotated_segment
+    v_lx1 = v_left_rim
+    v_ly1 = v_bot
+    v_lx2 = v_right_rim
+    v_ly2 = v_bot
+    call draw_rotated_segment
+
+    v_lx1 = v_left_rim
+    v_ly1 = v_top
+    v_lx2 = v_neck_l
+    v_ly2 = v_neck_y0
+    call draw_rotated_segment
+    v_lx1 = v_right_rim
+    v_ly1 = v_top
+    v_lx2 = v_neck_r
+    v_ly2 = v_neck_y0
+    call draw_rotated_segment
+
+    v_lx1 = v_neck_l
+    v_ly1 = v_neck_y0
+    v_lx2 = v_neck_l
+    v_ly2 = v_neck_y1
+    call draw_rotated_segment
+    v_lx1 = v_neck_r
+    v_ly1 = v_neck_y0
+    v_lx2 = v_neck_r
+    v_ly2 = v_neck_y1
+    call draw_rotated_segment
+
+    v_lx1 = v_neck_l
+    v_ly1 = v_neck_y1
+    v_lx2 = v_left_rim
+    v_ly2 = v_bot
+    call draw_rotated_segment
+    v_lx1 = v_neck_r
+    v_ly1 = v_neck_y1
+    v_lx2 = v_right_rim
+    v_ly2 = v_bot
+    call draw_rotated_segment
+
+    # Cap highlights make the frame look thicker than a single line.
+    v_line_color = "white"
+    v_line_brightness = 38
+    v_lx1 = 10
+    v_ly1 = v_top - 1
+    v_lx2 = 53
+    v_ly2 = v_top - 1
+    call draw_rotated_segment
+    v_lx1 = 10
+    v_ly1 = v_bot + 1
+    v_lx2 = 53
+    v_ly2 = v_bot + 1
+    call draw_rotated_segment
+
+    # Short reflections suggest curved glass without obscuring the marbles.
+    v_line_color = "cyan"
+    v_line_brightness = 24
+    v_lx1 = 14
+    v_ly1 = 8
+    v_lx2 = 21
+    v_ly2 = 17
+    call draw_rotated_segment
+    v_lx1 = 42
+    v_ly1 = 46
+    v_lx2 = 49
+    v_ly2 = 55
+    call draw_rotated_segment
+}
+
+def draw_marbles {
+    for v_i in (0, v_count - 1, 1)
+        v_mx = v_x[v_i]
+        v_my = v_y[v_i]
+        if v_phase == 1 then
+            v_mdx = v_mx - v_cx
+            v_mdy = v_my - v_cy
+            v_mx = v_cx + v_mdx * cos(v_shell_angle) - v_mdy * sin(v_shell_angle)
+            v_my = v_cy + v_mdx * sin(v_shell_angle) + v_mdy * cos(v_shell_angle)
+        endif
+        # Round so a rest just inside the right rim plots on that rim
+        # the same way the left side already did with truncation.
+        mplot(int(v_mx + 0.5), int(v_my + 0.5), v_color[v_i], 100)
+    endfor v_i
+    mflush()
+}
+
+call reset_marbles
+
+while 1 == 1 then
+    if v_phase == 0 then
+        particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, v_gravity, v_air, 0, v_count)
+        particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_ball_radius, 1, v_pair_bounce, v_pair_hit, v_count)
+        particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_wall_x, v_wall_y, v_ball_radius, v_wall_radius, v_restitution, v_wall_hit, v_count, v_wall_count)
+        call contain_marbles
+
+        v_upper_count = 0
+        for v_i in (0, v_count - 1, 1)
+            if v_vx[v_i] > v_max_speed then
+                v_vx[v_i] = v_max_speed
+            endif
+            if v_vx[v_i] < v_neg_max_speed then
+                v_vx[v_i] = v_neg_max_speed
+            endif
+            if v_vy[v_i] > v_max_speed then
+                v_vy[v_i] = v_max_speed
+            endif
+            if v_vy[v_i] < v_neg_max_speed then
+                v_vy[v_i] = v_neg_max_speed
+            endif
+            if v_y[v_i] < v_neck_y1 then
+                v_upper_count = v_upper_count + 1
+            endif
+        endfor v_i
+
+        if v_upper_count == 0 then
+            v_empty_frames = v_empty_frames + 1
+        else
+            v_empty_frames = 0
+        endif
+
+        if v_empty_frames >= v_empty_hold then
+            v_phase = 1
+            v_phase_frame = 0
+            v_empty_frames = 0
+        endif
+    else
+        v_phase_frame = v_phase_frame + 1
+        v_shell_angle = (v_phase_frame / v_turn_frames) * 3.14159
+
+        if v_phase_frame >= v_turn_frames then
+            for v_i in (0, v_count - 1, 1)
+                v_x[v_i] = 63 - v_x[v_i]
+                v_y[v_i] = 63 - v_y[v_i]
+                v_vx[v_i] = random(-0.14, 0.14, 2)
+                v_vy[v_i] = 0
+            endfor v_i
+            call contain_marbles
+            v_phase = 0
+            v_phase_frame = 0
+            v_shell_angle = 0
+        endif
+    endif
+
+    begin_frame
+        call draw_hourglass
+        call draw_marbles
+    end_frame
+endwhile

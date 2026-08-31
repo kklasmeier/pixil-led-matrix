@@ -7,3 +7,9 @@ main/Floating_Geometry.pix volatile 6s
 main/3D_asterisk.pix volatile 6s
 main/Perlin_Noise_Particle_System.pix volatile 6s
 main/Billiard_Break.pix volatile 6s
+main/Magnetic_Marbles.pix volatile 6s
+main/Particle_Tumbler.pix volatile 6s
+main/Asteroid_Miner.pix volatile 6s
+main/pachinko_machine_v2.pix volatile 6s
+main/Galton_Board.pix volatile 6s
+main/Hourglass_Marbles.pix volatile 6s
