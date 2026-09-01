@@ -1962,14 +1962,15 @@ COMMON PITFALLS
 20. PARTICLE PRIMITIVES
 ================================================================================
 
-Five producer-side commands advance many particles without a Pixil physics
+Ten producer-side commands advance many particles without a Pixil physics
 loop. They mutate numeric arrays in place and do not draw. Pixil still owns
 spawning, scoring, wrap-vs-bounce policy, random kicks, and rendering
 (plot, sprites, begin_frame).
 
-Use them when you have a pool of circles (balls, rocks, marbles). Keep a
-plain Pixil loop when you have only a few bodies or logic the kernels
-cannot express (open floor exit, torus wrap, peg-hit random kick).
+Use them when many bodies share the same motion rule (balls, birds, cloth
+knots). Keep a plain Pixil loop when you have only a few bodies or logic
+the kernels cannot express (open floor exit, wrapping positions onto the
+panel, peg-hit random kick).
 
 ARRAY CONTRACT
 --------------
@@ -2029,10 +2030,74 @@ particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_peg_x, v_peg_y
 Commands may be called inside or outside begin_frame; they only update
 variables. Draw afterwards.
 
+PARTICLE_APPLY_ATTRACTORS
+-------------------------
+particle_apply_attractors(x, y, ax, ay, active, attractor_x, attractor_y,
+                          [attractor_strength], [particle_strength],
+                          [falloff], [softening], [max_acceleration],
+                          [count], [attractor_count], [swirl])
+
+Adds each attractor's pull to the acceleration arrays. Positive strengths
+pull; negative strengths push away. Both strength values may be scalar or
+arrays: attractor_strength is one value per attractor and particle_strength
+is one value per particle. Their values multiply, so signed arrays can model
+magnetic charges.
+
+falloff defaults to 1: pull becomes weaker as distance increases. Use 2 for
+a faster inverse-square falloff, or -1 for a spring-like pull that grows with
+distance. softening defaults to 0 and prevents extreme pull close to an
+attractor. max_acceleration optionally caps the combined acceleration after
+all pulls are added. swirl defaults to 0; a non-zero value adds sideways
+spin around each attractor (positive is counterclockwise, negative is
+clockwise). The command preserves existing ax/ay, so reset those arrays
+in Pixil first when this is the only force.
+
+Example — three gravity wells:
+particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_well_x, v_well_y, v_well_force, 1, 1, 1, 2.5, v_count, 3)
+particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 0.998, 0, v_count)
+
+PARTICLE_FLOCK
+--------------
+particle_flock(x, y, vx, vy, ax, ay, active, separation_distance,
+               neighbor_distance, [separation_weight], [alignment_weight],
+               [cohesion_weight], [max_speed], [max_force], [wrap_width],
+               [wrap_height], [count])
+
+Add three classic flock steering forces to ax/ay (Reynolds: separate,
+align, cohere). Existing ax/ay values are kept, so set wander or a chase
+target in Pixil first, then call this. The command does not move, wrap
+positions, or draw.
+
+Each active body looks at every other active body (O(n^2) over count).
+Bodies closer than separation_distance push apart. Bodies closer than
+neighbor_distance also contribute matching velocity (alignment) and a
+pull toward the group's average offset (cohesion). Each of those three
+steers is capped by max_force and aimed as if the body wanted to go at
+max_speed, then scaled by its weight. Defaults: weights 1.5 / 1 / 1,
+max_speed 2.5, max_force 0.3.
+
+wrap_width / wrap_height default to 0 (open world: neighbor distance is
+ordinary Euclidean). Pass the same world size you use when wrapping
+positions in Pixil so neighbors across an edge still count. Positive
+values use the shortest toroidal delta; they do not move x/y. If the
+logical wrap box is larger than the 64x64 panel, pass that larger size
+here and still wrap/draw in Pixil.
+
+Scatter / panic is a show event: call again with a large separation
+weight and 0 alignment/cohesion. Inactive slots (active=0) are skipped.
+
+Example — flock, then apply steering, then move and wrap in Pixil:
+particle_flock(v_x, v_y, v_vx, v_vy, v_ax, v_ay, v_active, 7, 15, 1.5, 1, 1, 2.5, 0.3, 64, 64, v_count)
+particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 1, 0, v_count, post_move, 100, 0)
+# Pixil: clamp speed by magnitude, wrap x/y into the world, draw
+
+Example — scatter (separate only):
+particle_flock(v_x, v_y, v_vx, v_vy, v_ax, v_ay, v_active, 7, 15, 4.5, 0, 0, 2.5, 0.3, 64, 64, v_count)
+
 PARTICLE_INTEGRATE
 ------------------
 particle_integrate(x, y, vx, vy, active, [ax], [ay], [damping], [sleep_speed],
-                   [count], [integration_mode], [max_speed])
+                   [count], [integration_mode], [max_speed], [position_scale])
 
 For each active particle:
     vx += ax;  vy += ay
@@ -2045,14 +2110,52 @@ ax and ay may be scalars (same for every particle) or per-particle arrays.
 integration_mode defaults to post_move: accelerate, move, then damp. Pass
 pre_move to accelerate, damp, clamp, then move. max_speed is optional; when
 given (as a scalar or per-particle array), it caps each velocity component
-to +/- max_speed after damping. Both modes apply sleep_speed after moving.
-Does not write a hit array.
+to +/- max_speed after damping. position_scale defaults to 1 and controls how
+far velocity moves position without changing velocity itself. Both modes
+apply sleep_speed after moving. Does not write a hit array.
 
 Example — gravity, no air drag:
 particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.15)
 
 Example — damped, capped motion before movement:
 particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.12, 0.998, 0, v_count, pre_move, 2.5)
+
+PARTICLE_VERLET_INTEGRATE
+-------------------------
+particle_verlet_integrate(x, y, old_x, old_y, active, [ax], [ay],
+                          [damping], [count])
+
+Move a 2D point net using current and previous positions instead of explicit
+velocity. These two cloth commands model fabric that lives in the screen
+plane: a hanging sheet, curtain, net, or rope, with gravity (Y down) and
+pinned anchors. They do not model a 3D flag blowing toward or away from
+the viewer. Link constraints can move positions directly. active=0 means a
+fixed point: it and its old position are unchanged. ax/ay may be scalar or
+per-point arrays.
+
+PARTICLE_CONSTRAIN_DISTANCES
+----------------------------
+particle_constrain_distances(x, y, active, link_from, link_to, rest_length,
+                             [stiffness], [iterations], [tension], [count],
+                             [link_count], [min_distance])
+
+Correct an arbitrary list of links toward their requested lengths. Pair this
+with particle_verlet_integrate for hanging 2D cloth. link_from and link_to
+hold point indexes. active=0 makes a point a fixed anchor while its links
+still affect movable partners. rest_length and stiffness may be scalars or
+per-link arrays. Multiple iterations make cloth firmer. Optional tension
+receives each link's absolute stretch from the final pass.
+
+PARTICLE_APPLY_SPRINGS
+----------------------
+particle_apply_springs(x, y, force_x, force_y, active, link_from, link_to,
+                       rest_length, [stiffness], [tension], [count],
+                       [link_count])
+
+Add spring forces for an arbitrary list of links. Existing force arrays are
+preserved, allowing gravity, wind, and other forces to be combined. Inactive
+endpoints act as fixed anchors. Optional tension receives absolute spring
+force for color or other show logic. Use particle_integrate afterwards.
 
 PARTICLE_COLLIDE_BOUNDS
 -----------------------
@@ -2137,16 +2240,36 @@ particle_collide_static_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball
 
 TYPICAL FRAME
 -------------
+Balls / marbles:
 particle_integrate(...)
 particle_collide_bounds(...)          # or wrap in Pixil; not both
 particle_collide_static_circles(...)  # optional pegs
 particle_collide_circles(...)         # optional ball-ball
 # then Pixil: kicks, clamp speed, deactivate, draw
 
+Wells / magnets (reset ax/ay in Pixil first if this is the only force):
+particle_apply_attractors(...)
+particle_integrate(...)
+
+Flock (wander/target into ax/ay first):
+particle_flock(...)
+particle_integrate(...)               # apply steering; wrap x/y in Pixil
+# then Pixil: magnitude speed cap, wrap, draw
+
+Hanging 2D cloth / net (not a 3D wind-blown flag):
+particle_verlet_integrate(...)
+particle_constrain_distances(...)     # several iterations inside the call
+# then Pixil: draw links
+
 Example shows:
   scripts/main/Billiard_Break.pix
   scripts/main/Particle_Tumbler.pix
   scripts/main/Magnetic_Marbles.pix
+  scripts/main/Gravity_Wells.pix
+  scripts/main/swarm.pix
+  scripts/main/Boids_Flocking_Simulation.pix
+  scripts/main/Cloth_simulation.pix
+  scripts/main/Spring_Network.pix
   scripts/main/Asteroid_Miner.pix
   scripts/main/pachinko_machine_v2.pix
   scripts/main/Galton_Board.pix

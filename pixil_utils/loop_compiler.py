@@ -57,7 +57,12 @@ _FRAME_NO_ARG = frozenset({
 })
 _FRAME_MISC_COMMANDS = frozenset({"fps"})
 _PARTICLE_COMMANDS = frozenset({
+    "particle_apply_attractors",
+    "particle_apply_springs",
+    "particle_constrain_distances",
+    "particle_flock",
     "particle_integrate",
+    "particle_verlet_integrate",
     "particle_collide_bounds",
     "particle_collide_circle_bounds",
     "particle_collide_circles",

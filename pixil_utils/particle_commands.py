@@ -9,17 +9,27 @@ from .array_manager import PixilArray
 from .math_functions import evaluate_math_expression
 from .parameter_types import split_command_parameters, validate_command_params
 from .particle_engine import (
+    particle_apply_attractors,
+    particle_apply_springs,
     particle_collide_bounds,
     particle_collide_circle_bounds,
     particle_collide_circles,
     particle_collide_static_circles,
+    particle_constrain_distances,
+    particle_flock,
     particle_integrate,
+    particle_verlet_integrate,
 )
 
 _ARRAY_NAME = re.compile(r"^v_\w+$")
 
 _COMMANDS = frozenset({
+    "particle_apply_attractors",
+    "particle_apply_springs",
     "particle_integrate",
+    "particle_verlet_integrate",
+    "particle_constrain_distances",
+    "particle_flock",
     "particle_collide_bounds",
     "particle_collide_circle_bounds",
     "particle_collide_circles",
@@ -160,6 +170,73 @@ def _state_arrays(
     return arrays[0], arrays[1], arrays[2], arrays[3], arrays[4]
 
 
+def _acceleration_state_arrays(
+    command: str,
+    tokens: List[str],
+    variables: Any,
+) -> Tuple[PixilArray, PixilArray, PixilArray, PixilArray, PixilArray]:
+    names = [
+        require_array_name(command, tokens[i], param)
+        for i, param in enumerate(("x", "y", "ax", "ay", "active"))
+    ]
+    arrays = [
+        require_numeric_array(variables, name, command, param)
+        for name, param in zip(names, ("x", "y", "ax", "ay", "active"))
+    ]
+    lengths = {name: arr.size for name, arr in zip(names, arrays)}
+    if len(set(lengths.values())) != 1:
+        detail = ", ".join(f"{name}={size}" for name, size in lengths.items())
+        raise _cmd_error(
+            command,
+            f"x, y, ax, ay, and active must have the same length ({detail})",
+        )
+    return arrays[0], arrays[1], arrays[2], arrays[3], arrays[4]
+
+
+def _named_numeric_arrays(
+    command: str,
+    tokens: List[str],
+    variables: Any,
+    positions_and_names: List[Tuple[int, str]],
+) -> List[PixilArray]:
+    arrays = []
+    for position, param in positions_and_names:
+        name = require_array_name(command, tokens[position], param)
+        arrays.append(require_numeric_array(variables, name, command, param))
+    return arrays
+
+
+def _require_same_lengths(
+    command: str,
+    names: Tuple[str, ...],
+    arrays: List[PixilArray],
+) -> None:
+    lengths = {name: array.size for name, array in zip(names, arrays)}
+    if len(set(lengths.values())) != 1:
+        detail = ", ".join(f"{name}={size}" for name, size in lengths.items())
+        raise _cmd_error(command, f"{', '.join(names)} must have the same length ({detail})")
+
+
+def _optional_numeric_array(
+    command: str,
+    token: Optional[str],
+    param: str,
+    variables: Any,
+    expected_size: int,
+) -> Optional[PixilArray]:
+    if token is None:
+        return None
+    name = require_array_name(command, token, param)
+    array = require_numeric_array(variables, name, command, param)
+    if array.size != expected_size:
+        raise _cmd_error(
+            command,
+            f"{param} array length {array.size} does not match expected length "
+            f"{expected_size}",
+        )
+    return array
+
+
 def _optional_hit(
     command: str,
     token: Optional[str],
@@ -226,6 +303,248 @@ def _parse_integration_mode(command: str, token: Optional[str]) -> str:
 def run_particle_command(command: str, tokens: List[str], variables: Any) -> int:
     """Validate tokens and run one particle kernel. Returns collide pair count or 0."""
     tokens = validate_command_params(command, ", ".join(tokens) if tokens else "")
+    if command == "particle_flock":
+        arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [
+                (0, "x"), (1, "y"), (2, "vx"), (3, "vy"),
+                (4, "ax"), (5, "ay"), (6, "active"),
+            ],
+        )
+        _require_same_lengths(
+            command, ("x", "y", "vx", "vy", "ax", "ay", "active"), arrays,
+        )
+        x, y, vx, vy, ax, ay, active = arrays
+        separation_distance = _eval_number(
+            command, tokens[7], "separation_distance", variables,
+        )
+        neighbor_distance = _eval_number(
+            command, tokens[8], "neighbor_distance", variables,
+        )
+        defaults = (1.5, 1.0, 1.0, 2.5, 0.3, 0.0, 0.0)
+        names = (
+            "separation_weight", "alignment_weight", "cohesion_weight",
+            "max_speed", "max_force", "wrap_width", "wrap_height",
+        )
+        values = []
+        for offset, (default, name) in enumerate(zip(defaults, names), start=9):
+            token = _optional_token(tokens, offset)
+            values.append(
+                default if token is None else _eval_number(
+                    command, token, name, variables,
+                )
+            )
+        count = _optional_count(
+            command, _optional_token(tokens, 16), variables, x.size,
+        )
+        return particle_flock(
+            x, y, vx, vy, ax, ay, active,
+            separation_distance, neighbor_distance,
+            separation_weight=values[0],
+            alignment_weight=values[1],
+            cohesion_weight=values[2],
+            max_speed=values[3],
+            max_force=values[4],
+            wrap_width=values[5],
+            wrap_height=values[6],
+            count=count,
+        )
+
+    if command == "particle_verlet_integrate":
+        arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [(0, "x"), (1, "y"), (2, "old_x"), (3, "old_y"), (4, "active")],
+        )
+        _require_same_lengths(
+            command, ("x", "y", "old_x", "old_y", "active"), arrays,
+        )
+        x, y, old_x, old_y, active = arrays
+        ax_tok = _optional_token(tokens, 5)
+        ay_tok = _optional_token(tokens, 6)
+        damping_tok = _optional_token(tokens, 7)
+        count_tok = _optional_token(tokens, 8)
+        ax: Union[float, PixilArray] = 0.0
+        ay: Union[float, PixilArray] = 0.0
+        if ax_tok is not None:
+            ax = resolve_particle_scalar_or_array(
+                command, ax_tok, "ax", variables, x.size,
+            )
+        if ay_tok is not None:
+            ay = resolve_particle_scalar_or_array(
+                command, ay_tok, "ay", variables, x.size,
+            )
+        damping = 1.0 if damping_tok is None else _eval_number(
+            command, damping_tok, "damping", variables,
+        )
+        count = _optional_count(command, count_tok, variables, x.size)
+        particle_verlet_integrate(
+            x, y, old_x, old_y, active,
+            ax=ax, ay=ay, damping=damping, count=count,
+        )
+        return 0
+
+    if command == "particle_constrain_distances":
+        point_arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [(0, "x"), (1, "y"), (2, "active")],
+        )
+        _require_same_lengths(command, ("x", "y", "active"), point_arrays)
+        x, y, active = point_arrays
+        link_arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [(3, "link_from"), (4, "link_to")],
+        )
+        _require_same_lengths(command, ("link_from", "link_to"), link_arrays)
+        link_from, link_to = link_arrays
+        rest_length = resolve_particle_scalar_or_array(
+            command, tokens[5], "rest_length", variables, link_from.size,
+        )
+        stiffness_tok = _optional_token(tokens, 6)
+        iterations_tok = _optional_token(tokens, 7)
+        tension_tok = _optional_token(tokens, 8)
+        count_tok = _optional_token(tokens, 9)
+        link_count_tok = _optional_token(tokens, 10)
+        min_distance_tok = _optional_token(tokens, 11)
+        stiffness: Union[float, PixilArray] = 0.5
+        if stiffness_tok is not None:
+            stiffness = resolve_particle_scalar_or_array(
+                command, stiffness_tok, "stiffness", variables, link_from.size,
+            )
+        iterations = 1 if iterations_tok is None else int(
+            _eval_number(command, iterations_tok, "iterations", variables)
+        )
+        tension = _optional_numeric_array(
+            command, tension_tok, "tension", variables, link_from.size,
+        )
+        count = _optional_count(command, count_tok, variables, x.size)
+        link_count = _optional_count(
+            command, link_count_tok, variables, link_from.size,
+        )
+        min_distance = 0.0 if min_distance_tok is None else _eval_number(
+            command, min_distance_tok, "min_distance", variables,
+        )
+        return particle_constrain_distances(
+            x, y, active, link_from, link_to, rest_length,
+            stiffness=stiffness, iterations=iterations, tension=tension,
+            count=count, link_count=link_count, min_distance=min_distance,
+        )
+
+    if command == "particle_apply_springs":
+        point_arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [(0, "x"), (1, "y"), (2, "force_x"), (3, "force_y"), (4, "active")],
+        )
+        _require_same_lengths(
+            command, ("x", "y", "force_x", "force_y", "active"), point_arrays,
+        )
+        x, y, force_x, force_y, active = point_arrays
+        link_arrays = _named_numeric_arrays(
+            command, tokens, variables,
+            [(5, "link_from"), (6, "link_to")],
+        )
+        _require_same_lengths(command, ("link_from", "link_to"), link_arrays)
+        link_from, link_to = link_arrays
+        rest_length = resolve_particle_scalar_or_array(
+            command, tokens[7], "rest_length", variables, link_from.size,
+        )
+        stiffness_tok = _optional_token(tokens, 8)
+        tension_tok = _optional_token(tokens, 9)
+        count_tok = _optional_token(tokens, 10)
+        link_count_tok = _optional_token(tokens, 11)
+        stiffness: Union[float, PixilArray] = 1.0
+        if stiffness_tok is not None:
+            stiffness = resolve_particle_scalar_or_array(
+                command, stiffness_tok, "stiffness", variables, link_from.size,
+            )
+        tension = _optional_numeric_array(
+            command, tension_tok, "tension", variables, link_from.size,
+        )
+        count = _optional_count(command, count_tok, variables, x.size)
+        link_count = _optional_count(
+            command, link_count_tok, variables, link_from.size,
+        )
+        return particle_apply_springs(
+            x, y, force_x, force_y, active, link_from, link_to, rest_length,
+            stiffness=stiffness, tension=tension,
+            count=count, link_count=link_count,
+        )
+
+    if command == "particle_apply_attractors":
+        x, y, ax, ay, active = _acceleration_state_arrays(command, tokens, variables)
+        attractor_x_name = require_array_name(command, tokens[5], "attractor_x")
+        attractor_y_name = require_array_name(command, tokens[6], "attractor_y")
+        attractor_x = require_numeric_array(
+            variables, attractor_x_name, command, "attractor_x",
+        )
+        attractor_y = require_numeric_array(
+            variables, attractor_y_name, command, "attractor_y",
+        )
+        if attractor_x.size != attractor_y.size:
+            raise _cmd_error(
+                command,
+                "attractor_x and attractor_y must have the same length",
+            )
+        strength_tok = _optional_token(tokens, 7)
+        particle_strength_tok = _optional_token(tokens, 8)
+        falloff_tok = _optional_token(tokens, 9)
+        softening_tok = _optional_token(tokens, 10)
+        max_acceleration_tok = _optional_token(tokens, 11)
+        count_tok = _optional_token(tokens, 12)
+        attractor_count_tok = _optional_token(tokens, 13)
+        swirl_tok = _optional_token(tokens, 14)
+        attractor_strength: Union[float, PixilArray] = 1.0
+        if strength_tok is not None:
+            attractor_strength = resolve_scalar_or_array(
+                command, strength_tok, "attractor_strength", variables,
+            )
+            if (
+                isinstance(attractor_strength, PixilArray)
+                and attractor_strength.size != attractor_x.size
+            ):
+                raise _cmd_error(
+                    command,
+                    "attractor_strength array length "
+                    f"{attractor_strength.size} does not match attractor length "
+                    f"{attractor_x.size}",
+                )
+        particle_strength: Union[float, PixilArray] = 1.0
+        if particle_strength_tok is not None:
+            particle_strength = resolve_particle_scalar_or_array(
+                command, particle_strength_tok, "particle_strength",
+                variables, x.size,
+            )
+        falloff = 1.0 if falloff_tok is None else _eval_number(
+            command, falloff_tok, "falloff", variables,
+        )
+        softening = 0.0 if softening_tok is None else _eval_number(
+            command, softening_tok, "softening", variables,
+        )
+        max_acceleration: Optional[Union[float, PixilArray]] = None
+        if max_acceleration_tok is not None:
+            max_acceleration = resolve_particle_scalar_or_array(
+                command, max_acceleration_tok, "max_acceleration",
+                variables, x.size,
+            )
+        count = _optional_count(command, count_tok, variables, x.size)
+        attractor_count = _optional_count(
+            command, attractor_count_tok, variables, attractor_x.size,
+        )
+        swirl = 0.0 if swirl_tok is None else _eval_number(
+            command, swirl_tok, "swirl", variables,
+        )
+        particle_apply_attractors(
+            x, y, ax, ay, active, attractor_x, attractor_y,
+            attractor_strength=attractor_strength,
+            particle_strength=particle_strength,
+            falloff=falloff,
+            softening=softening,
+            max_acceleration=max_acceleration,
+            count=count,
+            attractor_count=attractor_count,
+            swirl=swirl,
+        )
+        return 0
+
     if command == "particle_integrate":
         x, y, vx, vy, active = _state_arrays(command, tokens, variables)
         ax = 0.0
@@ -239,6 +558,7 @@ def run_particle_command(command: str, tokens: List[str], variables: Any) -> int
         count_tok = _optional_token(tokens, 9)
         mode_tok = _optional_token(tokens, 10)
         max_speed_tok = _optional_token(tokens, 11)
+        position_scale_tok = _optional_token(tokens, 12)
         if ax_tok is not None:
             ax = resolve_scalar_or_array(command, ax_tok, "ax", variables)
         if ay_tok is not None:
@@ -254,10 +574,14 @@ def run_particle_command(command: str, tokens: List[str], variables: Any) -> int
             max_speed = resolve_particle_scalar_or_array(
                 command, max_speed_tok, "max_speed", variables, x.size,
             )
+        position_scale = 1.0 if position_scale_tok is None else _eval_number(
+            command, position_scale_tok, "position_scale", variables,
+        )
         particle_integrate(
             x, y, vx, vy, active,
             ax=ax, ay=ay, damping=damping, sleep_speed=sleep_speed, count=count,
             integration_mode=integration_mode, max_speed=max_speed,
+            position_scale=position_scale,
         )
         return 0
 

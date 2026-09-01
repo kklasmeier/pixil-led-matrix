@@ -70,13 +70,14 @@ def particle_integrate(
     count: Optional[int] = None,
     integration_mode: str = "post_move",
     max_speed: Optional[ScalarOrSeq] = None,
+    position_scale: float = 1.0,
 ) -> None:
     """Advance active particles by one Euler step.
 
     ``integration_mode`` is ``"post_move"`` (default) or ``"pre_move"``.
     Post-move order:
       vx += ax; vy += ay
-      x += vx; y += vy
+      x += vx * position_scale; y += vy * position_scale
       vx *= damping; vy *= damping
       clamp each velocity component to max_speed, if supplied
 
@@ -84,7 +85,7 @@ def particle_integrate(
       vx += ax; vy += ay
       vx *= damping; vy *= damping
       clamp each velocity component to max_speed, if supplied
-      x += vx; y += vy
+      x += vx * position_scale; y += vy * position_scale
 
     In either mode, components below sleep_speed are set to 0 after moving.
 
@@ -100,6 +101,7 @@ def particle_integrate(
     n = _count(x, y, vx, vy, active, count=count)
     damp = float(damping)
     sleep = float(sleep_speed)
+    move_scale = float(position_scale)
     mode = str(integration_mode).strip().lower()
     if mode not in ("post_move", "pre_move"):
         raise ValueError(
@@ -117,8 +119,8 @@ def particle_integrate(
             vxd[i] *= damp
             vyd[i] *= damp
         else:
-            xd[i] += vxd[i]
-            yd[i] += vyd[i]
+            xd[i] += vxd[i] * move_scale
+            yd[i] += vyd[i] * move_scale
             vxd[i] *= damp
             vyd[i] *= damp
         if max_speed is not None:
@@ -131,12 +133,436 @@ def particle_integrate(
             vxd[i] = max(-limit, min(limit, vxd[i]))
             vyd[i] = max(-limit, min(limit, vyd[i]))
         if pre_move:
-            xd[i] += vxd[i]
-            yd[i] += vyd[i]
+            xd[i] += vxd[i] * move_scale
+            yd[i] += vyd[i] * move_scale
         if abs(vxd[i]) < sleep:
             vxd[i] = 0.0
         if abs(vyd[i]) < sleep:
             vyd[i] = 0.0
+
+
+def particle_apply_attractors(
+    x: NumericSeq,
+    y: NumericSeq,
+    ax: NumericSeq,
+    ay: NumericSeq,
+    active: NumericSeq,
+    attractor_x: NumericSeq,
+    attractor_y: NumericSeq,
+    attractor_strength: ScalarOrSeq = 1.0,
+    particle_strength: ScalarOrSeq = 1.0,
+    falloff: float = 1.0,
+    softening: float = 0.0,
+    max_acceleration: Optional[ScalarOrSeq] = None,
+    count: Optional[int] = None,
+    attractor_count: Optional[int] = None,
+    swirl: float = 0.0,
+) -> None:
+    """Add the pull from fixed or moving attractors to particle acceleration.
+
+    Positive strengths pull and negative strengths push away. The two strength
+    inputs multiply, so a per-particle ``particle_strength`` supports charges
+    or particle-specific response. ``falloff=-1`` is linear (spring-like),
+    ``falloff=1`` is inverse-distance, and ``falloff=2`` is inverse-square.
+    ``softening`` prevents extreme force near an attractor. ``swirl`` adds a
+    sideways spin around each attractor (positive is counterclockwise).
+    Existing acceleration is preserved so scripts may combine this with
+    other forces.
+    """
+    xd, yd, axd, ayd, ad = (
+        _data(x),
+        _data(y),
+        _data(ax),
+        _data(ay),
+        _data(active),
+    )
+    attractor_xd, attractor_yd = _data(attractor_x), _data(attractor_y)
+    n = _count(x, y, ax, ay, active, count=count)
+    attractors = _count(
+        attractor_x, attractor_y, count=attractor_count,
+    )
+    exponent = float(falloff)
+    if exponent < -1.0:
+        raise ValueError(
+            "particle_apply_attractors: falloff must be >= -1 "
+            f"(got {falloff})"
+        )
+    softening_sq = float(softening) ** 2
+    spin = float(swirl)
+
+    for i in range(n):
+        if not _is_active(ad, i):
+            continue
+        strength = _component(particle_strength, i)
+        for j in range(attractors):
+            dx = float(attractor_xd[j]) - xd[i]
+            dy = float(attractor_yd[j]) - yd[i]
+            dist_sq = dx * dx + dy * dy + softening_sq
+            if dist_sq <= 1e-12:
+                continue
+            scale = strength * _component(attractor_strength, j)
+            scale /= dist_sq ** ((exponent + 1.0) * 0.5)
+            axd[i] += dx * scale
+            ayd[i] += dy * scale
+            if spin != 0.0:
+                axd[i] += -dy * scale * spin
+                ayd[i] += dx * scale * spin
+        if max_acceleration is not None:
+            limit = _component(max_acceleration, i)
+            if limit < 0.0:
+                raise ValueError(
+                    "particle_apply_attractors: max_acceleration must be >= 0 "
+                    f"(got {limit})"
+                )
+            magnitude_sq = axd[i] * axd[i] + ayd[i] * ayd[i]
+            if magnitude_sq > limit * limit and magnitude_sq > 0.0:
+                scale = limit / math.sqrt(magnitude_sq)
+                axd[i] *= scale
+                ayd[i] *= scale
+
+
+def particle_verlet_integrate(
+    x: NumericSeq,
+    y: NumericSeq,
+    old_x: NumericSeq,
+    old_y: NumericSeq,
+    active: NumericSeq,
+    ax: ScalarOrSeq = 0.0,
+    ay: ScalarOrSeq = 0.0,
+    damping: float = 1.0,
+    count: Optional[int] = None,
+) -> None:
+    """Move points using their current and previous positions.
+
+    This is useful for cloth and ropes because links can correct positions
+    directly without maintaining explicit velocity arrays.
+    """
+    xd, yd, old_xd, old_yd, ad = (
+        _data(x),
+        _data(y),
+        _data(old_x),
+        _data(old_y),
+        _data(active),
+    )
+    n = _count(x, y, old_x, old_y, active, count=count)
+    damp = float(damping)
+
+    for i in range(n):
+        if not _is_active(ad, i):
+            continue
+        current_x = xd[i]
+        current_y = yd[i]
+        velocity_x = (current_x - old_xd[i]) * damp
+        velocity_y = (current_y - old_yd[i]) * damp
+        old_xd[i] = current_x
+        old_yd[i] = current_y
+        xd[i] = current_x + velocity_x + _component(ax, i)
+        yd[i] = current_y + velocity_y + _component(ay, i)
+
+
+def _link_index(value: object, link: int, endpoint: str, point_count: int) -> int:
+    numeric = float(value)
+    index = int(numeric)
+    if numeric != index or index < 0 or index >= point_count:
+        raise ValueError(
+            f"link {link} {endpoint} index must be an integer from 0 to "
+            f"{point_count - 1} (got {value!r})"
+        )
+    return index
+
+
+def particle_constrain_distances(
+    x: NumericSeq,
+    y: NumericSeq,
+    active: NumericSeq,
+    link_from: NumericSeq,
+    link_to: NumericSeq,
+    rest_length: ScalarOrSeq,
+    stiffness: ScalarOrSeq = 0.5,
+    iterations: int = 1,
+    tension: Optional[NumericSeq] = None,
+    count: Optional[int] = None,
+    link_count: Optional[int] = None,
+    min_distance: float = 0.0,
+) -> int:
+    """Move linked points toward their requested separation.
+
+    ``active`` means movable here: inactive points act as fixed anchors.
+    Each movable endpoint receives its normal share of the correction, so a
+    link with one fixed endpoint remains intentionally softer than one where
+    both endpoints move. Returns the number of link corrections performed.
+    """
+    xd, yd, ad = _data(x), _data(y), _data(active)
+    from_data, to_data = _data(link_from), _data(link_to)
+    n = _count(x, y, active, count=count)
+    links = _count(link_from, link_to, count=link_count)
+    tension_data = _data(tension) if tension is not None else None
+    passes = int(iterations)
+    minimum = float(min_distance)
+    if passes < 0:
+        raise ValueError(
+            f"particle_constrain_distances: iterations must be >= 0 (got {iterations})"
+        )
+    if minimum < 0.0:
+        raise ValueError(
+            "particle_constrain_distances: min_distance must be >= 0 "
+            f"(got {min_distance})"
+        )
+    corrections = 0
+
+    if tension_data is not None:
+        for link in range(links):
+            tension_data[link] = 0.0
+
+    for _ in range(passes):
+        for link in range(links):
+            i = _link_index(from_data[link], link, "from", n)
+            j = _link_index(to_data[link], link, "to", n)
+            movable_i = _is_active(ad, i)
+            movable_j = _is_active(ad, j)
+            if not movable_i and not movable_j:
+                continue
+            dx = xd[j] - xd[i]
+            dy = yd[j] - yd[i]
+            distance_sq = dx * dx + dy * dy
+            if distance_sq <= minimum * minimum or distance_sq <= 1e-12:
+                continue
+            distance = math.sqrt(distance_sq)
+            extension = distance - _component(rest_length, link)
+            correction = extension / distance * _component(stiffness, link)
+            move_x = dx * correction
+            move_y = dy * correction
+            if movable_i:
+                xd[i] += move_x
+                yd[i] += move_y
+            if movable_j:
+                xd[j] -= move_x
+                yd[j] -= move_y
+            if tension_data is not None:
+                tension_data[link] = abs(extension)
+            corrections += 1
+
+    return corrections
+
+
+def particle_apply_springs(
+    x: NumericSeq,
+    y: NumericSeq,
+    force_x: NumericSeq,
+    force_y: NumericSeq,
+    active: NumericSeq,
+    link_from: NumericSeq,
+    link_to: NumericSeq,
+    rest_length: ScalarOrSeq,
+    stiffness: ScalarOrSeq = 1.0,
+    tension: Optional[NumericSeq] = None,
+    count: Optional[int] = None,
+    link_count: Optional[int] = None,
+) -> int:
+    """Add Hooke-style spring forces for an arbitrary list of links.
+
+    Existing force arrays are preserved so scripts can combine springs with
+    gravity, wind, or attractors. Inactive endpoints act as fixed anchors.
+    Returns the number of non-zero-length springs processed.
+    """
+    xd, yd, fxd, fyd, ad = (
+        _data(x),
+        _data(y),
+        _data(force_x),
+        _data(force_y),
+        _data(active),
+    )
+    from_data, to_data = _data(link_from), _data(link_to)
+    n = _count(x, y, force_x, force_y, active, count=count)
+    links = _count(link_from, link_to, count=link_count)
+    tension_data = _data(tension) if tension is not None else None
+    processed = 0
+
+    if tension_data is not None:
+        for link in range(links):
+            tension_data[link] = 0.0
+
+    for link in range(links):
+        i = _link_index(from_data[link], link, "from", n)
+        j = _link_index(to_data[link], link, "to", n)
+        active_i = _is_active(ad, i)
+        active_j = _is_active(ad, j)
+        if not active_i and not active_j:
+            continue
+        dx = xd[j] - xd[i]
+        dy = yd[j] - yd[i]
+        distance_sq = dx * dx + dy * dy
+        if distance_sq <= 1e-12:
+            continue
+        distance = math.sqrt(distance_sq)
+        spring_force = _component(stiffness, link) * (
+            distance - _component(rest_length, link)
+        )
+        force_scale = spring_force / distance
+        applied_x = dx * force_scale
+        applied_y = dy * force_scale
+        if active_i:
+            fxd[i] += applied_x
+            fyd[i] += applied_y
+        if active_j:
+            fxd[j] -= applied_x
+            fyd[j] -= applied_y
+        if tension_data is not None:
+            tension_data[link] = abs(spring_force)
+        processed += 1
+
+    return processed
+
+
+def _steering_vector(
+    desired_x: float,
+    desired_y: float,
+    velocity_x: float,
+    velocity_y: float,
+    max_speed: float,
+    max_force: float,
+) -> tuple[float, float]:
+    magnitude_sq = desired_x * desired_x + desired_y * desired_y
+    if magnitude_sq <= 1e-12:
+        return 0.0, 0.0
+    scale = max_speed / math.sqrt(magnitude_sq)
+    steer_x = desired_x * scale - velocity_x
+    steer_y = desired_y * scale - velocity_y
+    force_sq = steer_x * steer_x + steer_y * steer_y
+    if force_sq > max_force * max_force and force_sq > 0.0:
+        scale = max_force / math.sqrt(force_sq)
+        steer_x *= scale
+        steer_y *= scale
+    return steer_x, steer_y
+
+
+def particle_flock(
+    x: NumericSeq,
+    y: NumericSeq,
+    vx: NumericSeq,
+    vy: NumericSeq,
+    ax: NumericSeq,
+    ay: NumericSeq,
+    active: NumericSeq,
+    separation_distance: float,
+    neighbor_distance: float,
+    separation_weight: float = 1.5,
+    alignment_weight: float = 1.0,
+    cohesion_weight: float = 1.0,
+    max_speed: float = 2.5,
+    max_force: float = 0.3,
+    wrap_width: float = 0.0,
+    wrap_height: float = 0.0,
+    count: Optional[int] = None,
+) -> int:
+    """Add separation, alignment, and cohesion steering to acceleration.
+
+    Acceleration arrays are preserved so scripts can add wander, targets, or
+    events before or after this call. Positive wrap dimensions use shortest
+    toroidal distance; zero leaves that axis open. Returns directed neighbor
+    visits, mainly for tests and diagnostics.
+    """
+    xd, yd, vxd, vyd, axd, ayd, ad = (
+        _data(x),
+        _data(y),
+        _data(vx),
+        _data(vy),
+        _data(ax),
+        _data(ay),
+        _data(active),
+    )
+    n = _count(x, y, vx, vy, ax, ay, active, count=count)
+    separation = float(separation_distance)
+    neighborhood = float(neighbor_distance)
+    speed_limit = float(max_speed)
+    force_limit = float(max_force)
+    width = float(wrap_width)
+    height = float(wrap_height)
+    if separation < 0.0 or neighborhood < 0.0:
+        raise ValueError("particle_flock: distances must be >= 0")
+    if speed_limit < 0.0 or force_limit < 0.0:
+        raise ValueError("particle_flock: max_speed and max_force must be >= 0")
+    if width < 0.0 or height < 0.0:
+        raise ValueError("particle_flock: wrap dimensions must be >= 0")
+    separation_sq = separation * separation
+    neighborhood_sq = neighborhood * neighborhood
+    visits = 0
+
+    for i in range(n):
+        if not _is_active(ad, i):
+            continue
+        sep_x = sep_y = 0.0
+        align_x = align_y = 0.0
+        cohesion_x = cohesion_y = 0.0
+        sep_count = neighbor_count = 0
+
+        for j in range(n):
+            if i == j or not _is_active(ad, j):
+                continue
+            dx = xd[j] - xd[i]
+            dy = yd[j] - yd[i]
+            if width > 0.0 and abs(dx) > width * 0.5:
+                dx -= math.copysign(width, dx)
+            if height > 0.0 and abs(dy) > height * 0.5:
+                dy -= math.copysign(height, dy)
+            distance_sq = dx * dx + dy * dy
+            if distance_sq <= 1e-12:
+                continue
+            inside_separation = distance_sq < separation_sq
+            inside_neighborhood = distance_sq < neighborhood_sq
+            if not inside_separation and not inside_neighborhood:
+                continue
+            visits += 1
+
+            if inside_separation:
+                inverse_distance = 1.0 / math.sqrt(distance_sq)
+                sep_x -= dx * inverse_distance
+                sep_y -= dy * inverse_distance
+                sep_count += 1
+            if inside_neighborhood:
+                align_x += vxd[j]
+                align_y += vyd[j]
+                cohesion_x += dx
+                cohesion_y += dy
+                neighbor_count += 1
+
+        total_x = total_y = 0.0
+        if sep_count:
+            steer_x, steer_y = _steering_vector(
+                sep_x / sep_count,
+                sep_y / sep_count,
+                vxd[i],
+                vyd[i],
+                speed_limit,
+                force_limit,
+            )
+            total_x += steer_x * float(separation_weight)
+            total_y += steer_y * float(separation_weight)
+        if neighbor_count:
+            steer_x, steer_y = _steering_vector(
+                align_x / neighbor_count,
+                align_y / neighbor_count,
+                vxd[i],
+                vyd[i],
+                speed_limit,
+                force_limit,
+            )
+            total_x += steer_x * float(alignment_weight)
+            total_y += steer_y * float(alignment_weight)
+            steer_x, steer_y = _steering_vector(
+                cohesion_x / neighbor_count,
+                cohesion_y / neighbor_count,
+                vxd[i],
+                vyd[i],
+                speed_limit,
+                force_limit,
+            )
+            total_x += steer_x * float(cohesion_weight)
+            total_y += steer_y * float(cohesion_weight)
+        axd[i] += total_x
+        ayd[i] += total_y
+
+    return visits
 
 
 def particle_collide_bounds(

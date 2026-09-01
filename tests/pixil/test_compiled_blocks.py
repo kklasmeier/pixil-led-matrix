@@ -213,15 +213,14 @@ def test_boids_key_procedures_compile():
     """Smoke-compile real Boids procedures (no hardware)."""
     flags.ENABLE_COMPILED_PROCEDURES = True
     reset_loop_compiler_stats()
-    assert try_compile_procedure_block(_boids_procedure_body("calculate_distance")) is not None
-    assert try_compile_procedure_block(_boids_procedure_body("apply_flocking_rules")) is not None
-    assert try_compile_procedure_block(_boids_procedure_body("update_boids")) is not None
+    assert try_compile_procedure_block(_boids_procedure_body("update_dynamics")) is not None
+    assert try_compile_procedure_block(_boids_procedure_body("prepare_extra_steering")) is not None
+    assert try_compile_procedure_block(_boids_procedure_body("limit_speed")) is not None
+    assert try_compile_procedure_block(_boids_procedure_body("wrap_positions")) is not None
     draw = try_compile_procedure_block(_boids_procedure_body("draw_boids"))
     assert draw is not None
     assert isinstance(draw.statements[0], CommandStmt)
     assert draw.statements[0].command_name == "begin_frame"
-    # update_dynamics uses print — must fall back
-    assert try_compile_procedure_block(_boids_procedure_body("update_dynamics")) is None
     flags.ENABLE_COMPILED_PROCEDURES = False
 
 
