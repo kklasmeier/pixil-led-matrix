@@ -2265,10 +2265,15 @@ Example shows:
   scripts/main/Billiard_Break.pix
   scripts/main/Particle_Tumbler.pix
   scripts/main/Magnetic_Marbles.pix
+  scripts/main/Ferrofluid_Iron_Filings.pix
   scripts/main/Gravity_Wells.pix
+  scripts/main/Meteor_Shower.pix
   scripts/main/swarm.pix
   scripts/main/Boids_Flocking_Simulation.pix
   scripts/main/Cloth_simulation.pix
+  scripts/main/Hanging_Lanterns.pix
+  scripts/main/Seaweed_Forest.pix
+  scripts/main/Swaying_Meadow_Grass.pix
   scripts/main/Spring_Network.pix
   scripts/main/Asteroid_Miner.pix
   scripts/main/pachinko_machine_v2.pix

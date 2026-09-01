@@ -1,0 +1,187 @@
+# Sunny Meadow
+# A bright layered countryside with gentle parallax rather than a fast camera
+# ride. Background sprites provide depth; butterflies animate in the foreground.
+
+throttle(0)
+fps(30)
+
+# Static bright sky and sun.
+define_sprite(meadow_sky, 64, 64)
+    draw_rectangle(0, 0, 64, 12, azure, 72, true)
+    draw_rectangle(0, 12, 64, 12, sky_blue, 75, true)
+    draw_rectangle(0, 24, 64, 12, sky_blue, 62, true)
+    draw_rectangle(0, 36, 64, 10, cyan, 28, true)
+    draw_rectangle(0, 46, 64, 18, green, 35, true)
+
+    draw_circle(51, 10, 8, yellow, 18, false)
+    draw_circle(51, 10, 6, gold, 45, true)
+    draw_circle(51, 10, 4, yellow, 100, true)
+    draw_line(51, 1, 51, 0, yellow, 50)
+    draw_line(43, 4, 40, 2, yellow, 38)
+    draw_line(59, 4, 62, 2, yellow, 38)
+    draw_line(43, 16, 40, 19, yellow, 30)
+    draw_line(59, 16, 62, 19, yellow, 30)
+endsprite
+
+# Small distant cloud bank.
+define_sprite(meadow_far_clouds, 128, 64)
+    draw_ellipse(12, 13, 8, 2, white, 36, true, 0)
+    draw_ellipse(18, 12, 5, 2, white, 30, true, 0)
+    draw_ellipse(48, 18, 10, 2, white, 30, true, 0)
+    draw_ellipse(55, 17, 6, 2, white, 27, true, 0)
+    draw_ellipse(88, 11, 8, 2, white, 38, true, 0)
+    draw_ellipse(94, 10, 5, 2, white, 32, true, 0)
+    draw_ellipse(120, 17, 7, 2, white, 28, true, 0)
+endsprite
+
+# Larger nearby clouds move faster and appear lower.
+define_sprite(meadow_near_clouds, 128, 64)
+    draw_ellipse(28, 20, 12, 4, white, 62, true, 0)
+    draw_ellipse(21, 20, 7, 3, white, 55, true, 0)
+    draw_ellipse(34, 18, 8, 4, white, 68, true, 0)
+    draw_ellipse(30, 22, 8, 2, light_gray, 24, true, 0)
+
+    draw_ellipse(84, 17, 14, 4, white, 58, true, 0)
+    draw_ellipse(76, 18, 8, 3, white, 52, true, 0)
+    draw_ellipse(91, 15, 8, 4, white, 65, true, 0)
+    draw_ellipse(85, 20, 9, 2, light_gray, 22, true, 0)
+endsprite
+
+# Soft distant hills.
+define_sprite(meadow_hills, 128, 64)
+    draw_rectangle(0, 39, 128, 25, forest_green, 62, true)
+    draw_circle(8, 42, 15, forest_green, 62, true)
+    draw_circle(30, 40, 18, green, 58, true)
+    draw_circle(55, 42, 15, forest_green, 65, true)
+    draw_circle(79, 39, 19, green, 60, true)
+    draw_circle(105, 42, 16, forest_green, 64, true)
+    draw_circle(128, 40, 18, green, 58, true)
+    draw_arc(0, 34, 40, 34, -7, lime, 22, false)
+    draw_arc(40, 35, 82, 35, -8, lime, 20, false)
+    draw_arc(82, 34, 127, 34, -7, lime, 22, false)
+endsprite
+
+# Fine far grass gives the first ground-depth plane.
+define_sprite(meadow_far_grass, 128, 64)
+    draw_rectangle(0, 48, 128, 16, green, 52, true)
+    for v_x in (0, 127, 4)
+        v_h = 1 + v_x % 3
+        draw_line(v_x, 49, v_x + 1, 49 - v_h, lime, 42)
+    endfor v_x
+    for v_x in (3, 124, 13)
+        plot(v_x, 47, yellow, 65)
+    endfor v_x
+endsprite
+
+# A fence makes the middle plane easy to read.
+define_sprite(meadow_fence, 128, 64)
+    draw_line(0, 50, 127, 50, white, 62)
+    draw_line(0, 54, 127, 54, white, 52)
+    for v_x in (4, 124, 16)
+        draw_rectangle(v_x, 46, 2, 11, white, 65, true)
+        draw_polygon(v_x + 1, 46, 2, 3, white, 68, 0, true)
+    endfor v_x
+endsprite
+
+# Mid-ground flower clusters.
+define_sprite(meadow_flowers, 128, 64)
+    draw_rectangle(0, 54, 128, 10, green, 62, true)
+    for v_x in (3, 124, 8)
+        v_h = 2 + v_x % 4
+        draw_line(v_x, 61, v_x, 61 - v_h, lime, 66)
+    endfor v_x
+    plot(8, 55, red, 95)
+    plot(18, 58, yellow, 100)
+    plot(29, 56, pink, 90)
+    plot(42, 57, white, 92)
+    plot(55, 55, purple, 90)
+    plot(69, 58, red, 95)
+    plot(82, 56, yellow, 100)
+    plot(96, 57, pink, 92)
+    plot(110, 55, white, 95)
+    plot(123, 58, purple, 90)
+endsprite
+
+# Tall foreground grass and large flowers.
+define_sprite(meadow_near_grass, 128, 64)
+    draw_rectangle(0, 61, 128, 3, forest_green, 85, true)
+    for v_x in (0, 127, 3)
+        v_h = 4 + v_x % 4
+        draw_line(v_x, 63, v_x + 1, 63 - v_h, lime, 82)
+    endfor v_x
+
+    draw_line(13, 63, 13, 56, green, 90)
+    draw_circle(13, 55, 2, yellow, 100, true)
+    plot(13, 55, white, 100)
+    draw_line(39, 63, 39, 54, green, 90)
+    draw_circle(39, 53, 2, pink, 100, true)
+    plot(39, 53, yellow, 100)
+    draw_line(67, 63, 67, 57, green, 90)
+    draw_circle(67, 56, 2, red, 100, true)
+    draw_line(96, 63, 96, 54, green, 90)
+    draw_circle(96, 53, 2, purple, 100, true)
+    plot(96, 53, yellow, 100)
+    draw_line(119, 63, 119, 57, green, 90)
+    draw_circle(119, 56, 2, white, 100, true)
+    plot(119, 56, yellow, 100)
+endsprite
+
+sync_queue
+set_background(meadow_sky)
+set_background(meadow_far_clouds, 1)
+set_background(meadow_near_clouds, 2)
+set_background(meadow_hills, 3)
+set_background(meadow_far_grass, 4)
+set_background(meadow_fence, 5)
+set_background(meadow_flowers, 6)
+set_background(meadow_near_grass, 7)
+sync_queue
+
+v_frame = 0
+while true then
+    begin_frame(false)
+
+    # Gentle parallax: nearby planes travel farther than distant ones.
+    if v_frame % 6 == 0 then
+        nudge_background(1, 0, 1)
+    endif
+    if v_frame % 3 == 0 then
+        nudge_background(1, 0, 2)
+    endif
+    if v_frame % 10 == 0 then
+        nudge_background(1, 0, 3)
+    endif
+    if v_frame % 5 == 0 then
+        nudge_background(1, 0, 4)
+    endif
+    if v_frame % 3 == 0 then
+        nudge_background(1, 0, 5)
+    endif
+    if v_frame % 2 == 0 then
+        nudge_background(1, 0, 6)
+    endif
+    nudge_background(1, 0, 7)
+
+    # Two foreground butterflies move independently of the scenery.
+    v_bx1 = 17 + sin(v_frame * 0.055) * 12
+    v_by1 = 29 + sin(v_frame * 0.087) * 5
+    v_flap1 = round(sin(v_frame * 0.35) * 2)
+    draw_line(v_bx1, v_by1, v_bx1 - 2, v_by1 - v_flap1, pink, 95)
+    draw_line(v_bx1, v_by1, v_bx1 + 2, v_by1 - v_flap1, yellow, 95)
+    plot(v_bx1, v_by1, white, 100)
+
+    v_bx2 = 43 + sin(v_frame * 0.041 + 2) * 10
+    v_by2 = 35 + sin(v_frame * 0.071 + 1) * 4
+    v_flap2 = round(sin(v_frame * 0.31 + 2) * 2)
+    draw_line(v_bx2, v_by2, v_bx2 - 2, v_by2 - v_flap2, cyan, 90)
+    draw_line(v_bx2, v_by2, v_bx2 + 2, v_by2 - v_flap2, purple, 90)
+    plot(v_bx2, v_by2, white, 100)
+
+    end_frame
+    rest(0.03)
+
+    v_frame = v_frame + 1
+    if v_frame >= 300 then
+        v_frame = 0
+    endif
+endwhile

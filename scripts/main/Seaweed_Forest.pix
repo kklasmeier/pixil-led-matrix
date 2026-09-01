@@ -1,0 +1,140 @@
+# Seaweed Forest
+# Buoyant Verlet chains are pinned to the seabed and flex in layered currents.
+# Distance constraints keep each strand connected; Pixil draws stems and leaves.
+
+throttle(0)
+fps(30)
+
+v_strand_count = 7
+v_points_per_strand = 7
+v_point_count = v_strand_count * v_points_per_strand
+v_link_count = v_strand_count * (v_points_per_strand - 1)
+
+create_array(v_px, v_point_count, numeric)
+create_array(v_py, v_point_count, numeric)
+create_array(v_ox, v_point_count, numeric)
+create_array(v_oy, v_point_count, numeric)
+create_array(v_ax, v_point_count, numeric)
+create_array(v_ay, v_point_count, numeric)
+create_array(v_active, v_point_count, numeric)
+create_array(v_link_from, v_link_count, numeric)
+create_array(v_link_to, v_link_count, numeric)
+create_array(v_link_rest, v_link_count, numeric)
+create_array(v_link_tension, v_link_count, numeric)
+create_array(v_strand_color, v_strand_count, string)
+
+v_strand_color[0] = "green"
+v_strand_color[1] = "lime"
+v_strand_color[2] = "lime"
+v_strand_color[3] = "cyan"
+v_strand_color[4] = "green"
+v_strand_color[5] = "lime"
+v_strand_color[6] = "green"
+
+# Every strand starts at the seabed and rises under negative-Y buoyancy.
+v_link = 0
+for v_strand in (0, v_strand_count - 1, 1)
+    v_base = v_strand * v_points_per_strand
+    v_anchor_x = 5 + v_strand * 9
+    v_rest = 5 + v_strand % 3
+
+    for v_point in (0, v_points_per_strand - 1, 1)
+        v_i = v_base + v_point
+        v_px[v_i] = v_anchor_x
+        v_py[v_i] = 61 - v_point * v_rest
+        v_ox[v_i] = v_px[v_i] - random(-5, 5, 10) / 10
+        v_oy[v_i] = v_py[v_i]
+        v_ax[v_i] = 0
+        v_ay[v_i] = -0.085
+        v_active[v_i] = 1
+        if v_point == 0 then
+            v_active[v_i] = 0
+            v_ox[v_i] = v_px[v_i]
+        endif
+    endfor v_point
+
+    for v_point in (0, v_points_per_strand - 2, 1)
+        v_link_from[v_link] = v_base + v_point
+        v_link_to[v_link] = v_base + v_point + 1
+        v_link_rest[v_link] = v_rest
+        v_link = v_link + 1
+    endfor v_point
+endfor v_strand
+
+v_frame = 0
+v_damping = 0.988
+v_stiffness = 0.58
+v_constraint_iters = 3
+
+while true then
+    # Two slow currents keep the forest from moving in lockstep. A broad surge
+    # passes through every twelve seconds.
+    v_current = sin(v_frame * 0.025) * 0.022 + sin(v_frame * 0.008) * 0.015
+    v_surge_phase = v_frame % 360
+    if v_surge_phase >= 180 and v_surge_phase < 240 then
+        v_current = v_current + sin((v_surge_phase - 180) * 0.052) * 0.045
+    endif
+
+    for v_strand in (0, v_strand_count - 1, 1)
+        v_base = v_strand * v_points_per_strand
+        v_local = v_current + sin(v_frame * 0.019 + v_strand * 0.83) * 0.009
+        v_ripple = sin(v_frame * 0.035 + v_strand * 0.5) * 0.006
+        for v_point in (1, v_points_per_strand - 1, 1)
+            v_i = v_base + v_point
+            v_height = v_point / (v_points_per_strand - 1)
+            v_ax[v_i] = v_local * v_height + v_ripple
+            v_ay[v_i] = -0.085
+        endfor v_point
+    endfor v_strand
+
+    particle_verlet_integrate(v_px, v_py, v_ox, v_oy, v_active, v_ax, v_ay, v_damping, v_point_count)
+    particle_constrain_distances(v_px, v_py, v_active, v_link_from, v_link_to, v_link_rest, v_stiffness, v_constraint_iters, v_link_tension, v_point_count, v_link_count, 0.25)
+
+    begin_frame
+        # Dim water column, slightly brighter near the surface.
+        draw_rectangle(0, 0, 64, 61, blue, 16, true)
+        draw_rectangle(0, 0, 64, 6, cyan, 10, true)
+        v_caustic = 18 + round(sin(v_frame * 0.04) * 6)
+        draw_line(0, v_caustic, 63, v_caustic, cyan, 12)
+
+        # Sandy seabed and a few rocks sit in front of the pinned roots.
+        draw_rectangle(0, 61, 64, 3, standard_brown, 55, true)
+        draw_circle(10, 61, 2, light_gray, 55, true)
+        draw_circle(35, 62, 2, light_gray, 45, true)
+        draw_circle(57, 61, 2, light_gray, 50, true)
+
+        for v_strand in (0, v_strand_count - 1, 1)
+            v_base = v_strand * v_points_per_strand
+            v_stem_intensity = 58 + (v_strand % 3) * 14
+
+            for v_point in (0, v_points_per_strand - 2, 1)
+                v_from = v_base + v_point
+                v_to = v_from + 1
+                draw_line(v_px[v_from], v_py[v_from], v_px[v_to], v_py[v_to], v_strand_color[v_strand], v_stem_intensity)
+            endfor v_point
+
+            # One leaf rotates with the local stem tangent.
+            for v_point in (4, 4, 1)
+                v_i = v_base + v_point
+                v_prev = v_i - 1
+                v_next = v_i + 1
+                v_dx = v_px[v_next] - v_px[v_prev]
+                v_dy = v_py[v_next] - v_py[v_prev]
+                v_len = sqrt(v_dx * v_dx + v_dy * v_dy)
+                if v_len > 0.2 then
+                    v_nx = (0 - v_dy) / v_len
+                    v_ny = v_dx / v_len
+                    if (v_strand + v_point) % 2 == 0 then
+                        v_side = 1
+                    else
+                        v_side = -1
+                    endif
+                    draw_line(v_px[v_i], v_py[v_i], v_px[v_i] + v_nx * 3 * v_side, v_py[v_i] + v_ny * 3 * v_side, v_strand_color[v_strand], v_stem_intensity)
+                endif
+            endfor v_point
+
+        endfor v_strand
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

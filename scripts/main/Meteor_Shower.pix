@@ -1,0 +1,356 @@
+# Meteor Shower
+# Rotating weather modes vary density, speed, angle, size, color, tail length,
+# burn-out, and impact energy. Primitives own bulk motion and spark physics.
+
+throttle(0)
+fps(30)
+
+v_meteor_count = 14
+v_spark_count = 18
+
+create_array(v_mx, v_meteor_count, numeric)
+create_array(v_my, v_meteor_count, numeric)
+create_array(v_mvx, v_meteor_count, numeric)
+create_array(v_mvy, v_meteor_count, numeric)
+create_array(v_max, v_meteor_count, numeric)
+create_array(v_may, v_meteor_count, numeric)
+create_array(v_mactive, v_meteor_count, numeric)
+create_array(v_mrespawn, v_meteor_count, numeric)
+create_array(v_mlife, v_meteor_count, numeric)
+create_array(v_mburn, v_meteor_count, numeric)
+create_array(v_msize, v_meteor_count, numeric)
+create_array(v_mtail, v_meteor_count, numeric)
+create_array(v_mcolor, v_meteor_count, string)
+
+create_array(v_sx, v_spark_count, numeric)
+create_array(v_sy, v_spark_count, numeric)
+create_array(v_svx, v_spark_count, numeric)
+create_array(v_svy, v_spark_count, numeric)
+create_array(v_sax, v_spark_count, numeric)
+create_array(v_say, v_spark_count, numeric)
+create_array(v_sactive, v_spark_count, numeric)
+create_array(v_sage, v_spark_count, numeric)
+create_array(v_scolor, v_spark_count, string)
+create_array(v_shit, v_spark_count, numeric)
+
+create_array(v_impact_x, 1, numeric)
+create_array(v_impact_y, 1, numeric)
+v_impact_x[0] = 32
+v_impact_y[0] = 62
+v_impact_timer = 0
+v_impact_size = 1
+v_spark_cursor = 0
+
+for v_i in (0, v_meteor_count - 1, 1)
+    v_mactive[v_i] = 0
+    v_mrespawn[v_i] = 1
+    v_mburn[v_i] = 0
+endfor v_i
+for v_i in (0, v_spark_count - 1, 1)
+    v_sactive[v_i] = 0
+    v_sage[v_i] = 0
+    v_scolor[v_i] = "orange"
+endfor v_i
+
+v_mode = -1
+v_mode_timer = 0
+
+while true then
+    # Pick a distinct sky for 9-16 seconds. Existing meteors are reseeded so
+    # the new mode becomes visible immediately instead of fading in slowly.
+    v_mode_timer = v_mode_timer - 1
+    if v_mode_timer <= 0 then
+        v_mode = random(0, 5, 0)
+        v_mode_timer = random(270, 480, 0)
+
+        if v_mode == 0 then
+            # Light shower: sparse, small, slow, and prone to burning out.
+            v_live_limit = 6
+            v_vx_min = -12
+            v_vx_max = -5
+            v_vy_min = 8
+            v_vy_max = 16
+            v_size_min = 1
+            v_size_max = 1
+            v_tail_base = 3.5
+            v_life_min = 18
+            v_life_max = 65
+            v_mgravity = 0.012
+            v_sparks_per_hit = 2
+        elseif v_mode == 1 then
+            # Meteor storm: dense, fast, bright, and long-tailed.
+            v_live_limit = 14
+            v_vx_min = -25
+            v_vx_max = -10
+            v_vy_min = 20
+            v_vy_max = 38
+            v_size_min = 1
+            v_size_max = 2
+            v_tail_base = 5.3
+            v_life_min = 70
+            v_life_max = 180
+            v_mgravity = 0.02
+            v_sparks_per_hit = 3
+        elseif v_mode == 2 then
+            # Fire rain: steep orange/red trajectories and frequent impacts.
+            v_live_limit = 11
+            v_vx_min = -10
+            v_vx_max = -3
+            v_vy_min = 16
+            v_vy_max = 30
+            v_size_min = 1
+            v_size_max = 2
+            v_tail_base = 4.5
+            v_life_min = 120
+            v_life_max = 240
+            v_mgravity = 0.025
+            v_sparks_per_hit = 4
+        elseif v_mode == 3 then
+            # Blue ice: sparse, extremely fast, and often gone midair.
+            v_live_limit = 8
+            v_vx_min = -24
+            v_vx_max = -11
+            v_vy_min = 24
+            v_vy_max = 40
+            v_size_min = 1
+            v_size_max = 2
+            v_tail_base = 5.8
+            v_life_min = 12
+            v_life_max = 48
+            v_mgravity = 0.008
+            v_sparks_per_hit = 2
+        elseif v_mode == 4 then
+            # Skimmers: shallow, very long paths that mostly leave at the left.
+            v_live_limit = 10
+            v_vx_min = -36
+            v_vx_max = -21
+            v_vy_min = 5
+            v_vy_max = 13
+            v_size_min = 1
+            v_size_max = 1
+            v_tail_base = 6.5
+            v_life_min = 35
+            v_life_max = 90
+            v_mgravity = 0.004
+            v_sparks_per_hit = 2
+        else
+            # Fireballs: rare, large bodies with energetic impacts.
+            v_live_limit = 5
+            v_vx_min = -16
+            v_vx_max = -6
+            v_vy_min = 14
+            v_vy_max = 25
+            v_size_min = 2
+            v_size_max = 3
+            v_tail_base = 6
+            v_life_min = 160
+            v_life_max = 300
+            v_mgravity = 0.018
+            v_sparks_per_hit = 5
+        endif
+
+        for v_i in (0, v_meteor_count - 1, 1)
+            if v_i < v_live_limit then
+                v_mactive[v_i] = 1
+                v_mrespawn[v_i] = 1
+            else
+                v_mactive[v_i] = 0
+            endif
+        endfor v_i
+    endif
+
+    # Spawn according to the current mode. Each meteor still receives its own
+    # speed, angle, size, lifetime, tail, and color within that profile.
+    for v_i in (0, v_meteor_count - 1, 1)
+        if v_mactive[v_i] == 1 then
+            if v_mburn[v_i] > 0 then
+                v_mburn[v_i] = v_mburn[v_i] - 1
+                v_mvx[v_i] = v_mvx[v_i] * 0.86
+                v_mvy[v_i] = v_mvy[v_i] * 0.86
+                v_mtail[v_i] = v_mtail[v_i] * 0.82
+                if v_mburn[v_i] == 5 then
+                    v_slot = v_spark_cursor
+                    v_sx[v_slot] = v_mx[v_i]
+                    v_sy[v_slot] = v_my[v_i]
+                    v_svx[v_slot] = random(-10, 10, 10) / 10
+                    v_svy[v_slot] = random(-12, 4, 10) / 10
+                    v_sactive[v_slot] = 1
+                    v_sage[v_slot] = 8
+                    v_scolor[v_slot] = "white"
+                    v_spark_cursor = v_spark_cursor + 1
+                    if v_spark_cursor >= v_spark_count then
+                        v_spark_cursor = 0
+                    endif
+                endif
+                if v_mburn[v_i] == 0 then
+                    v_mrespawn[v_i] = 1
+                endif
+            else
+                v_mlife[v_i] = v_mlife[v_i] - 1
+                if v_mlife[v_i] <= 0 then
+                    if v_mx[v_i] >= 0 and v_mx[v_i] <= 63 and v_my[v_i] >= 0 and v_my[v_i] <= 61 then
+                        v_mburn[v_i] = 10
+                        v_mcolor[v_i] = "orange"
+                        v_slot = v_spark_cursor
+                        v_sx[v_slot] = v_mx[v_i]
+                        v_sy[v_slot] = v_my[v_i]
+                        v_svx[v_slot] = v_mvx[v_i] * 0.4 + random(-6, 6, 10) / 10
+                        v_svy[v_slot] = v_mvy[v_i] * 0.4 + random(-8, 2, 10) / 10
+                        v_sactive[v_slot] = 1
+                        v_sage[v_slot] = 10
+                        v_scolor[v_slot] = "yellow"
+                        v_spark_cursor = v_spark_cursor + 1
+                        if v_spark_cursor >= v_spark_count then
+                            v_spark_cursor = 0
+                        endif
+                    else
+                        v_mrespawn[v_i] = 1
+                    endif
+                endif
+            endif
+            if v_mrespawn[v_i] == 1 then
+                if v_mode == 4 then
+                    v_mx[v_i] = random(64, 96, 0)
+                    v_my[v_i] = random(-8, 42, 0)
+                else
+                    v_mx[v_i] = random(5, 92, 0)
+                    v_my[v_i] = random(-60, -4, 0)
+                endif
+                v_mvx[v_i] = random(v_vx_min, v_vx_max, 10) / 10
+                v_mvy[v_i] = random(v_vy_min, v_vy_max, 10) / 10
+                v_msize[v_i] = random(v_size_min, v_size_max, 0)
+                v_mtail[v_i] = v_tail_base + random(-8, 8, 10) / 10
+                v_mlife[v_i] = random(v_life_min, v_life_max, 0)
+                v_mburn[v_i] = 0
+                v_mrespawn[v_i] = 0
+
+                if v_mode == 3 then
+                    if v_i % 3 == 0 then
+                        v_mcolor[v_i] = "blue"
+                    elseif v_i % 3 == 1 then
+                        v_mcolor[v_i] = "cyan"
+                    else
+                        v_mcolor[v_i] = "white"
+                    endif
+                elseif v_mode == 2 or v_mode == 5 then
+                    if v_i % 3 == 0 then
+                        v_mcolor[v_i] = "red"
+                    elseif v_i % 3 == 1 then
+                        v_mcolor[v_i] = "orange"
+                    else
+                        v_mcolor[v_i] = "yellow"
+                    endif
+                else
+                    if v_i % 3 == 0 then
+                        v_mcolor[v_i] = "cyan"
+                    elseif v_i % 3 == 1 then
+                        v_mcolor[v_i] = "white"
+                    else
+                        v_mcolor[v_i] = "yellow"
+                    endif
+                endif
+            endif
+            v_max[v_i] = 0
+            v_may[v_i] = v_mgravity
+        endif
+    endfor v_i
+
+    particle_integrate(v_mx, v_my, v_mvx, v_mvy, v_mactive, v_max, v_may, 0.999, 0, v_meteor_count)
+
+    # Ground impacts allocate reusable spark slots. Burn-outs and side exits
+    # simply request a new meteor from the current weather profile.
+    for v_i in (0, v_meteor_count - 1, 1)
+        if v_mactive[v_i] == 1 then
+            if v_my[v_i] >= 62 then
+                v_impact_x[0] = min(63, max(0, v_mx[v_i]))
+                v_impact_y[0] = 62
+                v_impact_timer = 5
+                v_impact_size = v_msize[v_i]
+
+                for v_j in (0, v_sparks_per_hit - 1, 1)
+                    v_slot = v_spark_cursor
+                    v_angle = radians(random(205, 335, 0))
+                    v_speed = random(8, 23, 10) / 10 + v_impact_size * 0.2
+                    v_sx[v_slot] = v_impact_x[0] + random(-8, 8, 10) / 10
+                    v_sy[v_slot] = 61
+                    v_svx[v_slot] = cos(v_angle) * v_speed
+                    v_svy[v_slot] = sin(v_angle) * v_speed
+                    v_sactive[v_slot] = 1
+                    v_sage[v_slot] = random(16, 30, 0) + v_impact_size * 3
+                    if v_j % 3 == 0 then
+                        v_scolor[v_slot] = "white"
+                    elseif v_j % 3 == 1 then
+                        v_scolor[v_slot] = "yellow"
+                    else
+                        v_scolor[v_slot] = "orange"
+                    endif
+                    v_spark_cursor = v_spark_cursor + 1
+                    if v_spark_cursor >= v_spark_count then
+                        v_spark_cursor = 0
+                    endif
+                endfor v_j
+                v_mrespawn[v_i] = 1
+            elseif v_mx[v_i] < -12 or v_mx[v_i] > 100 or v_my[v_i] > 70 then
+                v_mrespawn[v_i] = 1
+            endif
+        endif
+    endfor v_i
+
+    # Negative attractor gives impact debris an outward pressure front.
+    for v_i in (0, v_spark_count - 1, 1)
+        v_sax[v_i] = 0
+        v_say[v_i] = 0.085
+        if v_sactive[v_i] == 1 then
+            v_sage[v_i] = v_sage[v_i] - 1
+            if v_sage[v_i] <= 0 or v_sy[v_i] > 66 then
+                v_sactive[v_i] = 0
+            endif
+        endif
+    endfor v_i
+    if v_impact_timer > 0 then
+        particle_apply_attractors(v_sx, v_sy, v_sax, v_say, v_sactive, v_impact_x, v_impact_y, -6, 1, 1, 2, 0.22, v_spark_count, 1)
+        v_impact_timer = v_impact_timer - 1
+    endif
+    particle_integrate(v_sx, v_sy, v_svx, v_svy, v_sactive, v_sax, v_say, 0.975, 0, v_spark_count)
+    particle_collide_bounds(v_sx, v_sy, v_svx, v_svy, v_sactive, -1000, 1000, -1000, 62, 0.38, 0, v_shit, v_spark_count)
+
+    begin_frame
+        for v_i in (0, v_meteor_count - 1, 1)
+            if v_mactive[v_i] == 1 and v_mx[v_i] >= -10 and v_mx[v_i] <= 72 and v_my[v_i] >= -10 and v_my[v_i] <= 63 then
+                v_tail_x = v_mx[v_i] - v_mvx[v_i] * v_mtail[v_i]
+                v_tail_y = v_my[v_i] - v_mvy[v_i] * v_mtail[v_i]
+                if v_mburn[v_i] > 0 then
+                    v_fade = v_mburn[v_i] * 9
+                    draw_line(v_tail_x, v_tail_y, v_mx[v_i], v_my[v_i], orange, v_fade)
+                    plot(v_mx[v_i], v_my[v_i], yellow, min(100, v_fade + 20))
+                    if v_mburn[v_i] % 3 == 0 then
+                        plot(v_mx[v_i] + 1, v_my[v_i], white, v_fade)
+                    endif
+                else
+                    v_head_glow = min(100, 65 + v_msize[v_i] * 15)
+                    draw_line(v_tail_x, v_tail_y, v_mx[v_i], v_my[v_i], v_mcolor[v_i], 55)
+                    if v_msize[v_i] == 1 then
+                        plot(v_mx[v_i], v_my[v_i], white, v_head_glow)
+                    else
+                        draw_circle(v_mx[v_i], v_my[v_i], v_msize[v_i] - 1, v_mcolor[v_i], v_head_glow, true)
+                        plot(v_mx[v_i], v_my[v_i], white, 100)
+                    endif
+                endif
+            endif
+        endfor v_i
+
+        for v_i in (0, v_spark_count - 1, 1)
+            if v_sactive[v_i] == 1 then
+                v_glow = min(100, 35 + v_sage[v_i] * 3)
+                draw_line(v_sx[v_i] - v_svx[v_i] * 1.8, v_sy[v_i] - v_svy[v_i] * 1.8, v_sx[v_i], v_sy[v_i], v_scolor[v_i], v_glow)
+            endif
+        endfor v_i
+
+        if v_impact_timer > 0 then
+            v_ring = 6 - v_impact_timer + v_impact_size - 1
+            draw_circle(v_impact_x[0], 62, v_ring, yellow, 90, false)
+            plot(v_impact_x[0], 62, white, 100)
+        endif
+        draw_line(0, 63, 63, 63, orange, 30)
+    end_frame
+endwhile

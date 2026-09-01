@@ -1,0 +1,207 @@
+# Swaying Meadow Grass
+# Short Verlet chains are rooted in three depth rows. Upward growth force keeps
+# each blade standing while layered wind bends it like the seaweed and lanterns.
+
+throttle(0)
+fps(30)
+
+# Static sky. Clouds live on wrapping layers in front of it.
+define_sprite(grass_meadow_sky, 64, 64)
+    draw_rectangle(0, 0, 64, 14, azure, 76, true)
+    draw_rectangle(0, 14, 64, 14, sky_blue, 72, true)
+    draw_rectangle(0, 28, 64, 12, cyan, 28, true)
+    draw_rectangle(0, 40, 64, 24, green, 50, true)
+endsprite
+
+# Two copies of each puff so a 128-wide layer wraps without a gap.
+define_sprite(grass_far_clouds, 128, 64)
+    draw_ellipse(13, 16, 10, 3, white, 58, true, 0)
+    draw_ellipse(20, 15, 6, 3, white, 64, true, 0)
+    draw_ellipse(8, 17, 6, 2, white, 50, true, 0)
+    draw_ellipse(77, 16, 10, 3, white, 58, true, 0)
+    draw_ellipse(84, 15, 6, 3, white, 64, true, 0)
+    draw_ellipse(72, 17, 6, 2, white, 50, true, 0)
+endsprite
+
+define_sprite(grass_near_clouds, 128, 64)
+    draw_ellipse(38, 22, 9, 3, white, 48, true, 0)
+    draw_ellipse(44, 21, 6, 2, white, 54, true, 0)
+    draw_ellipse(102, 22, 9, 3, white, 48, true, 0)
+    draw_ellipse(108, 21, 6, 2, white, 54, true, 0)
+endsprite
+
+define_sprite(grass_meadow_hills, 64, 64)
+    draw_circle(7, 44, 12, forest_green, 55, true)
+    draw_circle(28, 43, 15, green, 55, true)
+    draw_circle(51, 44, 13, forest_green, 58, true)
+    draw_circle(66, 42, 15, green, 52, true)
+    for v_x in (1, 62, 4)
+        draw_line(v_x, 55, v_x + 1, 52 - v_x % 3, lime, 36)
+    endfor v_x
+endsprite
+
+sync_queue
+set_background(grass_meadow_sky)
+set_background(grass_far_clouds, 1)
+set_background(grass_near_clouds, 2)
+set_background(grass_meadow_hills, 3)
+sync_queue
+
+v_blade_count = 18
+v_points_per_blade = 4
+v_point_count = v_blade_count * v_points_per_blade
+v_link_count = v_blade_count * (v_points_per_blade - 1)
+
+create_array(v_px, v_point_count, numeric)
+create_array(v_py, v_point_count, numeric)
+create_array(v_ox, v_point_count, numeric)
+create_array(v_oy, v_point_count, numeric)
+create_array(v_ax, v_point_count, numeric)
+create_array(v_ay, v_point_count, numeric)
+create_array(v_active, v_point_count, numeric)
+create_array(v_link_from, v_link_count, numeric)
+create_array(v_link_to, v_link_count, numeric)
+create_array(v_link_rest, v_link_count, numeric)
+create_array(v_link_tension, v_link_count, numeric)
+create_array(v_depth, v_blade_count, numeric)
+create_array(v_blade_color, v_blade_count, string)
+create_array(v_flower_color, v_blade_count, string)
+create_array(v_has_flower, v_blade_count, numeric)
+
+v_link = 0
+for v_blade in (0, v_blade_count - 1, 1)
+    if v_blade < 6 then
+        # Far row: shortest, dimmest, staggered on the distant slope.
+        v_depth[v_blade] = 0
+        v_root_x = 7 + v_blade * 10
+        v_root_y = 54
+        v_rest = 2 + v_blade % 2
+    elseif v_blade < 12 then
+        # Mid row sits in the gaps between far blades.
+        v_depth[v_blade] = 1
+        v_mid = v_blade - 6
+        v_root_x = 3 + v_mid * 10
+        v_root_y = 58
+        v_rest = 3 + v_mid % 2
+    else
+        # Front row: tallest blades begin at the bottom edge.
+        v_depth[v_blade] = 2
+        v_front = v_blade - 12
+        v_root_x = 2 + v_front * 12
+        v_root_y = 63
+        v_rest = 4 + v_front % 2
+    endif
+
+    if v_blade % 3 == 0 then
+        v_blade_color[v_blade] = "lime"
+    elseif v_blade % 3 == 1 then
+        v_blade_color[v_blade] = "green"
+    else
+        v_blade_color[v_blade] = "spring_green"
+    endif
+
+    # Flowers only on the front row so their stems stay visible.
+    v_has_flower[v_blade] = 0
+    if v_blade == 12 or v_blade == 14 or v_blade == 17 then
+        v_has_flower[v_blade] = 1
+    endif
+    if v_blade == 12 then
+        v_flower_color[v_blade] = "red"
+    elseif v_blade == 14 then
+        v_flower_color[v_blade] = "pink"
+    else
+        v_flower_color[v_blade] = "yellow"
+    endif
+
+    v_base = v_blade * v_points_per_blade
+    for v_point in (0, v_points_per_blade - 1, 1)
+        v_i = v_base + v_point
+        v_px[v_i] = v_root_x
+        v_py[v_i] = v_root_y - v_point * v_rest
+        v_ox[v_i] = v_px[v_i] - random(-5, 5, 10) / 10
+        v_oy[v_i] = v_py[v_i]
+        v_ax[v_i] = 0
+        v_ay[v_i] = -0.075
+        v_active[v_i] = 1
+        if v_point == 0 then
+            v_active[v_i] = 0
+            v_ox[v_i] = v_px[v_i]
+        endif
+    endfor v_point
+
+    for v_point in (0, v_points_per_blade - 2, 1)
+        v_link_from[v_link] = v_base + v_point
+        v_link_to[v_link] = v_base + v_point + 1
+        v_link_rest[v_link] = v_rest
+        v_link = v_link + 1
+    endfor v_point
+endfor v_blade
+
+v_frame = 0
+v_damping = 0.986
+v_stiffness = 0.54
+v_constraint_iters = 3
+
+while true then
+    # A broad breeze and slower undertow combine. The front row catches more
+    # wind, while phase offsets keep individual blades from moving together.
+    v_wind = sin(v_frame * 0.03) * 0.024 + sin(v_frame * 0.009) * 0.014
+    v_gust_phase = v_frame % 330
+    if v_gust_phase >= 175 and v_gust_phase < 220 then
+        v_wind = v_wind + sin((v_gust_phase - 175) * 0.07) * 0.04
+    endif
+
+    for v_blade in (0, v_blade_count - 1, 1)
+        v_base = v_blade * v_points_per_blade
+        v_depth_force = 0.5 + v_depth[v_blade] * 0.28
+        v_local = v_wind * v_depth_force + sin(v_frame * 0.022 + v_blade * 0.61) * 0.008
+        for v_point in (1, v_points_per_blade - 1, 1)
+            v_i = v_base + v_point
+            v_height = v_point / (v_points_per_blade - 1)
+            v_ax[v_i] = v_local * v_height
+            v_ay[v_i] = -0.075
+        endfor v_point
+    endfor v_blade
+
+    particle_verlet_integrate(v_px, v_py, v_ox, v_oy, v_active, v_ax, v_ay, v_damping, v_point_count)
+    particle_constrain_distances(v_px, v_py, v_active, v_link_from, v_link_to, v_link_rest, v_stiffness, v_constraint_iters, v_link_tension, v_point_count, v_link_count, 0.25)
+
+    # Slow rightward drift: far clouds every 6th frame, nearer every 3rd.
+    v_mod3 = v_frame % 3
+    v_mod6 = v_frame % 6
+    if v_mod6 == 0 then
+        nudge_background(1, 0, 1)
+    endif
+    if v_mod3 == 0 then
+        nudge_background(1, 0, 2)
+    endif
+
+    begin_frame(false)
+        # Back row first, front row last: overlap reinforces meadow depth.
+        for v_pass in (0, 2, 1)
+            for v_blade in (0, v_blade_count - 1, 1)
+                if v_depth[v_blade] == v_pass then
+                    v_base = v_blade * v_points_per_blade
+                    v_intensity = 38 + v_pass * 26
+                    for v_point in (0, v_points_per_blade - 2, 1)
+                        v_from = v_base + v_point
+                        v_to = v_from + 1
+                        draw_line(v_px[v_from], v_py[v_from], v_px[v_to], v_py[v_to], v_blade_color[v_blade], v_intensity)
+                    endfor v_point
+
+                    if v_has_flower[v_blade] == 1 then
+                        v_tip = v_base + v_points_per_blade - 1
+                        v_neck = v_tip - 1
+                        draw_line(v_px[v_neck], v_py[v_neck], v_px[v_tip], v_py[v_tip], v_blade_color[v_blade], v_intensity)
+                        draw_circle(v_px[v_tip], v_py[v_tip], 1, v_flower_color[v_blade], 100, true)
+                        plot(v_px[v_tip], v_py[v_tip], yellow, 100)
+                    endif
+                endif
+            endfor v_blade
+        endfor v_pass
+
+        draw_rectangle(0, 62, 64, 2, forest_green, 82, true)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

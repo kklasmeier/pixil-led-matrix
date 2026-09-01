@@ -1,0 +1,184 @@
+# Hanging Lanterns
+# Five pinned Verlet chains sway under gravity and changing wind. Distance
+# constraints keep each cord intact; Pixil draws lanterns, glow, and tassels.
+
+throttle(0)
+fps(30)
+
+v_lantern_count = 5
+v_points_per_chain = 5
+v_point_count = v_lantern_count * v_points_per_chain
+v_link_count = v_lantern_count * (v_points_per_chain - 1)
+
+create_array(v_px, v_point_count, numeric)
+create_array(v_py, v_point_count, numeric)
+create_array(v_ox, v_point_count, numeric)
+create_array(v_oy, v_point_count, numeric)
+create_array(v_ax, v_point_count, numeric)
+create_array(v_ay, v_point_count, numeric)
+create_array(v_active, v_point_count, numeric)
+create_array(v_link_from, v_link_count, numeric)
+create_array(v_link_to, v_link_count, numeric)
+create_array(v_link_rest, v_link_count, numeric)
+create_array(v_link_tension, v_link_count, numeric)
+create_array(v_lantern_color, v_lantern_count, string)
+create_array(v_depth, v_lantern_count, numeric)
+create_array(v_scale, v_lantern_count, numeric)
+
+v_lantern_color[0] = "red"
+v_lantern_color[1] = "orange"
+v_lantern_color[2] = "purple"
+v_lantern_color[3] = "cyan"
+v_lantern_color[4] = "green"
+
+# Two rows of hang points. Depth 0 is the far rafter (drawn first).
+v_depth[0] = 1
+v_depth[1] = 0
+v_depth[2] = 1
+v_depth[3] = 0
+v_depth[4] = 1
+v_scale[0] = 1.1
+v_scale[1] = 0.68
+v_scale[2] = 1
+v_scale[3] = 0.68
+v_scale[4] = 1.1
+
+# Build five separate chains. The first point of each chain is a fixed anchor.
+v_link = 0
+for v_lantern in (0, v_lantern_count - 1, 1)
+    if v_depth[v_lantern] == 0 then
+        v_anchor_x = 20 + (v_lantern - 1) * 13
+        v_anchor_y = 2
+        v_rest = 5
+    else
+        v_anchor_x = 8 + v_lantern * 12
+        v_anchor_y = 6
+        v_rest = 6 + v_lantern % 2
+    endif
+    v_base = v_lantern * v_points_per_chain
+
+    for v_point in (0, v_points_per_chain - 1, 1)
+        v_i = v_base + v_point
+        v_px[v_i] = v_anchor_x
+        v_py[v_i] = v_anchor_y + v_point * v_rest
+        # A tiny initial sideways velocity prevents a motionless start.
+        v_ox[v_i] = v_px[v_i] - random(-5, 5, 10) / 10
+        v_oy[v_i] = v_py[v_i]
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0.11
+        v_active[v_i] = 1
+        if v_point == 0 then
+            v_active[v_i] = 0
+            v_ox[v_i] = v_px[v_i]
+        endif
+    endfor v_point
+
+    for v_point in (0, v_points_per_chain - 2, 1)
+        v_link_from[v_link] = v_base + v_point
+        v_link_to[v_link] = v_base + v_point + 1
+        v_link_rest[v_link] = v_rest
+        v_link = v_link + 1
+    endfor v_point
+endfor v_lantern
+
+v_frame = 0
+v_damping = 0.993
+v_stiffness = 0.72
+v_constraint_iters = 4
+
+while true then
+    # Slow cross-breeze plus a short stronger gust every ten seconds.
+    v_wind = sin(v_frame * 0.035) * 0.022 + sin(v_frame * 0.011) * 0.012
+    v_gust_phase = v_frame % 300
+    if v_gust_phase >= 165 and v_gust_phase < 195 then
+        v_wind = v_wind + sin((v_gust_phase - 165) * 0.105) * 0.055
+    endif
+
+    # Wind catches the lower cord more strongly. A phase offset prevents all
+    # five lanterns from swinging in lockstep.
+    for v_lantern in (0, v_lantern_count - 1, 1)
+        v_base = v_lantern * v_points_per_chain
+        v_local_wind = v_wind + sin(v_frame * 0.023 + v_lantern * 1.1) * 0.008
+        for v_point in (1, v_points_per_chain - 1, 1)
+            v_i = v_base + v_point
+            v_ax[v_i] = v_local_wind * v_point / (v_points_per_chain - 1)
+            v_ay[v_i] = 0.11
+        endfor v_point
+    endfor v_lantern
+
+    particle_verlet_integrate(v_px, v_py, v_ox, v_oy, v_active, v_ax, v_ay, v_damping, v_point_count)
+    particle_constrain_distances(v_px, v_py, v_active, v_link_from, v_link_to, v_link_rest, v_stiffness, v_constraint_iters, v_link_tension, v_point_count, v_link_count, 0.25)
+
+    begin_frame
+        # Far rafter first, then back lanterns, then the near beam so back cords
+        # pass behind it, then front lanterns on top.
+        draw_line(12, 1, 52, 1, standard_brown, 80)
+        draw_line(12, 2, 52, 2, standard_brown, 55)
+        draw_line(12, 2, 2, 6, standard_brown, 70)
+        draw_line(52, 2, 61, 6, standard_brown, 70)
+
+        for v_pass in (0, 1, 1)
+            if v_pass == 1 then
+                draw_rectangle(1, 5, 62, 2, standard_brown, 80, true)
+                draw_line(1, 7, 62, 7, white, 30)
+            endif
+            for v_lantern in (0, v_lantern_count - 1, 1)
+                if v_depth[v_lantern] == v_pass then
+                    v_base = v_lantern * v_points_per_chain
+                    v_s = v_scale[v_lantern]
+                    if v_pass == 0 then
+                        v_cord = 32
+                    else
+                        v_cord = 55
+                    endif
+                    plot(v_px[v_base], v_py[v_base], white, 90)
+
+                    for v_point in (0, v_points_per_chain - 2, 1)
+                        v_from = v_base + v_point
+                        v_to = v_from + 1
+                        draw_line(v_px[v_from], v_py[v_from], v_px[v_to], v_py[v_to], light_gray, v_cord)
+                    endfor v_point
+
+                    v_end = v_base + v_points_per_chain - 1
+                    v_prev = v_end - 1
+                    v_dx = v_px[v_end] - v_px[v_prev]
+                    v_dy = v_py[v_end] - v_py[v_prev]
+                    v_len = sqrt(v_dx * v_dx + v_dy * v_dy)
+                    if v_len < 0.2 then
+                        v_ux = 0
+                        v_uy = 1
+                    else
+                        v_ux = v_dx / v_len
+                        v_uy = v_dy / v_len
+                    endif
+                    v_pxp = 0 - v_uy
+                    v_pyp = v_ux
+
+                    v_hx = v_px[v_end]
+                    v_hy = v_py[v_end]
+                    v_cx = v_hx + v_ux * 3.5 * v_s
+                    v_cy = v_hy + v_uy * 3.5 * v_s
+                    v_bx = v_hx + v_ux * 7 * v_s
+                    v_by = v_hy + v_uy * 7 * v_s
+                    v_lx = v_cx + v_pxp * 2.4 * v_s
+                    v_ly = v_cy + v_pyp * 2.4 * v_s
+                    v_rx = v_cx - v_pxp * 2.4 * v_s
+                    v_ry = v_cy - v_pyp * 2.4 * v_s
+                    v_tx = v_bx + v_ux * 3 * v_s
+                    v_ty = v_by + v_uy * 3 * v_s
+
+                    draw_circle(v_cx, v_cy, 2 + v_pass * 2, v_lantern_color[v_lantern], 16 + v_pass * 8, false)
+                    draw_line(v_hx, v_hy, v_lx, v_ly, v_lantern_color[v_lantern], 70 + v_pass * 30)
+                    draw_line(v_lx, v_ly, v_bx, v_by, v_lantern_color[v_lantern], 70 + v_pass * 30)
+                    draw_line(v_bx, v_by, v_rx, v_ry, v_lantern_color[v_lantern], 70 + v_pass * 30)
+                    draw_line(v_rx, v_ry, v_hx, v_hy, v_lantern_color[v_lantern], 70 + v_pass * 30)
+                    draw_line(v_lx, v_ly, v_rx, v_ry, yellow, 30 + v_pass * 20)
+                    plot(v_cx, v_cy, yellow, 80 + v_pass * 20)
+                    draw_line(v_bx, v_by, v_tx, v_ty, v_lantern_color[v_lantern], 50 + v_pass * 20)
+                endif
+            endfor v_lantern
+        endfor v_pass
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile
