@@ -2263,6 +2263,7 @@ particle_constrain_distances(...)     # several iterations inside the call
 
 Example shows:
   scripts/main/Billiard_Break.pix
+  scripts/main/Pinball_Magnet_Table.pix
   scripts/main/Particle_Tumbler.pix
   scripts/main/Magnetic_Marbles.pix
   scripts/main/Ferrofluid_Iron_Filings.pix

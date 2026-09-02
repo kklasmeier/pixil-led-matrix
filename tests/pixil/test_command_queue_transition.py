@@ -76,16 +76,26 @@ def test_prepare_for_next_script_falls_back_when_drain_times_out(monkeypatch):
         q.prepare_for_next_script()
 
 
-def test_perform_fast_drain_swallows_pending_command():
+def test_fast_drain_waits_for_fifo_marker_before_acknowledging():
     q = MatrixCommandQueue(queue_size=4)
     q._drain_requested.set()
 
-    shutdown = q._perform_fast_drain("draw_line(0,0,1,1,white)")
-
-    assert shutdown is False
+    assert q._handle_fast_drain_command("draw_line(0,0,1,1,white)") is True
     assert q._drain_swallowed.value == 1
+    assert q._drain_complete.is_set() is False
+    assert q._drain_requested.is_set() is True
+
+    assert q._handle_fast_drain_command("__DRAIN__") is True
     assert q._drain_complete.is_set()
     assert q._drain_requested.is_set() is False
+
+
+def test_fast_drain_does_not_consume_commands_when_not_requested():
+    q = MatrixCommandQueue(queue_size=4)
+
+    assert q._handle_fast_drain_command("draw_line(0,0,1,1,white)") is False
+    assert q._drain_swallowed.value == 0
+    assert q._drain_complete.is_set() is False
 
 
 def test_sleep_delay_interruptible_detects_drain():

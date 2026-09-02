@@ -12,7 +12,7 @@
 fps(60)
 
 v_sequence_duration = 6    # Approximate seconds per sequence
-v_test_sequence = 16         # 0 = shuffle, 1-16 = pin specific, -1 = sequential debug mode
+v_test_sequence = 0          # 0 = shuffle, 1-16 = pin specific, -1 = sequential debug mode
 v_num_sequences = 16        # Total number of sequences
 
 # ============================================
@@ -242,7 +242,10 @@ def seq_sparkle_burst {
         mflush()
         v_pause = random(3, 12, 0)
         v_pause = v_pause / 10
-        rest((v_burnout / 1000) - v_pause)
+        # Short burnouts can be smaller than the random pause. Never send a
+        # negative duration to the display worker.
+        v_rest = max(0.01, (v_burnout / 1000) - v_pause)
+        rest(v_rest)
         v_elapsed = v_elapsed + v_pause + 0.1
     endwhile
 }

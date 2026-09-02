@@ -161,7 +161,7 @@ class MatrixCommandQueue:
             self._consumer_process = None
             self._running = False
 
-    def request_fast_drain(self, timeout: float = 1.0) -> int:
+    def request_fast_drain(self, timeout: float = 3.0) -> int:
         """
         Ask the consumer to swallow pending commands without executing them.
 
@@ -232,31 +232,19 @@ class MatrixCommandQueue:
             return False
         return self._reset_complete.wait(timeout=timeout)
 
-    def _perform_fast_drain(self, pending_command: Optional[str] = None) -> bool:
-        """
-        Swallow up to queue_size commands without executing them.
-
-        Returns True if __SHUTDOWN__ was encountered.
-        """
-        swallowed = 0
-        if pending_command and pending_command not in ('__DRAIN__', '__SHUTDOWN__'):
-            swallowed += 1
-
-        while swallowed < self._queue_size:
-            try:
-                command, _delay = self.command_queue.get_nowait()
-            except Empty:
-                break
-            if command == '__SHUTDOWN__':
-                self._drain_swallowed.value = swallowed
-                self._drain_requested.clear()
-                self._drain_complete.set()
-                return True
-            swallowed += 1
-
-        self._drain_swallowed.value = swallowed
+    def _complete_fast_drain(self) -> None:
+        """Acknowledge the FIFO drain marker after all older commands were seen."""
         self._drain_requested.clear()
         self._drain_complete.set()
+
+    def _handle_fast_drain_command(self, command: str) -> bool:
+        """Discard data during a drain; complete only at the FIFO fence."""
+        if command == "__DRAIN__":
+            self._complete_fast_drain()
+            return True
+        if self._drain_requested.is_set():
+            self._drain_swallowed.value += 1
+            return True
         return False
 
     def prepare_for_next_script(self, timeout: float = 3.0) -> None:
@@ -271,7 +259,7 @@ class MatrixCommandQueue:
             self.start_consumer()
 
         self.discard_pending()
-        swallowed = self.request_fast_drain(timeout=1.0)
+        swallowed = self.request_fast_drain(timeout=timeout)
         if swallowed < 0:
             print("[QUEUE] Warning: fast drain timed out; restarting consumer")
             self.reset_for_next_script(timeout=timeout)
@@ -432,11 +420,13 @@ class MatrixCommandQueue:
                         self._reset_complete.set()
                         continue
 
-                    if command == "__DRAIN__" or self._drain_requested.is_set():
-                        if self._perform_fast_drain(
-                            None if command == "__DRAIN__" else command,
-                        ):
-                            break
+                    # __DRAIN__ is a FIFO fence.  While a drain is requested,
+                    # discard ordinary commands one at a time.  Acknowledge
+                    # only after the marker itself arrives, proving that every
+                    # command enqueued before it has been seen.  Draining with
+                    # get_nowait() can observe a transient Empty while the
+                    # Queue feeder still holds older commands.
+                    if self._handle_fast_drain_command(command):
                         continue
 
                     # Test harness: capture drawing buffer fingerprint (consumer process)
@@ -460,24 +450,17 @@ class MatrixCommandQueue:
                             )
                         continue
 
-                    if self._drain_requested.is_set():
-                        if self._perform_fast_drain(command):
-                            break
-                        continue
-
                     # Wait for specified delay (interruptible when drain/shutdown requested)
                     if delay > 0:
                         if self._sleep_delay_interruptible(delay):
                             if self._force_shutdown.is_set():
                                 self._consumer_blackout_and_exit(api_instance)
                                 break
-                            if self._perform_fast_drain(command):
-                                break
+                            self._drain_swallowed.value += 1
                             continue
 
                     if self._drain_requested.is_set():
-                        if self._perform_fast_drain(command):
-                            break
+                        self._drain_swallowed.value += 1
                         continue
 
                     api_instance.execute_command(command)
@@ -488,8 +471,8 @@ class MatrixCommandQueue:
                         self._consumer_blackout_and_exit(api_instance)
                         break
                     if self._drain_requested.is_set():
-                        if self._perform_fast_drain():
-                            break
+                        # Wait for the FIFO marker; Empty may only mean the
+                        # producer's feeder thread has not published it yet.
                         continue
                     try:
                         if not api_instance.drain_abort_requested():

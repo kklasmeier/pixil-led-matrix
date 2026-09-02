@@ -1,0 +1,375 @@
+# Pinball Magnet Table
+# Automatic pinballs ricochet through fixed bumpers while one of three magnetic
+# zones activates at a time and bends their paths across the table.
+
+throttle(0)
+fps(30)
+
+v_count = 10
+v_bumper_count = 11
+v_magnet_count = 3
+v_ball_radius = 1.15
+v_bumper_radius = 2.25
+v_gravity = 0.075
+v_drag = 0.997
+v_frame = 0
+v_mode = 0
+v_mode_frame = 0
+v_launcher_ball = -1
+v_launcher_state = 0
+v_launcher_frame = 0
+
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_vx, v_count, numeric)
+create_array(v_vy, v_count, numeric)
+create_array(v_ax, v_count, numeric)
+create_array(v_ay, v_count, numeric)
+create_array(v_active, v_count, numeric)
+create_array(v_restitution, v_count, numeric)
+create_array(v_color, v_count, string)
+create_array(v_wall_hit, v_count, numeric)
+create_array(v_bumper_hit, v_count, numeric)
+create_array(v_pair_hit, v_count, numeric)
+create_array(v_flash_life, v_count, numeric)
+create_array(v_flash_x, v_count, numeric)
+create_array(v_flash_y, v_count, numeric)
+
+create_array(v_bx, v_bumper_count, numeric)
+create_array(v_by, v_bumper_count, numeric)
+
+create_array(v_mx, v_magnet_count, numeric)
+create_array(v_my, v_magnet_count, numeric)
+create_array(v_mstrength, v_magnet_count, numeric)
+
+# Bumpers leave broad lanes through the centre and around both sides.
+v_bx[0] = 18
+v_by[0] = 12
+v_bx[1] = 44
+v_by[1] = 12
+v_bx[2] = 31
+v_by[2] = 19
+v_bx[3] = 13
+v_by[3] = 27
+v_bx[4] = 49
+v_by[4] = 27
+v_bx[5] = 23
+v_by[5] = 34
+v_bx[6] = 40
+v_by[6] = 35
+v_bx[7] = 14
+v_by[7] = 44
+v_bx[8] = 50
+v_by[8] = 44
+v_bx[9] = 27
+v_by[9] = 49
+v_bx[10] = 37
+v_by[10] = 50
+
+# Timed magnetic lanes: upper-left, upper-right, and lower centre.
+v_mx[0] = 12
+v_my[0] = 18
+v_mx[1] = 52
+v_my[1] = 18
+v_mx[2] = 32
+v_my[2] = 42
+
+define_sprite(magnet_pinball_table, 64, 64)
+    draw_rectangle(0, 0, 64, 64, black, 100, true)
+    draw_rectangle(2, 1, 60, 63, navy, 58, true)
+    draw_rectangle(4, 2, 56, 62, purple, 36, true)
+    draw_line(4, 10, 4, 61, cyan, 54)
+    draw_line(59, 10, 59, 61, cyan, 54)
+    # Segmented rails match the rounded collision corners.
+    draw_line(4, 10, 5, 7, cyan, 68)
+    draw_line(5, 7, 8, 4, cyan, 68)
+    draw_line(8, 4, 12, 2, cyan, 68)
+    draw_line(12, 2, 51, 2, cyan, 54)
+    draw_line(51, 2, 55, 4, cyan, 68)
+    draw_line(55, 4, 58, 7, cyan, 68)
+    draw_line(58, 7, 59, 10, cyan, 68)
+
+    # Launch lane opens into the rounded upper-right rail.
+    draw_line(53, 20, 53, 62, white, 38)
+    draw_line(54, 20, 54, 62, cyan, 26)
+
+    # Fixed rubber bumpers.
+    draw_circle(18, 12, 3, yellow, 78, false)
+    draw_circle(44, 12, 3, yellow, 78, false)
+    draw_circle(31, 19, 3, orange, 82, false)
+    draw_circle(13, 27, 3, cyan, 76, false)
+    draw_circle(49, 27, 3, cyan, 76, false)
+    draw_circle(23, 34, 3, yellow, 78, false)
+    draw_circle(40, 35, 3, orange, 82, false)
+    draw_circle(14, 44, 3, cyan, 76, false)
+    draw_circle(50, 44, 3, cyan, 76, false)
+    draw_circle(27, 49, 3, yellow, 78, false)
+    draw_circle(37, 50, 3, yellow, 78, false)
+endsprite
+
+sync_queue
+set_background(magnet_pinball_table)
+sync_queue
+
+def stage_ball {
+    # Hold the ball directly over the plunger until its pull animation finishes.
+    v_x[v_i] = 57
+    v_y[v_i] = 57
+    v_vx[v_i] = 0
+    v_vy[v_i] = 0
+    v_ax[v_i] = 0
+    v_ay[v_i] = 0
+    v_active[v_i] = 0
+    v_restitution[v_i] = random(0.82, 0.94, 2)
+    v_flash_life[v_i] = 0
+}
+
+def collide_rubber_band {
+    # Bounce a ball off a taut rubber segment. v_x1/y1 and v_x2/y2 are posts.
+    v_dx = v_x2 - v_x1
+    v_dy = v_y2 - v_y1
+    v_len2 = v_dx * v_dx + v_dy * v_dy
+    v_px = v_x[v_i] - v_x1
+    v_py = v_y[v_i] - v_y1
+    v_t = (v_px * v_dx + v_py * v_dy) / v_len2
+    if v_t < 0 then
+        v_t = 0
+    endif
+    if v_t > 1 then
+        v_t = 1
+    endif
+    v_cx = v_x1 + v_t * v_dx
+    v_cy = v_y1 + v_t * v_dy
+    v_nx = v_x[v_i] - v_cx
+    v_ny = v_y[v_i] - v_cy
+    v_d2 = v_nx * v_nx + v_ny * v_ny
+    v_hit_r = v_ball_radius + 0.7
+    if v_d2 < v_hit_r * v_hit_r then
+        if v_d2 < 0.04 then
+            v_nx = 0
+            v_ny = -1
+        else
+            v_d = sqrt(v_d2)
+            v_nx = v_nx / v_d
+            v_ny = v_ny / v_d
+            if v_ny > 0 then
+                v_nx = 0 - v_nx
+                v_ny = 0 - v_ny
+            endif
+        endif
+        v_x[v_i] = v_cx + v_nx * v_hit_r
+        v_y[v_i] = v_cy + v_ny * v_hit_r
+        v_out = v_vx[v_i] * v_nx + v_vy[v_i] * v_ny
+        if v_out < 0 then
+            v_vx[v_i] = v_vx[v_i] - 1.72 * v_out * v_nx
+            v_vy[v_i] = v_vy[v_i] - 1.72 * v_out * v_ny
+            v_vy[v_i] = v_vy[v_i] - 0.42
+            v_flash_x[v_i] = v_x[v_i]
+            v_flash_y[v_i] = v_y[v_i]
+            v_flash_life[v_i] = 5
+        endif
+    endif
+}
+
+for v_i in (0, v_count - 1, 1)
+    if v_i % 3 == 0 then
+        v_color[v_i] = "yellow"
+    elseif v_i % 3 == 1 then
+        v_color[v_i] = "cyan"
+    else
+        v_color[v_i] = "magenta"
+    endif
+    v_active[v_i] = 0
+    v_restitution[v_i] = random(0.82, 0.94, 2)
+    v_flash_life[v_i] = 0
+endfor v_i
+
+while true then
+    # Feed one inactive ball into the visible launcher. Pull for a full second,
+    # release it straight upward, then let the handle return before reloading.
+    if v_launcher_state == 0 then
+        v_launcher_ball = -1
+        for v_i in (0, v_count - 1, 1)
+            if v_launcher_ball < 0 and v_active[v_i] == 0 then
+                v_launcher_ball = v_i
+            endif
+        endfor v_i
+        if v_launcher_ball >= 0 then
+            v_i = v_launcher_ball
+            call stage_ball
+            v_launcher_state = 1
+            v_launcher_frame = 0
+        endif
+    elseif v_launcher_state == 1 then
+        v_launcher_frame = v_launcher_frame + 1
+        if v_launcher_frame >= 30 then
+            v_i = v_launcher_ball
+            v_active[v_i] = 1
+            v_vx[v_i] = 0
+            v_vy[v_i] = -4.4
+            v_launcher_ball = -1
+            v_launcher_state = 2
+            v_launcher_frame = 0
+        endif
+    else
+        v_launcher_frame = v_launcher_frame + 1
+        if v_launcher_frame >= 12 then
+            v_launcher_state = 0
+            v_launcher_frame = 0
+        endif
+    endif
+
+    # Rotate the active magnetic lane every five seconds.
+    v_mode_frame = v_mode_frame + 1
+    if v_mode_frame >= 150 then
+        v_mode = v_mode + 1
+        if v_mode >= v_magnet_count then
+            v_mode = 0
+        endif
+        v_mode_frame = 0
+    endif
+
+    for v_m in (0, v_magnet_count - 1, 1)
+        v_mstrength[v_m] = 0
+    endfor v_m
+    # Pulse prevents a permanent orbit while keeping the lane visibly magnetic.
+    v_mstrength[v_mode] = 0.72 + sin(v_mode_frame * 0.08) * 0.2
+
+    for v_i in (0, v_count - 1, 1)
+        v_ax[v_i] = 0
+        v_ay[v_i] = v_gravity
+    endfor v_i
+
+    particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_mx, v_my, v_mstrength, 1, 1, 3.2, 0.16, v_count, v_magnet_count)
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, v_drag, 0, v_count, post_move, 2.8)
+
+    # Concave quarter-circle rails replace square top corners. A ball entering
+    # either corner is projected to the arc and reflected back into the table.
+    for v_i in (0, v_count - 1, 1)
+        if v_active[v_i] == 1 then
+            if v_x[v_i] < 12 and v_y[v_i] < 10 then
+                v_cdx = v_x[v_i] - 12
+                v_cdy = v_y[v_i] - 10
+                v_cd2 = v_cdx * v_cdx + v_cdy * v_cdy
+                if v_cd2 > 64 then
+                    v_cd = sqrt(v_cd2)
+                    v_nx = v_cdx / v_cd
+                    v_ny = v_cdy / v_cd
+                    v_x[v_i] = 12 + v_nx * 8
+                    v_y[v_i] = 10 + v_ny * 8
+                    v_out = v_vx[v_i] * v_nx + v_vy[v_i] * v_ny
+                    if v_out > 0 then
+                        v_vx[v_i] = v_vx[v_i] - 1.88 * v_out * v_nx
+                        v_vy[v_i] = v_vy[v_i] - 1.88 * v_out * v_ny
+                    endif
+                endif
+            elseif v_x[v_i] > 51 and v_y[v_i] < 10 then
+                v_cdx = v_x[v_i] - 51
+                v_cdy = v_y[v_i] - 10
+                v_cd2 = v_cdx * v_cdx + v_cdy * v_cdy
+                if v_cd2 > 64 then
+                    v_cd = sqrt(v_cd2)
+                    v_nx = v_cdx / v_cd
+                    v_ny = v_cdy / v_cd
+                    v_x[v_i] = 51 + v_nx * 8
+                    v_y[v_i] = 10 + v_ny * 8
+                    v_out = v_vx[v_i] * v_nx + v_vy[v_i] * v_ny
+                    if v_out > 0 then
+                        v_vx[v_i] = v_vx[v_i] - 1.88 * v_out * v_nx
+                        v_vy[v_i] = v_vy[v_i] - 1.88 * v_out * v_ny
+                    endif
+                endif
+            endif
+        endif
+    endfor v_i
+
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 4, 59, 2, 1000, v_restitution, v_ball_radius, v_wall_hit, v_count)
+    particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_bx, v_by, v_ball_radius, v_bumper_radius, v_restitution, v_bumper_hit, v_count, v_bumper_count)
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_ball_radius, 1, 0.92, v_pair_hit, v_count)
+
+    for v_i in (0, v_count - 1, 1)
+        if v_active[v_i] == 1 then
+            v_x1 = 6
+            v_y1 = 54
+            v_x2 = 24
+            v_y2 = 61
+            call collide_rubber_band
+            v_x1 = 51
+            v_y1 = 54
+            v_x2 = 39
+            v_y2 = 61
+            call collide_rubber_band
+        endif
+        if v_bumper_hit[v_i] > 0 then
+            v_flash_x[v_i] = v_x[v_i]
+            v_flash_y[v_i] = v_y[v_i]
+            v_flash_life[v_i] = 5
+            # Rubber bumpers add a small kick so the table stays lively.
+            v_vx[v_i] = v_vx[v_i] + random(-0.45, 0.45, 2)
+            v_vy[v_i] = v_vy[v_i] - 0.18
+        endif
+        if v_y[v_i] > 64 then
+            v_active[v_i] = 0
+            v_vx[v_i] = 0
+            v_vy[v_i] = 0
+        endif
+    endfor v_i
+
+    begin_frame(false)
+        # Inactive magnets remain as dim targets; the live one pulses.
+        for v_m in (0, v_magnet_count - 1, 1)
+            if v_m == v_mode then
+                v_glow = 58 + sin(v_mode_frame * 0.12) * 24
+                draw_circle(v_mx[v_m], v_my[v_m], 5, red, v_glow, false)
+                draw_circle(v_mx[v_m], v_my[v_m], 2, orange, 92, true)
+                plot(v_mx[v_m], v_my[v_m], white, 100)
+            else
+                draw_circle(v_mx[v_m], v_my[v_m], 3, red, 16, false)
+                plot(v_mx[v_m], v_my[v_m], red, 30)
+            endif
+        endfor v_m
+
+        # Lower rubber bands: taut elastic between posts, gap in the centre.
+        draw_circle(6, 54, 1, white, 88, true)
+        draw_circle(24, 61, 1, white, 88, true)
+        draw_line(6, 54, 24, 61, yellow, 92)
+        draw_line(6, 53, 24, 60, orange, 48)
+        draw_circle(51, 54, 1, white, 88, true)
+        draw_circle(39, 61, 1, white, 88, true)
+        draw_line(51, 54, 39, 61, yellow, 92)
+        draw_line(51, 53, 39, 60, orange, 48)
+
+        for v_i in (0, v_count - 1, 1)
+            if v_active[v_i] == 1 then
+                draw_circle(v_x[v_i], v_y[v_i], 1, v_color[v_i], 100, true)
+                plot(v_x[v_i] - 1, v_y[v_i] - 1, white, 72)
+                if v_flash_life[v_i] > 0 then
+                    draw_circle(v_flash_x[v_i], v_flash_y[v_i], 2, white, v_flash_life[v_i] * 18, false)
+                    v_flash_life[v_i] = v_flash_life[v_i] - 1
+                endif
+            endif
+        endfor v_i
+
+        # Staged ball and animated pull lever. The knob visibly travels down
+        # before the ball is released straight up the lane.
+        if v_launcher_state == 1 and v_launcher_ball >= 0 then
+            draw_circle(57, 57, 1, v_color[v_launcher_ball], 100, true)
+            plot(56, 56, white, 72)
+            v_handle_y = 49 + v_launcher_frame * 0.38
+        elseif v_launcher_state == 2 then
+            v_handle_y = 61 - v_launcher_frame
+            if v_handle_y < 49 then
+                v_handle_y = 49
+            endif
+        else
+            v_handle_y = 49
+        endif
+        draw_line(61, 43, 61, v_handle_y, yellow, 72)
+        draw_circle(61, v_handle_y, 2, red, 92, true)
+        draw_line(56, 59, 58, 61, white, 48)
+        draw_line(56, 55, 58, 57, white, 48)
+        draw_line(56, 51, 58, 53, white, 48)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

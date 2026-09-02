@@ -27,6 +27,9 @@ v_particle_x = 0
 v_particle_y = 3
 v_velocity_y = 0
 v_time = 0
+# Restart once settled sand covers roughly 55% of the 64x64 display.
+v_restart_threshold = 2253
+v_settled_pixels = 0
 
 # Color variation for sand texture
 create_array(v_sand_colors, 4, string)
@@ -76,11 +79,26 @@ while 1 then
         endif
         
         v_pile_height[v_particle_x] = v_pile_height[v_particle_x] + 1
+        v_settled_pixels = v_settled_pixels + 1
         
         v_particle_x = v_x + 1
         v_particle_y = 3
         v_velocity_y = random(-1, 1, 1)
         v_time = 0
+    endif
+
+    # Start a fresh scene before accumulated sand fills the display.
+    if v_settled_pixels >= v_restart_threshold then
+        clear()
+        for v_i in (0, 63, 1) then
+            v_pile_height[v_i] = 0
+        endfor v_i
+        v_settled_pixels = 0
+        v_particle_x = v_x + 1
+        v_particle_y = 3
+        v_velocity_y = 0
+        show_sprite(chute, v_x, 0)
+        show_sprite(sand, v_particle_x, v_particle_y)
     endif
     
     rest(v_move_delay)
