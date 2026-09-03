@@ -981,21 +981,28 @@ class RGB_Api:
         duration = effective_rest_duration(duration)
         record_rest()
         debug(f"Resting for {duration} seconds", Level.DEBUG, Component.COMMAND)
-        end_time = time.time() + duration
-        last_refresh_time = time.time()
+        end_time = time.monotonic() + duration
+        last_refresh_time = time.monotonic()
         refresh_interval = 0.05  # Refresh display every 50ms
-        
-        while time.time() < end_time:
+
+        while True:
             if self.drain_abort_requested():
                 break
-            current_time = time.time()
+
+            current_time = time.monotonic()
+            if current_time >= end_time:
+                break
 
             if current_time - last_refresh_time >= refresh_interval:
                 self.pump_fade_display(min_interval=0, force=True)
                 last_refresh_time = current_time
-                
-            # Sleep for a small amount of time
-            time.sleep(min(0.01, end_time - current_time))
+
+            # Recalculate after display work so scheduling delays can never
+            # produce a negative argument to time.sleep().
+            remaining = end_time - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.01, remaining))
 
     # Sprite Management Methods
     def show_sprite(self, name: str, x: float, y: float, instance_id: int = 0, 
