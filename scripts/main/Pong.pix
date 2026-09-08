@@ -1,50 +1,52 @@
-# Pong Game AI Simulation - Enhanced Edition
-# Court size: 64x64 pixels
-# Best 2 of 3 games, first to 21 points (win by 2)
+# Pong V2 - predictive AI, paddle spin, and accelerating rallies
+# Court: 64x64 pixels. First to 11 points.
+
+# Present twice as often as the original 60 FPS sim so the ball covers
+# fewer pixels between frames. Motion is scaled by 60/120 so rallies
+# still travel at the same pixels-per-second.
+fps(120)
+throttle(0)
 
 # ============================================
-# GAME STATE VARIABLES
+# COURT STATE
 # ============================================
+v_left_score = 0
+v_right_score = 0
+v_win_score = 11
 
-# Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
-fps(60)
-
-v_p1_games = 0
-v_p2_games = 0
-v_game_number = 0
-v_game_over = 0
-
-# ============================================
-# PADDLE AND BALL VARIABLES
-# ============================================
 v_paddle_height = 12
 v_paddle_width = 2
 v_ball_size = 2
-v_center_x = 32
-v_center_y = 32
-v_left_score = 0
-v_right_score = 0
-v_center_line_segments = 8
-
-# Speed factors
-v_ball_speed = 2
-v_paddle_speed = 1.7
-
-# Paddle positions
 v_left_paddle_x = 2
-v_left_paddle_y = 26
 v_right_paddle_x = 60
+v_left_paddle_y = 26
 v_right_paddle_y = 26
+v_left_paddle_velocity = 0
+v_right_paddle_velocity = 0
 
-# Ball position and direction
+v_frame_scale = 0.5
+
+# Each rally starts comfortably, then gains speed on every paddle hit.
+# Speeds are in original 60 FPS pixels-per-frame units.
+v_start_ball_speed = 1.65
+v_ball_speed = v_start_ball_speed
+v_ball_speed_step = 0.09
+v_max_ball_speed = 3.35
+v_rally_hits = 0
+
+v_paddle_speed = 2.05
 v_ball_x = 32
 v_ball_y = 32
 v_ball_dx = 1
 v_ball_dy = 0
 
-# ============================================
-# SPRITE DEFINITIONS
-# ============================================
+# AI targets are selected once per incoming ball rather than recalculated every
+# frame. This gives each computer a fair reaction delay and a chance to miss.
+v_left_ai_target = 26
+v_right_ai_target = 26
+v_left_ai_tracking = 0
+v_right_ai_tracking = 0
+
 define_sprite(ball, v_ball_size, v_ball_size)
     draw_rectangle(0, 0, 1, 1, white, 100, true)
 endsprite
@@ -58,422 +60,309 @@ define_sprite(right_paddle, v_paddle_width, v_paddle_height)
 endsprite
 
 # ============================================
-# TITLE SCREEN PROCEDURE
+# DISPLAY
 # ============================================
-def show_title_screen {
-    clear()
-    
-    # Draw "PONG" title near top
-    draw_text(32, 10, "PONG", piboto-regular, 12, white, 100, NORMAL, CENTER)
-    
-    # Draw decorative paddles and ball in middle
-    draw_rectangle(8, 28, 2, 12, white, 60, true)
-    draw_rectangle(54, 28, 2, 12, white, 60, true)
-    draw_rectangle(31, 33, 2, 2, white, 60, true)
-    
-    # Draw game wins spread out at bottom
-    # P1 on left side, P2 on right side
-    draw_text(16, 52, "P1:", piboto-regular, 10, white, 100, NORMAL, RIGHT)
-    draw_text(18, 52, int(v_p1_games), piboto-regular, 10, white, 100, NORMAL, LEFT)
-    draw_text(48, 52, "P2:", piboto-regular, 10, white, 100, NORMAL, RIGHT)
-    draw_text(50, 52, int(v_p2_games), piboto-regular, 10, white, 100, NORMAL, LEFT)
-    
-    # Wait 5 seconds
-    rest(5)
-    clear()
+def draw_court {
+    for v_i in (0, 7, 1)
+        draw_rectangle(31, v_i * 8, 2, 4, white, 100, true)
+    endfor v_i
 }
 
-# ============================================
-# GAME WON SCREEN PROCEDURE
-# ============================================
-def show_game_won_screen {
+def update_score {
+    clear_text(16, 3)
+    clear_text(48, 3)
+    draw_text(16, 3, int(v_left_score), piboto-regular, 9, white, 100, NORMAL, CENTER)
+    draw_text(48, 3, int(v_right_score), piboto-regular, 9, white, 100, NORMAL, CENTER)
+}
+
+def show_title_screen {
     clear()
-    
-    # Show "GAME X"
-    draw_text(32, 8, "MATCH", piboto-regular, 9, white, 100, NORMAL, CENTER)
-    draw_text(32, 20, int(v_game_number), piboto-regular, 9, white, 100, NORMAL, CENTER)
-    
-    # Show winner based on who has more points
-    if v_left_score > v_right_score then
-        draw_text(32, 36, "P1 WINS!", piboto-regular, 12, white, 100, NORMAL, CENTER)
-    endif
-    if v_right_score > v_left_score then
-        draw_text(32, 36, "P2 WINS!", piboto-regular, 12, white, 100, NORMAL, CENTER)
-    endif
-    
-    # Show game series score
-    draw_text(24, 52, int(v_p1_games), piboto-regular, 10, white, 100, NORMAL, RIGHT)
-    draw_text(32, 52, "-", piboto-regular, 9, white, 100, NORMAL, CENTER)
-    draw_text(40, 52, int(v_p2_games), piboto-regular, 10, white, 100, NORMAL, LEFT)
-    
-    # Wait 4 seconds
+    draw_text(32, 8, "PONG", piboto-regular, 14, white, 100, NORMAL, CENTER)
+    draw_text(32, 26, "SPIN", piboto-regular, 11, cyan, 100, NORMAL, CENTER)
+    draw_text(32, 38, "SPEED", piboto-regular, 11, cyan, 100, NORMAL, CENTER)
+    draw_text(16, 54, "P1", piboto-regular, 9, white, 100, NORMAL, CENTER)
+    draw_text(48, 54, "P2", piboto-regular, 9, white, 100, NORMAL, CENTER)
     rest(4)
     clear()
 }
 
-# ============================================
-# GAME OVER SCREEN WITH 1978 FANFARE
-# ============================================
-def show_game_over_screen {
+def show_winner_screen {
     clear()
-    
-    # Draw initial screen with everything
     begin_frame
-        # Border rectangles
         draw_rectangle(0, 0, 63, 63, white, 100, false)
         draw_rectangle(2, 2, 59, 59, white, 100, false)
-        
-        # Winner text
-        if v_p1_games == 2 then
-            draw_text(32, 22, "P1 WINS!", piboto-regular, 10, white, 100, NORMAL, CENTER)
+        if v_left_score > v_right_score then
+            draw_text(32, 16, "P1 WINS!", piboto-regular, 11, white, 100, NORMAL, CENTER)
+        else
+            draw_text(32, 16, "P2 WINS!", piboto-regular, 11, white, 100, NORMAL, CENTER)
         endif
-        if v_p2_games == 2 then
-            draw_text(32, 22, "P2 WINS!", piboto-regular, 10, white, 100, NORMAL, CENTER)
-        endif
-        
-        # Final score
-        draw_text(24, 40, int(v_p1_games), piboto-regular, 9, white, 100, NORMAL, RIGHT)
-        draw_text(32, 42, "-", piboto-regular, 9, white, 100, NORMAL, CENTER)
-        draw_text(40, 40, int(v_p2_games), piboto-regular, 9, white, 100, NORMAL, LEFT)
+        draw_text(22, 38, int(v_left_score), piboto-regular, 12, white, 100, NORMAL, CENTER)
+        draw_text(32, 40, "-", piboto-regular, 10, white, 100, NORMAL, CENTER)
+        draw_text(42, 38, int(v_right_score), piboto-regular, 12, white, 100, NORMAL, CENTER)
     end_frame
-    
     rest(0.5)
-    
-    # Flash the rectangles 10 times
-    for v_flash in (1, 10, 1)
-        # Rectangles OFF (draw black)
+
+    for v_flash in (1, 6, 1)
         begin_frame(true)
             draw_rectangle(0, 0, 63, 63, black, 100, false)
             draw_rectangle(2, 2, 59, 59, black, 100, false)
         end_frame
-        rest(0.5)
-        
-        # Rectangles ON (draw white)
+        rest(0.25)
         begin_frame(true)
             draw_rectangle(0, 0, 63, 63, white, 100, false)
             draw_rectangle(2, 2, 59, 59, white, 100, false)
         end_frame
-        rest(0.5)
+        rest(0.25)
     endfor v_flash
-    
-    # Hold with rectangles on for 1 second
-    rest(2)
-    
+
+    rest(1.5)
     clear()
-    rest(0.8)
 }
 
 # ============================================
-# DRAW COURT PROCEDURE
+# BALANCED PREDICTIVE AI
 # ============================================
-def draw_court {
-    # Draw center line (dashed)
-    v_segment_height = 64 / (v_center_line_segments * 2)
-    for v_i in (0, v_center_line_segments - 1, 1)
-        v_y_pos = v_i * v_segment_height * 2
-        draw_rectangle(31, v_y_pos, 2, v_segment_height, white, 100, true)
-    endfor v_i
+def choose_left_target {
+    # Predict where the ball will be at the left paddle, including wall bounces.
+    v_distance = v_ball_x - (v_left_paddle_x + v_paddle_width)
+    v_predicted_y = v_ball_y + (v_ball_dy * v_distance)
+    while v_predicted_y < 0 or v_predicted_y > 62 then
+        if v_predicted_y < 0 then
+            v_predicted_y = -v_predicted_y
+        endif
+        if v_predicted_y > 62 then
+            v_predicted_y = 124 - v_predicted_y
+        endif
+    endwhile
+
+    # Most reads are close; occasional larger errors create honest misses.
+    v_ai_error = random(-2, 2, 1)
+    if random(0, 99, 0) < 18 then
+        v_ai_error = random(-7, 7, 1)
+    endif
+    v_left_ai_target = v_predicted_y + (v_ball_size / 2) - (v_paddle_height / 2) + v_ai_error
+    v_left_ai_target = max(0, min(64 - v_paddle_height, v_left_ai_target))
 }
 
-# ============================================
-# UPDATE SCORE DISPLAY PROCEDURE
-# ============================================
-def update_score {
-    clear_text(16, 3)
-    draw_text(16, 3, int(v_left_score), piboto-regular, 9, white, 100, NORMAL, CENTER)
-    clear_text(48, 3)
-    draw_text(48, 3, int(v_right_score), piboto-regular, 9, white, 100, NORMAL, CENTER)
+def choose_right_target {
+    # This is deliberately identical to the left AI, keeping opponents balanced.
+    v_distance = (v_right_paddle_x - v_ball_size) - v_ball_x
+    v_predicted_y = v_ball_y + (v_ball_dy * v_distance)
+    while v_predicted_y < 0 or v_predicted_y > 62 then
+        if v_predicted_y < 0 then
+            v_predicted_y = -v_predicted_y
+        endif
+        if v_predicted_y > 62 then
+            v_predicted_y = 124 - v_predicted_y
+        endif
+    endwhile
+
+    v_ai_error = random(-2, 2, 1)
+    if random(0, 99, 0) < 18 then
+        v_ai_error = random(-7, 7, 1)
+    endif
+    v_right_ai_target = v_predicted_y + (v_ball_size / 2) - (v_paddle_height / 2) + v_ai_error
+    v_right_ai_target = max(0, min(64 - v_paddle_height, v_right_ai_target))
 }
 
-# ============================================
-# UPDATE PADDLES AI PROCEDURE
-# ============================================
 def update_paddles {
-    v_left_paddle_center = v_left_paddle_y + (v_paddle_height / 2)
-    v_right_paddle_center = v_right_paddle_y + (v_paddle_height / 2)
-    
-    # Left paddle AI
-    if v_ball_dx < 0 and v_ball_y > v_left_paddle_center + 2 then
-        v_left_paddle_y = v_left_paddle_y + v_paddle_speed
-        move_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
+    # A new target is selected only as the ball begins travelling toward a side.
+    if v_ball_dx > 0 then
+        v_left_ai_tracking = 0
+        if v_right_ai_tracking == 0 then
+            call choose_right_target
+            v_right_ai_tracking = 1
+        endif
     endif
-    if v_ball_dx < 0 and v_ball_y < v_left_paddle_center - 2 then
-        v_left_paddle_y = v_left_paddle_y - v_paddle_speed
-        move_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
+    if v_ball_dx < 0 then
+        v_right_ai_tracking = 0
+        if v_left_ai_tracking == 0 then
+            call choose_left_target
+            v_left_ai_tracking = 1
+        endif
     endif
-    
-    # Right paddle AI
-    if v_ball_dx > 0 and v_ball_y > v_right_paddle_center + 2 then
-        v_right_paddle_y = v_right_paddle_y + v_paddle_speed
-        move_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
+
+    v_left_paddle_velocity = 0
+    v_left_difference = v_left_ai_target - v_left_paddle_y
+    if abs(v_left_difference) > 0.12 then
+        v_left_step = min(v_paddle_speed * v_frame_scale, abs(v_left_difference))
+        v_left_paddle_velocity = copysign(v_left_step, v_left_difference)
+        v_left_paddle_y = v_left_paddle_y + v_left_paddle_velocity
     endif
-    if v_ball_dx > 0 and v_ball_y < v_right_paddle_center - 2 then
-        v_right_paddle_y = v_right_paddle_y - v_paddle_speed
-        move_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
+    v_left_paddle_y = max(0, min(64 - v_paddle_height, v_left_paddle_y))
+
+    v_right_paddle_velocity = 0
+    v_right_difference = v_right_ai_target - v_right_paddle_y
+    if abs(v_right_difference) > 0.12 then
+        v_right_step = min(v_paddle_speed * v_frame_scale, abs(v_right_difference))
+        v_right_paddle_velocity = copysign(v_right_step, v_right_difference)
+        v_right_paddle_y = v_right_paddle_y + v_right_paddle_velocity
     endif
-    
-    # Keep paddles in bounds
-    if v_left_paddle_y < 0 then
-        v_left_paddle_y = 0
-        move_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
-    endif
-    if v_left_paddle_y > 64 - v_paddle_height then
-        v_left_paddle_y = 64 - v_paddle_height
-        move_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
-    endif
-    if v_right_paddle_y < 0 then
-        v_right_paddle_y = 0
-        move_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
-    endif
-    if v_right_paddle_y > 64 - v_paddle_height then
-        v_right_paddle_y = 64 - v_paddle_height
-        move_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
-    endif
+    v_right_paddle_y = max(0, min(64 - v_paddle_height, v_right_paddle_y))
+
+    move_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
+    move_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
 }
 
 # ============================================
-# CHECK COLLISIONS PROCEDURE
+# BALL PHYSICS
 # ============================================
-def check_collisions {
-    # Ball hitting top or bottom
-    if v_ball_y <= 0 then
-        v_ball_dy = 1
-    endif
-    if v_ball_y >= 62 then
-        v_ball_dy = -1
-    endif
-    
-    # Ball hitting left paddle
-    if v_ball_x <= v_left_paddle_x + v_paddle_width and v_ball_y >= v_left_paddle_y and v_ball_y <= v_left_paddle_y + v_paddle_height then
-        v_ball_dx = 1
-        v_hit_pos = (v_ball_y - v_left_paddle_y) / v_paddle_height
-        v_base_angle = (v_hit_pos - 0.5) * 2
-        v_random_factor = random(-20, 20, 0) / 100
-        v_ball_dy = v_base_angle + v_random_factor
-        if v_ball_dy > 0.8 then
-            v_ball_dy = 0.8
-        endif
-        if v_ball_dy < -0.8 then
-            v_ball_dy = -0.8
-        endif
-    endif
-    
-    # Ball hitting right paddle
-    if v_ball_x >= v_right_paddle_x - v_ball_size and v_ball_y >= v_right_paddle_y and v_ball_y <= v_right_paddle_y + v_paddle_height then
-        v_ball_dx = -1
-        v_hit_pos = (v_ball_y - v_right_paddle_y) / v_paddle_height
-        v_base_angle = (v_hit_pos - 0.5) * 2
-        v_random_factor = random(-20, 20, 0) / 100
-        v_ball_dy = v_base_angle + v_random_factor
-        if v_ball_dy > 0.8 then
-            v_ball_dy = 0.8
-        endif
-        if v_ball_dy < -0.8 then
-            v_ball_dy = -0.8
-        endif
-    endif
+def accelerate_rally {
+    v_rally_hits = v_rally_hits + 1
+    v_ball_speed = min(v_max_ball_speed, v_ball_speed + v_ball_speed_step)
 }
 
-# ============================================
-# CHECK FOR POINT SCORED PROCEDURE
-# ============================================
-def check_scoring {
-    v_point_scored = 0
-    v_server = 0
-    
-    # Ball passed left side - P2 (right) scores
-    if v_ball_x <= 0 then
-        v_right_score = v_right_score + 1
-        v_point_scored = 1
-        v_server = 2
-    endif
-    
-    # Ball passed right side - P1 (left) scores
-    if v_ball_x >= 63 then
-        v_left_score = v_left_score + 1
-        v_point_scored = 1
-        v_server = 1
-    endif
-    
-    # Handle point scored
-    if v_point_scored == 1 then
-        # First update the score display
-        call update_score
-        
-        # Position ball by server's paddle for serve
-        if v_server == 1 then
-            # P1 scored and serves - ball by left paddle
-            v_ball_x = v_left_paddle_x + v_paddle_width + 3
-            v_ball_y = v_left_paddle_y + (v_paddle_height / 2)
-        else
-            # P2 scored and serves - ball by right paddle
-            v_ball_x = v_right_paddle_x - v_ball_size - 3
-            v_ball_y = v_right_paddle_y + (v_paddle_height / 2)
-        endif
-        
-        # Move ball to serve position and show it
-        move_sprite(ball, v_ball_x, v_ball_y)
-        
-        # Ensure everything is rendered before pause
-        sync_queue
-        
-        # 1.5 second serve pause (ball visible by paddle)
-        rest(1.5)
-        
-        # Set ball direction for serve (toward opponent)
-        v_angle = random(-45, 45, 0)
-        if v_angle == 0 then
-            v_angle = 15
-        endif
-        v_ball_dy = v_angle / 45
-        
-        if v_server == 1 then
-            v_ball_dx = 1
-        else
-            v_ball_dx = -1
-        endif
-    endif
+def bounce_from_left_paddle {
+    # Impact zone ranges from -1 at the top edge to +1 at the bottom edge.
+    v_ball_center = v_ball_y + (v_ball_size / 2)
+    v_paddle_center = v_left_paddle_y + (v_paddle_height / 2)
+    v_impact = (v_ball_center - v_paddle_center) / (v_paddle_height / 2)
+
+    # Paddle movement supplies spin: moving down adds downward deflection, etc.
+    # Divide by frame_scale so spin stays the same as at 60 FPS.
+    v_ball_dy = (v_impact * 0.78) + (v_left_paddle_velocity * 0.18 / v_frame_scale)
+    v_ball_dy = max(-0.94, min(0.94, v_ball_dy))
+    v_ball_dx = 1
+    v_ball_x = v_left_paddle_x + v_paddle_width + 0.1
+    call accelerate_rally
 }
 
-# ============================================
-# CHECK FOR GAME WIN (21 pts, win by 2)
-# ============================================
-def check_game_win {
-    v_game_won = 0
-    
-    # Check if left player won
-    if v_left_score >= 21 then
-        v_lead = v_left_score - v_right_score
-        if v_lead >= 2 then
-            v_game_won = 1
-            v_p1_games = v_p1_games + 1
-        endif
-    endif
-    
-    # Check if right player won
-    if v_right_score >= 21 then
-        v_lead = v_right_score - v_left_score
-        if v_lead >= 2 then
-            v_game_won = 1
-            v_p2_games = v_p2_games + 1
-        endif
-    endif
-    
-    # Handle game win
-    if v_game_won == 1 then
-        v_playing_game = 0
-        
-        # Hide sprites before showing game won screen
-        hide_sprite(ball)
-        hide_sprite(left_paddle)
-        hide_sprite(right_paddle)
-        
-        # Check if someone won the match (2 games)
-        if v_p1_games == 2 or v_p2_games == 2 then
-            v_game_over = 1
-        endif
-        
-        # Show appropriate screen
-        if v_game_over == 1 then
-            call show_game_over_screen
-        else
-            call show_game_won_screen
-        endif
-    endif
+def bounce_from_right_paddle {
+    v_ball_center = v_ball_y + (v_ball_size / 2)
+    v_paddle_center = v_right_paddle_y + (v_paddle_height / 2)
+    v_impact = (v_ball_center - v_paddle_center) / (v_paddle_height / 2)
+    v_ball_dy = (v_impact * 0.78) + (v_right_paddle_velocity * 0.18 / v_frame_scale)
+    v_ball_dy = max(-0.94, min(0.94, v_ball_dy))
+    v_ball_dx = -1
+    v_ball_x = v_right_paddle_x - v_ball_size - 0.1
+    call accelerate_rally
 }
 
-# ============================================
-# UPDATE BALL POSITION PROCEDURE
-# ============================================
 def update_ball {
-    v_ball_x = v_ball_x + (v_ball_dx * v_ball_speed)
-    v_ball_y = v_ball_y + (v_ball_dy * v_ball_speed)
+    v_ball_x = v_ball_x + (v_ball_dx * v_ball_speed * v_frame_scale)
+    v_ball_y = v_ball_y + (v_ball_dy * v_ball_speed * v_frame_scale)
+
+    if v_ball_y < 0 then
+        v_ball_y = -v_ball_y
+        v_ball_dy = abs(v_ball_dy)
+    endif
+    if v_ball_y > 62 then
+        v_ball_y = 124 - v_ball_y
+        v_ball_dy = -abs(v_ball_dy)
+    endif
+
+    # Test the ball centre against a paddle so the full 2x2 ball behaves cleanly.
+    v_ball_center = v_ball_y + (v_ball_size / 2)
+    if v_ball_dx < 0 and v_ball_x <= v_left_paddle_x + v_paddle_width and v_ball_center >= v_left_paddle_y and v_ball_center <= v_left_paddle_y + v_paddle_height then
+        call bounce_from_left_paddle
+    endif
+    if v_ball_dx > 0 and v_ball_x >= v_right_paddle_x - v_ball_size and v_ball_center >= v_right_paddle_y and v_ball_center <= v_right_paddle_y + v_paddle_height then
+        call bounce_from_right_paddle
+    endif
+
     move_sprite(ball, v_ball_x, v_ball_y)
 }
 
 # ============================================
-# RESET FOR NEW GAME PROCEDURE
+# SCORING AND GAME FLOW
 # ============================================
+def serve_after_point {
+    v_ball_speed = v_start_ball_speed
+    v_rally_hits = 0
+    v_left_ai_tracking = 0
+    v_right_ai_tracking = 0
+    v_ball_x = 32
+    v_ball_y = 32
+    v_ball_dy = random(-55, 55, 0) / 100
+    if abs(v_ball_dy) < 0.15 then
+        v_ball_dy = 0.22
+    endif
+    if v_server == 1 then
+        v_ball_dx = 1
+    else
+        v_ball_dx = -1
+    endif
+    move_sprite(ball, v_ball_x, v_ball_y)
+    rest(0.8)
+}
+
+def check_scoring {
+    v_point_scored = 0
+    if v_ball_x < -v_ball_size then
+        v_right_score = v_right_score + 1
+        v_server = 2
+        v_point_scored = 1
+    endif
+    if v_ball_x > 63 then
+        v_left_score = v_left_score + 1
+        v_server = 1
+        v_point_scored = 1
+    endif
+    if v_point_scored == 1 then
+        call update_score
+        if v_left_score >= v_win_score or v_right_score >= v_win_score then
+            v_playing_game = 0
+        else
+            call serve_after_point
+        endif
+    endif
+}
+
 def reset_game {
     v_left_score = 0
     v_right_score = 0
     v_left_paddle_y = 26
     v_right_paddle_y = 26
+    v_ball_speed = v_start_ball_speed
+    v_rally_hits = 0
+    v_left_ai_tracking = 0
+    v_right_ai_tracking = 0
+    v_server = random(1, 2, 0)
     v_ball_x = 32
     v_ball_y = 32
-    
-    # Random initial direction
-    v_direction = random(0, 1, 0)
-    if v_direction == 0 then
-        v_ball_dx = -1
-    else
+    v_ball_dy = random(-55, 55, 0) / 100
+    if abs(v_ball_dy) < 0.15 then
+        v_ball_dy = 0.22
+    endif
+    if v_server == 1 then
         v_ball_dx = 1
+    else
+        v_ball_dx = -1
     endif
-    
-    v_angle = random(-45, 45, 0)
-    if v_angle == 0 then
-        v_angle = 15
-    endif
-    v_ball_dy = v_angle / 45
 }
 
-# ============================================
-# PLAY ONE GAME PROCEDURE
-# ============================================
 def play_game {
-    v_game_number = v_game_number + 1
-    
-    # Reset game state
     call reset_game
-    
-    # Draw court and show sprites
     clear()
     call draw_court
     show_sprite(ball, v_ball_x, v_ball_y)
     show_sprite(left_paddle, v_left_paddle_x, v_left_paddle_y)
     show_sprite(right_paddle, v_right_paddle_x, v_right_paddle_y)
     call update_score
-    
-    # Game loop
+
     v_playing_game = 1
     while v_playing_game == 1 then
         begin_frame(true)
         call update_paddles
         call update_ball
-        call check_collisions
         end_frame
-        
-        # Check scoring AFTER frame is rendered so pause shows correctly
         call check_scoring
-        call check_game_win
-        
-        rest(0.02)
     endwhile
+
+    rest(2)
+    hide_sprite(ball)
+    hide_sprite(left_paddle)
+    hide_sprite(right_paddle)
+    call show_winner_screen
 }
 
 # ============================================
-# MAIN GAME LOOP
+# MAIN LOOP
 # ============================================
-
-# Outer loop - keeps playing best-of-3 series
 v_running = 1
 while v_running == 1 then
-    # Reset for new series
-    v_p1_games = 0
-    v_p2_games = 0
-    v_game_number = 0
-    v_game_over = 0
-    
-    # Show title screen
     call show_title_screen
-    
-    # Play games until someone wins 2
-    while v_p1_games < 2 and v_p2_games < 2 then
-        call play_game
-    endwhile
-    
-    # Loop back to title for next series
+    call play_game
 endwhile
 
-# Clean up
 dispose_all_sprites()
