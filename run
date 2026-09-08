@@ -101,7 +101,9 @@ COMMANDS
   interactive   Pixil in foreground (attached terminal)
   start, bg       Pixil in background (nohup, log: pixil.log)
   info            Current / recent scripts from pixil.log
-  status          Running Pixil PIDs
+  status, --status  Live Pixil process, script, and timing
+  next            Advance a running wildcard show to its next script
+  jump SCRIPT     Run SCRIPT next, then resume the current wildcard show
   stop            Stop Pixil (TERM, then KILL)
   killpython      Emergency: kill Pixil python, optionally all python
   help            This help
@@ -151,6 +153,9 @@ EXAMPLES — tests:
 INFO / STATUS / STOP:
   ./run info
   ./run status
+  ./run --status
+  ./run next
+  ./run jump main/rainbow_sweep.pix
   ./run stop
 
 IMPORTANT — wildcards:
@@ -183,6 +188,158 @@ pixil_is_running() {
     || pgrep -af "$PIXIL_HELPER_MATCH" >/dev/null 2>&1
 }
 
+show_runtime_status() {
+  python3 - "$REPO_ROOT/database/data/runtime_status.json" "/dev/shm/pixil_queue_status.json" <<'PY'
+import datetime
+import json
+import os
+import sys
+
+path = sys.argv[1]
+queue_path = sys.argv[2]
+try:
+    with open(path, encoding="utf-8") as source:
+        status = json.load(source)
+except FileNotFoundError:
+    print("Runtime state: unavailable (the process may predate this status feature)")
+    raise SystemExit(0)
+except (OSError, json.JSONDecodeError):
+    print("Runtime state: unreadable")
+    raise SystemExit(0)
+
+pid = status.get("pid")
+try:
+    command = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\0", b" ").decode(errors="replace")
+    live_pixil = "Pixil.py" in command
+except (OSError, TypeError):
+    live_pixil = False
+
+if not live_pixil:
+    print(f"Runtime state: stale (recorded PID: {pid})")
+    raise SystemExit(0)
+
+now = datetime.datetime.now().astimezone()
+
+def stamp(value):
+    return datetime.datetime.fromtimestamp(value, tz=now.tzinfo).strftime("%Y-%m-%d %H:%M:%S %Z")
+
+def duration(seconds):
+    seconds = max(0, int(seconds))
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    return f"{hours}h {minutes}m {seconds}s" if hours else f"{minutes}m {seconds}s"
+
+print("Running: yes")
+print(f"Primary PID: {pid}")
+started = status.get("process_started_at")
+if isinstance(started, (int, float)):
+    print(f"Process uptime: {duration(now.timestamp() - started)} (started {stamp(started)})")
+
+script = status.get("script_name")
+if script:
+    print(f"Current script: {script}")
+    script_started = status.get("script_started_at")
+    if isinstance(script_started, (int, float)):
+        print(f"Script elapsed: {duration(now.timestamp() - script_started)} (started {stamp(script_started)})")
+    expected_end = status.get("script_expected_end_at")
+    if isinstance(expected_end, (int, float)):
+        remaining = expected_end - now.timestamp()
+        label = "remaining" if remaining >= 0 else "overdue"
+        print(f"Expected end: {stamp(expected_end)} ({duration(abs(remaining))} {label})")
+else:
+    print("Current script: starting")
+
+try:
+    with open(queue_path, encoding="utf-8") as source:
+        queue_status = json.load(source)
+except (FileNotFoundError, OSError, json.JSONDecodeError):
+    queue_status = None
+
+if (
+    isinstance(queue_status, dict)
+    and queue_status.get("pid") == pid
+    and queue_status.get("script_started_at") == status.get("script_started_at")
+):
+    depth = queue_status.get("queue_depth")
+    capacity = queue_status.get("queue_capacity")
+    average = queue_status.get("script_average_queue_depth")
+    samples = queue_status.get("sample_count")
+    sampled_at = queue_status.get("sampled_at")
+    if isinstance(depth, int) and isinstance(capacity, int) and capacity > 0:
+        print(f"Queue depth: {depth} / {capacity} ({depth / capacity:.0%})")
+    if isinstance(average, (int, float)) and isinstance(samples, int):
+        print(f"Script average queue depth: {average:.1f} ({samples} samples)")
+    if isinstance(sampled_at, (int, float)) and now.timestamp() - sampled_at > 5:
+        print(f"Queue sample age: {duration(now.timestamp() - sampled_at)} (stale)")
+elif script:
+    print("Queue depth: waiting for first sample")
+
+recent = status.get("recent_scripts") or []
+if recent:
+    print("Recent scripts (this run):")
+    for entry in reversed(recent[-3:]):
+        name = entry.get("name")
+        started_at = entry.get("started_at")
+        if name and isinstance(started_at, (int, float)):
+            print(f"  {name}  started {stamp(started_at)}")
+else:
+    print("Recent scripts (this run): none yet")
+
+arguments = status.get("arguments")
+if isinstance(arguments, list):
+    print(f"Arguments: {' '.join(map(str, arguments))}")
+PY
+}
+
+show_last_failure() {
+  python3 - "$REPO_ROOT/nohup.out" "$REPO_ROOT/$LOG_FILE" <<'PY'
+import datetime
+import sys
+from pathlib import Path
+
+logs = [Path(value) for value in sys.argv[1:]]
+logs = [path for path in logs if path.is_file() and path.stat().st_size]
+if not logs:
+    print("Last failure: no Pixil log available")
+    raise SystemExit(0)
+
+log = max(logs, key=lambda path: path.stat().st_mtime)
+lines = log.read_text(errors="replace").splitlines()
+script = None
+started = None
+fatal = None
+error = None
+for index, line in enumerate(lines):
+    if line.startswith("Current script:"):
+        script_path = line.removeprefix("Current script:").removesuffix("...")
+        script = Path(script_path).name
+        started = None
+        fatal = None
+        error = None
+        if index + 1 < len(lines) and lines[index + 1].startswith("Started:"):
+            started = lines[index + 1].removeprefix("Started:").strip()
+    if "[QUEUE] Fatal:" in line:
+        fatal = line.strip()
+    elif line.startswith("Error:"):
+        error = line.strip()
+
+modified = datetime.datetime.fromtimestamp(
+    log.stat().st_mtime
+).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+print("Last failure:")
+print(f"  Log: {log.name} (last updated {modified})")
+if script:
+    start_suffix = f", started {started}" if started else ""
+    print(f"  Script: {script}{start_suffix}")
+if fatal:
+    print(f"  Cause: {fatal.removeprefix('[QUEUE] Fatal: ').strip()}")
+elif error:
+    print(f"  Cause: {error.removeprefix('Error: ').strip()}")
+else:
+    print("  Cause: no fatal error was recorded at the end of this log")
+PY
+}
+
 signal_pixil() {
   local signal_name="$1"
   pkill "-$signal_name" -f "$PIXIL_MATCH" || true
@@ -210,6 +367,7 @@ stop_pixil() {
     return 1
   fi
 
+  rm -f "$REPO_ROOT/database/data/runtime_status.json" "/dev/shm/pixil_queue_status.json"
   echo "Pixil stopped."
 }
 
@@ -265,7 +423,15 @@ guard_against_bare_star() {
 # ------------------------------------------------------------
 COMMAND=""
 case "${1:-}" in
-  help|info|status|stop|killpython|interactive|start|bg|test|test-scripts|test-scripts-main|test-all|setup-tests)
+  --help|-h)
+    COMMAND="help"
+    shift
+    ;;
+  --status)
+    COMMAND="status"
+    shift
+    ;;
+  help|info|status|next|jump|stop|killpython|interactive|start|bg|test|test-scripts|test-scripts-main|test-all|setup-tests)
     COMMAND="$1"
     shift
     ;;
@@ -335,7 +501,33 @@ case "$COMMAND" in
     ;;
 
   status)
-    show_pixil_procs || true
+    if pixil_is_running; then
+      show_runtime_status
+      echo
+      show_pixil_procs
+    else
+      echo "Running: no"
+      show_runtime_status
+      echo
+      show_last_failure
+    fi
+    ;;
+
+  next)
+    if [[ ${#PASS_ARGS[@]} -ne 0 ]]; then
+      echo "Usage: ./run next" >&2
+      exit 2
+    fi
+    python3 -m pixil_utils.runtime_control next
+    ;;
+
+  jump)
+    if [[ ${#PASS_ARGS[@]} -ne 1 ]]; then
+      echo "Usage: ./run jump SCRIPT" >&2
+      echo "Example: ./run jump main/rainbow_sweep.pix" >&2
+      exit 2
+    fi
+    python3 -m pixil_utils.runtime_control jump "${PASS_ARGS[0]}"
     ;;
 
   stop)
@@ -352,9 +544,9 @@ case "$COMMAND" in
 
   interactive)
     echo "Starting Pixil interactively (foreground)..."
-    echo "Command: sudo python3 Pixil.py ${PASS_ARGS[*]}"
+    echo "Command: sudo python3 -u Pixil.py ${PASS_ARGS[*]}"
     echo
-    exec sudo python3 Pixil.py "${PASS_ARGS[@]}"
+    exec sudo python3 -u Pixil.py "${PASS_ARGS[@]}"
     ;;
 
   setup-tests)

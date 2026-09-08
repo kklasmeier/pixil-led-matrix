@@ -103,7 +103,22 @@ def test_is_time_expired_on_spacebar_skip(monkeypatch):
     timer.clear_timer()
     timer.initialize_timer(3600)
     monkeypatch.setattr(
+        "pixil_utils.runtime_control.consume_transition_request",
+        lambda: False,
+    )
+    monkeypatch.setattr(
         "pixil_utils.terminal_handler.consume_skip_request",
+        lambda: True,
+    )
+    assert timer.is_time_expired() is True
+    timer.clear_timer()
+
+
+def test_is_time_expired_on_external_transition_request(monkeypatch):
+    timer.clear_timer()
+    timer.initialize_timer(3600)
+    monkeypatch.setattr(
+        "pixil_utils.runtime_control.consume_transition_request",
         lambda: True,
     )
     assert timer.is_time_expired() is True

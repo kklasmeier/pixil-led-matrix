@@ -5,7 +5,7 @@
 throttle(0)
 fps(60)
 
-v_num_particles = 10
+v_num_particles = 12
 
 create_array(v_px, v_num_particles, numeric)
 create_array(v_py, v_num_particles, numeric)
@@ -20,10 +20,15 @@ create_array(v_color, v_num_particles, string)
 create_array(v_size, v_num_particles, numeric)
 create_array(v_settled, v_num_particles, numeric)
 
-create_array(v_burst_x, 1, numeric)
-create_array(v_burst_y, 1, numeric)
-v_burst_x[0] = 32
-v_burst_y[0] = 63
+# Two wells slightly below the floor: more upward push than a single
+# center blast, without lifting every ball at once.
+v_num_bursts = 2
+create_array(v_burst_x, v_num_bursts, numeric)
+create_array(v_burst_y, v_num_bursts, numeric)
+v_burst_x[0] = 26
+v_burst_x[1] = 38
+v_burst_y[0] = 72
+v_burst_y[1] = 72
 
 for v_i in (0, v_num_particles - 1, 1)
     v_px[v_i] = random(5, 58, 0)
@@ -91,7 +96,7 @@ while true then
 
         # Negative strength pushes away. Strength 75 is the original
         # explosion_force * 30; softening 5 keeps the center under control.
-        particle_apply_attractors(v_px, v_py, v_ax, v_ay, v_burst_active, v_burst_x, v_burst_y, -75, 1, 1, 5, 20, v_num_particles, 1)
+        particle_apply_attractors(v_px, v_py, v_ax, v_ay, v_burst_active, v_burst_x, v_burst_y, -75, 1, 1, 5, 20, v_num_particles, v_num_bursts)
     else
         v_exploding = 0
     endif
@@ -103,9 +108,11 @@ while true then
         draw_rectangle(0, 0, 64, 64, black, 20, true)
 
         if v_exploding == 1 then
-            draw_circle(32, 63, 10, yellow, 80, true, 100)
-            draw_circle(32, 63, 15, orange, 60, false, 150)
-            draw_circle(32, 63, 20, red, 40, false, 200)
+            draw_circle(26, 63, 12, yellow, 80, true, 100)
+            draw_circle(38, 63, 12, yellow, 80, true, 100)
+            draw_circle(26, 63, 18, orange, 55, false, 150)
+            draw_circle(38, 63, 18, orange, 55, false, 150)
+            draw_circle(32, 63, 24, red, 35, false, 200)
         endif
 
         for v_i in (0, v_num_particles - 1, 1)

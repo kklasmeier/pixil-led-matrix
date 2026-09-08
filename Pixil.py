@@ -2414,6 +2414,7 @@ def reset_parse_value_stats():
 # Main Execution
 if __name__ == '__main__':
     queue_monitor = None
+    queue_status_reporter = None
     # Set up signal handler
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -2430,6 +2431,17 @@ if __name__ == '__main__':
         # Initialize queue and start consumer
         queue_instance = QueueManager.get_instance()
         queue_instance.start_consumer()
+        from pixil_utils.runtime_status import (
+            QueueStatusReporter,
+            clear_status,
+            initialize_status,
+            set_current_script,
+        )
+        from pixil_utils.runtime_control import clear_control_request, consume_jump_target
+        clear_control_request()
+        initialize_status(sys.argv[1:])
+        queue_status_reporter = QueueStatusReporter(queue_instance)
+        queue_status_reporter.start()
 
         # Start queue monitor if requested
         if args.queue_monitor:
@@ -2451,6 +2463,8 @@ if __name__ == '__main__':
             # Single script mode
             if script_manager.is_single_script():
                 announce_script_start(scripts[0], args.duration)
+                status_start = set_current_script(scripts[0], args.duration)
+                queue_status_reporter.reset_for_script(status_start)
                 start_time = time.time()
                 try:
                     process_script(scripts[0], execute_command)
@@ -2475,12 +2489,22 @@ if __name__ == '__main__':
                     current_script = scripts.pop()
 
                     announce_script_start(current_script, args.duration)
+                    status_start = set_current_script(current_script, args.duration)
+                    queue_status_reporter.reset_for_script(status_start)
                     try:
                         process_script(current_script, execute_command)
                     except PixilShutdownRequested:
                         pass
                     if shutdown_requested():
                         break
+                    jump_target = consume_jump_target()
+                    if jump_target:
+                        resolved_target = Path(jump_target).resolve()
+                        scripts = [
+                            script for script in scripts
+                            if Path(script).resolve() != resolved_target
+                        ]
+                        scripts.append(jump_target)
                     clear_timer()
                     clear_all_caches_between_scripts() 
             finally:
@@ -2496,6 +2520,12 @@ if __name__ == '__main__':
         print(f"Error: {str(e)}")
         sys.exit(1)
     finally:
+        try:
+            if queue_status_reporter:
+                queue_status_reporter.stop()
+            clear_status()
+        except Exception:
+            pass
         if shutdown_requested():
             exit_pixil(queue_instance, queue_monitor)
         try:

@@ -16,8 +16,8 @@ class MatrixCommandQueue:
     def __init__(
         self,
         queue_size: int = 5000,
-        queue_full_timeout: float = 10.0,
-        consumer_heartbeat_timeout: float = 10.0,
+        queue_full_timeout: float = 300.0,
+        consumer_heartbeat_timeout: float = 300.0,
     ):
         """Initialize command queue with specified size"""
         # Forking after Python has created Queue feeder threads can leave those

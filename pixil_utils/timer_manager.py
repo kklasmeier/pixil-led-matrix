@@ -42,7 +42,12 @@ def is_time_expired():
     if timer_expired:
         return True
 
+    from .runtime_control import consume_transition_request
     from .terminal_handler import consume_skip_request
+
+    if consume_transition_request():
+        force_timer_expired()
+        return True
 
     if consume_skip_request():
         print("Spacebar pressed, skipping to next script...")
