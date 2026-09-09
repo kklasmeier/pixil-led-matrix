@@ -100,7 +100,7 @@ COMMANDS
   test, test-scripts, test-all, setup-tests   See AUTOMATED TESTS above
   interactive   Pixil in foreground (attached terminal)
   start, bg       Pixil in background (nohup, log: pixil.log)
-  info            Current / recent scripts from pixil.log
+  info            Live script status, or recent scripts from newest Pixil log
   status, --status  Live Pixil process, script, and timing
   next            Advance a running wildcard show to its next script
   jump SCRIPT     Run SCRIPT next, then resume the current wildcard show
@@ -340,6 +340,43 @@ else:
 PY
 }
 
+show_recent_scripts() {
+  python3 - "$REPO_ROOT/nohup.out" "$REPO_ROOT/$LOG_FILE" <<'PY'
+import datetime
+import sys
+from pathlib import Path
+
+logs = [Path(value) for value in sys.argv[1:]]
+logs = [path for path in logs if path.is_file() and path.stat().st_size]
+if not logs:
+    print("No Pixil log found.")
+    raise SystemExit(0)
+
+log = max(logs, key=lambda path: path.stat().st_mtime)
+scripts = []
+for line in log.read_text(errors="replace").splitlines():
+    if not line.startswith("Current script:"):
+        continue
+    script = Path(line.removeprefix("Current script:").removesuffix("...")).name
+    if script:
+        scripts.append(script)
+
+if not scripts:
+    print(f"No script history found in {log.name}.")
+    raise SystemExit(0)
+
+modified = datetime.datetime.fromtimestamp(log.stat().st_mtime).astimezone()
+recent = scripts[-10:]
+print(
+    f"=== Recent scripts (last {len(recent)}, from {log.name} "
+    f"updated {modified:%Y-%m-%d %H:%M:%S %Z}) ==="
+)
+for script in recent[:-1]:
+    print(f"    {script}")
+print(f"  ▶ {recent[-1]}  [LAST]")
+PY
+}
+
 signal_pixil() {
   local signal_name="$1"
   pkill "-$signal_name" -f "$PIXIL_MATCH" || true
@@ -461,42 +498,16 @@ case "$COMMAND" in
     ;;
 
   info)
-    # Check if Pixil is actually running
-    PIXIL_RUNNING=false
     if pixil_is_running; then
-      PIXIL_RUNNING=true
       show_pixil_procs
+      echo
+      # The persistent status file is tied to a specific live PID.  Do not
+      # infer the current script from a log: it might belong to another run.
+      show_runtime_status
     else
       echo "No Pixil processes running."
-    fi
-    echo
-    if [[ -f "$LOG_FILE" ]]; then
-      # Extract last 10 "Current script:" entries
-      SCRIPTS=$(grep "Current script:" "$LOG_FILE" | tail -10)
-      if [[ -n "$SCRIPTS" ]]; then
-        TOTAL=$(echo "$SCRIPTS" | wc -l)
-        echo "=== Recent scripts (last $TOTAL) ==="
-        COUNT=1
-        while IFS= read -r line; do
-          # Extract just the script name from the path
-          SCRIPT_PATH=$(echo "$line" | sed 's/Current script: //' | sed 's/\.\.\.$//')
-          SCRIPT_NAME=$(basename "$SCRIPT_PATH")
-          if [[ $COUNT -eq $TOTAL ]]; then
-            if [[ "$PIXIL_RUNNING" == "true" ]]; then
-              echo "  ▶ $SCRIPT_NAME  [RUNNING]"
-            else
-              echo "  ▶ $SCRIPT_NAME  [LAST]"
-            fi
-          else
-            echo "    $SCRIPT_NAME"
-          fi
-          ((COUNT++))
-        done <<< "$SCRIPTS"
-      else
-        echo "No script history found in log."
-      fi
-    else
-      echo "No log file found ($LOG_FILE)"
+      echo
+      show_recent_scripts
     fi
     ;;
 

@@ -6,7 +6,7 @@
 # Cap display refresh at 60 FPS (rgb_matrix_lib; fps(0) = unlimited)
 fps(60)
 
-v_num_pixels = 4
+v_num_pixels = 5
 
 # Create arrays for pixel properties
 create_array(v_x, v_num_pixels)      # X position
