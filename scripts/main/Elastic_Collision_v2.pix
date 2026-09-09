@@ -1,0 +1,215 @@
+# Elastic Collision v2
+# Same physics as Elastic_Collision.pix. Trails/sparks use burnout instead of
+# age arrays. begin_frame(true) keeps burnout pixels; moving shapes use a short
+# burnout so they do not stain the buffer.
+
+throttle(0)
+fps(60)
+
+v_num_balls = 4
+v_trail_burnout = 1200
+v_spark_burnout = 133
+v_body_burnout = 45
+v_blast_speck_burnout = 50
+
+v_energy_check_interval = 50
+v_min_total_energy = 75
+v_blast_particles = 16
+v_blast_duration = 20
+v_blast_active = 0
+v_blast_center_x = 32
+v_blast_center_y = 32
+v_blast_push_radius = 25
+v_blast_push_strength = 6
+
+v_gravity = 0.02
+v_wall_damping = 0.98
+v_friction = 0.999
+
+v_min_x = 2
+v_max_x = 62
+v_min_y = 2
+v_max_y = 62
+
+create_array(v_ball_x, v_num_balls, numeric)
+create_array(v_ball_y, v_num_balls, numeric)
+create_array(v_ball_vx, v_num_balls, numeric)
+create_array(v_ball_vy, v_num_balls, numeric)
+create_array(v_ball_radius, v_num_balls, numeric)
+create_array(v_ball_mass, v_num_balls, numeric)
+create_array(v_ball_active, v_num_balls, numeric)
+create_array(v_pair_hit, v_num_balls, numeric)
+create_array(v_ball_color, v_num_balls, string)
+
+create_array(v_blast_x, v_blast_particles, numeric)
+create_array(v_blast_y, v_blast_particles, numeric)
+create_array(v_blast_dx, v_blast_particles, numeric)
+create_array(v_blast_dy, v_blast_particles, numeric)
+create_array(v_blast_speck, v_blast_particles, numeric)
+
+create_array(v_colors, 8, string)
+v_colors[0] = "red"
+v_colors[1] = "blue"
+v_colors[2] = "green"
+v_colors[3] = "yellow"
+v_colors[4] = "purple"
+v_colors[5] = "orange"
+v_colors[6] = "cyan"
+v_colors[7] = "white"
+
+def check_energy_boost {
+    v_total_energy = 0
+    for v_i in (0, v_num_balls - 1, 1)
+        v_speed_sq = v_ball_vx[v_i] * v_ball_vx[v_i] + v_ball_vy[v_i] * v_ball_vy[v_i]
+        v_total_energy = v_total_energy + v_speed_sq * v_ball_mass[v_i]
+    endfor v_i
+
+    if v_total_energy < v_min_total_energy then
+        call energy_blast
+    endif
+}
+
+def energy_blast {
+    v_blast_center_x = random(15, 49, 0)
+    v_blast_center_y = random(15, 49, 0)
+    v_blast_active = v_blast_duration
+
+    for v_i in (0, v_blast_particles - 1, 1)
+        v_angle = v_i * 6.28 / v_blast_particles
+        v_speed = random(3, 8, 1)
+        v_blast_x[v_i] = v_blast_center_x
+        v_blast_y[v_i] = v_blast_center_y
+        v_blast_dx[v_i] = v_speed * cos(v_angle)
+        v_blast_dy[v_i] = v_speed * sin(v_angle)
+        v_blast_speck[v_i] = 1
+    endfor v_i
+
+    for v_i in (0, v_num_balls - 1, 1)
+        v_dx = v_ball_x[v_i] - v_blast_center_x
+        v_dy = v_ball_y[v_i] - v_blast_center_y
+        v_distance = sqrt(v_dx * v_dx + v_dy * v_dy)
+        if v_distance < v_blast_push_radius and v_distance > 0 then
+            v_push_x = v_dx / v_distance
+            v_push_y = v_dy / v_distance
+            v_distance_factor = (v_blast_push_radius - v_distance) / v_blast_push_radius
+            v_push_force = v_blast_push_strength * v_distance_factor
+            v_ball_vx[v_i] = v_ball_vx[v_i] + v_push_x * v_push_force
+            v_ball_vy[v_i] = v_ball_vy[v_i] + v_push_y * v_push_force
+        endif
+    endfor v_i
+}
+
+def draw_energy_blast {
+    if v_blast_active > 0 then
+        particle_integrate(v_blast_x, v_blast_y, v_blast_dx, v_blast_dy, v_blast_speck, 0, 0, 1, 0, v_blast_particles)
+
+        v_fade_intensity = v_blast_active * 100 / v_blast_duration
+        for v_i in (0, v_blast_particles - 1, 1)
+            if v_blast_x[v_i] >= 0 and v_blast_x[v_i] < 64 and v_blast_y[v_i] >= 0 and v_blast_y[v_i] < 64 then
+                if v_blast_active > v_blast_duration * 0.8 then
+                    plot(v_blast_x[v_i], v_blast_y[v_i], white, v_fade_intensity, v_blast_speck_burnout, fade)
+                elseif v_blast_active > v_blast_duration * 0.5 then
+                    plot(v_blast_x[v_i], v_blast_y[v_i], cyan, v_fade_intensity, v_blast_speck_burnout, fade)
+                elseif v_blast_active > v_blast_duration * 0.2 then
+                    plot(v_blast_x[v_i], v_blast_y[v_i], blue, v_fade_intensity, v_blast_speck_burnout, fade)
+                else
+                    plot(v_blast_x[v_i], v_blast_y[v_i], purple, v_fade_intensity, v_blast_speck_burnout, fade)
+                endif
+            endif
+        endfor v_i
+
+        v_explosion_radius = (v_blast_duration - v_blast_active) * 2
+        if v_explosion_radius < 15 then
+            draw_circle(v_blast_center_x, v_blast_center_y, v_explosion_radius, white, v_fade_intensity / 2, false, v_body_burnout, fade)
+        endif
+
+        if v_blast_active > v_blast_duration * 0.6 then
+            v_radius_intensity = v_fade_intensity / 4
+            draw_circle(v_blast_center_x, v_blast_center_y, v_blast_push_radius, cyan, v_radius_intensity, false, v_body_burnout, fade)
+        endif
+
+        v_blast_active = v_blast_active - 1
+    endif
+}
+
+def init_balls {
+    for v_i in (0, v_num_balls - 1, 1)
+        v_ball_x[v_i] = random(8, 56, 0)
+        v_ball_y[v_i] = random(8, 56, 0)
+        v_ball_vx[v_i] = random(-3, 3, 1)
+        v_ball_vy[v_i] = random(-3, 3, 1)
+        v_ball_radius[v_i] = random(2, 4, 0)
+        v_ball_mass[v_i] = v_ball_radius[v_i] * v_ball_radius[v_i]
+        v_c = v_i % 8
+        v_ball_color[v_i] = v_colors[v_c]
+        v_ball_active[v_i] = 1
+    endfor v_i
+}
+
+def init_effects {
+    for v_i in (0, v_blast_particles - 1, 1)
+        v_blast_x[v_i] = v_blast_center_x
+        v_blast_y[v_i] = v_blast_center_y
+        v_blast_dx[v_i] = 0
+        v_blast_dy[v_i] = 0
+        v_blast_speck[v_i] = 0
+    endfor v_i
+}
+
+def update_balls {
+    particle_integrate(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, 0, v_gravity, v_friction, 0, v_num_balls)
+    particle_collide_bounds(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_min_x, v_max_x, v_min_y, v_max_y, v_wall_damping, v_ball_radius)
+    particle_collide_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_ball_radius, v_ball_mass, 1, v_pair_hit, v_num_balls)
+}
+
+def spawn_collision_sparks {
+    for v_i in (0, v_num_balls - 1, 1)
+        if v_pair_hit[v_i] > 0 then
+            v_speed = abs(v_ball_vx[v_i]) + abs(v_ball_vy[v_i])
+            if v_speed > 0.05 then
+                plot(v_ball_x[v_i], v_ball_y[v_i], white, 100, v_spark_burnout, fade)
+                draw_circle(v_ball_x[v_i], v_ball_y[v_i], 1, white, 50, false, v_spark_burnout, fade)
+            endif
+        endif
+    endfor v_i
+}
+
+def draw_trails {
+    for v_i in (0, v_num_balls - 1, 1)
+        plot(v_ball_x[v_i], v_ball_y[v_i], v_ball_color[v_i], 100, v_trail_burnout, fade)
+    endfor v_i
+}
+
+def draw_balls {
+    for v_i in (0, v_num_balls - 1, 1)
+        v_speed = sqrt(v_ball_vx[v_i] * v_ball_vx[v_i] + v_ball_vy[v_i] * v_ball_vy[v_i])
+        v_intensity = min(100, 60 + v_speed * 10)
+        draw_circle(v_ball_x[v_i], v_ball_y[v_i], v_ball_radius[v_i], v_ball_color[v_i], v_intensity, true, v_body_burnout, fade)
+        draw_circle(v_ball_x[v_i], v_ball_y[v_i], v_ball_radius[v_i], white, 30, false, v_body_burnout, fade)
+    endfor v_i
+}
+
+clear()
+call init_balls
+call init_effects
+
+v_frame = 0
+while v_frame >= 0 then
+    call update_balls
+
+    if v_frame % v_energy_check_interval == 0 then
+        call check_energy_boost
+    endif
+
+    begin_frame(true)
+        call draw_trails
+        call spawn_collision_sparks
+        call draw_balls
+        call draw_energy_blast
+    end_frame
+
+    v_frame = v_frame + 1
+    if v_frame > 1000000 then
+        v_frame = 0
+    endif
+endwhile

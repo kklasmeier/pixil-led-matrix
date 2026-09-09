@@ -28,7 +28,7 @@ v_burnout_max = 500
 v_wave_amp = 10         # Wave amplitude
 
 while 1 then
-    rest(.2)
+    rest(.15)
     # Change effects periodically
     if v_effect_duration > v_effect_max_time then
         v_effect_duration = 0

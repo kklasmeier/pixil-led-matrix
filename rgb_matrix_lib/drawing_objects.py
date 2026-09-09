@@ -36,7 +36,12 @@ class DrawingObject:
         self.points = points
         self.start_time = start_time
         self.mode = mode
-        self.pixel_colors = pixel_colors  # Only populated for FADE mode, parallel to points
+        # Original and last-rendered colors, parallel to points. Keeping the
+        # latter lets a covered burnout distinguish its own pixels from an
+        # untracked/permanent overlay.
+        self.pixel_colors = pixel_colors
+        self.last_pixel_colors = list(pixel_colors) if pixel_colors is not None else None
+        self.point_indexes = {point: i for i, point in enumerate(points)}
 
     def get_region(self) -> Region:
         return self.region
@@ -56,7 +61,9 @@ if TYPE_CHECKING:
 
 
 class ThreadedBurnoutManager:
-    BURNOUT_WAKE_INTERVAL = 0.01  # 10ms
+    # The panel cannot present object animation above 60 FPS. Running fade
+    # bookkeeping at 100 Hz only steals CPU from drawing and queue handling.
+    BURNOUT_WAKE_INTERVAL = 1.0 / 60.0
     
     # Optimization #5: Gamma correction for perceptual fade
     # 2.2 is standard sRGB gamma - makes fade appear more linear to human eyes
@@ -80,6 +87,7 @@ class ThreadedBurnoutManager:
 
     def _process_burnouts(self):
         while self.running:
+            tick_started = time.monotonic()
             try:
                 current_time = time.time()
                 
@@ -98,8 +106,9 @@ class ThreadedBurnoutManager:
                     else:
                         # Queue is sorted by removal_time, so if first isn't expired, none are
                         break
-                
-                time.sleep(self.BURNOUT_WAKE_INTERVAL)
+
+                elapsed = time.monotonic() - tick_started
+                time.sleep(max(0.0, self.BURNOUT_WAKE_INTERVAL - elapsed))
             except Exception as e:
                 from .debug import debug, Level, Component
                 debug(f"Error in burnout thread: {e}", Level.ERROR, Component.SYSTEM)
@@ -116,84 +125,89 @@ class ThreadedBurnoutManager:
         if not self.active_fades:
             return
         
-        # Optimization #4: Copy fades list while holding lock briefly
+        # Snapshot only the visible fade at each occupied pixel. Walking every
+        # point in every fade object makes covered trail stacks increasingly
+        # expensive even though none of those hidden objects can draw.
         with self.index_lock:
-            fades_to_process = list(self.active_fades)
+            visible_fades = []
+            for (x, y), entries in self.pixel_index.items():
+                for obj, removal_time in reversed(entries):
+                    if removal_time > current_time:
+                        if obj.mode == BurnoutMode.FADE:
+                            point_index = obj.point_indexes.get((x, y))
+                            if point_index is not None:
+                                visible_fades.append((x, y, obj, point_index))
+                        break
         
         pixels_updated = False
-        
-        for obj in fades_to_process:
-            # Skip if expired (will be handled by _clear_object)
-            if obj.is_expired(current_time):
-                continue
-            
-            # Calculate fade progress
-            duration = obj.removal_time - obj.start_time
-            if duration <= 0:
-                continue
-                
-            elapsed = current_time - obj.start_time
-            progress = elapsed / duration  # 0.0 → 1.0
-            
-            # Optimization #5: Apply gamma curve for perceptual fade
-            linear_intensity = max(0.0, 1.0 - progress)
-            intensity = pow(linear_intensity, self.FADE_GAMMA)
-            
-            # Track pixels to remove from future updates
-            pixels_to_remove = []
-            
-            # Update each pixel if this object owns it
-            for i, (x, y) in enumerate(obj.points):
-                # Optimization #4: Lock only for ownership check
-                with self.index_lock:
-                    is_owner = self._is_pixel_owner(x, y, obj)
-                
-                if is_owner:
-                    r, g, b = obj.pixel_colors[i]
-                    faded_r = int(r * intensity)
-                    faded_g = int(g * intensity)
-                    faded_b = int(b * intensity)
-                    
-                    # Skip only if another draw exceeded this object's original color.
-                    # Do not compare to faded_r: the buffer still holds full brightness
-                    # until the first fade write, which made fade look like instant burnout.
-                    current = self.api.drawing_buffer[y, x]
-                    if (
-                        int(current[0]) > r
-                        or int(current[1]) > g
-                        or int(current[2]) > b
-                    ):
-                        pixels_to_remove.append((x, y))
-                        continue
-                    
-                    self.api._draw_to_buffers(x, y, faded_r, faded_g, faded_b)
-                    pixels_updated = True
-            
-            # Remove overwritten pixels from this object's points
-            # (Optimization: skip these pixels in future fade cycles)
-            if pixels_to_remove:
-                with self.index_lock:
-                    for x, y in pixels_to_remove:
-                        # Remove from pixel_index
-                        if (x, y) in self.pixel_index:
-                            self.pixel_index[(x, y)] = [
-                                (o, t) for o, t in self.pixel_index[(x, y)] if o != obj
-                            ]
-                            if not self.pixel_index[(x, y)]:
-                                del self.pixel_index[(x, y)]
+
+        # Most shapes use one source color for many points. Cache each object's
+        # fade multiplier instead of repeating time math and pow() per pixel.
+        intensity_by_object = {}
+        for x, y, obj, point_index in visible_fades:
+            intensity = intensity_by_object.get(obj)
+            if intensity is None:
+                duration = obj.removal_time - obj.start_time
+                if duration <= 0:
+                    continue
+                progress = max(0.0, min(1.0, (current_time - obj.start_time) / duration))
+                intensity = pow(1.0 - progress, self.FADE_GAMMA)
+                intensity_by_object[obj] = intensity
+
+            r, g, b = obj.pixel_colors[point_index]
+            color = (int(r * intensity), int(g * intensity), int(b * intensity))
+
+            # Registration can happen after the snapshot, so validate ownership
+            # and update atomically. Covered fades remain indexed for reveal.
+            with self.index_lock:
+                if not self._is_pixel_owner(x, y, obj, current_time):
+                    continue
+                current = self.api.drawing_buffer[y, x]
+                expected = obj.last_pixel_colors[point_index]
+                if (
+                    int(current[0]) != expected[0]
+                    or int(current[1]) != expected[1]
+                    or int(current[2]) != expected[2]
+                ):
+                    continue
+                self.api._draw_to_buffers(x, y, *color)
+                obj.last_pixel_colors[point_index] = color
+                pixels_updated = True
         
         if pixels_updated:
             self.changes_made = True
 
-    def _is_pixel_owner(self, x: int, y: int, obj: DrawingObject) -> bool:
-        """Check if the given object is the current owner of the pixel (has latest removal_time)."""
+    def _is_pixel_owner(
+        self, x: int, y: int, obj: DrawingObject, current_time: Optional[float] = None
+    ) -> bool:
+        """Return whether obj is the most recently drawn live burnout at a pixel."""
         entries = self.pixel_index.get((x, y), [])
         if not entries:
             return False
-        
-        # Find the entry with the latest removal_time
-        latest_entry = max(entries, key=lambda e: e[1])
-        return latest_entry[0] is obj
+
+        now = time.time() if current_time is None else current_time
+        for candidate, removal_time in reversed(entries):
+            if removal_time > now:
+                return candidate is obj
+        return False
+
+    def _color_at(self, obj: DrawingObject, point_index: int, current_time: float) -> Tuple[int, int, int]:
+        """Return an object's current color, including elapsed fade."""
+        r, g, b = obj.pixel_colors[point_index]
+        if obj.mode != BurnoutMode.FADE:
+            return r, g, b
+
+        duration = obj.removal_time - obj.start_time
+        if duration <= 0:
+            return 0, 0, 0
+        progress = max(0.0, min(1.0, (current_time - obj.start_time) / duration))
+        intensity = pow(1.0 - progress, self.FADE_GAMMA)
+        return int(r * intensity), int(g * intensity), int(b * intensity)
+
+    @staticmethod
+    def _point_index(obj: DrawingObject, x: int, y: int) -> Optional[int]:
+        """Find a pixel's parallel color index in an object."""
+        return obj.point_indexes.get((x, y))
 
     def add_object(self, shape_type: ShapeType, bounds: tuple, points: List[Tuple[int, int]], 
                    duration_ms: float, mode: BurnoutMode = BurnoutMode.INSTANT,
@@ -207,21 +221,42 @@ class ThreadedBurnoutManager:
             points: List of (x, y) pixel coordinates
             duration_ms: Time until burnout in milliseconds
             mode: INSTANT (clear to black at expiration) or FADE (gradual fade)
-            pixel_colors: For FADE mode, list of (r, g, b) tuples parallel to points
+            pixel_colors: Original (r, g, b) values parallel to points
         """
         start_time = time.time()
         removal_time = start_time + (duration_ms / 1000.0)
         region = Region(shape_type, bounds)
-        
+
+        # Instant burnouts historically omitted colors. Capture them now so an
+        # expired covering object can reveal another live burnout underneath.
+        if pixel_colors is None:
+            pixel_colors = [
+                tuple(int(channel) for channel in self.api.drawing_buffer[y, x])
+                for x, y in points
+            ]
+
         obj = DrawingObject(removal_time, region, points, start_time, mode, pixel_colors)
         
         self.burnout_queue.put(obj)
         
         with self.index_lock:
-            for x, y in points:
+            for i, (x, y) in enumerate(points):
                 if (x, y) not in self.pixel_index:
                     self.pixel_index[(x, y)] = []
                 self.pixel_index[(x, y)].append((obj, removal_time))
+
+                # Drawing and registration are separate API operations. If the
+                # fade thread repainted this pixel in that small gap, reassert
+                # the newly registered (and therefore topmost) draw.
+                current = self.api.drawing_buffer[y, x]
+                color = obj.pixel_colors[i]
+                if (
+                    int(current[0]) != color[0]
+                    or int(current[1]) != color[1]
+                    or int(current[2]) != color[2]
+                ):
+                    self.api._draw_to_buffers(x, y, *color)
+                    obj.last_pixel_colors[i] = color
             
             # Track separately if it needs active fading
             if mode == BurnoutMode.FADE:
@@ -229,26 +264,65 @@ class ThreadedBurnoutManager:
 
     def _clear_object(self, obj: DrawingObject):
         """
-        Clear an expired drawing object by setting its pixels to black.
-        If other objects use the same pixels with later expiry times, preserve those pixels.
+        Remove an expired object. If it was visible, reveal the most recently
+        drawn live burnout underneath at its current fade level.
         """
         current_time = time.time()
         points_to_clear = obj.get_points()
         pixels_changed = False
 
         with self.index_lock:
-            for x, y in points_to_clear:
+            for point_index, (x, y) in enumerate(points_to_clear):
                 entries = self.pixel_index.get((x, y), [])
-                if not entries or max(t for _, t in entries) <= current_time:
-                    self.api._draw_to_buffers(x, y, 0, 0, 1) # TRANSPARENT_COLOR
-                    pixels_changed = True
+                if not entries:
+                    continue
 
-        with self.index_lock:
-            for x, y in points_to_clear:
-                if (x, y) in self.pixel_index:
-                    self.pixel_index[(x, y)] = [(o, t) for o, t in self.pixel_index[(x, y)] if o != obj]
-                    if not self.pixel_index[(x, y)]:
-                        del self.pixel_index[(x, y)]
+                # obj is expired at this point, so determine visibility from
+                # draw order before removing it instead of live ownership.
+                obj_positions = [
+                    i for i, (candidate, _) in enumerate(entries) if candidate is obj
+                ]
+                # Rasterized outlines can contain the same coordinate more
+                # than once. The first occurrence removes all entries for this
+                # object; later duplicates must be harmless.
+                if not obj_positions:
+                    continue
+                obj_position = obj_positions[-1]
+                later_entries = entries[obj_position + 1:]
+                was_top = not any(t > current_time for _, t in later_entries)
+
+                expected = obj.last_pixel_colors[point_index]
+                current = self.api.drawing_buffer[y, x]
+                was_visible = was_top and (
+                    int(current[0]) == expected[0]
+                    and int(current[1]) == expected[1]
+                    and int(current[2]) == expected[2]
+                )
+
+                remaining = [(o, t) for o, t in entries if o is not obj]
+                if remaining:
+                    self.pixel_index[(x, y)] = remaining
+                else:
+                    del self.pixel_index[(x, y)]
+
+                if not was_visible:
+                    continue
+
+                underneath = next(
+                    ((o, t) for o, t in reversed(remaining) if t > current_time),
+                    None,
+                )
+                if underneath is None:
+                    self.api._draw_to_buffers(x, y, 0, 0, 1)  # TRANSPARENT_COLOR
+                else:
+                    under_obj = underneath[0]
+                    under_index = self._point_index(under_obj, x, y)
+                    if under_index is None:
+                        continue
+                    color = self._color_at(under_obj, under_index, current_time)
+                    self.api._draw_to_buffers(x, y, *color)
+                    under_obj.last_pixel_colors[under_index] = color
+                pixels_changed = True
 
         if pixels_changed:
             self.changes_made = True

@@ -367,7 +367,7 @@ class RGB_Api:
 
             if burnout is not None and burnout >= 0:
                 mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
-                pixel_colors = [rgb_color] if mode == BurnoutMode.FADE else None
+                pixel_colors = [rgb_color]
                 self.burnout_manager.add_object(
                     ShapeType.POINT, (x, y), [(x, y)], burnout, mode, pixel_colors
                 )
@@ -417,7 +417,7 @@ class RGB_Api:
         if has_burnouts:
             for (x, y), burnout_time, b_mode, rgb_color in burnout_objects:
                 mode = BurnoutMode.FADE if b_mode.lower() == "fade" else BurnoutMode.INSTANT
-                pixel_colors = [rgb_color] if mode == BurnoutMode.FADE else None
+                pixel_colors = [rgb_color]
                 self.burnout_manager.add_object(
                     ShapeType.POINT, (x, y), [(x, y)], burnout_time, mode, pixel_colors
                 )
@@ -466,7 +466,7 @@ class RGB_Api:
 
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
-            pixel_colors = [rgb_color] * len(points) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(points)
             self.burnout_manager.add_object(
                 ShapeType.LINE, (x0, y0, x1, y1), points, burnout, mode, pixel_colors
             )
@@ -514,7 +514,7 @@ class RGB_Api:
 
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
-            pixel_colors = [rgb_color] * len(points) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(points)
             self.burnout_manager.add_object(
                 ShapeType.RECTANGLE, (x, y, width, height), points, burnout, mode, pixel_colors
             )
@@ -573,7 +573,7 @@ class RGB_Api:
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
             points_list = list(points)
-            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(points_list)
             self.burnout_manager.add_object(
                 ShapeType.CIRCLE, (x_center, y_center, radius), points_list, burnout, mode, pixel_colors
             )
@@ -653,7 +653,7 @@ class RGB_Api:
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
             points_list = list(burnout_points) if burnout_points else []
-            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(points_list)
             self.burnout_manager.add_object(
                 ShapeType.POLYGON, (x_center, y_center, radius), 
                 points_list, burnout, mode, pixel_colors
@@ -715,7 +715,7 @@ class RGB_Api:
             if burnout is not None and burnout >= 0:
                 mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
                 points_list = list(points)
-                pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
+                pixel_colors = [rgb_color] * len(points_list)
                 self.burnout_manager.add_object(
                     ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
                     points_list, burnout, mode, pixel_colors
@@ -835,7 +835,7 @@ class RGB_Api:
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
             points_list = list(points)
-            pixel_colors = [rgb_color] * len(points_list) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(points_list)
             self.burnout_manager.add_object(
                 ShapeType.ELLIPSE, (x_center, y_center, x_radius, y_radius, rotation), 
                 points_list, burnout, mode, pixel_colors
@@ -886,7 +886,7 @@ class RGB_Api:
         # Register with burnout manager if duration specified
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
-            pixel_colors = [rgb_color] * len(drawn_points) if mode == BurnoutMode.FADE else None
+            pixel_colors = [rgb_color] * len(drawn_points)
             self.burnout_manager.add_object(
                 ShapeType.ARC, (x1, y1, x2, y2, bulge), drawn_points, burnout, mode, pixel_colors
             )
