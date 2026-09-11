@@ -28,6 +28,11 @@ class DebugManager:
     enabled_components: Set[Component] = set(Component)
 
     @classmethod
+    def is_enabled(cls, level: Level, component: Component) -> bool:
+        """Return whether a message would be emitted."""
+        return level.value >= cls.min_level.value and component in cls.enabled_components
+
+    @classmethod
     def configure(cls, 
                  level: Optional[Level] = None,
                  components: Optional[Set[Component]] = None) -> None:
@@ -61,7 +66,7 @@ class DebugManager:
             level: Debug level of the message
             component: System component the message relates to
         """
-        if level.value >= cls.min_level.value and component in cls.enabled_components:
+        if cls.is_enabled(level, component):
             # Get the calling module name
             frame = inspect.currentframe()
             if frame:
@@ -81,3 +86,4 @@ class DebugManager:
 # Convenience functions
 debug = DebugManager.debug
 configure_debug = DebugManager.configure
+is_debug_enabled = DebugManager.is_enabled

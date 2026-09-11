@@ -7,7 +7,7 @@ import math
 from .drawing_objects import DrawingObject, ShapeType, ThreadedBurnoutManager, BurnoutMode
 from .utils import get_color_rgb, polygon_vertices, arc_points, TRANSPARENT_COLOR, GRID_SIZE, get_grid_cells, is_transparent
 from typing import Optional, List, Tuple, Union, Any
-from .debug import debug, Level, Component, configure_debug
+from .debug import debug, is_debug_enabled, Level, Component, configure_debug
 from .sprite import MatrixSprite, SpriteManager, SpriteInstance
 from .background import BackgroundManager
 import numpy as np
@@ -358,8 +358,12 @@ class RGB_Api:
             burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
         """
         rgb_color = self._get_color(color, intensity)
-        debug(f"Plotting point at ({x}, {y}) with color {color} at {intensity}% -> RGB {rgb_color}", 
-              Level.TRACE, Component.DRAWING)
+        if is_debug_enabled(Level.TRACE, Component.DRAWING):
+            debug(
+                f"Plotting point at ({x}, {y}) with color {color} at {intensity}% -> RGB {rgb_color}",
+                Level.TRACE,
+                Component.DRAWING,
+            )
         
         if 0 <= x < self.matrix.width and 0 <= y < self.matrix.height:
             self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
@@ -490,10 +494,30 @@ class RGB_Api:
         points = []
         
         if fill:
-            for i in range(max(0, x), min(x + width, self.matrix.width)):
-                for j in range(max(0, y), min(y + height, self.matrix.height)):
-                    self._draw_to_buffers(i, j, rgb_color[0], rgb_color[1], rgb_color[2])
-                    points.append((i, j))
+            start_x = max(0, x)
+            end_x = min(x + width, self.matrix.width)
+            start_y = max(0, y)
+            end_y = min(y + height, self.matrix.height)
+            if (
+                self.frame_mode
+                and not self.preserve_frame_changes
+                and start_x < end_x
+                and start_y < end_y
+            ):
+                # Standard frame mode only needs the numpy accumulation buffer.
+                # Immediate and preserve modes retain per-pixel SetPixel behavior.
+                self.drawing_buffer[start_y:end_y, start_x:end_x] = rgb_color
+                if burnout is not None and burnout >= 0:
+                    points = [
+                        (px, py)
+                        for px in range(start_x, end_x)
+                        for py in range(start_y, end_y)
+                    ]
+            else:
+                for i in range(start_x, end_x):
+                    for j in range(start_y, end_y):
+                        self._draw_to_buffers(i, j, rgb_color[0], rgb_color[1], rgb_color[2])
+                        points.append((i, j))
         else:
             for i in range(max(0, x), min(x + width, self.matrix.width)):
                 if 0 <= y < self.matrix.height:
@@ -534,20 +558,31 @@ class RGB_Api:
             burnout_mode: 'instant' (clear to black at expiration) or 'fade' (gradual fade)
         """
         rgb_color = self._get_color(color, intensity)
-        points = set()
+        track_points = burnout is not None and burnout >= 0
+        points = set() if track_points else None
+        standard_frame = self.frame_mode and not self.preserve_frame_changes
 
         def plot_circle_points(x: int, y: int):
             for dx, dy in [(x, y), (-x, y), (x, -y), (-x, -y), (y, x), (-y, x), (y, -x), (-y, -x)]:
                 px, py = x_center + dx, y_center + dy
                 if 0 <= px < self.matrix.width and 0 <= py < self.matrix.height:
                     self._draw_to_buffers(px, py, rgb_color[0], rgb_color[1], rgb_color[2])
-                    points.add((px, py))
+                    if points is not None:
+                        points.add((px, py))
                     
         def draw_line(x0: int, y0: int, x1: int):
-            for x in range(max(0, x0), min(x1 + 1, self.matrix.width)):
-                if 0 <= y0 < self.matrix.height:
-                    self._draw_to_buffers(x, y0, rgb_color[0], rgb_color[1], rgb_color[2])
-                    points.add((x, y0))
+            start_x = max(0, x0)
+            end_x = min(x1 + 1, self.matrix.width)
+            if 0 <= y0 < self.matrix.height and start_x < end_x:
+                if standard_frame:
+                    self.drawing_buffer[y0, start_x:end_x] = rgb_color
+                    if points is not None:
+                        points.update((px, y0) for px in range(start_x, end_x))
+                else:
+                    for x in range(start_x, end_x):
+                        self._draw_to_buffers(x, y0, rgb_color[0], rgb_color[1], rgb_color[2])
+                        if points is not None:
+                            points.add((x, y0))
 
         x, y = 0, radius
         d = 3 - 2 * radius
@@ -572,7 +607,7 @@ class RGB_Api:
 
         if burnout is not None and burnout >= 0:
             mode = BurnoutMode.FADE if burnout_mode.lower() == "fade" else BurnoutMode.INSTANT
-            points_list = list(points)
+            points_list = list(points) if points else []
             pixel_colors = [rgb_color] * len(points_list)
             self.burnout_manager.add_object(
                 ShapeType.CIRCLE, (x_center, y_center, radius), points_list, burnout, mode, pixel_colors
@@ -643,10 +678,17 @@ class RGB_Api:
                     if i + 1 < len(intersections):
                         start = max(min_x, min(intersections[i], intersections[i + 1]))
                         end = min(max_x, max(intersections[i], intersections[i + 1]))
-                        for x in range(int(start), int(end) + 1):
-                            self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
+                        start = int(start)
+                        end = int(end)
+                        if self.frame_mode and not self.preserve_frame_changes:
+                            self.drawing_buffer[y, start:end + 1] = rgb_color
                             if burnout_points is not None:
-                                burnout_points.add((x, y))
+                                burnout_points.update((x, y) for x in range(start, end + 1))
+                        else:
+                            for x in range(start, end + 1):
+                                self._draw_to_buffers(x, y, rgb_color[0], rgb_color[1], rgb_color[2])
+                                if burnout_points is not None:
+                                    burnout_points.add((x, y))
 
         self._maybe_swap_buffer()
 
@@ -735,19 +777,35 @@ class RGB_Api:
             x_radius_sq = x_radius * x_radius
             y_radius_sq = y_radius * y_radius
             
-            for y in range(min_y, max_y + 1):
-                for x in range(min_x, max_x + 1):
-                    # Transform back to ellipse coordinate system
-                    dx = x - x_center
-                    dy = y - y_center
-                    
-                    # Apply inverse rotation to check if point is inside unrotated ellipse
-                    rx = dx * cos_rot + dy * sin_rot
-                    ry = -dx * sin_rot + dy * cos_rot
-                    
-                    # Check ellipse equation: (x/a)² + (y/b)² <= 1
-                    if (rx * rx / x_radius_sq + ry * ry / y_radius_sq) <= 1.0:
-                        plot_pixel(x, y)
+            if self.frame_mode and not self.preserve_frame_changes:
+                grid_y, grid_x = np.ogrid[min_y:max_y + 1, min_x:max_x + 1]
+                dx = grid_x - x_center
+                dy = grid_y - y_center
+                rx = dx * cos_rot + dy * sin_rot
+                ry = -dx * sin_rot + dy * cos_rot
+                inside = (rx * rx / x_radius_sq + ry * ry / y_radius_sq) <= 1.0
+                region = self.drawing_buffer[min_y:max_y + 1, min_x:max_x + 1]
+                region[inside] = rgb_color
+                if points is not None:
+                    local_y, local_x = np.nonzero(inside)
+                    points.update(
+                        (min_x + int(px), min_y + int(py))
+                        for py, px in zip(local_y, local_x)
+                    )
+            else:
+                for y in range(min_y, max_y + 1):
+                    for x in range(min_x, max_x + 1):
+                        # Transform back to ellipse coordinate system
+                        dx = x - x_center
+                        dy = y - y_center
+
+                        # Apply inverse rotation to check if point is inside unrotated ellipse
+                        rx = dx * cos_rot + dy * sin_rot
+                        ry = -dx * sin_rot + dy * cos_rot
+
+                        # Check ellipse equation: (x/a)² + (y/b)² <= 1
+                        if (rx * rx / x_radius_sq + ry * ry / y_radius_sq) <= 1.0:
+                            plot_pixel(x, y)
         else:
             # For outlines, use the midpoint algorithm
             a_squared = x_radius * x_radius
@@ -1165,39 +1223,48 @@ class RGB_Api:
         else:
             # MatrixSprite doesn't have x/y attributes; draw at origin
             x, y = 0, 0
-        start_x = max(0, x)
-        start_y = max(0, y)
-        end_x = min(self.matrix.width, x + sprite.width)
-        end_y = min(self.matrix.height, y + sprite.height)
-        sprite_start_x = max(0, -x)
-        sprite_start_y = max(0, -y)
-        pixels_copied = 0
-        pixels_skipped = 0
-        for sy in range(sprite_start_y, sprite.height):
-            dy = y + sy
-            if dy >= end_y:
-                break
-            if dy < start_y:
-                continue
-            for sx in range(sprite_start_x, sprite.width):
-                dx = x + sx
-                if dx >= end_x:
-                    break
-                if dx < start_x:
-                    continue
-                r, g, b = sprite.buffer[sy][sx]
-                if (r, g, b) != TRANSPARENT_COLOR:
-                    intensity = sprite.intensity_buffer[sy][sx]
-                    scale = intensity / 100.0
-                    scaled_rgb = (int(r * scale), int(g * scale), int(b * scale))
-                    debug(f"Copying sprite pixel ({dx}, {dy}) with RGB {scaled_rgb} (intensity: {intensity}%)", 
-                        Level.TRACE, Component.SPRITE)
-                    dest_buffer.SetPixel(dx, dy, scaled_rgb[0], scaled_rgb[1], scaled_rgb[2])
-                    pixels_copied += 1
-                else:
-                    pixels_skipped += 1
-        debug(f"Sprite copy complete: {pixels_copied} pixels copied, {pixels_skipped} skipped", 
-            Level.TRACE, Component.SPRITE)
+        dest_x0 = max(0, x)
+        dest_y0 = max(0, y)
+        dest_x1 = min(self.matrix.width, x + sprite.width)
+        dest_y1 = min(self.matrix.height, y + sprite.height)
+        if dest_x0 >= dest_x1 or dest_y0 >= dest_y1:
+            return
+
+        src_x0 = dest_x0 - x
+        src_y0 = dest_y0 - y
+        src_x1 = src_x0 + (dest_x1 - dest_x0)
+        src_y1 = src_y0 + (dest_y1 - dest_y0)
+        colors = sprite.buffer[src_y0:src_y1, src_x0:src_x1]
+        intensities = sprite.intensity_buffer[src_y0:src_y1, src_x0:src_x1]
+        visible = np.any(colors != TRANSPARENT_COLOR, axis=2)
+        local_y, local_x = np.nonzero(visible)
+        if local_x.size == 0:
+            return
+
+        # uint16 prevents overflow; integer division matches int(channel * scale)
+        # for non-negative 8-bit color and intensity values.
+        scaled = (
+            colors[visible].astype(np.uint16)
+            * intensities[visible, None].astype(np.uint16)
+            // 100
+        ).astype(np.uint8)
+
+        for px, py, rgb in zip(local_x, local_y, scaled):
+            dest_buffer.SetPixel(
+                dest_x0 + int(px),
+                dest_y0 + int(py),
+                int(rgb[0]),
+                int(rgb[1]),
+                int(rgb[2]),
+            )
+
+        if is_debug_enabled(Level.TRACE, Component.SPRITE):
+            debug(
+                f"Sprite copy complete: {len(scaled)} pixels copied, "
+                f"{visible.size - len(scaled)} skipped",
+                Level.TRACE,
+                Component.SPRITE,
+            )
     
     def clear_sprite_position(self, sprite: Union[SpriteInstance, MatrixSprite], dest_buffer):
         """Clear the sprite's current position on the display canvas."""
@@ -1268,6 +1335,8 @@ class RGB_Api:
             else:
                 debug(f"Unsupported sprite command: {command}", Level.ERROR, Component.SPRITE)
                 raise ValueError(f"Unsupported sprite command: {command}")
+            # A sprite template may already be serving as a background.
+            self.background_manager.invalidate_cache()
             debug(f"Successfully executed {command} on sprite {name}", Level.DEBUG, Component.SPRITE)
         except Exception as e:
             debug(f"Error executing sprite command: {e}", Level.ERROR, Component.SPRITE)

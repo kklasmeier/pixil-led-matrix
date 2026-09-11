@@ -39,6 +39,11 @@ class BackgroundManager:
     def __init__(self, sprite_manager):
         self.sprite_manager = sprite_manager
         self._layers: Dict[int, BackgroundLayerState] = {}
+        self._viewport_cache: Dict[tuple[int, int], np.ndarray] = {}
+
+    def invalidate_cache(self) -> None:
+        """Discard composited viewports after any layer or template change."""
+        self._viewport_cache.clear()
 
     # ------------------------------------------------------------------
     # Public API
@@ -77,6 +82,7 @@ class BackgroundManager:
         # Create or replace the layer state
         state = BackgroundLayerState(sprite_name, cel_index)
         self._layers[layer] = state
+        self.invalidate_cache()
 
         debug(f"Background layer {layer} set to sprite '{sprite_name}' cel {cel_index}",
               Level.INFO, Component.SYSTEM)
@@ -101,17 +107,20 @@ class BackgroundManager:
             return
 
         self._layers[layer].visible = False
+        self.invalidate_cache()
         debug(f"Background layer {layer} hidden", Level.INFO, Component.SYSTEM)
 
     def hide_all(self):
         """Hide all background layers (preserves state)."""
         for layer_num, state in self._layers.items():
             state.visible = False
+        self.invalidate_cache()
         debug("All background layers hidden", Level.INFO, Component.SYSTEM)
 
     def destroy_all(self):
         """Destroy all background layer state. Called by dispose_all_sprites."""
         self._layers.clear()
+        self.invalidate_cache()
         debug("All background layer state destroyed", Level.INFO, Component.SYSTEM)
 
     def nudge(self, dx: int, dy: int, layer: int = 0, cel_index: Optional[int] = None):
@@ -132,6 +141,7 @@ class BackgroundManager:
         state.offset_x += dx
         state.offset_y += dy
         self._update_cel(state, cel_index)
+        self.invalidate_cache()
 
         debug(f"Background layer {layer} nudged by ({dx},{dy}) -> offset ({state.offset_x},{state.offset_y}), "
               f"cel {state.cel_index}", Level.TRACE, Component.SYSTEM)
@@ -154,6 +164,7 @@ class BackgroundManager:
         state.offset_x = x
         state.offset_y = y
         self._update_cel(state, cel_index)
+        self.invalidate_cache()
 
         debug(f"Background layer {layer} offset set to ({x},{y}), cel {state.cel_index}",
               Level.TRACE, Component.SYSTEM)
@@ -178,6 +189,13 @@ class BackgroundManager:
             np.ndarray of shape (height, width, 3) with composited background.
             Pixels where no layer drew anything will be TRANSPARENT_COLOR (0,0,1).
         """
+        cache_key = (width, height)
+        cached = self._viewport_cache.get(cache_key)
+        if cached is not None:
+            # Callers overlay drawing pixels and normalize the transparency
+            # sentinel in-place, so never expose the cached master array.
+            return cached.copy()
+
         # Transparent sentinel as numpy array for fast comparison
         tc = np.array(TRANSPARENT_COLOR, dtype=np.uint8)
 
@@ -203,7 +221,8 @@ class BackgroundManager:
             mask = np.any(layer_buf != tc, axis=2)
             viewport[mask] = layer_buf[mask]
 
-        return viewport
+        self._viewport_cache[cache_key] = viewport
+        return viewport.copy()
 
     # ------------------------------------------------------------------
     # Internal helpers

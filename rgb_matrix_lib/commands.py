@@ -3,7 +3,6 @@
 import re
 from typing import List, Any, Optional, Union
 from .debug import debug, Level, Component
-from .utils import NAMED_COLORS, get_color_rgb  # Removed parse_color_spec
 from .text_effects import TextEffect, EffectModifier
 from shared.mplot_protocol import decode_buffer, unpack_mplot_batch
 from shared.draw_batch_protocol import decode_buffer as decode_draw_buffer, unpack_draw_batch
@@ -238,15 +237,13 @@ class CommandExecutor:
     def _handle_plot(self, x: int, y: int, color: Union[str, int], intensity: int = 100, 
                      burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle plot command."""
-        rgb_color = get_color_rgb(color, intensity)
-        debug(f"Handling plot command: ({x}, {y}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode} -> RGB {rgb_color}", 
+        debug(f"Handling plot command: ({x}, {y}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}",
             Level.DEBUG, Component.COMMAND)
         self.api.plot(x, y, color, intensity, burnout, burnout_mode)
 
     def _handle_draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Union[str, int], 
                         intensity: int = 100, burnout: Optional[int] = None, burnout_mode: str = "instant"):
         """Handle draw_line command."""
-        rgb_color = get_color_rgb(color, intensity)
         debug(f"Handling draw_line command: ({x0}, {y0}) to ({x1}, {y1}) in {color} at {intensity}% with burnout {burnout if burnout is not None else 'None (permanent)'}, mode={burnout_mode}", 
             Level.DEBUG, Component.COMMAND)
         self.api.draw_line(x0, y0, x1, y1, color, intensity, burnout, burnout_mode)

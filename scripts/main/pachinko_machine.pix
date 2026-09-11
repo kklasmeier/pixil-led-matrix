@@ -1,7 +1,8 @@
-# Pachinko Machine Simulation
+# Pachinko Machine Simulation V2
+# Same 24 shuffled boards as V1; motion uses generic particle primitives.
+# Rubber, metal, and soft-polymer balls have visibly different elasticity.
 # Runs forever, cycling through 24 board designs
 # Boards are shuffled at startup, then repeat in same order forever
-# Optimized with spatial Y-banding for peg collision detection
 
 # ========== PERFORMANCE ==========
 throttle(0)
@@ -11,11 +12,10 @@ fps(30)
 
 
 # ========== CONFIGURABLE SETTINGS ==========
-v_num_balls = 50              # Total number of balls to drop per board
-v_max_balls_active = 10          # Maximum balls on screen at once
+v_num_balls = 80              # Total number of balls to drop per board
+v_max_balls_active = 10       # Match V1 density; V2 still handles 80 total
 v_gravity = 0.15              # Downward acceleration per frame
-v_bounce_damping = 0.85       # Energy retained after bounce (0-1, higher = bouncier)
-v_drop_interval = 5          # Frames between ball drops
+v_drop_interval = 5          # Match V1 pacing; avoids a waterfall effect
 v_total_boards = 24           # Total number of board designs
 v_force_board = -1            # -1 = normal shuffle; 0-23 = always use that board (testing)
 
@@ -32,18 +32,19 @@ v_peg_brightness = 70
 # Match draw_circle(..., radius 1) pegs + 1px ball sprite (center-to-center at contact ~1.5)
 v_peg_radius = 1
 v_ball_radius = 0.5
-v_collision_dist = v_peg_radius + v_ball_radius
-v_coll_dist_sq = v_collision_dist * v_collision_dist
-v_bounce_randomness = 0.5     # Random horizontal kick on peg bounce
 v_max_velocity = 3            # Maximum ball speed in any direction
 v_neg_max_velocity = -3       # Pre-computed negative max velocity
 
-# ========== BALL ARRAYS ==========
-create_array(v_ball_x, 13)
-create_array(v_ball_y, 13)
-create_array(v_ball_vx, 13)
-create_array(v_ball_vy, 13)
-create_array(v_ball_active, 13)
+# ========== BALL ARRAYS (24 slots, indices 0..23) ==========
+create_array(v_ball_x, 24, numeric)
+create_array(v_ball_y, 24, numeric)
+create_array(v_ball_vx, 24, numeric)
+create_array(v_ball_vy, 24, numeric)
+create_array(v_ball_active, 24, numeric)
+create_array(v_ball_material, 24, numeric)
+create_array(v_ball_restitution, 24, numeric)
+create_array(v_ball_kick, 24, numeric)
+create_array(v_peg_hit, 24, numeric)
 
 # ========== PEG ARRAYS ==========
 create_array(v_peg_x, 45)
@@ -72,9 +73,17 @@ if v_force_board < 0 then
     endfor v_i
 endif
 
-# ========== DEFINE BALL SPRITE ==========
+# ========== DEFINE MATERIAL BALL SPRITE ==========
 define_sprite(ball_sprite, 1, 1)
+    # Cel 0: rubber (cyan, lively)
+    sprite_cel(0)
+    plot(0, 0, cyan, 100)
+    # Cel 1: metal (white, medium bounce)
+    sprite_cel(1)
     plot(0, 0, white, 100)
+    # Cel 2: soft polymer (orange, damped)
+    sprite_cel(2)
+    plot(0, 0, orange, 100)
 endsprite
 
 # ========== OUTER LOOP - RUNS FOREVER ==========
@@ -93,7 +102,7 @@ while 1 == 1 then
     v_frame_count = 0
     v_active_count = 0
     
-    for v_i in (0, 12, 1)
+    for v_i in (0, 23, 1)
         v_was_active = v_ball_active[v_i]
         if v_was_active > 0 then
             hide_sprite(ball_sprite, v_i)
@@ -1595,7 +1604,7 @@ while 1 == 1 then
             if v_balls_dropped < v_num_balls then
                 if v_active_count < v_max_balls_active then
                     v_found_slot = -1
-                    for v_slot in (0, 12, 1)
+                    for v_slot in (0, 23, 1)
                         if v_found_slot == -1 then
                             v_slot_status = v_ball_active[v_slot]
                             if v_slot_status < 1 then
@@ -1610,134 +1619,74 @@ while 1 == 1 then
                         v_ball_y[v_found_slot] = 2
                         v_ball_vx[v_found_slot] = random(-0.5, 0.5, 2)
                         v_ball_vy[v_found_slot] = 0
+
+                        # Material controls both bounce energy and sideways life.
+                        v_material = random(0, 2, 0)
+                        v_ball_material[v_found_slot] = v_material
+                        if v_material == 0 then
+                            # Rubber: springy and lively.
+                            v_ball_restitution[v_found_slot] = 0.95
+                            v_ball_kick[v_found_slot] = 0.7
+                        elseif v_material == 1 then
+                            # Metal: firm but less elastic than rubber.
+                            v_ball_restitution[v_found_slot] = 0.72
+                            v_ball_kick[v_found_slot] = 0.4
+                        else
+                            # Soft polymer: absorbs most impact energy.
+                            v_ball_restitution[v_found_slot] = 0.42
+                            v_ball_kick[v_found_slot] = 0.18
+                        endif
+
                         v_balls_dropped = v_balls_dropped + 1
                         v_active_count = v_active_count + 1
                         v_bx = floor(v_ball_x[v_found_slot])
                         v_by = floor(v_ball_y[v_found_slot])
-                        show_sprite(ball_sprite, v_bx, v_by, v_found_slot)
+                        show_sprite(ball_sprite, v_bx, v_by, v_found_slot, 0, v_material)
                     endif
                 endif
             endif
         endif
         
-        # ========== UPDATE BALLS ==========
-        for v_b in (0, 12, 1)
+        # ========== UPDATE BALLS (generic particle primitives) ==========
+        # Bounds left/right 4.5 and 58.5 + radius 0.5 => center limits 5 and 58
+        particle_integrate(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, 0, v_gravity, 1, 0, 24)
+        particle_collide_bounds(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, 4.5, 58.5, -1000, 1000, v_ball_restitution, v_ball_radius)
+        particle_collide_static_circles(v_ball_x, v_ball_y, v_ball_vx, v_ball_vy, v_ball_active, v_peg_x, v_peg_y, v_ball_radius, v_peg_radius, v_ball_restitution, v_peg_hit, 24, v_num_pegs)
+
+        v_active_count = 0
+        for v_b in (0, 23, 1)
             v_is_active = v_ball_active[v_b]
             if v_is_active > 0 then
-                v_vy = v_ball_vy[v_b] + v_gravity
-                v_vx = v_ball_vx[v_b]
-                
-                if v_vy > v_max_velocity then
-                    v_vy = v_max_velocity
+                if v_peg_hit[v_b] > 0 then
+                    v_kick_limit = v_ball_kick[v_b]
+                    v_rand_kick = random(-v_kick_limit, v_kick_limit, 2)
+                    v_ball_vx[v_b] = v_ball_vx[v_b] + v_rand_kick
                 endif
-                if v_vx > v_max_velocity then
-                    v_vx = v_max_velocity
+
+                if v_ball_vx[v_b] > v_max_velocity then
+                    v_ball_vx[v_b] = v_max_velocity
                 endif
-                if v_vx < v_neg_max_velocity then
-                    v_vx = v_neg_max_velocity
+                if v_ball_vx[v_b] < v_neg_max_velocity then
+                    v_ball_vx[v_b] = v_neg_max_velocity
                 endif
-                
-                v_x = v_ball_x[v_b] + v_vx
-                v_y = v_ball_y[v_b] + v_vy
-                
-                if v_x <= v_left_wall + 1 then
-                    v_x = v_left_wall + 2
-                    v_vx = -v_vx * v_bounce_damping
+                if v_ball_vy[v_b] > v_max_velocity then
+                    v_ball_vy[v_b] = v_max_velocity
                 endif
-                
-                if v_x >= v_right_wall - 1 then
-                    v_x = v_right_wall - 2
-                    v_vx = -v_vx * v_bounce_damping
+                if v_ball_vy[v_b] < v_neg_max_velocity then
+                    v_ball_vy[v_b] = v_neg_max_velocity
                 endif
-                
-                # Banded peg collision
-                v_ball_band = floor(v_y / 8)
-                if v_ball_band < 0 then
-                    v_ball_band = 0
-                endif
-                if v_ball_band > 7 then
-                    v_ball_band = 7
-                endif
-                
-                if v_vy >= 0 then
-                    v_adj_band = v_ball_band + 1
-                    if v_adj_band > 7 then
-                        v_adj_band = 7
-                    endif
-                else
-                    v_adj_band = v_ball_band - 1
-                    if v_adj_band < 0 then
-                        v_adj_band = 0
-                    endif
-                endif
-                
-                v_pc_start = v_band_start[v_ball_band]
-                v_pc_end = v_band_end[v_ball_band]
-                if v_pc_end >= v_pc_start then
-                    for v_pc in (v_pc_start, v_pc_end, 1)
-                        v_dx = v_x - v_peg_x[v_pc]
-                        v_dy = v_y - v_peg_y[v_pc]
-                        v_dist_sq = v_dx * v_dx + v_dy * v_dy
-                        if v_dist_sq < v_coll_dist_sq then
-                            v_dist = sqrt(v_dist_sq)
-                            if v_dist > 0.1 then
-                                v_nx = v_dx / v_dist
-                                v_ny = v_dy / v_dist
-                                v_x = v_peg_x[v_pc] + v_nx * v_collision_dist
-                                v_y = v_peg_y[v_pc] + v_ny * v_collision_dist
-                                v_dot = v_vx * v_nx + v_vy * v_ny
-                                v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
-                                v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
-                                v_rand_kick = random(-v_bounce_randomness, v_bounce_randomness, 2)
-                                v_vx = v_vx + v_rand_kick
-                            endif
-                        endif
-                    endfor v_pc
-                endif
-                
-                if v_adj_band != v_ball_band then
-                    v_pc_start = v_band_start[v_adj_band]
-                    v_pc_end = v_band_end[v_adj_band]
-                    if v_pc_end >= v_pc_start then
-                        for v_pc in (v_pc_start, v_pc_end, 1)
-                            v_dx = v_x - v_peg_x[v_pc]
-                            v_dy = v_y - v_peg_y[v_pc]
-                            v_dist_sq = v_dx * v_dx + v_dy * v_dy
-                            if v_dist_sq < v_coll_dist_sq then
-                                v_dist = sqrt(v_dist_sq)
-                                if v_dist > 0.1 then
-                                    v_nx = v_dx / v_dist
-                                    v_ny = v_dy / v_dist
-                                    v_x = v_peg_x[v_pc] + v_nx * v_collision_dist
-                                    v_y = v_peg_y[v_pc] + v_ny * v_collision_dist
-                                    v_dot = v_vx * v_nx + v_vy * v_ny
-                                    v_vx = (v_vx - 2 * v_dot * v_nx) * v_bounce_damping
-                                    v_vy = (v_vy - 2 * v_dot * v_ny) * v_bounce_damping
-                                    v_rand_kick = random(-v_bounce_randomness, v_bounce_randomness, 2)
-                                    v_vx = v_vx + v_rand_kick
-                                endif
-                            endif
-                        endfor v_pc
-                    endif
-                endif
-                
-                v_ball_x[v_b] = v_x
-                v_ball_y[v_b] = v_y
-                v_ball_vx[v_b] = v_vx
-                v_ball_vy[v_b] = v_vy
-                
-                if v_y > v_exit_y then
+
+                if v_ball_y[v_b] > v_exit_y then
                     v_ball_active[v_b] = 0
                     hide_sprite(ball_sprite, v_b)
                 else
-                    v_bx_draw = floor(v_x)
-                    v_by_draw = floor(v_y)
-                    move_sprite(ball_sprite, v_bx_draw, v_by_draw, v_b)
+                    v_bx_draw = floor(v_ball_x[v_b])
+                    v_by_draw = floor(v_ball_y[v_b])
+                    move_sprite(ball_sprite, v_bx_draw, v_by_draw, v_b, v_ball_material[v_b])
+                    v_active_count = v_active_count + 1
                 endif
             endif
         endfor v_b
-        
-        v_active_count = v_ball_active[0] + v_ball_active[1] + v_ball_active[2] + v_ball_active[3] + v_ball_active[4] + v_ball_active[5] + v_ball_active[6] + v_ball_active[7] + v_ball_active[8] + v_ball_active[9] + v_ball_active[10] + v_ball_active[11] + v_ball_active[12]
         
         v_frame_count = v_frame_count + 1
         
