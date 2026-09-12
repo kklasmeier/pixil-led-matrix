@@ -128,3 +128,35 @@ def test_expiration_tolerates_duplicate_rasterized_points(monkeypatch):
 
     assert tuple(api.drawing_buffer[0, 0]) == (0, 0, 1)
     assert (0, 0) not in manager.pixel_index
+
+
+def test_new_draw_prunes_underlayers_that_expire_first(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(drawing_objects.time, "time", lambda: now[0])
+    api = FakeApi()
+    manager = ThreadedBurnoutManager(api)
+
+    add_point(manager, api, (255, 0, 0), 1000, BurnoutMode.FADE)
+    old = manager.pixel_index[(0, 0)][0][0]
+    now[0] = 100.1
+    add_point(manager, api, (0, 0, 255), 1000, BurnoutMode.FADE)
+
+    entries = manager.pixel_index[(0, 0)]
+    assert len(entries) == 1
+    assert entries[0][0] is not old
+
+
+def test_new_draw_keeps_underlayer_that_outlives_it(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(drawing_objects.time, "time", lambda: now[0])
+    api = FakeApi()
+    manager = ThreadedBurnoutManager(api)
+
+    add_point(manager, api, (255, 0, 0), 2000, BurnoutMode.FADE)
+    old = manager.pixel_index[(0, 0)][0][0]
+    now[0] = 100.1
+    add_point(manager, api, (0, 0, 255), 100, BurnoutMode.INSTANT)
+
+    entries = manager.pixel_index[(0, 0)]
+    assert len(entries) == 2
+    assert entries[0][0] is old

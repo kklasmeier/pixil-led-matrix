@@ -241,9 +241,20 @@ class ThreadedBurnoutManager:
         
         with self.index_lock:
             for i, (x, y) in enumerate(points):
-                if (x, y) not in self.pixel_index:
-                    self.pixel_index[(x, y)] = []
-                self.pixel_index[(x, y)].append((obj, removal_time))
+                entries = self.pixel_index.get((x, y), [])
+
+                # A newly drawn object hides every older entry until its own
+                # expiry. Any older entry that expires no later can therefore
+                # never become visible again and is safe to drop from this
+                # pixel's ownership stack. Longer-lived underlayers remain so
+                # they can be revealed when this object expires.
+                entries = [
+                    (older_obj, older_removal)
+                    for older_obj, older_removal in entries
+                    if older_removal > removal_time
+                ]
+                entries.append((obj, removal_time))
+                self.pixel_index[(x, y)] = entries
 
                 # Drawing and registration are separate API operations. If the
                 # fade thread repainted this pixel in that small gap, reassert

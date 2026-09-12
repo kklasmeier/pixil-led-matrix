@@ -642,6 +642,7 @@ while 1 == 1 then
 
             call get_next_style
             call apply_style
+            sync_queue
         endif
     endif
 
