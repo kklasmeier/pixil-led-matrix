@@ -111,6 +111,9 @@ COMMANDS
 DEFAULT PIXIL ARGS (interactive / start / bg when args omitted):
   main/* -t 60:00
 
+Background wildcard shows automatically restart Pixil after an unsafe display
+worker failure, skip the failed script once, and continue the show.
+
 PIXIL OPTIONS (pass after -- with interactive / start / bg):
   script[.pix]   One script, or a wildcard like main/*
   -t mm:ss       Run duration per script (e.g. 5:00, 0:30)
@@ -629,8 +632,8 @@ case "$COMMAND" in
 
   start|bg)
     echo "Starting Pixil in background..."
-    echo "Command: sudo nohup python3 -u Pixil.py ${PASS_ARGS[*]} > $LOG_FILE 2>&1 &"
-    sudo nohup python3 -u Pixil.py "${PASS_ARGS[@]}" > "$LOG_FILE" 2>&1 &
+    echo "Command: sudo nohup env PIXIL_AUTO_RESTART=1 python3 -u Pixil.py ${PASS_ARGS[*]} > $LOG_FILE 2>&1 &"
+    sudo nohup env PIXIL_AUTO_RESTART=1 python3 -u Pixil.py "${PASS_ARGS[@]}" > "$LOG_FILE" 2>&1 &
     sleep 1
     show_pixil_procs || true
     echo "Log: $LOG_FILE"

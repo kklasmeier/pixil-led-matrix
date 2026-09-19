@@ -615,15 +615,17 @@ def seq_static_burst {
             v_y = random(0, 63, 0)
             if v_color_mode == 1 then
                 v_gray = random(40, 100, 0)
-                mplot(v_x, v_y, white, v_gray, v_burnout * 100, fade)
+                mplot(v_x, v_y, white, v_gray, v_burnout, fade)
             else
-                plot(v_x, v_y, v_color, 100, v_burnout * 100, fade)
+                plot(v_x, v_y, v_color, 100, v_burnout, fade)
             endif
         endfor v_i
         mflush()
         rest(0.05)
     endfor v_frame
-    rest(v_burnout * 50)
+    # Let the final 80-150ms fade finish. The previous multiplication slept
+    # for 4,000-7,500 seconds and tripped the five-minute queue watchdog.
+    rest(v_burnout / 1000)
 }
 
 # ============================================

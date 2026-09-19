@@ -9,11 +9,15 @@ class QueueMonitor:
         self.queue_instance = queue_instance
         self.running = False
         self.thread = None
+        self.terminal_active = False
         atexit.register(self.cleanup)
         
     def start(self):
         """Start queue monitoring thread"""
+        if not sys.stdout.isatty():
+            return
         self.running = True
+        self.terminal_active = True
         self.thread = Thread(target=self._monitor_loop, daemon=True)
         sys.stdout.write('\n\033[s\033[?25l')  # Save cursor position and hide it
         self.thread.start()
@@ -27,8 +31,11 @@ class QueueMonitor:
             
     def cleanup(self):
         """Restore cursor and position"""
+        if not self.terminal_active:
+            return
         sys.stdout.write('\033[?25h\033[u\n')  # Show cursor, restore position, and add newline
         sys.stdout.flush()
+        self.terminal_active = False
         
     def _monitor_loop(self):
         """Update queue depth display"""

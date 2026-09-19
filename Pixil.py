@@ -1,11 +1,14 @@
 import re
 import sys
+import os
 import gc
 import signal  # At top with other imports
 import time
 import datetime
+import traceback
 from queue import Empty
 from shared import QueueManager
+from shared.command_queue import ConsumerRecoveryRequired
 from shared.mplot_protocol import pack_mplot, encode_buffer
 from pathlib import Path
 from database import PixilMetricsDB
@@ -2413,8 +2416,14 @@ def reset_parse_value_stats():
 
 # Main Execution
 if __name__ == '__main__':
+    queue_instance = None
     queue_monitor = None
     queue_status_reporter = None
+    script_manager = None
+    current_script = None
+    restart_required = False
+    restart_reason = None
+    restart_script = None
     # Set up signal handler
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -2427,6 +2436,7 @@ if __name__ == '__main__':
             
         # Initialize script manager
         script_manager = ScriptManager(args.script_path)
+        skip_script_once = os.environ.pop("PIXIL_SKIP_SCRIPT_ONCE", None)
 
         # Initialize queue and start consumer
         queue_instance = QueueManager.get_instance()
@@ -2459,6 +2469,20 @@ if __name__ == '__main__':
                 break
 
             scripts = script_manager.get_script_queue()
+            if skip_script_once and len(scripts) > 1:
+                skipped_path = Path(skip_script_once).resolve()
+                remaining_scripts = [
+                    script for script in scripts
+                    if Path(script).resolve() != skipped_path
+                ]
+                if remaining_scripts:
+                    print(
+                        f"[RECOVERY] Skipping failed script once: "
+                        f"{Path(skip_script_once).name}",
+                        flush=True,
+                    )
+                    scripts = remaining_scripts
+                skip_script_once = None
             
             # Single script mode
             if script_manager.is_single_script():
@@ -2495,6 +2519,18 @@ if __name__ == '__main__':
                         process_script(current_script, execute_command)
                     except PixilShutdownRequested:
                         pass
+                    except ConsumerRecoveryRequired:
+                        # Queue IPC may be damaged; only a full process restart
+                        # can safely continue the wildcard show.
+                        raise
+                    except Exception as script_error:
+                        print(
+                            f"[SCRIPT] Error in {Path(current_script).name}: "
+                            f"{script_error}",
+                            flush=True,
+                        )
+                        traceback.print_exc()
+                        print("[SCRIPT] Continuing with the next script.", flush=True)
                     if shutdown_requested():
                         break
                     jump_target = consume_jump_target()
@@ -2516,6 +2552,24 @@ if __name__ == '__main__':
                 
     except PixilShutdownRequested:
         pass
+    except ConsumerRecoveryRequired as e:
+        auto_restart = os.environ.get("PIXIL_AUTO_RESTART") == "1"
+        if (
+            auto_restart
+            and script_manager is not None
+            and script_manager.is_wildcard
+            and not shutdown_requested()
+        ):
+            restart_required = True
+            restart_reason = str(e)
+            restart_script = current_script
+            print(
+                f"[RECOVERY] Pixil process restart required: {restart_reason}",
+                flush=True,
+            )
+        else:
+            print(f"Error: {str(e)}", flush=True)
+            sys.exit(1)
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
@@ -2535,4 +2589,18 @@ if __name__ == '__main__':
                 queue_instance.shutdown_display(timeout=4.0)
             stop_terminal()
         except Exception:
-            sys.exit(1)
+            if not restart_required:
+                sys.exit(1)
+
+    if restart_required:
+        if restart_script:
+            os.environ["PIXIL_SKIP_SCRIPT_ONCE"] = str(restart_script)
+        print(
+            "[RECOVERY] Restarting Pixil and resuming the wildcard show...",
+            flush=True,
+        )
+        time.sleep(1.0)
+        os.execv(
+            sys.executable,
+            [sys.executable, "-u", str(Path(__file__).resolve()), *sys.argv[1:]],
+        )
