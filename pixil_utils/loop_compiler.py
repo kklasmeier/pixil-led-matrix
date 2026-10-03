@@ -68,9 +68,13 @@ _PARTICLE_COMMANDS = frozenset({
     "particle_collide_circles",
     "particle_collide_static_circles",
 })
+_AGENT_COMMANDS = frozenset({
+    "agent_chemotaxis",
+})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
 _FRAME_BUILTIN_NAMES = (
-    _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS | _PARTICLE_COMMANDS
+    _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS
+    | _PARTICLE_COMMANDS | _AGENT_COMMANDS
 )
 _SPRITE_COMMANDS = frozenset({"show_sprite", "move_sprite", "hide_sprite"})
 _BARE_CALL_RESERVED = frozenset(
@@ -1101,7 +1105,7 @@ def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
     if not match:
         return None
     cmd = match.group(1)
-    if cmd in _PARTICLE_COMMANDS:
+    if cmd in _PARTICLE_COMMANDS or cmd in _AGENT_COMMANDS:
         from .parameter_types import split_command_parameters
 
         inner = match.group(2)

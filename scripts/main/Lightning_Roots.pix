@@ -1,0 +1,499 @@
+# Lightning Roots
+# Mode sticks for 3 strikes, then randomly rolls a new variation + palette.
+
+throttle(0)
+fps(48)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 28
+v_step = 1.0
+v_sensor_dist = 3
+v_deposit = 0.62
+v_mix = 0.03
+v_evap = 0.935
+v_evap_base = 0.935
+v_deposit_base = 0.62
+v_smooth = 0.55
+
+# Life range for tip respawns
+v_life_lo = 10
+v_life_hi = 28
+v_jitter = 1.2
+v_wipe = 0.15
+v_dual = 0
+v_leader = 0
+v_fork = 0
+v_pulse = 0
+v_active_n = 28
+
+v_seed_x = 16
+v_seed_y = 16
+v_seed2_x = 20
+v_seed2_y = 12
+v_seed_phase = 0
+v_strike_timer = 90
+v_strike_age = 0
+v_strikes_left = 0
+v_strike_num = 0
+v_mode = 0
+v_mode_name = "Classic"
+v_frame = 0
+
+v_color_base = 55
+v_color_scale = 30
+v_c_hot = "white"
+v_c_mid = "cyan"
+v_c_cool = "sky_blue"
+
+create_array(v_charge, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_home, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program roots {
+    size v_size
+    cell v_cell
+    fields v_charge
+    steps 1
+    boundary clamp
+
+    step v_charge {
+        v_blur = at(v_charge) + lap(v_charge) * 0.25
+        v_charge_next = clamp((at(v_charge) * (1 - v_mix) + v_blur * v_mix) * v_evap, 0, 1.5)
+    }
+
+    draw {
+        palette_field v_charge
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 100
+    }
+}
+
+def pick_palette {
+    v_pal = int(random(0, 5, 0))
+    if v_pal == 0 then
+        v_color_base = 52
+        v_color_scale = 28
+        v_c_hot = "white"
+        v_c_mid = "cyan"
+        v_c_cool = "sky_blue"
+    elseif v_pal == 1 then
+        v_color_base = 70
+        v_color_scale = 26
+        v_c_hot = "white"
+        v_c_mid = "magenta"
+        v_c_cool = "purple"
+    elseif v_pal == 2 then
+        v_color_base = 10
+        v_color_scale = 22
+        v_c_hot = "white"
+        v_c_mid = "yellow"
+        v_c_cool = "orange"
+    elseif v_pal == 3 then
+        v_color_base = 30
+        v_color_scale = 24
+        v_c_hot = "white"
+        v_c_mid = "lime"
+        v_c_cool = "green"
+    elseif v_pal == 4 then
+        v_color_base = 60
+        v_color_scale = 32
+        v_c_hot = "white"
+        v_c_mid = "violet"
+        v_c_cool = "blue"
+    else
+        v_color_base = 2
+        v_color_scale = 20
+        v_c_hot = "yellow"
+        v_c_mid = "orange"
+        v_c_cool = "red"
+    endif
+}
+
+def apply_style_pack {
+    # Sub-styles for mode 2: tendrils / fat / sheet
+    v_sub = int(random(0, 2, 0))
+    if v_sub == 0 then
+        # Long tendrils
+        v_mode_name = "Style: Long Tendrils"
+        v_deposit_base = 0.34
+        v_deposit = 0.34
+        v_sensor_dist = 5
+        v_step = 1.15
+        v_mix = 0.02
+        v_evap_base = 0.95
+        v_evap = 0.95
+        v_life_lo = 22
+        v_life_hi = 48
+        v_jitter = 0.8
+        v_active_n = 22
+    elseif v_sub == 1 then
+        # Fat bursts
+        v_mode_name = "Style: Fat Bursts"
+        v_deposit_base = 0.9
+        v_deposit = 0.9
+        v_sensor_dist = 2
+        v_step = 0.85
+        v_mix = 0.05
+        v_evap_base = 0.92
+        v_evap = 0.92
+        v_life_lo = 6
+        v_life_hi = 14
+        v_jitter = 1.6
+        v_active_n = 28
+    else
+        # Sheet flash
+        v_mode_name = "Style: Sheet Flash"
+        v_deposit_base = 0.55
+        v_deposit = 0.55
+        v_sensor_dist = 4
+        v_step = 1.2
+        v_mix = 0.04
+        v_evap_base = 0.9
+        v_evap = 0.9
+        v_life_lo = 4
+        v_life_hi = 11
+        v_jitter = 3.5
+        v_active_n = 28
+    endif
+}
+
+def pick_strike_mode {
+    # 0 classic  1 dual  2 style-pack  3 wander-leader
+    # 4 afterglow  5 pulse-breathe  6 fork-storm
+    v_mode = int(random(0, 6, 0))
+
+    v_dual = 0
+    v_leader = 0
+    v_fork = 0
+    v_pulse = 0
+    v_wipe = 0.15
+    v_active_n = 28
+    v_jitter = 1.2
+    v_life_lo = 10
+    v_life_hi = 28
+    v_deposit_base = 0.62
+    v_deposit = 0.62
+    v_sensor_dist = 3
+    v_step = 1.0
+    v_mix = 0.03
+    v_evap_base = 0.935
+    v_evap = 0.935
+
+    if v_mode == 0 then
+        v_mode_name = "Classic"
+        v_wipe = 0.12
+    elseif v_mode == 1 then
+        v_mode_name = "Dual Seeds"
+        v_dual = 1
+        v_wipe = 0.18
+        v_deposit_base = 0.58
+        v_deposit = 0.58
+    elseif v_mode == 2 then
+        call apply_style_pack
+        v_wipe = 0.14
+    elseif v_mode == 3 then
+        v_mode_name = "Wandering Leader"
+        v_leader = 1
+        v_life_lo = 12
+        v_life_hi = 30
+        v_wipe = 0.2
+    elseif v_mode == 4 then
+        v_mode_name = "Afterglow"
+        v_wipe = 0.55
+        v_evap_base = 0.96
+        v_evap = 0.96
+        v_deposit_base = 0.5
+        v_deposit = 0.5
+    elseif v_mode == 5 then
+        v_mode_name = "Pulse Breathe"
+        v_pulse = 1
+        v_wipe = 0.16
+    else
+        v_mode_name = "Fork Storm"
+        v_fork = 1
+        v_wipe = 0.14
+        v_deposit_base = 0.7
+        v_deposit = 0.7
+        v_life_lo = 8
+        v_life_hi = 22
+    endif
+}
+
+def spawn_at_seed {
+    if v_dual == 1 and v_home[v_i] == 1 then
+        v_sx = v_seed2_x
+        v_sy = v_seed2_y
+    else
+        v_sx = v_seed_x
+        v_sy = v_seed_y
+    endif
+
+    v_x[v_i] = v_sx + random(0 - v_jitter, v_jitter, 1)
+    v_y[v_i] = v_sy + random(0 - v_jitter, v_jitter, 1)
+    if v_x[v_i] < 1 then
+        v_x[v_i] = 1
+    elseif v_x[v_i] > 30 then
+        v_x[v_i] = 30
+    endif
+    if v_y[v_i] < 1 then
+        v_y[v_i] = 1
+    elseif v_y[v_i] > 30 then
+        v_y[v_i] = 30
+    endif
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(v_life_lo, v_life_hi, 0))
+    if v_leader == 1 and v_i == 0 then
+        v_life[v_i] = 200
+    endif
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def place_seeds {
+    v_seed_x = random(8, 23, 1)
+    v_seed_y = random(8, 23, 1)
+    if v_dual == 1 then
+        v_seed2_x = random(8, 23, 1)
+        v_seed2_y = random(8, 23, 1)
+        # Keep seeds apart
+        if abs(v_seed2_x - v_seed_x) + abs(v_seed2_y - v_seed_y) < 8 then
+            v_seed2_x = 31 - v_seed_x
+            v_seed2_y = 31 - v_seed_y
+        endif
+    endif
+}
+
+def pulse_at {
+    v_fx = int(v_sx)
+    v_fy = int(v_sy)
+    if v_fx < 0 then
+        v_fx = 0
+    elseif v_fx > v_max then
+        v_fx = v_max
+    endif
+    if v_fy < 0 then
+        v_fy = 0
+    elseif v_fy > v_max then
+        v_fy = v_max
+    endif
+    v_idx = v_fy * v_size + v_fx
+    v_charge[v_idx] = min(1.5, v_charge[v_idx] + v_amount)
+    if v_fx > 0 then
+        v_charge[v_idx - 1] = min(1.5, v_charge[v_idx - 1] + v_amount * 0.4)
+    endif
+    if v_fx < v_max then
+        v_charge[v_idx + 1] = min(1.5, v_charge[v_idx + 1] + v_amount * 0.4)
+    endif
+    if v_fy > 0 then
+        v_charge[v_idx - v_size] = min(1.5, v_charge[v_idx - v_size] + v_amount * 0.4)
+    endif
+    if v_fy < v_max then
+        v_charge[v_idx + v_size] = min(1.5, v_charge[v_idx + v_size] + v_amount * 0.4)
+    endif
+}
+
+def seed_pulse {
+    v_sx = v_seed_x
+    v_sy = v_seed_y
+    v_amount = 0.85
+    call pulse_at
+    if v_dual == 1 then
+        v_sx = v_seed2_x
+        v_sy = v_seed2_y
+        v_amount = 0.85
+        call pulse_at
+    endif
+}
+
+def assign_homes {
+    for v_i in (0, v_n - 1, 1)
+        if v_dual == 1 then
+            if v_i < v_n / 2 then
+                v_home[v_i] = 0
+            else
+                v_home[v_i] = 1
+            endif
+        else
+            v_home[v_i] = 0
+        endif
+    endfor v_i
+}
+
+def begin_strike {
+    if v_strikes_left <= 0 then
+        call pick_palette
+        call pick_strike_mode
+        v_strikes_left = 3
+        print(f"Lightning Roots: new mode → {v_mode_name}")
+    endif
+
+    v_strikes_left = v_strikes_left - 1
+    v_strike_num = int(3 - v_strikes_left)
+    print(f"Lightning Roots: {v_mode_name} — strike {v_strike_num}/3")
+
+    call place_seeds
+    call assign_homes
+    for v_i in (0, v_cells - 1, 1)
+        v_charge[v_i] = v_charge[v_i] * v_wipe
+    endfor v_i
+    for v_i in (0, v_n - 1, 1)
+        call spawn_at_seed
+    endfor v_i
+    call seed_pulse
+    v_strike_age = 0
+    if v_mode == 4 then
+        v_strike_timer = int(random(100, 160, 0))
+    elseif v_mode == 2 and v_life_hi < 15 then
+        v_strike_timer = int(random(45, 75, 0))
+    else
+        v_strike_timer = int(random(75, 130, 0))
+    endif
+    grid_reset(roots)
+}
+
+def init_world {
+    grid_fill(v_charge, 0)
+    call begin_strike
+}
+
+def update_seed {
+    v_strike_age = v_strike_age + 1
+
+    if v_leader == 1 then
+        # Seed follows the long-lived tip
+        v_seed_x = v_seed_x + (v_x[0] - v_seed_x) * 0.08
+        v_seed_y = v_seed_y + (v_y[0] - v_seed_y) * 0.08
+        v_life[0] = 200
+    else
+        v_seed_phase = v_seed_phase + 0.04
+        v_seed_x = v_seed_x + cos(v_seed_phase) * 0.04
+        v_seed_y = v_seed_y + sin(v_seed_phase * 1.3) * 0.04
+        if v_dual == 1 then
+            v_seed2_x = v_seed2_x + cos(v_seed_phase + 2) * 0.05
+            v_seed2_y = v_seed2_y + sin(v_seed_phase * 1.1) * 0.05
+        endif
+    endif
+
+    if v_seed_x < 6 then
+        v_seed_x = 6
+    elseif v_seed_x > 25 then
+        v_seed_x = 25
+    endif
+    if v_seed_y < 6 then
+        v_seed_y = 6
+    elseif v_seed_y > 25 then
+        v_seed_y = 25
+    endif
+    if v_dual == 1 then
+        if v_seed2_x < 6 then
+            v_seed2_x = 6
+        elseif v_seed2_x > 25 then
+            v_seed2_x = 25
+        endif
+        if v_seed2_y < 6 then
+            v_seed2_y = 6
+        elseif v_seed2_y > 25 then
+            v_seed2_y = 25
+        endif
+    endif
+
+    if v_pulse == 1 then
+        # Breathe: deposit/evap swell then ease
+        v_breath = 0.5 + 0.5 * sin(v_strike_age * 0.14)
+        v_deposit = v_deposit_base * (0.7 + 0.7 * v_breath)
+        v_evap = v_evap_base - 0.025 * v_breath
+    endif
+
+    v_strike_timer = v_strike_timer - 1
+    if v_strike_timer <= 0 then
+        call begin_strike
+    endif
+}
+
+def refresh_tips {
+    for v_i in (0, v_active_n - 1, 1)
+        if v_leader == 1 and v_i == 0 then
+            # Leader never expires from life; rim bounce back via respawn offset
+            if v_x[v_i] <= 0.5 or v_x[v_i] >= 30.5 or v_y[v_i] <= 0.5 or v_y[v_i] >= 30.5 then
+                v_x[v_i] = v_seed_x
+                v_y[v_i] = v_seed_y
+                v_dir[v_i] = int(random(0, 7, 0))
+            endif
+        else
+            v_life[v_i] = v_life[v_i] - 1
+            if v_life[v_i] <= 0 or v_x[v_i] <= 0.5 or v_x[v_i] >= 30.5 or v_y[v_i] <= 0.5 or v_y[v_i] >= 30.5 then
+                call spawn_at_seed
+            endif
+        endif
+    endfor v_i
+}
+
+def fork_tips {
+    if v_fork == 1 and v_frame % 7 == 0 then
+        # Mirror a few tip headings for sudden Y-splits
+        for v_k in (0, 3, 1)
+            v_i = int(random(1, v_active_n - 1, 0))
+            v_j = int(random(1, v_active_n - 1, 0))
+            v_dir[v_j] = (v_dir[v_i] + 2) % 8
+            v_x[v_j] = v_x[v_i]
+            v_y[v_j] = v_y[v_i]
+            v_life[v_j] = int(random(v_life_lo, v_life_hi, 0))
+        endfor v_k
+    endif
+}
+
+def smooth_tips {
+    for v_i in (0, v_active_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call update_seed
+    if v_frame % 2 == 0 then
+        call seed_pulse
+    endif
+    call refresh_tips
+    call fork_tips
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_charge, v_size, v_sensor_dist, v_step, v_deposit, v_active_n, 0)
+    call smooth_tips
+
+    begin_frame
+        grid_step(roots)
+
+        mplot(v_seed_x * v_cell, v_seed_y * v_cell, v_c_hot, 100)
+        mplot(v_seed_x * v_cell + 1, v_seed_y * v_cell, v_c_mid, 80)
+        if v_dual == 1 then
+            mplot(v_seed2_x * v_cell, v_seed2_y * v_cell, v_c_hot, 100)
+            mplot(v_seed2_x * v_cell + 1, v_seed2_y * v_cell, v_c_cool, 75)
+        endif
+
+        for v_i in (0, v_active_n - 1, 1)
+            if v_life[v_i] > v_life_hi * 0.65 then
+                mplot(v_px[v_i], v_py[v_i], v_c_hot, 90)
+            elseif v_life[v_i] > v_life_hi * 0.3 then
+                mplot(v_px[v_i], v_py[v_i], v_c_mid, 75)
+            else
+                mplot(v_px[v_i], v_py[v_i], v_c_cool, 55)
+            endif
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

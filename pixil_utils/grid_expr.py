@@ -384,6 +384,9 @@ def eval_expr(node: ExprNode, ctx: Union[GridEvalContext, FieldEvalContext]) -> 
         if name == "cos" and len(args) == 1:
             val = _to_array(args[0])
             return np.cos(val)
+        if name == "atan2" and len(args) == 2:
+            y, x = _broadcast(args[0], args[1])
+            return np.arctan2(y, x)
         if name == "sqrt" and len(args) == 1:
             val = _to_array(args[0])
             return np.sqrt(np.maximum(val, 0.0))

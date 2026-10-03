@@ -35,7 +35,8 @@ TABLE OF CONTENTS
 18. Performance Tips
 19. Native Grid and Field Programs
 20. Particle Primitives
-21. Script Examples
+21. Agent Primitives
+22. Script Examples
 
 To run a script:
 1. ssh pi@192.168.1.58
@@ -90,6 +91,13 @@ particle_integrate(v_x, v_y, v_vx, v_vy, v_active, 0, 0.15)
 particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 2, 61, 2, 61, 0.96, 1.5)
 ```
 These mutate arrays in place and do not draw. See section 20.
+
+Agent chemotaxis (grid-following trail makers — slime mold, ant highways):
+```
+agent_chemotaxis(v_x, v_y, v_dir, v_phero, v_size, 5, 1, 0.55, v_n, 1)
+grid_step(slime)    # diffuse / evaporate / draw the field
+```
+See section 21.
 
 ================================================================================
 2. DRAWING COMMANDS
@@ -1565,6 +1573,12 @@ For many moving circles, use particle_integrate and the particle_collide_*
 commands instead of a per-particle physics loop. They mutate numeric arrays
 in the producer and do not draw. See section 20.
 
+AGENT CHEMOTAXIS
+----------------
+For many grid-following trail agents (slime / ants), use agent_chemotaxis
+instead of a Pixil sense/turn loop, then grid_step for diffuse/draw. See
+section 21.
+
 ================================================================================
 19. NATIVE GRID AND FIELD PROGRAMS
 ================================================================================
@@ -1597,6 +1611,9 @@ language, or when only a handful of objects are updated per frame.
 For many independent circles (balls, rocks, marbles), use the particle
 primitives in section 20 instead of per-body Pixil physics. Those commands
 update arrays; they do not render pixels (unlike grid_step / chladni_step).
+
+For grid-following trail agents (slime mold, ant highways), use
+agent_chemotaxis in section 21 plus grid_step for diffuse/draw.
 
 OVERVIEW
 --------
@@ -1655,7 +1672,7 @@ Inside step expressions you can use:
 - clamp(val, lo, hi)    Clip values
 - where(cond, a, b)     Per-cell conditional (like np.where)
 - min, max, abs, floor  Element-wise math
-- sin, cos, sqrt, pow   Element-wise math
+- sin, cos, sqrt, pow, atan2(y, x)   Element-wise math
 - v_* scalars           Any Pixil numeric variable (v_dt, v_f, etc.)
 - and, or, not, ==, !=, <, >, <=, >=
 
@@ -1943,6 +1960,7 @@ REFERENCE SCRIPTS
   Mandelbrot_Zoom.pix        field_program (escape_zoom fractal tour)
   Chladni_Patterns.pix       chladni_step
   Ink_In_Water.pix           ink_step
+  Slime_Mold.pix             agent_chemotaxis + grid_program
 
 Test examples: scripts/testing/test_grid_program_*.pix,
 scripts/testing/test_field_program_metaballs.pix
@@ -2282,7 +2300,68 @@ Example shows:
   scripts/main/Hourglass_Marbles.pix
 
 ================================================================================
-21. SCRIPT EXAMPLES
+21. AGENT PRIMITIVES
+================================================================================
+
+Producer-side commands for agents that sense a flat grid field, steer, move,
+and optionally deposit into that field. They mutate arrays in place and do
+not draw. Pair with grid_program / grid_step for diffusion, evaporation, and
+rendering (see section 19).
+
+Use agent_chemotaxis when many bodies follow / reinforce a scent field
+(slime mold, ant trails, glow seekers). Keep Pixil for food placement, phase
+timing, palettes, and which field/arrays to use. Prefer particle_* (section 20)
+when motion is physics forces without a grid field.
+
+AGENT_CHEMOTAXIS
+----------------
+agent_chemotaxis(x, y, heading, field, size,
+                 [sensor_dist], [step], [deposit], [count], [wrap])
+
+Parameters:
+- x, y          Numeric position arrays (grid coordinates, not necessarily pixels)
+- heading       Numeric array of 8-way directions 0..7:
+                  0=E  1=SE  2=S  3=SW  4=W  5=NW  6=N  7=NE
+- field         Flat row-major numeric array, length size*size (pheromone / scent)
+- size          Grid dimension (e.g. 32 for a 32x32 field)
+- sensor_dist   How far ahead sensors look (default 5)
+- step          Move distance per call (default 1)
+- deposit       Amount added to field at the landing cell (default 0.55).
+                Use 0 for pure followers that never reinforce the trail.
+- count         Optional leading-slot limit (default: full array length)
+- wrap          Non-zero (default 1): toroidal edges. 0: clamp to the field.
+
+Each agent samples field ahead / left / right of its heading, turns toward the
+strongest sample, steps forward, and deposits. Caps deposited cells at 1.5 so
+hot spots stay bounded before grid_step evaporates them.
+
+Typical frame (slime-style):
+```
+# Pixil: inject food into v_phero, advance phases, etc.
+agent_chemotaxis(v_x, v_y, v_dir, v_phero, v_size, v_sensor_dist, v_step, v_deposit, v_n, 1)
+begin_frame
+    grid_step(diffuse)          # blur + evaporate + draw field
+    for v_i in (0, v_n - 1, 1)
+        plot(v_x[v_i] * v_cell, v_y[v_i] * v_cell, lime, 95)
+    endfor v_i
+end_frame
+```
+
+Notes:
+- Coordinates are in *field* space (0 .. size-1). Scale by cell size when plotting
+  on the 64x64 panel (e.g. plot(v_x[i] * 2, v_y[i] * 2, ...) for size 32 cell 2).
+- grid_step syncs Pixil field edits (deposits / food) into the engine each frame —
+  you do not need grid_reset after every deposit (still call grid_reset after a
+  full reseed / grid_fill if you rebuild the world).
+- slime_step() remains as a legacy wrapper that calls agent_chemotaxis with the
+  fixed names v_x, v_y, v_dir, v_phero, v_size, v_sensor_dist, v_step, v_deposit, v_n.
+  New scripts should call agent_chemotaxis explicitly.
+
+Example show:
+  scripts/main/Slime_Mold.pix
+
+================================================================================
+22. SCRIPT EXAMPLES
 ================================================================================
 
 SIMPLE BOUNCING BALL

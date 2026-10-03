@@ -1,0 +1,337 @@
+# Ink Storm
+# One (or two) wandering pens dump scent. Agents deposit 0 and chase —
+# comet + school, not slime highways or lightning trees.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 24
+v_step = 0.85
+v_sensor_dist = 5
+v_deposit = 0
+v_mix = 0.12
+v_evap = 0.88
+v_smooth = 0.3
+
+v_pens = 1
+v_pen_x = 16
+v_pen_y = 16
+v_pen_vx = 0.35
+v_pen_vy = 0.22
+v_pen2_x = 20
+v_pen2_y = 12
+v_pen2_vx = -0.28
+v_pen2_vy = 0.3
+v_ink = 0.95
+v_frame = 0
+v_hold = 0
+v_mode_name = "Single Nib"
+
+v_color_base = 70
+v_color_scale = 22
+v_c_hot = "white"
+v_c_mid = "magenta"
+v_c_cool = "purple"
+
+create_array(v_inkf, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program blot {
+    size v_size
+    cell v_cell
+    fields v_inkf
+    steps 1
+    boundary clamp
+
+    step v_inkf {
+        v_blur = at(v_inkf) + lap(v_inkf) * 0.25
+        v_inkf_next = clamp((at(v_inkf) * (1 - v_mix) + v_blur * v_mix) * v_evap, 0, 1.4)
+    }
+
+    draw {
+        palette_field v_inkf
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 95
+    }
+}
+
+def pick_palette {
+    v_pal = int(random(0, 4, 0))
+    if v_pal == 0 then
+        v_color_base = 70
+        v_color_scale = 22
+        v_c_hot = "white"
+        v_c_mid = "magenta"
+        v_c_cool = "purple"
+    elseif v_pal == 1 then
+        v_color_base = 8
+        v_color_scale = 18
+        v_c_hot = "white"
+        v_c_mid = "gold"
+        v_c_cool = "orange"
+    elseif v_pal == 2 then
+        v_color_base = 52
+        v_color_scale = 24
+        v_c_hot = "white"
+        v_c_mid = "cyan"
+        v_c_cool = "blue"
+    elseif v_pal == 3 then
+        v_color_base = 2
+        v_color_scale = 16
+        v_c_hot = "yellow"
+        v_c_mid = "orange"
+        v_c_cool = "red"
+    else
+        v_color_base = 30
+        v_color_scale = 20
+        v_c_hot = "white"
+        v_c_mid = "lime"
+        v_c_cool = "green"
+    endif
+}
+
+def pick_mode {
+    v_pick = int(random(0, 2, 0))
+    if v_pick == 0 then
+        v_mode_name = "Single Nib"
+        v_pens = 1
+        v_ink = 1.05
+        v_evap = 0.87
+        v_mix = 0.12
+        v_pen_vx = random(0.28, 0.48, 2)
+        v_pen_vy = random(0.18, 0.4, 2)
+        if random(0, 1, 2) < 0.5 then
+            v_pen_vx = 0 - v_pen_vx
+        endif
+        if random(0, 1, 2) < 0.5 then
+            v_pen_vy = 0 - v_pen_vy
+        endif
+    elseif v_pick == 1 then
+        v_mode_name = "Scribble"
+        v_pens = 1
+        v_ink = 0.9
+        v_evap = 0.9
+        v_mix = 0.14
+        v_pen_vx = random(0.45, 0.7, 2)
+        v_pen_vy = random(0.4, 0.65, 2)
+        if random(0, 1, 2) < 0.5 then
+            v_pen_vx = 0 - v_pen_vx
+        endif
+    else
+        v_mode_name = "Two Nibs"
+        v_pens = 2
+        v_ink = 0.72
+        v_evap = 0.86
+        v_mix = 0.11
+        v_pen_vx = random(0.25, 0.42, 2)
+        v_pen_vy = random(0.2, 0.38, 2)
+        v_pen2_vx = 0 - v_pen_vy
+        v_pen2_vy = v_pen_vx
+    endif
+    call pick_palette
+    v_hold = int(random(300, 440, 0))
+    print(f"Ink Storm: {v_mode_name}")
+}
+
+def spawn_away {
+    # Far from the lead pen so they stream in as a school
+    v_x[v_i] = 31 - v_pen_x + random(-4, 4, 1)
+    v_y[v_i] = 31 - v_pen_y + random(-4, 4, 1)
+    if v_x[v_i] < 2 then
+        v_x[v_i] = 2
+    elseif v_x[v_i] > 29 then
+        v_x[v_i] = 29
+    endif
+    if v_y[v_i] < 2 then
+        v_y[v_i] = 2
+    elseif v_y[v_i] > 29 then
+        v_y[v_i] = 29
+    endif
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(40, 90, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def bounce_pen {
+    if v_pxp < 3 then
+        v_pxp = 3
+        v_pvx = abs(v_pvx)
+    elseif v_pxp > 28 then
+        v_pxp = 28
+        v_pvx = 0 - abs(v_pvx)
+    endif
+    if v_pyp < 3 then
+        v_pyp = 3
+        v_pvy = abs(v_pvy)
+    elseif v_pyp > 28 then
+        v_pyp = 28
+        v_pvy = 0 - abs(v_pvy)
+    endif
+}
+
+def move_pens {
+    v_pen_x = v_pen_x + v_pen_vx
+    v_pen_y = v_pen_y + v_pen_vy
+    if v_mode_name == "Scribble" then
+        v_pen_vx = v_pen_vx + random(-0.08, 0.08, 2)
+        v_pen_vy = v_pen_vy + random(-0.08, 0.08, 2)
+        if v_pen_vx > 0.75 then
+            v_pen_vx = 0.75
+        elseif v_pen_vx < -0.75 then
+            v_pen_vx = -0.75
+        endif
+        if v_pen_vy > 0.75 then
+            v_pen_vy = 0.75
+        elseif v_pen_vy < -0.75 then
+            v_pen_vy = -0.75
+        endif
+    endif
+    v_pxp = v_pen_x
+    v_pyp = v_pen_y
+    v_pvx = v_pen_vx
+    v_pvy = v_pen_vy
+    call bounce_pen
+    v_pen_x = v_pxp
+    v_pen_y = v_pyp
+    v_pen_vx = v_pvx
+    v_pen_vy = v_pvy
+
+    if v_pens == 2 then
+        v_pen2_x = v_pen2_x + v_pen2_vx
+        v_pen2_y = v_pen2_y + v_pen2_vy
+        v_pxp = v_pen2_x
+        v_pyp = v_pen2_y
+        v_pvx = v_pen2_vx
+        v_pvy = v_pen2_vy
+        call bounce_pen
+        v_pen2_x = v_pxp
+        v_pen2_y = v_pyp
+        v_pen2_vx = v_pvx
+        v_pen2_vy = v_pvy
+    endif
+}
+
+def scent_at {
+    if v_fx >= 0 and v_fx <= v_max and v_fy >= 0 and v_fy <= v_max then
+        v_idx = v_fy * v_size + v_fx
+        v_inkf[v_idx] = min(1.4, v_inkf[v_idx] + v_amount)
+        if v_fx > 0 then
+            v_inkf[v_idx - 1] = min(1.4, v_inkf[v_idx - 1] + v_amount * 0.45)
+        endif
+        if v_fx < v_max then
+            v_inkf[v_idx + 1] = min(1.4, v_inkf[v_idx + 1] + v_amount * 0.45)
+        endif
+        if v_fy > 0 then
+            v_inkf[v_idx - v_size] = min(1.4, v_inkf[v_idx - v_size] + v_amount * 0.45)
+        endif
+        if v_fy < v_max then
+            v_inkf[v_idx + v_size] = min(1.4, v_inkf[v_idx + v_size] + v_amount * 0.45)
+        endif
+    endif
+}
+
+def dump_ink {
+    v_fx = int(v_pen_x)
+    v_fy = int(v_pen_y)
+    v_amount = v_ink
+    call scent_at
+    v_fx = int(v_pen_x - v_pen_vx)
+    v_fy = int(v_pen_y - v_pen_vy)
+    v_amount = v_ink * 0.55
+    call scent_at
+    if v_pens == 2 then
+        v_fx = int(v_pen2_x)
+        v_fy = int(v_pen2_y)
+        v_amount = v_ink
+        call scent_at
+    endif
+}
+
+def init_world {
+    grid_fill(v_inkf, 0)
+    v_pen_x = random(8, 23, 1)
+    v_pen_y = random(8, 23, 1)
+    v_pen2_x = random(8, 23, 1)
+    v_pen2_y = random(8, 23, 1)
+    call pick_mode
+    for v_i in (0, v_n - 1, 1)
+        call spawn_away
+    endfor v_i
+    grid_reset(blot)
+}
+
+def refresh_school {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        v_dx = v_x[v_i] - v_pen_x
+        v_dy = v_y[v_i] - v_pen_y
+        v_hit = 0
+        if v_dx * v_dx + v_dy * v_dy < 5 then
+            v_hit = 1
+        endif
+        if v_pens == 2 then
+            v_dx = v_x[v_i] - v_pen2_x
+            v_dy = v_y[v_i] - v_pen2_y
+            if v_dx * v_dx + v_dy * v_dy < 5 then
+                v_hit = 1
+            endif
+        endif
+        if v_hit == 1 or v_life[v_i] <= 0 or v_x[v_i] <= 0.8 or v_x[v_i] >= 30.2 or v_y[v_i] <= 0.8 or v_y[v_i] >= 30.2 then
+            call spawn_away
+        endif
+    endfor v_i
+}
+
+def smooth_school {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    v_hold = v_hold - 1
+    if v_hold <= 0 then
+        call pick_mode
+    endif
+
+    call move_pens
+    call dump_ink
+    call refresh_school
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_inkf, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call smooth_school
+
+    begin_frame
+        grid_step(blot)
+
+        mplot(v_pen_x * v_cell, v_pen_y * v_cell, v_c_hot, 100)
+        mplot(v_pen_x * v_cell + 1, v_pen_y * v_cell, v_c_mid, 80)
+        if v_pens == 2 then
+            mplot(v_pen2_x * v_cell, v_pen2_y * v_cell, v_c_hot, 100)
+            mplot(v_pen2_x * v_cell + 1, v_pen2_y * v_cell, v_c_cool, 75)
+        endif
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], v_c_mid, 75)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

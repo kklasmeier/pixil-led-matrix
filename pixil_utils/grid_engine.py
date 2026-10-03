@@ -55,9 +55,8 @@ def _array_to_numpy(arr: PixilArray) -> np.ndarray:
 
 
 def _write_back(arr: PixilArray, data: np.ndarray) -> None:
-    flat = np.asarray(data, dtype=np.float64).ravel()
-    for i, val in enumerate(flat):
-        arr.data[i] = float(val)
+    # Replace the backing list in one shot — much faster than per-index sets.
+    arr.data = np.asarray(data, dtype=np.float64).ravel().tolist()
 
 
 def grid_fill(variables: Any, array_name: str, value: float) -> None:
@@ -260,10 +259,12 @@ def _render_grid(
         int_grid = _reshape(intensities, size)
         for y in range(size):
             for x in range(size):
+                intensity = int(int_grid[y, x])
+                if intensity < 1:
+                    continue
                 px = x * cell
                 py = y * cell
                 color = int(color_grid[y, x])
-                intensity = int(int_grid[y, x])
                 if cell == 1:
                     append_draw("mplot", [px, py, color, intensity])
                 else:
@@ -292,8 +293,6 @@ def _render_grid(
                         "draw_rectangle",
                         [px, py, cell, cell, color, intensity, True],
                     )
-        return
-
         return
 
     if draw.mode == "fire":
@@ -395,6 +394,18 @@ def run_grid_step(
     append_draw: Callable[[str, List[Any]], None],
 ) -> None:
     rt = _ensure_runtime(program, variables)
+    # Pull any Pixil-side deposits/edits into the active buffers. Scripts like
+    # Fractal_Fire / Slime_Mold write the field arrays between frames; without
+    # this sync they would need a full grid_reset (buffer rebuild) every step.
+    for fname in program.fields:
+        src = _array_to_numpy(_get_array(variables, fname))
+        if src.size != rt.size * rt.size:
+            raise ValueError(
+                f"Field {fname} size {src.size} != {rt.size * rt.size}"
+            )
+        active = rt.buffers[fname][rt.active_idx[fname]]
+        np.copyto(active, src)
+
     step_count = max(1, resolve_size(program.steps, variables))
     for _ in range(step_count):
         for block in program.step_blocks:

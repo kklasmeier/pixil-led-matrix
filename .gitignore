@@ -29,6 +29,7 @@ nohup.out
 
 # Database files
 database/data/pixil_metrics.db
+database/data/runtime_status.json
 
 # Local deploy script (machine-specific)
 deploy.ps1

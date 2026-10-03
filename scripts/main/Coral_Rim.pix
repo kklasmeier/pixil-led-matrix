@@ -1,0 +1,291 @@
+# Coral Rim
+# Tips spawn on the edge, deposit as they grow inward toward a heart,
+# then die and respawn on the rim — frost filling a window, not lightning out.
+
+throttle(0)
+fps(48)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 24
+v_step = 0.7
+v_sensor_dist = 4
+v_deposit = 0.42
+v_mix = 0.07
+v_evap = 0.955
+v_smooth = 0.32
+
+v_heart_x = 16
+v_heart_y = 16
+v_heart2_x = 16
+v_heart2_y = 16
+v_twin = 0
+v_heart_phase = 0
+v_frame = 0
+v_hold = 0
+v_mode_name = "Center Heart"
+
+v_color_base = 28
+v_color_scale = 24
+v_c_hot = "white"
+v_c_mid = "mint"
+v_c_cool = "teal"
+
+create_array(v_reef, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program coral {
+    size v_size
+    cell v_cell
+    fields v_reef
+    steps 1
+    boundary clamp
+
+    step v_reef {
+        v_blur = at(v_reef) + lap(v_reef) * 0.25
+        v_reef_next = clamp((at(v_reef) * (1 - v_mix) + v_blur * v_mix) * v_evap, 0, 1.35)
+    }
+
+    draw {
+        palette_field v_reef
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 92
+    }
+}
+
+def pick_palette {
+    v_pal = int(random(0, 4, 0))
+    if v_pal == 0 then
+        v_color_base = 28
+        v_color_scale = 22
+        v_c_hot = "white"
+        v_c_mid = "mint"
+        v_c_cool = "teal"
+    elseif v_pal == 1 then
+        v_color_base = 52
+        v_color_scale = 24
+        v_c_hot = "white"
+        v_c_mid = "cyan"
+        v_c_cool = "sky_blue"
+    elseif v_pal == 2 then
+        v_color_base = 72
+        v_color_scale = 20
+        v_c_hot = "white"
+        v_c_mid = "pink"
+        v_c_cool = "magenta"
+    elseif v_pal == 3 then
+        v_color_base = 8
+        v_color_scale = 18
+        v_c_hot = "white"
+        v_c_mid = "peach"
+        v_c_cool = "coral"
+    else
+        v_color_base = 40
+        v_color_scale = 22
+        v_c_hot = "yellow"
+        v_c_mid = "lime"
+        v_c_cool = "green"
+    endif
+}
+
+def pick_mode {
+    v_pick = int(random(0, 2, 0))
+    v_twin = 0
+    if v_pick == 0 then
+        v_mode_name = "Center Heart"
+        v_heart_x = 16
+        v_heart_y = 16
+        v_deposit = 0.42
+        v_mix = 0.07
+        v_evap = 0.955
+    elseif v_pick == 1 then
+        v_mode_name = "Offset Heart"
+        v_heart_x = random(10, 21, 1)
+        v_heart_y = random(10, 21, 1)
+        v_deposit = 0.4
+        v_mix = 0.065
+        v_evap = 0.96
+    else
+        v_mode_name = "Twin Hearts"
+        v_twin = 1
+        v_heart_x = 11
+        v_heart_y = 14
+        v_heart2_x = 21
+        v_heart2_y = 18
+        v_deposit = 0.38
+        v_mix = 0.08
+        v_evap = 0.95
+    endif
+    call pick_palette
+    for v_i in (0, v_cells - 1, 1)
+        v_reef[v_i] = v_reef[v_i] * 0.35
+    endfor v_i
+    v_hold = int(random(320, 460, 0))
+    grid_reset(coral)
+    print(f"Coral Rim: {v_mode_name}")
+}
+
+def spawn_on_rim {
+    v_side = int(random(0, 3, 0))
+    if v_side == 0 then
+        v_x[v_i] = 2.5
+        v_y[v_i] = random(2, 29, 1)
+        v_dir[v_i] = 0
+    elseif v_side == 1 then
+        v_x[v_i] = 28.5
+        v_y[v_i] = random(2, 29, 1)
+        v_dir[v_i] = 4
+    elseif v_side == 2 then
+        v_x[v_i] = random(2, 29, 1)
+        v_y[v_i] = 2.5
+        v_dir[v_i] = 2
+    else
+        v_x[v_i] = random(2, 29, 1)
+        v_y[v_i] = 28.5
+        v_dir[v_i] = 6
+    endif
+    v_life[v_i] = int(random(22, 48, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def scent_at {
+    if v_fx >= 0 and v_fx <= v_max and v_fy >= 0 and v_fy <= v_max then
+        v_idx = v_fy * v_size + v_fx
+        v_reef[v_idx] = min(1.3, v_reef[v_idx] + v_amount)
+        if v_fx > 0 then
+            v_reef[v_idx - 1] = min(1.3, v_reef[v_idx - 1] + v_amount * 0.4)
+        endif
+        if v_fx < v_max then
+            v_reef[v_idx + 1] = min(1.3, v_reef[v_idx + 1] + v_amount * 0.4)
+        endif
+        if v_fy > 0 then
+            v_reef[v_idx - v_size] = min(1.3, v_reef[v_idx - v_size] + v_amount * 0.4)
+        endif
+        if v_fy < v_max then
+            v_reef[v_idx + v_size] = min(1.3, v_reef[v_idx + v_size] + v_amount * 0.4)
+        endif
+    endif
+}
+
+def pulse_heart {
+    v_fx = int(v_heart_x)
+    v_fy = int(v_heart_y)
+    v_amount = 0.7
+    call scent_at
+    if v_twin == 1 then
+        v_fx = int(v_heart2_x)
+        v_fy = int(v_heart2_y)
+        v_amount = 0.7
+        call scent_at
+    endif
+}
+
+def init_world {
+    grid_fill(v_reef, 0)
+    call pick_mode
+    for v_i in (0, v_n - 1, 1)
+        call spawn_on_rim
+    endfor v_i
+    call pulse_heart
+}
+
+def update_heart {
+    v_heart_phase = v_heart_phase + 0.03
+    if v_twin == 0 then
+        v_heart_x = v_heart_x + cos(v_heart_phase) * 0.03
+        v_heart_y = v_heart_y + sin(v_heart_phase * 1.2) * 0.03
+        if v_heart_x < 10 then
+            v_heart_x = 10
+        elseif v_heart_x > 21 then
+            v_heart_x = 21
+        endif
+        if v_heart_y < 10 then
+            v_heart_y = 10
+        elseif v_heart_y > 21 then
+            v_heart_y = 21
+        endif
+    endif
+
+    v_hold = v_hold - 1
+    if v_hold <= 0 then
+        call pick_mode
+        for v_i in (0, v_n - 1, 1)
+            call spawn_on_rim
+        endfor v_i
+    endif
+}
+
+def refresh_tips {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        v_dx = v_x[v_i] - v_heart_x
+        v_dy = v_y[v_i] - v_heart_y
+        v_near = 0
+        if v_dx * v_dx + v_dy * v_dy < 6 then
+            v_near = 1
+        endif
+        if v_twin == 1 then
+            v_dx = v_x[v_i] - v_heart2_x
+            v_dy = v_y[v_i] - v_heart2_y
+            if v_dx * v_dx + v_dy * v_dy < 6 then
+                v_near = 1
+            endif
+        endif
+        if v_near == 1 or v_life[v_i] <= 0 then
+            call spawn_on_rim
+        endif
+    endfor v_i
+}
+
+def smooth_tips {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call update_heart
+    if v_frame % 2 == 0 then
+        call pulse_heart
+    endif
+    call refresh_tips
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_reef, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call smooth_tips
+
+    begin_frame
+        grid_step(coral)
+
+        mplot(v_heart_x * v_cell, v_heart_y * v_cell, v_c_hot, 95)
+        if v_twin == 1 then
+            mplot(v_heart2_x * v_cell, v_heart2_y * v_cell, v_c_hot, 95)
+        endif
+
+        for v_i in (0, v_n - 1, 1)
+            if v_life[v_i] > 30 then
+                mplot(v_px[v_i], v_py[v_i], v_c_hot, 80)
+            elseif v_life[v_i] > 14 then
+                mplot(v_px[v_i], v_py[v_i], v_c_mid, 70)
+            else
+                mplot(v_px[v_i], v_py[v_i], v_c_cool, 55)
+            endif
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

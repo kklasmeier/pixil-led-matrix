@@ -1,0 +1,294 @@
+# Ember Moths
+# Hot embers write heat; moths chase only (deposit 0).
+# Lean: 32x32 field, sparse draw, fewer moths, lerped dots.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 16
+v_step = 0.9
+v_sensor_dist = 5
+v_deposit = 0
+v_mix = 0.14
+v_evap = 0.82
+v_smooth = 0.5
+
+v_ember_count = 2
+v_frame = 0
+v_pulse = 0
+
+create_array(v_heat, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_edge, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+create_array(v_ex, v_ember_count, numeric)
+create_array(v_ey, v_ember_count, numeric)
+create_array(v_epx, v_ember_count, numeric)
+create_array(v_epy, v_ember_count, numeric)
+create_array(v_ephase, v_ember_count, numeric)
+create_array(v_espeed, v_ember_count, numeric)
+create_array(v_eradius, v_ember_count, numeric)
+
+grid_program embers {
+    size v_size
+    cell v_cell
+    fields v_heat
+    steps 1
+    boundary clamp
+
+    step v_heat {
+        v_blur = at(v_heat) + lap(v_heat) * 0.25
+        v_heat_next = clamp((at(v_heat) * (1 - v_mix) + v_blur * v_mix) * v_evap, 0, 1.4)
+    }
+
+    draw {
+        palette_field v_heat
+        color_base 8
+        color_scale 18
+        # No floor — skip cold cells (full-grid paint was the FPS killer)
+        intensity_base 0
+        intensity_scale 100
+    }
+}
+
+def scent_at {
+    if v_fx >= 0 and v_fx <= v_max and v_fy >= 0 and v_fy <= v_max then
+        v_idx = v_fy * v_size + v_fx
+        v_heat[v_idx] = min(1.4, v_heat[v_idx] + v_amount)
+        if v_fx > 0 then
+            v_heat[v_idx - 1] = min(1.4, v_heat[v_idx - 1] + v_amount * 0.4)
+        endif
+        if v_fx < v_max then
+            v_heat[v_idx + 1] = min(1.4, v_heat[v_idx + 1] + v_amount * 0.4)
+        endif
+        if v_fy > 0 then
+            v_heat[v_idx - v_size] = min(1.4, v_heat[v_idx - v_size] + v_amount * 0.4)
+        endif
+        if v_fy < v_max then
+            v_heat[v_idx + v_size] = min(1.4, v_heat[v_idx + v_size] + v_amount * 0.4)
+        endif
+    endif
+}
+
+def heading_toward {
+    # Sets v_dir[v_i] from (v_x,v_y) toward (v_tx,v_ty) — 8-way
+    v_adx = v_tx - v_x[v_i]
+    v_ady = v_ty - v_y[v_i]
+    if abs(v_adx) < 0.2 and abs(v_ady) < 0.2 then
+        v_dir[v_i] = int(random(0, 7, 0))
+    elseif abs(v_adx) > abs(v_ady) * 2 then
+        if v_adx > 0 then
+            v_dir[v_i] = 0
+        else
+            v_dir[v_i] = 4
+        endif
+    elseif abs(v_ady) > abs(v_adx) * 2 then
+        if v_ady > 0 then
+            v_dir[v_i] = 2
+        else
+            v_dir[v_i] = 6
+        endif
+    elseif v_adx > 0 and v_ady > 0 then
+        v_dir[v_i] = 1
+    elseif v_adx < 0 and v_ady > 0 then
+        v_dir[v_i] = 3
+    elseif v_adx < 0 and v_ady < 0 then
+        v_dir[v_i] = 5
+    else
+        v_dir[v_i] = 7
+    endif
+}
+
+def spawn_moth_at_rim {
+    # Inset from the wall so clamp doesn't pin them immediately
+    v_side = int(random(0, 3, 0))
+    if v_side == 0 then
+        v_x[v_i] = 3
+        v_y[v_i] = random(3, 28, 1)
+        v_dir[v_i] = 0
+    elseif v_side == 1 then
+        v_x[v_i] = 28
+        v_y[v_i] = random(3, 28, 1)
+        v_dir[v_i] = 4
+    elseif v_side == 2 then
+        v_x[v_i] = random(3, 28, 1)
+        v_y[v_i] = 3
+        v_dir[v_i] = 2
+    else
+        v_x[v_i] = random(3, 28, 1)
+        v_y[v_i] = 28
+        v_dir[v_i] = 6
+    endif
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+    v_life[v_i] = random(40, 95, 0)
+    v_edge[v_i] = 0
+}
+
+def init_embers {
+    for v_i in (0, v_ember_count - 1, 1)
+        v_ephase[v_i] = random(0, tau, 2)
+        v_espeed[v_i] = random(0.06, 0.1, 3)
+        if v_i % 2 == 0 then
+            v_espeed[v_i] = 0 - v_espeed[v_i]
+        endif
+        v_eradius[v_i] = random(7, 11, 1)
+        v_epx[v_i] = 32
+        v_epy[v_i] = 32
+    endfor v_i
+}
+
+def init_world {
+    grid_fill(v_heat, 0)
+    call init_embers
+    for v_i in (0, v_n - 1, 1)
+        call spawn_moth_at_rim
+    endfor v_i
+    grid_reset(embers)
+}
+
+def update_embers {
+    v_pulse = 0.75 + 0.25 * sin(v_frame * 0.28)
+    for v_i in (0, v_ember_count - 1, 1)
+        v_ephase[v_i] = v_ephase[v_i] + v_espeed[v_i]
+        if v_i == 0 then
+            v_cx = 15
+            v_cy = 16
+            v_ex[v_i] = v_cx + cos(v_ephase[v_i]) * v_eradius[v_i]
+            v_ey[v_i] = v_cy + sin(v_ephase[v_i] * 0.85) * v_eradius[v_i] * 0.7
+        else
+            v_cx = 17
+            v_cy = 15
+            v_ex[v_i] = v_cx + cos(v_ephase[v_i] * 1.3) * (v_eradius[v_i] * 0.75)
+            v_ey[v_i] = v_cy + sin(v_ephase[v_i]) * v_eradius[v_i] * 0.55
+        endif
+        if v_ex[v_i] < 3 then
+            v_ex[v_i] = 3
+        elseif v_ex[v_i] > 28 then
+            v_ex[v_i] = 28
+        endif
+        if v_ey[v_i] < 3 then
+            v_ey[v_i] = 3
+        elseif v_ey[v_i] > 28 then
+            v_ey[v_i] = 28
+        endif
+        v_epx[v_i] = v_epx[v_i] + (v_ex[v_i] * v_cell - v_epx[v_i]) * 0.4
+        v_epy[v_i] = v_epy[v_i] + (v_ey[v_i] * v_cell - v_epy[v_i]) * 0.4
+    endfor v_i
+}
+
+def inject_heat {
+    for v_i in (0, v_ember_count - 1, 1)
+        v_fx = int(v_ex[v_i])
+        v_fy = int(v_ey[v_i])
+        v_amount = 1.0 * v_pulse
+        call scent_at
+        v_fx = int(v_ex[v_i] + 1)
+        v_amount = 0.55 * v_pulse
+        call scent_at
+    endfor v_i
+}
+
+def refresh_moths {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        v_dx = v_x[v_i] - v_ex[0]
+        v_dy = v_y[v_i] - v_ey[0]
+        v_near = 0
+        if v_dx * v_dx + v_dy * v_dy < 4 then
+            v_near = 1
+        endif
+        if v_near == 0 then
+            v_dx = v_x[v_i] - v_ex[1]
+            v_dy = v_y[v_i] - v_ey[1]
+            if v_dx * v_dx + v_dy * v_dy < 4 then
+                v_near = 1
+            endif
+        endif
+        if v_near == 1 or v_life[v_i] <= 0 then
+            call spawn_moth_at_rim
+        endif
+    endfor v_i
+}
+
+def unstick_moths {
+    # Clamp edges pin seekers — aim at nearest ember and nudge inward
+    for v_i in (0, v_n - 1, 1)
+        v_on_edge = 0
+        if v_x[v_i] <= 1.2 or v_x[v_i] >= 29.8 or v_y[v_i] <= 1.2 or v_y[v_i] >= 29.8 then
+            v_on_edge = 1
+        endif
+        if v_on_edge == 1 then
+            v_edge[v_i] = v_edge[v_i] + 1
+            v_d0 = (v_x[v_i] - v_ex[0]) * (v_x[v_i] - v_ex[0]) + (v_y[v_i] - v_ey[0]) * (v_y[v_i] - v_ey[0])
+            v_d1 = (v_x[v_i] - v_ex[1]) * (v_x[v_i] - v_ex[1]) + (v_y[v_i] - v_ey[1]) * (v_y[v_i] - v_ey[1])
+            if v_d0 <= v_d1 then
+                v_tx = v_ex[0]
+                v_ty = v_ey[0]
+            else
+                v_tx = v_ex[1]
+                v_ty = v_ey[1]
+            endif
+            call heading_toward
+            if v_x[v_i] <= 1.2 then
+                v_x[v_i] = 2.5
+            elseif v_x[v_i] >= 29.8 then
+                v_x[v_i] = 28.5
+            endif
+            if v_y[v_i] <= 1.2 then
+                v_y[v_i] = 2.5
+            elseif v_y[v_i] >= 29.8 then
+                v_y[v_i] = 28.5
+            endif
+            if v_edge[v_i] > 14 then
+                call spawn_moth_at_rim
+            endif
+        else
+            v_edge[v_i] = 0
+        endif
+    endfor v_i
+}
+
+def smooth_moths {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call update_embers
+    call inject_heat
+    call refresh_moths
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_heat, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call unstick_moths
+    call smooth_moths
+
+    begin_frame
+        grid_step(embers)
+
+        for v_i in (0, v_ember_count - 1, 1)
+            mplot(v_epx[v_i], v_epy[v_i], yellow, 100)
+            mplot(v_epx[v_i] + 1, v_epy[v_i], orange, 80)
+        endfor v_i
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], orange, 70)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

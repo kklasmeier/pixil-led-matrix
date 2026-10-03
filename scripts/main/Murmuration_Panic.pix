@@ -1,0 +1,308 @@
+# Murmuration Panic (Pi4-tuned)
+# particle_flock is pure-Python O(n^2), so keep the flock modest.
+# Pixil stays light: one state pass, wrap, and batched dots.
+
+throttle(0)
+fps(30)
+
+# --------------------------------------------
+# Flock — 12 birds keeps flock cheap on Pi 4
+# --------------------------------------------
+v_num_birds = 12
+v_max_speed = 3.2
+v_max_force = 0.4
+v_sep_dist = 6
+v_neighbor_dist = 13
+v_sep_w = 1.5
+v_align_w = 1.2
+v_cohere_w = 1.1
+
+v_panic_sep_w = 5.5
+v_panic_max_speed = 4.2
+
+# How far velocity moves position each frame (swarm-style punch)
+v_move_scale = 0.85
+v_panic_move_scale = 1.15
+
+# Wrap world larger than the panel
+v_wrap_margin = 10
+v_world_left = 0 - v_wrap_margin
+v_world_right = 64 + v_wrap_margin
+v_world_top = 0 - v_wrap_margin
+v_world_bottom = 64 + v_wrap_margin
+v_wrap_w = v_world_right - v_world_left
+v_wrap_h = v_world_bottom - v_world_top
+
+# --------------------------------------------
+# Predator / hunt cycle (frame counts @ 30 FPS)
+# 0=patrol 1=dive 2=chase 3=retreat
+# --------------------------------------------
+v_mode = 0
+v_mode_timer = 0
+v_patrol_frames = 90
+v_dive_frames = 28
+v_chase_frames = 50
+v_retreat_frames = 40
+
+v_hawk_x = 8
+v_hawk_y = 8
+v_hawk_vx = 0.5
+v_hawk_vy = 0.3
+v_hawk_speed_patrol = 1.0
+v_hawk_speed_dive = 3.6
+v_hawk_speed_chase = 2.8
+v_hawk_speed_retreat = 2.0
+
+v_panic_radius = 18
+v_repel_strength = -3.4
+v_panic = 0
+v_panic_hold = 0
+
+v_centroid_x = 32
+v_centroid_y = 32
+v_retreat_x = 4
+v_retreat_y = 4
+v_patrol_ang = 0
+v_sky = 22
+
+create_array(v_x, v_num_birds, numeric)
+create_array(v_y, v_num_birds, numeric)
+create_array(v_vx, v_num_birds, numeric)
+create_array(v_vy, v_num_birds, numeric)
+create_array(v_ax, v_num_birds, numeric)
+create_array(v_ay, v_num_birds, numeric)
+create_array(v_active, v_num_birds, numeric)
+create_array(v_pred_x, 1, numeric)
+create_array(v_pred_y, 1, numeric)
+
+def init_flock {
+    for v_i in (0, v_num_birds - 1, 1)
+        v_x[v_i] = random(14, 50, 1)
+        v_y[v_i] = random(14, 50, 1)
+        v_ang = random(0, 360, 0)
+        v_spd = random(1.2, v_max_speed, 1)
+        v_vx[v_i] = cos(radians(v_ang)) * v_spd
+        v_vy[v_i] = sin(radians(v_ang)) * v_spd
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+    endfor v_i
+
+    v_hawk_x = random(2, 10, 1)
+    v_hawk_y = random(2, 10, 1)
+    v_mode = 0
+    v_mode_timer = v_patrol_frames
+    v_panic = 0
+    v_panic_hold = 0
+    v_sky = 22
+}
+
+# Centroid + panic in one pass; clear accel for flock/attractors
+def update_flock_state {
+    v_sx = 0
+    v_sy = 0
+    for v_i in (0, v_num_birds - 1, 1)
+        v_sx = v_sx + v_x[v_i]
+        v_sy = v_sy + v_y[v_i]
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+    endfor v_i
+    v_centroid_x = v_sx / v_num_birds
+    v_centroid_y = v_sy / v_num_birds
+
+    v_dx = v_centroid_x - v_hawk_x
+    v_dy = v_centroid_y - v_hawk_y
+    v_d2 = v_dx * v_dx + v_dy * v_dy
+    v_pr2 = v_panic_radius * v_panic_radius
+
+    if v_d2 < v_pr2 and (v_mode == 1 or v_mode == 2) then
+        v_panic = 1
+        v_panic_hold = 28
+        v_sky = 34
+    elseif v_d2 < (v_pr2 * 0.4) and v_mode == 0 then
+        v_panic = 1
+        v_panic_hold = 16
+        v_sky = 30
+    elseif v_panic_hold > 0 then
+        v_panic_hold = v_panic_hold - 1
+        v_panic = 1
+        v_sky = 30
+    else
+        v_panic = 0
+        v_sky = 22
+    endif
+}
+
+def update_hunt {
+    v_mode_timer = v_mode_timer - 1
+
+    if v_mode == 0 then
+        v_patrol_ang = v_patrol_ang + 0.05
+        v_r = 26 + 3 * sin(v_mode_timer * 0.1)
+        v_tx = 32 + cos(v_patrol_ang) * v_r
+        v_ty = 32 + sin(v_patrol_ang) * v_r
+        v_spd = v_hawk_speed_patrol
+        if v_mode_timer <= 0 then
+            v_mode = 1
+            v_mode_timer = v_dive_frames
+        endif
+    elseif v_mode == 1 then
+        v_tx = v_centroid_x
+        v_ty = v_centroid_y
+        v_spd = v_hawk_speed_dive
+        if v_mode_timer <= 0 then
+            v_mode = 2
+            v_mode_timer = v_chase_frames
+        endif
+    elseif v_mode == 2 then
+        v_tx = v_centroid_x + (v_centroid_x - 32) * 0.12
+        v_ty = v_centroid_y + (v_centroid_y - 32) * 0.12
+        v_spd = v_hawk_speed_chase
+        if v_mode_timer <= 0 then
+            v_mode = 3
+            v_mode_timer = v_retreat_frames
+            # Rim midpoints only — never park in a corner
+            v_side = random(0, 3, 0)
+            if v_side == 0 then
+                v_retreat_x = 32 + random(-10, 10, 0)
+                v_retreat_y = 7
+            elseif v_side == 1 then
+                v_retreat_x = 56
+                v_retreat_y = 32 + random(-10, 10, 0)
+            elseif v_side == 2 then
+                v_retreat_x = 32 + random(-10, 10, 0)
+                v_retreat_y = 56
+            else
+                v_retreat_x = 7
+                v_retreat_y = 32 + random(-10, 10, 0)
+            endif
+        endif
+    else
+        v_tx = v_retreat_x
+        v_ty = v_retreat_y
+        v_spd = v_hawk_speed_retreat
+    endif
+
+    v_dx = v_tx - v_hawk_x
+    v_dy = v_ty - v_hawk_y
+    v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+
+    # Arrive at retreat perch → resume patrol immediately (no corner linger)
+    if v_mode == 3 and (v_dist < 2.5 or v_mode_timer <= 0) then
+        v_mode = 0
+        v_mode_timer = v_patrol_frames + int(random(0, 30, 0))
+        v_patrol_ang = atan2(v_hawk_y - 32, v_hawk_x - 32)
+        v_tx = 32 + cos(v_patrol_ang) * 26
+        v_ty = 32 + sin(v_patrol_ang) * 26
+        v_spd = v_hawk_speed_patrol
+        v_dx = v_tx - v_hawk_x
+        v_dy = v_ty - v_hawk_y
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+    endif
+
+    if v_dist > 0.5 then
+        v_hawk_vx = (v_dx / v_dist) * v_spd
+        v_hawk_vy = (v_dy / v_dist) * v_spd
+    else
+        # Stop cleanly instead of overshooting into the clamp
+        v_hawk_vx = 0
+        v_hawk_vy = 0
+    endif
+    v_hawk_x = v_hawk_x + v_hawk_vx
+    v_hawk_y = v_hawk_y + v_hawk_vy
+
+    # Soft walls: kill outward velocity so edges do not chatter
+    if v_hawk_x < 2 then
+        v_hawk_x = 2
+        if v_hawk_vx < 0 then
+            v_hawk_vx = 0
+        endif
+    elseif v_hawk_x > 61 then
+        v_hawk_x = 61
+        if v_hawk_vx > 0 then
+            v_hawk_vx = 0
+        endif
+    endif
+    if v_hawk_y < 2 then
+        v_hawk_y = 2
+        if v_hawk_vy < 0 then
+            v_hawk_vy = 0
+        endif
+    elseif v_hawk_y > 61 then
+        v_hawk_y = 61
+        if v_hawk_vy > 0 then
+            v_hawk_vy = 0
+        endif
+    endif
+
+    v_pred_x[0] = v_hawk_x
+    v_pred_y[0] = v_hawk_y
+}
+
+def wrap_birds {
+    for v_i in (0, v_num_birds - 1, 1)
+        if v_x[v_i] < v_world_left then
+            v_x[v_i] = v_x[v_i] + v_wrap_w
+        elseif v_x[v_i] >= v_world_right then
+            v_x[v_i] = v_x[v_i] - v_wrap_w
+        endif
+        if v_y[v_i] < v_world_top then
+            v_y[v_i] = v_y[v_i] + v_wrap_h
+        elseif v_y[v_i] >= v_world_bottom then
+            v_y[v_i] = v_y[v_i] - v_wrap_h
+        endif
+    endfor v_i
+}
+
+def draw_scene {
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, v_sky, true)
+
+        if v_panic == 1 then
+            for v_i in (0, v_num_birds - 1, 1)
+                plot(v_x[v_i], v_y[v_i], white, 100)
+            endfor v_i
+        else
+            for v_i in (0, v_num_birds - 1, 1)
+                plot(v_x[v_i], v_y[v_i], cyan, 90)
+            endfor v_i
+        endif
+
+        v_hx = round(v_hawk_x)
+        v_hy = round(v_hawk_y)
+        plot(v_hx, v_hy, orange, 100)
+        if v_mode == 1 or v_mode == 2 then
+            plot(v_hx + 1, v_hy, crimson, 95)
+            plot(v_hx - 1, v_hy, crimson, 95)
+            plot(v_hx, v_hy + 1, crimson, 95)
+            plot(v_hx, v_hy - 1, crimson, 95)
+        endif
+        # Heading tick only while actually moving (avoids corner flicker)
+        if abs(v_hawk_vx) + abs(v_hawk_vy) > 0.4 then
+            v_hh = atan2(v_hawk_vy, v_hawk_vx)
+            plot(v_hx + round(cos(v_hh) * 2), v_hy + round(sin(v_hh) * 2), orange, 85)
+        endif
+    end_frame
+}
+
+call init_flock
+
+while true then
+    call update_flock_state
+    call update_hunt
+
+    if v_panic == 1 or v_mode == 1 or v_mode == 2 then
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_pred_x, v_pred_y, v_repel_strength, 1, 1, 2.5, 1.8, v_num_birds, 1)
+    endif
+
+    if v_panic == 1 then
+        particle_flock(v_x, v_y, v_vx, v_vy, v_ax, v_ay, v_active, v_sep_dist, v_neighbor_dist, v_panic_sep_w, 0, 0, v_panic_max_speed, v_max_force, v_wrap_w, v_wrap_h, v_num_birds)
+        particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 1, 0, v_num_birds, post_move, v_panic_max_speed, v_panic_move_scale)
+    else
+        particle_flock(v_x, v_y, v_vx, v_vy, v_ax, v_ay, v_active, v_sep_dist, v_neighbor_dist, v_sep_w, v_align_w, v_cohere_w, v_max_speed, v_max_force, v_wrap_w, v_wrap_h, v_num_birds)
+        particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 1, 0, v_num_birds, post_move, v_max_speed, v_move_scale)
+    endif
+
+    call wrap_birds
+    call draw_scene
+endwhile

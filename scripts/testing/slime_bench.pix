@@ -1,0 +1,33 @@
+throttle(0)
+fps(30)
+v_size = 32
+v_cells = 1024
+v_diff = 0.22
+v_evap = 0.955
+create_array(v_phero, v_cells, numeric)
+grid_fill(v_phero, 0)
+grid_program slime {
+    size v_size
+    cell 2
+    fields v_phero
+    steps 1
+    boundary wrap
+    step v_phero {
+        v_phero_next = clamp(at(v_phero) * v_evap + lap(v_phero) * v_diff, 0, 1.5)
+    }
+    draw {
+        palette_field v_phero
+        color_base 42
+        color_scale 50
+        intensity_base 6
+        intensity_scale 92
+    }
+}
+v_frame = 0
+while true then
+    v_phero[random(0, 1023, 0)] = 1.5
+    begin_frame
+        grid_step(slime)
+    end_frame
+    v_frame = v_frame + 1
+endwhile

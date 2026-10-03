@@ -1,0 +1,188 @@
+# Tide
+# A sine current sweeps the panel. Agents wrap, surf the crest,
+# and leave a faint wash — ocean sheet, not a whirlpool ring.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 22
+v_step = 0.7
+v_sensor_dist = 4
+v_deposit = 0.18
+v_mix_wave = 0.82
+v_wash = 0.22
+v_evap = 0.93
+v_smooth = 0.3
+
+v_phase = 0
+v_spin = 0.11
+v_freq = 0.45
+v_axis = 0
+v_gain = 1.05
+
+v_hold = 0
+v_frame = 0
+v_mode_name = "Cross Tide"
+
+v_color_base = 50
+v_color_scale = 22
+v_c_hot = "white"
+v_c_mid = "cyan"
+v_c_cool = "sky_blue"
+
+create_array(v_sea, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program tide {
+    size v_size
+    cell v_cell
+    fields v_sea
+    steps 1
+    boundary wrap
+
+    step v_sea {
+        v_coord = where(v_axis < 0.5, grid_x, where(v_axis < 1.5, grid_y, (grid_x + grid_y) * 0.5))
+        v_wave = 0.5 + 0.5 * sin(v_freq * v_coord - v_phase)
+        v_wave = pow(v_wave, 1.4) * v_gain
+        v_sea_next = clamp(v_wave * v_mix_wave + at(v_sea) * v_wash * v_evap, 0, 1.3)
+    }
+
+    draw {
+        palette_field v_sea
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 88
+    }
+}
+
+def pick_palette {
+    v_pal = int(random(0, 3, 0))
+    if v_pal == 0 then
+        v_color_base = 50
+        v_color_scale = 22
+        v_c_hot = "white"
+        v_c_mid = "cyan"
+        v_c_cool = "sky_blue"
+    elseif v_pal == 1 then
+        v_color_base = 44
+        v_color_scale = 20
+        v_c_hot = "white"
+        v_c_mid = "teal"
+        v_c_cool = "blue"
+    elseif v_pal == 2 then
+        v_color_base = 58
+        v_color_scale = 24
+        v_c_hot = "white"
+        v_c_mid = "azure"
+        v_c_cool = "navy"
+    else
+        v_color_base = 36
+        v_color_scale = 18
+        v_c_hot = "mint"
+        v_c_mid = "turquoise"
+        v_c_cool = "ocean_blue"
+    endif
+}
+
+def pick_mode {
+    v_pick = int(random(0, 2, 0))
+    if v_pick == 0 then
+        v_mode_name = "Cross Tide"
+        v_axis = 0
+        v_freq = 0.42
+        v_spin = 0.12
+        v_mix_wave = 0.84
+        v_wash = 0.2
+    elseif v_pick == 1 then
+        v_mode_name = "Longshore"
+        v_axis = 1
+        v_freq = 0.38
+        v_spin = 0.1
+        v_mix_wave = 0.8
+        v_wash = 0.24
+    else
+        v_mode_name = "Oblique"
+        v_axis = 2
+        v_freq = 0.5
+        v_spin = 0.09
+        v_mix_wave = 0.78
+        v_wash = 0.26
+    endif
+    if random(0, 1, 2) < 0.5 then
+        v_spin = 0 - v_spin
+    endif
+    call pick_palette
+    v_hold = int(random(320, 460, 0))
+    print(f"Tide: {v_mode_name}")
+}
+
+def spawn_surf {
+    v_x[v_i] = random(2, 29, 1)
+    v_y[v_i] = random(2, 29, 1)
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(80, 160, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def init_world {
+    grid_fill(v_sea, 0)
+    call pick_mode
+    for v_i in (0, v_n - 1, 1)
+        call spawn_surf
+    endfor v_i
+    grid_reset(tide)
+}
+
+def refresh_surf {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        if v_life[v_i] <= 0 then
+            call spawn_surf
+        endif
+    endfor v_i
+}
+
+def smooth_surf {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    v_phase = v_phase + v_spin
+    v_hold = v_hold - 1
+    if v_hold <= 0 then
+        call pick_mode
+    endif
+
+    call refresh_surf
+    # wrap on — surf off one edge, on the other
+    agent_chemotaxis(v_x, v_y, v_dir, v_sea, v_size, v_sensor_dist, v_step, v_deposit, v_n, 1)
+    call smooth_surf
+
+    begin_frame
+        grid_step(tide)
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], v_c_hot, 80)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

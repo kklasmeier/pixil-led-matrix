@@ -1,0 +1,248 @@
+# Front / Wildfire
+# A burning edge advances. Sparks ride the fireline and die behind it.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 22
+v_step = 0.75
+v_sensor_dist = 3.5
+v_deposit = 0.28
+v_evap = 0.9
+v_wash = 0.55
+v_smooth = 0.3
+v_tight = 0.55
+v_gain = 1.2
+
+v_front = 4
+v_speed = 0.12
+v_axis = 0
+v_spot = 0
+v_cx = 16
+v_cy = 16
+v_sign = 1
+
+v_hold = 0
+v_frame = 0
+v_mode_name = "Sweep"
+
+v_color_base = 8
+v_color_scale = 18
+
+create_array(v_heat, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program blaze {
+    size v_size
+    cell v_cell
+    fields v_heat
+    steps 1
+    boundary clamp
+
+    step v_heat {
+        v_along = where(v_axis < 0.5, grid_x, grid_y)
+        v_dx = grid_x - v_cx
+        v_dy = grid_y - v_cy
+        v_dist = sqrt(v_dx * v_dx + v_dy * v_dy)
+        v_pos = where(v_spot > 0.5, v_dist, v_along)
+        v_d = v_pos - v_front
+        v_band = 1 / (1 + v_d * v_d * v_tight)
+        v_heat_next = clamp(v_band * v_gain + at(v_heat) * v_wash * v_evap, 0, 1.4)
+    }
+
+    draw {
+        palette_field v_heat
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 95
+    }
+}
+
+def spawn_on_front {
+    if v_spot > 0.5 then
+        v_a = random(0, tau, 2)
+        v_x[v_i] = v_cx + cos(v_a) * v_front
+        v_y[v_i] = v_cy + sin(v_a) * v_front
+    elseif v_axis < 0.5 then
+        v_x[v_i] = v_front + random(-0.8, 0.8, 1)
+        v_y[v_i] = random(2, 29, 1)
+    else
+        v_x[v_i] = random(2, 29, 1)
+        v_y[v_i] = v_front + random(-0.8, 0.8, 1)
+    endif
+    if v_x[v_i] < 1 then
+        v_x[v_i] = 1
+    elseif v_x[v_i] > 30 then
+        v_x[v_i] = 30
+    endif
+    if v_y[v_i] < 1 then
+        v_y[v_i] = 1
+    elseif v_y[v_i] > 30 then
+        v_y[v_i] = 30
+    endif
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(18, 40, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def pick_mode {
+    v_pick = int(random(0, 2, 0))
+    v_spot = 0
+    if v_pick == 0 then
+        v_mode_name = "Sweep"
+        v_axis = 0
+        v_sign = 1
+        if random(0, 1, 2) < 0.5 then
+            v_sign = 0 - 1
+        endif
+        v_speed = random(0.1, 0.16, 2)
+        v_tight = 0.5
+        v_gain = 1.25
+    elseif v_pick == 1 then
+        v_mode_name = "Longshore Burn"
+        v_axis = 1
+        v_sign = 1
+        if random(0, 1, 2) < 0.5 then
+            v_sign = 0 - 1
+        endif
+        v_speed = random(0.09, 0.14, 2)
+        v_tight = 0.48
+        v_gain = 1.2
+    else
+        v_mode_name = "Spot Fire"
+        v_spot = 1
+        v_axis = 0
+        v_sign = 1
+        v_cx = random(12, 19, 1)
+        v_cy = random(12, 19, 1)
+        v_speed = random(0.07, 0.11, 2)
+        v_tight = 0.7
+        v_gain = 1.3
+    endif
+    if v_spot > 0.5 then
+        v_front = 2.5
+    elseif v_sign > 0 then
+        v_front = 3
+    else
+        v_front = 28
+    endif
+    for v_i in (0, v_cells - 1, 1)
+        v_heat[v_i] = v_heat[v_i] * 0.12
+    endfor v_i
+    v_hold = int(random(280, 400, 0))
+    grid_reset(blaze)
+    print(f"Wildfire: {v_mode_name}")
+}
+
+def init_world {
+    grid_fill(v_heat, 0)
+    call pick_mode
+    for v_i in (0, v_n - 1, 1)
+        call spawn_on_front
+    endfor v_i
+}
+
+def advance_front {
+    v_front = v_front + v_speed * v_sign
+    v_reset = 0
+    if v_spot > 0.5 then
+        if v_front > 18 then
+            v_reset = 1
+        endif
+    elseif v_sign > 0 then
+        if v_front > 29 then
+            v_reset = 1
+        endif
+    else
+        if v_front < 2 then
+            v_reset = 1
+        endif
+    endif
+
+    v_hold = v_hold - 1
+    if v_reset == 1 or v_hold <= 0 then
+        call pick_mode
+        for v_i in (0, v_n - 1, 1)
+            call spawn_on_front
+        endfor v_i
+    endif
+}
+
+def spark_pos {
+    if v_spot > 0.5 then
+        v_dx = v_x[v_i] - v_cx
+        v_dy = v_y[v_i] - v_cy
+        v_pos = sqrt(v_dx * v_dx + v_dy * v_dy)
+    elseif v_axis < 0.5 then
+        v_pos = v_x[v_i]
+    else
+        v_pos = v_y[v_i]
+    endif
+}
+
+def refresh_sparks {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        call spark_pos
+        v_d = v_pos - v_front
+        if v_spot > 0.5 then
+            v_behind = 0
+            if v_d < 0 - 3.5 then
+                v_behind = 1
+            endif
+        elseif v_sign > 0 then
+            v_behind = 0
+            if v_d < 0 - 4 then
+                v_behind = 1
+            endif
+        else
+            v_behind = 0
+            if v_d > 4 then
+                v_behind = 1
+            endif
+        endif
+        if v_behind == 1 or v_life[v_i] <= 0 or v_x[v_i] <= 0.5 or v_x[v_i] >= 30.5 or v_y[v_i] <= 0.5 or v_y[v_i] >= 30.5 then
+            call spawn_on_front
+        endif
+    endfor v_i
+}
+
+def smooth_sparks {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call advance_front
+    call refresh_sparks
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_heat, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call smooth_sparks
+
+    begin_frame
+        grid_step(blaze)
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], yellow, 90)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

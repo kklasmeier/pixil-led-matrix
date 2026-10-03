@@ -1,0 +1,284 @@
+# Iron Filings
+# Stream-function ridges = textbook magnetic field lines.
+# Dots are filings: they climb onto a line and ride it as the magnet turns.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 18
+v_step = 0.45
+v_sensor_dist = 2.5
+v_deposit = 0
+v_smooth = 0.28
+
+v_cx = 15.5
+v_cy = 15.5
+v_theta = 0
+v_spin = 0.022
+v_cos = 1
+v_sin = 0
+v_sep = 6.5
+v_sep_base = 6.5
+v_shape = 0
+v_harmonics = 7
+v_harm_base = 7
+v_gain = 1.2
+v_spin_base = 0.02
+v_flip = 1
+
+v_event = 0
+v_event_life = 0
+v_event_wait = 90
+
+v_pole1x = 22
+v_pole1y = 16
+v_pole2x = 9
+v_pole2y = 16
+v_pole3x = 16
+v_pole3y = 22
+v_pole4x = 16
+v_pole4y = 9
+
+v_hold = 0
+v_hold_len = 400
+v_frame = 0
+v_mode_name = "Dipole"
+
+v_color_base = 50
+v_color_scale = 18
+
+create_array(v_field, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program magnet {
+    size v_size
+    cell v_cell
+    fields v_field
+    steps 1
+    boundary clamp
+
+    step v_field {
+        v_dx = grid_x - v_cx
+        v_dy = grid_y - v_cy
+        # Rotate into magnet frame (dipole along +u)
+        v_u = v_dx * v_cos + v_dy * v_sin
+        v_v = v_dy * v_cos - v_dx * v_sin
+
+        # Dipole stream function: contours are the classic N→S loops
+        v_psi_d = atan2(v_v, v_u - v_sep) - atan2(v_v, v_u + v_sep)
+        # Quadrupole: four poles, clover loops
+        v_psi_q = atan2(v_v, v_u - v_sep) + atan2(v_v, v_u + v_sep)
+        v_psi_q = v_psi_q - atan2(v_u, v_v - v_sep) - atan2(v_u, v_v + v_sep)
+        v_psi = v_psi_d * (1 - v_shape) + v_psi_q * v_shape
+        v_psi = v_psi * v_flip
+
+        # Sharp bright ridges on a handful of field lines
+        v_ridges = abs(sin(v_harmonics * v_psi))
+        v_ridges = pow(v_ridges, 5)
+
+        v_r2 = v_dx * v_dx + v_dy * v_dy
+        v_env = 1 / (1 + v_r2 * 0.006)
+        # Soft pole glow so N/S (or 4 poles) read as magnets
+        v_p1 = 1 / ((v_u - v_sep) * (v_u - v_sep) + v_v * v_v + 1.2)
+        v_p2 = 1 / ((v_u + v_sep) * (v_u + v_sep) + v_v * v_v + 1.2)
+        v_poles = (v_p1 + v_p2) * (1.1 - v_shape * 0.4)
+
+        v_field_next = clamp((v_ridges * v_env * 1.35 + v_poles * 0.55) * v_gain, 0, 1.4)
+    }
+
+    draw {
+        palette_field v_field
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 92
+    }
+}
+
+def spawn_filing {
+    # Start in the mid-field, not on top of a pole
+    v_x[v_i] = random(4, 27, 1)
+    v_y[v_i] = random(4, 27, 1)
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(80, 160, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def pick_shape {
+    v_pick = int(random(0, 2, 0))
+    if v_pick == 0 then
+        v_shape = 0
+        v_mode_name = "Dipole"
+        v_sep = 6.5
+        v_harmonics = 7
+        v_gain = 1.15
+        v_color_base = 50
+        v_spin = 0.02
+    elseif v_pick == 1 then
+        v_shape = 1
+        v_mode_name = "Quadrupole"
+        v_sep = 7
+        v_harmonics = 6
+        v_gain = 1.2
+        v_color_base = 68
+        v_spin = 0.016
+    else
+        v_shape = 0.5
+        v_mode_name = "Mixed Field"
+        v_sep = 6.8
+        v_harmonics = 8
+        v_gain = 1.18
+        v_color_base = 12
+        v_spin = 0.024
+    endif
+    if random(0, 1, 2) < 0.5 then
+        v_spin = 0 - v_spin
+    endif
+    v_sep_base = v_sep
+    v_harm_base = v_harmonics
+    v_spin_base = v_spin
+    v_event = 0
+    v_event_life = 0
+    v_event_wait = int(random(70, 130, 0))
+    v_hold_len = int(random(360, 520, 0))
+    v_hold = v_hold_len
+    print(f"Iron Filings: {v_mode_name}")
+}
+
+def start_event {
+    v_kind = int(random(0, 3, 0))
+    if v_kind == 0 then
+        v_event = 1
+        v_event_life = int(random(80, 130, 0))
+        print(f"Iron Filings: {v_mode_name} + stretch poles")
+    elseif v_kind == 1 then
+        v_event = 2
+        v_flip = 0 - v_flip
+        v_event_life = 40
+        print(f"Iron Filings: {v_mode_name} + polarity flip")
+    elseif v_kind == 2 then
+        v_event = 3
+        v_harmonics = v_harm_base + 5
+        v_event_life = int(random(70, 110, 0))
+        print(f"Iron Filings: {v_mode_name} + fine lines")
+    else
+        v_event = 4
+        v_spin = v_spin_base * 2.6
+        v_event_life = int(random(55, 90, 0))
+        print(f"Iron Filings: {v_mode_name} + stir")
+    endif
+}
+
+def end_event {
+    v_event = 0
+    v_sep = v_sep_base
+    v_harmonics = v_harm_base
+    v_spin = v_spin_base
+    v_event_wait = int(random(60, 120, 0))
+}
+
+def tick_events {
+    if v_event_life > 0 then
+        v_event_life = v_event_life - 1
+        if v_event == 1 then
+            v_sep = v_sep_base + sin(v_frame * 0.09) * 2.4
+            if v_sep < 4 then
+                v_sep = 4
+            elseif v_sep > 10 then
+                v_sep = 10
+            endif
+        endif
+        if v_event_life <= 0 then
+            call end_event
+        endif
+    else
+        v_event_wait = v_event_wait - 1
+        if v_event_wait <= 0 then
+            call start_event
+        endif
+    endif
+}
+
+def init_world {
+    grid_fill(v_field, 0)
+    for v_i in (0, v_n - 1, 1)
+        call spawn_filing
+    endfor v_i
+    call pick_shape
+    grid_reset(magnet)
+}
+
+def update_magnet {
+    call tick_events
+    v_theta = v_theta + v_spin
+    v_cos = cos(v_theta)
+    v_sin = sin(v_theta)
+    v_pole1x = v_cx + v_cos * v_sep
+    v_pole1y = v_cy + v_sin * v_sep
+    v_pole2x = v_cx - v_cos * v_sep
+    v_pole2y = v_cy - v_sin * v_sep
+    v_pole3x = v_cx - v_sin * v_sep
+    v_pole3y = v_cy + v_cos * v_sep
+    v_pole4x = v_cx + v_sin * v_sep
+    v_pole4y = v_cy - v_cos * v_sep
+
+    v_hold = v_hold - 1
+    if v_hold <= 0 then
+        call pick_shape
+    endif
+}
+
+def refresh_filings {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        if v_life[v_i] <= 0 or v_x[v_i] <= 0.8 or v_x[v_i] >= 30.2 or v_y[v_i] <= 0.8 or v_y[v_i] >= 30.2 then
+            call spawn_filing
+        endif
+    endfor v_i
+}
+
+def smooth_filings {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call update_magnet
+    call refresh_filings
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_field, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call smooth_filings
+
+    begin_frame
+        grid_step(magnet)
+
+        mplot(v_pole1x * v_cell, v_pole1y * v_cell, white, 100)
+        mplot(v_pole2x * v_cell, v_pole2y * v_cell, white, 100)
+        if v_shape > 0.4 then
+            mplot(v_pole3x * v_cell, v_pole3y * v_cell, yellow, 90)
+            mplot(v_pole4x * v_cell, v_pole4y * v_cell, yellow, 90)
+        endif
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], silver, 95)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

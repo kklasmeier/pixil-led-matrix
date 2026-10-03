@@ -1,0 +1,269 @@
+# Whirlpool
+# Painted spinning ring of scent. Agents deposit 0 and ride the current
+# around the well — drain / galaxy, not poles or slime.
+
+throttle(0)
+fps(50)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 22
+v_step = 0.52
+v_sensor_dist = 3
+v_deposit = 0
+v_smooth = 0.26
+
+v_cx = 15.5
+v_cy = 15.5
+v_cx_base = 15.5
+v_cy_base = 15.5
+v_rad = 11
+v_rad_base = 11
+v_tight = 0.28
+v_arms = 2
+v_phase = 0
+v_spin = 0.09
+v_spin_base = 0.09
+v_gain = 1.2
+
+v_event = 0
+v_event_life = 0
+v_event_wait = 90
+v_hold = 0
+v_frame = 0
+v_mode_name = "Double Whirl"
+
+v_color_base = 52
+v_color_scale = 20
+
+create_array(v_field, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_life, v_n, numeric)
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+
+grid_program drain {
+    size v_size
+    cell v_cell
+    fields v_field
+    steps 1
+    boundary clamp
+
+    step v_field {
+        v_dx = grid_x - v_cx
+        v_dy = grid_y - v_cy
+        v_r = sqrt(v_dx * v_dx + v_dy * v_dy)
+        v_ang = atan2(v_dy, v_dx)
+
+        # Bright torus — hollow center so seekers don't fall in
+        v_dr = v_r - v_rad
+        v_ring = 1 / (1 + v_dr * v_dr * v_tight)
+
+        # Traveling crest they chase around the ring
+        v_wave = 0.42 + 0.58 * (0.5 + 0.5 * sin(v_arms * v_ang - v_phase))
+
+        # Keep the well dark
+        v_well = 1 / (1 + v_r * v_r * 0.08)
+        v_field_next = clamp(v_ring * v_wave * v_gain * (1.05 - v_well * 0.55), 0, 1.35)
+    }
+
+    draw {
+        palette_field v_field
+        color_base v_color_base
+        color_scale v_color_scale
+        intensity_base 0
+        intensity_scale 90
+    }
+}
+
+def spawn_on_ring {
+    v_a = random(0, tau, 2)
+    v_j = random(-1.2, 1.2, 1)
+    v_x[v_i] = v_cx + cos(v_a) * (v_rad + v_j)
+    v_y[v_i] = v_cy + sin(v_a) * (v_rad + v_j)
+    if v_x[v_i] < 1 then
+        v_x[v_i] = 1
+    elseif v_x[v_i] > 30 then
+        v_x[v_i] = 30
+    endif
+    if v_y[v_i] < 1 then
+        v_y[v_i] = 1
+    elseif v_y[v_i] > 30 then
+        v_y[v_i] = 30
+    endif
+    v_dir[v_i] = int(random(0, 7, 0))
+    v_life[v_i] = int(random(70, 140, 0))
+    v_px[v_i] = v_x[v_i] * v_cell
+    v_py[v_i] = v_y[v_i] * v_cell
+}
+
+def pick_mode {
+    v_pick = int(random(0, 2, 0))
+    if v_pick == 0 then
+        v_mode_name = "Single Spiral"
+        v_arms = 1
+        v_rad_base = 11.5
+        v_tight = 0.22
+        v_spin_base = 0.1
+        v_gain = 1.25
+        v_color_base = 52
+    elseif v_pick == 1 then
+        v_mode_name = "Double Whirl"
+        v_arms = 2
+        v_rad_base = 11
+        v_tight = 0.28
+        v_spin_base = 0.085
+        v_gain = 1.2
+        v_color_base = 58
+    else
+        v_mode_name = "Galaxy"
+        v_arms = 3
+        v_rad_base = 10.5
+        v_tight = 0.32
+        v_spin_base = 0.07
+        v_gain = 1.22
+        v_color_base = 70
+    endif
+    v_spin = v_spin_base
+    if random(0, 1, 2) < 0.5 then
+        v_spin = 0 - v_spin
+        v_spin_base = v_spin
+    endif
+    v_rad = v_rad_base
+    v_cx = v_cx_base
+    v_cy = v_cy_base
+    v_event = 0
+    v_event_life = 0
+    v_event_wait = int(random(70, 130, 0))
+    v_hold = int(random(340, 500, 0))
+    print(f"Whirlpool: {v_mode_name}")
+}
+
+def start_event {
+    v_kind = int(random(0, 2, 0))
+    if v_kind == 0 then
+        v_event = 1
+        v_event_life = int(random(90, 140, 0))
+        print(f"Whirlpool: {v_mode_name} + tighten/flare")
+    elseif v_kind == 1 then
+        v_event = 2
+        v_spin = 0 - v_spin
+        v_spin_base = v_spin
+        v_event_life = 50
+        print(f"Whirlpool: {v_mode_name} + reverse gulp")
+    else
+        v_event = 3
+        v_event_life = int(random(90, 140, 0))
+        print(f"Whirlpool: {v_mode_name} + eccentric well")
+    endif
+}
+
+def end_event {
+    v_event = 0
+    v_rad = v_rad_base
+    v_cx = v_cx_base
+    v_cy = v_cy_base
+    v_event_wait = int(random(55, 110, 0))
+}
+
+def tick_events {
+    if v_event_life > 0 then
+        v_event_life = v_event_life - 1
+        if v_event == 1 then
+            v_rad = v_rad_base + sin(v_frame * 0.11) * 3.2
+            if v_rad < 6.5 then
+                v_rad = 6.5
+            elseif v_rad > 14 then
+                v_rad = 14
+            endif
+        elseif v_event == 3 then
+            v_cx = v_cx_base + sin(v_frame * 0.07) * 3.2
+            v_cy = v_cy_base + cos(v_frame * 0.055) * 2.6
+            if v_cx < 12 then
+                v_cx = 12
+            elseif v_cx > 19 then
+                v_cx = 19
+            endif
+            if v_cy < 12 then
+                v_cy = 12
+            elseif v_cy > 19 then
+                v_cy = 19
+            endif
+        endif
+        if v_event_life <= 0 then
+            call end_event
+        endif
+    else
+        v_event_wait = v_event_wait - 1
+        if v_event_wait <= 0 then
+            call start_event
+        endif
+    endif
+}
+
+def init_world {
+    grid_fill(v_field, 0)
+    call pick_mode
+    for v_i in (0, v_n - 1, 1)
+        call spawn_on_ring
+    endfor v_i
+    grid_reset(drain)
+}
+
+def update_drain {
+    call tick_events
+    v_phase = v_phase + v_spin
+    if v_event != 1 then
+        v_rad = v_rad_base + sin(v_frame * 0.035) * 1.1
+    endif
+
+    v_hold = v_hold - 1
+    if v_hold <= 0 then
+        call pick_mode
+    endif
+}
+
+def refresh_swimmers {
+    for v_i in (0, v_n - 1, 1)
+        v_life[v_i] = v_life[v_i] - 1
+        v_dx = v_x[v_i] - v_cx
+        v_dy = v_y[v_i] - v_cy
+        v_rr = v_dx * v_dx + v_dy * v_dy
+        if v_life[v_i] <= 0 or v_rr < 16 or v_rr > 280 or v_x[v_i] <= 0.8 or v_x[v_i] >= 30.2 or v_y[v_i] <= 0.8 or v_y[v_i] >= 30.2 then
+            call spawn_on_ring
+        endif
+    endfor v_i
+}
+
+def smooth_swimmers {
+    for v_i in (0, v_n - 1, 1)
+        v_px[v_i] = v_px[v_i] + (v_x[v_i] * v_cell - v_px[v_i]) * v_smooth
+        v_py[v_i] = v_py[v_i] + (v_y[v_i] * v_cell - v_py[v_i]) * v_smooth
+    endfor v_i
+}
+
+call init_world
+
+while true then
+    call update_drain
+    call refresh_swimmers
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_field, v_size, v_sensor_dist, v_step, v_deposit, v_n, 0)
+    call smooth_swimmers
+
+    begin_frame
+        grid_step(drain)
+
+        for v_i in (0, v_n - 1, 1)
+            mplot(v_px[v_i], v_py[v_i], white, 88)
+        endfor v_i
+        mflush()
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

@@ -1,0 +1,439 @@
+# Shape Lock
+# Particles wander, then spring toward formation slots (ring, star, diamond…).
+# Hold the shape, burst apart, next figure. Swarm-style physics — no flock.
+
+throttle(0)
+fps(60)
+
+v_n = 20
+v_time = 0
+
+# Phase: 0=wander 1=lock 2=hold 3=burst
+v_phase = 0
+v_phase_timer = 0
+v_wander_frames = 110
+v_lock_frames = 100
+v_hold_frames = 130
+v_burst_frames = 50
+
+v_shape = 0
+v_shape_count = 18
+v_pull = 0.04
+v_damp = 1
+v_cap = 2.4
+v_move_scale = 0.55
+v_bright = 55
+v_color_mode = 0
+v_shape_cursor = 0
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_tx, v_n, numeric)
+create_array(v_ty, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_shape_order, v_shape_count, numeric)
+create_array(v_slot, v_n, numeric)
+
+# --------------------------------------------
+# Init / shuffle
+# --------------------------------------------
+def init_particles {
+    for v_i in (0, v_n - 1, 1)
+        v_x[v_i] = random(4, 59, 1)
+        v_y[v_i] = random(4, 59, 1)
+        v_vx[v_i] = random(-1.2, 1.2, 1)
+        v_vy[v_i] = random(-1.2, 1.2, 1)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+        v_slot[v_i] = v_i
+        v_tx[v_i] = 32
+        v_ty[v_i] = 32
+    endfor v_i
+}
+
+def shuffle_slots {
+    for v_i in (0, v_n - 1, 1)
+        v_slot[v_i] = v_i
+    endfor v_i
+    v_i = v_n - 1
+    while v_i > 0 then
+        v_j = int(random(0, v_i, 0))
+        v_tmp = v_slot[v_i]
+        v_slot[v_i] = v_slot[v_j]
+        v_slot[v_j] = v_tmp
+        v_i = v_i - 1
+    endwhile
+}
+
+def shuffle_shapes {
+    for v_i in (0, v_shape_count - 1, 1)
+        v_shape_order[v_i] = v_i
+    endfor v_i
+    v_i = v_shape_count - 1
+    while v_i > 0 then
+        v_j = int(random(0, v_i, 0))
+        v_tmp = v_shape_order[v_i]
+        v_shape_order[v_i] = v_shape_order[v_j]
+        v_shape_order[v_j] = v_tmp
+        v_i = v_i - 1
+    endwhile
+    v_shape_cursor = 0
+}
+
+def next_shape {
+    v_shape = v_shape_order[v_shape_cursor]
+    v_shape_cursor = v_shape_cursor + 1
+    if v_shape_cursor >= v_shape_count then
+        call shuffle_shapes
+    endif
+    call shuffle_slots
+    call build_shape
+}
+
+# --------------------------------------------
+# Target for formation slot v_si → (v_px, v_py)
+# 0 ring  1 star  2 diamond  3 plus  4 square
+# 5 triangle  6 spiral  7 infinity  8 christian cross
+# 9 heart  10 hexagon  11 arrow  12 chevron
+# 13 double ring  14 saltire X  15 crescent
+# 16 flower  17 twin pillars
+# --------------------------------------------
+def target_for_slot {
+    if v_shape == 0 then
+        # Ring
+        v_ang = v_si * tau / v_n
+        v_px = 32 + cos(v_ang) * 20
+        v_py = 32 + sin(v_ang) * 20
+
+    elseif v_shape == 1 then
+        # Star (10-point outer/inner)
+        v_vert = int(v_si / 2)
+        v_ang = v_vert * tau / 10 - pi / 2
+        if v_vert % 2 == 0 then
+            v_r = 22
+        else
+            v_r = 9
+        endif
+        v_px = 32 + cos(v_ang) * v_r
+        v_py = 32 + sin(v_ang) * v_r
+
+    elseif v_shape == 2 then
+        # Diamond
+        v_t = v_si / v_n
+        v_side = int(v_t * 4)
+        v_u = v_t * 4 - v_side
+        if v_side == 0 then
+            v_px = 32 + v_u * 20
+            v_py = 12 + v_u * 20
+        elseif v_side == 1 then
+            v_px = 52 - v_u * 20
+            v_py = 32 + v_u * 20
+        elseif v_side == 2 then
+            v_px = 32 - v_u * 20
+            v_py = 52 - v_u * 20
+        else
+            v_px = 12 + v_u * 20
+            v_py = 32 - v_u * 20
+        endif
+
+    elseif v_shape == 3 then
+        # Plus (equal-armed)
+        if v_si < 10 then
+            v_px = 12 + v_si * 4.2
+            v_py = 32
+        else
+            v_px = 32
+            v_py = 12 + (v_si - 10) * 4.2
+        endif
+
+    elseif v_shape == 4 then
+        # Square
+        v_t = v_si / v_n
+        v_side = int(v_t * 4)
+        v_u = v_t * 4 - v_side
+        if v_side == 0 then
+            v_px = 14 + v_u * 36
+            v_py = 14
+        elseif v_side == 1 then
+            v_px = 50
+            v_py = 14 + v_u * 36
+        elseif v_side == 2 then
+            v_px = 50 - v_u * 36
+            v_py = 50
+        else
+            v_px = 14
+            v_py = 50 - v_u * 36
+        endif
+
+    elseif v_shape == 5 then
+        # Triangle
+        v_t = v_si / v_n
+        v_side = int(v_t * 3)
+        v_u = v_t * 3 - v_side
+        if v_side == 0 then
+            v_px = 32 + (v_u - 0.5) * 36
+            v_py = 14 + abs(v_u - 0.5) * 8
+        elseif v_side == 1 then
+            v_px = 50 - v_u * 18
+            v_py = 18 + v_u * 34
+        else
+            v_px = 32 - v_u * 18
+            v_py = 52 - v_u * 34
+        endif
+
+    elseif v_shape == 6 then
+        # Spiral
+        v_ang = v_si * 0.55
+        v_r = 4 + v_si * 0.95
+        v_px = 32 + cos(v_ang) * v_r
+        v_py = 32 + sin(v_ang) * v_r
+
+    elseif v_shape == 7 then
+        # Infinity / lemniscate
+        v_t = v_si * tau / v_n
+        v_s = 1 + sin(v_t) * sin(v_t)
+        v_px = 32 + 18 * cos(v_t) / v_s
+        v_py = 32 + 12 * cos(v_t) * sin(v_t) / v_s
+
+    elseif v_shape == 8 then
+        # Christian / Latin cross — tall upright, shorter crossbar high
+        # 12 on vertical stem, 8 on crossbar (arms only, skip center)
+        if v_si < 12 then
+            v_px = 32
+            v_py = 8 + v_si * 4.0
+        elseif v_si < 16 then
+            v_px = 14 + (v_si - 12) * 4.0
+            v_py = 20
+        else
+            v_px = 38 + (v_si - 16) * 4.0
+            v_py = 20
+        endif
+
+    elseif v_shape == 9 then
+        # Heart
+        v_t = v_si * tau / v_n
+        v_st = sin(v_t)
+        v_px = 32 + 14 * v_st * v_st * v_st
+        v_py = 34 - 0.7 * (13 * cos(v_t) - 5 * cos(2 * v_t) - 2 * cos(3 * v_t) - cos(4 * v_t))
+
+    elseif v_shape == 10 then
+        # Hexagon
+        v_t = v_si / v_n
+        v_side = int(v_t * 6)
+        v_u = v_t * 6 - v_side
+        v_a0 = v_side * tau / 6 - pi / 2
+        v_a1 = (v_side + 1) * tau / 6 - pi / 2
+        v_px = 32 + 20 * (cos(v_a0) * (1 - v_u) + cos(v_a1) * v_u)
+        v_py = 32 + 20 * (sin(v_a0) * (1 - v_u) + sin(v_a1) * v_u)
+
+    elseif v_shape == 11 then
+        # Up arrow (shaft + head)
+        if v_si < 10 then
+            v_px = 32
+            v_py = 50 - v_si * 3.2
+        elseif v_si < 15 then
+            v_px = 32 - (v_si - 9) * 3.5
+            v_py = 18 + (v_si - 9) * 2.5
+        else
+            v_px = 32 + (v_si - 14) * 3.5
+            v_py = 18 + (v_si - 14) * 2.5
+        endif
+
+    elseif v_shape == 12 then
+        # Chevron / V
+        if v_si < 10 then
+            v_px = 32 - (9 - v_si) * 2.2
+            v_py = 18 + (9 - v_si) * 3.2
+        else
+            v_px = 32 + (v_si - 10) * 2.2
+            v_py = 18 + (v_si - 10) * 3.2
+        endif
+
+    elseif v_shape == 13 then
+        # Double ring
+        if v_si < 10 then
+            v_ang = v_si * tau / 10
+            v_r = 12
+        else
+            v_ang = (v_si - 10) * tau / 10
+            v_r = 22
+        endif
+        v_px = 32 + cos(v_ang) * v_r
+        v_py = 32 + sin(v_ang) * v_r
+
+    elseif v_shape == 14 then
+        # Saltire X
+        if v_si < 10 then
+            v_px = 14 + v_si * 3.8
+            v_py = 14 + v_si * 3.8
+        else
+            v_px = 14 + (v_si - 10) * 3.8
+            v_py = 50 - (v_si - 10) * 3.8
+        endif
+
+    elseif v_shape == 15 then
+        # Crescent (outer arc, right side open)
+        v_ang = -1.1 + v_si * 2.2 / (v_n - 1)
+        v_px = 28 + cos(v_ang) * 20
+        v_py = 32 + sin(v_ang) * 20
+
+    elseif v_shape == 16 then
+        # Flower — 5 petals
+        v_ang = v_si * tau / v_n
+        v_r = 12 + 8 * abs(cos(v_ang * 2.5))
+        v_px = 32 + cos(v_ang) * v_r
+        v_py = 32 + sin(v_ang) * v_r
+
+    else
+        # Twin pillars
+        if v_si < 10 then
+            v_px = 20
+            v_py = 10 + v_si * 4.4
+        else
+            v_px = 44
+            v_py = 10 + (v_si - 10) * 4.4
+        endif
+    endif
+}
+
+def build_shape {
+    for v_i in (0, v_n - 1, 1)
+        v_si = v_slot[v_i]
+        call target_for_slot
+        v_tx[v_i] = v_px
+        v_ty[v_i] = v_py
+    endfor v_i
+}
+
+# --------------------------------------------
+# Phase machine
+# --------------------------------------------
+def advance_phase {
+    v_phase_timer = v_phase_timer - 1
+    if v_phase_timer <= 0 then
+        if v_phase == 0 then
+            v_phase = 1
+            v_phase_timer = v_lock_frames
+            call next_shape
+        elseif v_phase == 1 then
+            v_phase = 2
+            v_phase_timer = v_hold_frames
+        elseif v_phase == 2 then
+            v_phase = 3
+            v_phase_timer = v_burst_frames
+            for v_i in (0, v_n - 1, 1)
+                v_vx[v_i] = v_vx[v_i] + random(-2.5, 2.5, 1)
+                v_vy[v_i] = v_vy[v_i] + random(-2.5, 2.5, 1)
+            endfor v_i
+        else
+            v_phase = 0
+            v_phase_timer = v_wander_frames
+        endif
+    endif
+}
+
+# --------------------------------------------
+# Forces
+# --------------------------------------------
+def prepare_forces {
+    if v_phase == 0 then
+        v_pull = 0
+        v_damp = 1
+        v_cap = 2.4
+        v_move_scale = 0.7
+        v_bright = 45
+        v_color_mode = 0
+    elseif v_phase == 1 then
+        v_pull = 0.055
+        v_damp = 0.96
+        v_cap = 2.8
+        v_move_scale = 0.65
+        v_bright = 80
+        v_color_mode = 1
+    elseif v_phase == 2 then
+        v_pull = 0.09
+        v_damp = 0.88
+        v_cap = 1.6
+        v_move_scale = 0.45
+        v_bright = 100
+        v_color_mode = 2
+    else
+        v_pull = 0
+        v_damp = 0.99
+        v_cap = 3.2
+        v_move_scale = 0.85
+        v_bright = 70
+        v_color_mode = 3
+    endif
+
+    for v_i in (0, v_n - 1, 1)
+        if v_phase == 0 then
+            v_ax[v_i] = random(-0.12, 0.12, 2)
+            v_ay[v_i] = random(-0.12, 0.12, 2)
+        elseif v_phase == 3 then
+            v_ax[v_i] = random(-0.08, 0.08, 2)
+            v_ay[v_i] = random(-0.08, 0.08, 2)
+        else
+            # Spring-like personal pull (attractor falloff=-1 style)
+            v_ax[v_i] = (v_tx[v_i] - v_x[v_i]) * v_pull + random(-0.02, 0.02, 2)
+            v_ay[v_i] = (v_ty[v_i] - v_y[v_i]) * v_pull + random(-0.02, 0.02, 2)
+        endif
+    endfor v_i
+}
+
+# --------------------------------------------
+# Draw
+# --------------------------------------------
+def draw_scene {
+    begin_frame
+        if v_phase == 2 then
+            draw_rectangle(0, 0, 64, 64, navy, 28, true)
+        else
+            draw_rectangle(0, 0, 64, 64, navy, 18, true)
+        endif
+
+        # Ghost targets while locking
+        if v_phase == 1 then
+            for v_i in (0, v_n - 1, 1)
+                plot(v_tx[v_i], v_ty[v_i], dark_gray, 35)
+            endfor v_i
+        endif
+
+        for v_i in (0, v_n - 1, 1)
+            if v_color_mode == 0 then
+                plot(v_x[v_i], v_y[v_i], cyan, v_bright)
+            elseif v_color_mode == 1 then
+                plot(v_x[v_i], v_y[v_i], sky_blue, v_bright)
+            elseif v_color_mode == 2 then
+                plot(v_x[v_i], v_y[v_i], white, v_bright)
+            else
+                plot(v_x[v_i], v_y[v_i], gold, v_bright)
+            endif
+        endfor v_i
+    end_frame
+}
+
+# --------------------------------------------
+# Main
+# --------------------------------------------
+call init_particles
+call shuffle_shapes
+v_phase = 0
+v_phase_timer = v_wander_frames
+
+while true then
+    call advance_phase
+    call prepare_forces
+
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, v_damp, 0, v_n, post_move, v_cap, v_move_scale)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 1, 62, 1, 62, 0.92, 0, v_wall_hit, v_n)
+
+    call draw_scene
+    v_time = v_time + 1
+endwhile

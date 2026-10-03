@@ -133,6 +133,9 @@ static-circle collide uses full-velocity bounce then restitution scale
 │   ├── chladni_engine.py    # Vectorized Chladni particle step (chladni_step)
 │   ├── particle_engine.py   # Generic particle kernels (integrate / collide)
 │   ├── particle_commands.py # Pixil dispatch for particle_* commands
+│   ├── agent_engine.py      # Grid-following agent kernels (chemotaxis)
+│   ├── agent_commands.py    # Pixil dispatch for agent_* commands
+│   ├── slime_engine.py      # Legacy slime_step() → agent_chemotaxis wrapper
 │   ├── ink_engine.py        # Ink-in-water particle step (ink_step)
 │   └── jit_compiler/        # JIT compilation for math expressions
 │       ├── __init__.py
@@ -248,11 +251,12 @@ Add the new command to Pixil_Scripting_Guide.txt.
 PRODUCER-SIDE COMMANDS (no rgb_matrix_lib changes)
 --------------------------------------------------
 grid_program, field_program, grid_step, field_render, grid_fill, grid_reset,
-and chladni_step and ink_step are handled entirely in Pixil.py + pixil_utils. They use
-_append_to_draw_batch (same path as plot/mplot inside begin_frame) rather
-than command_queue tuples.
+chladni_step, ink_step, particle_*, and agent_* are handled entirely in
+Pixil.py + pixil_utils. Grid/field/chladni/ink draw via _append_to_draw_batch
+(same path as plot/mplot inside begin_frame). particle_* and agent_* only
+mutate arrays (no draw).
 
-To add or modify these:
+To add or modify grid/field engines:
 1. Block parsing: pixil_utils/grid_field_compiler.py (if block syntax changes)
 2. Expression language: pixil_utils/grid_expr.py (new builtins / operators)
 3. Execution/render: pixil_utils/grid_engine.py or chladni_engine.py
@@ -261,6 +265,17 @@ To add or modify these:
 6. parameter_types.py: grid_step, field_render, grid_fill, chladni_step, ink_step
 7. Tier 1 tests: tests/pixil/test_grid_field_compiler.py, test_grid_engine.py
 8. Pixil_Scripting_Guide.txt section 19
+
+To add a parameterized agent kernel (preferred over a new *_step show hook):
+1. Kernel: pixil_utils/agent_engine.py
+2. Dispatch/validation: pixil_utils/agent_commands.py (+ PARAMETER_TYPES entry)
+3. Pixil.py: agent_ line dispatch (beside particle_) and compiled-loop handler
+4. loop_compiler.py: add name to _AGENT_COMMANDS
+5. Tier 1 tests: tests/pixil/test_agent_engine.py
+6. Pixil_Scripting_Guide.txt section 21
+
+Prefer agent_chemotaxis-style APIs (explicit array args) over fixed-name
+show steps like slime_step / ink_step when the behavior is reusable.
 
 Do NOT add per-effect hard-coded functions in rgb_matrix_lib for these —
 keep simulation logic in pixil_utils so scripts stay declarative.
@@ -394,11 +409,17 @@ grid_expr.py
 
 grid_engine.py
   - Module-level _RUNTIME dict: per-program double buffers + active_idx
-  - run_grid_step(): execute step blocks, swap buffers, write back to PixilArray,
-    render draw block -> append_draw
+  - run_grid_step(): sync Pixil field arrays into active buffers, execute step
+    blocks, swap buffers, write back to PixilArray, render draw block
   - run_field_render(): voronoi / metaballs / formula modes
   - grid_fill(), reset_grid_runtime()
   - Draw modes: palette, fill, fire, expr (grid); signed / plot_if (field)
+  - Palette draw skips intensity < 1 (empty cells)
+
+agent_engine.py / agent_commands.py
+  - agent_chemotaxis(x, y, heading, field, size, ...): 8-way sense/turn/move/deposit
+  - Explicit array arguments (reusable across scripts)
+  - slime_engine.run_slime_step(): legacy fixed-name wrapper → agent_chemotaxis
 
 chladni_engine.py
   - Specialized particle engine (not grid_program) — 75 particles
@@ -410,6 +431,9 @@ Pixil.py wiring (~line 1851):
   - grid_step(name), field_render(name), grid_reset(name), grid_fill(arr, val)
   - chladni_step / chladni_step()
   - ink_step / ink_step()
+  - slime_step / slime_step() (legacy)
+  - agent_* (...) via agent_commands.run_agent_line
+  - particle_* (...) via particle_commands.run_particle_line
 
 ================================================================================
 7. COMMON MODIFICATION PATTERNS

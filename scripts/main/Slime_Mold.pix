@@ -1,0 +1,337 @@
+# Living Trails (Slime + Aurora)
+# Livelier branching: drifting food, agent startles, spore pulses.
+# Stable blur + soft intensity floor to keep A/B frames calm.
+
+throttle(0)
+fps(24)
+
+v_size = 32
+v_cells = 1024
+v_max = 31
+v_cell = 2
+
+v_n = 32
+v_step = 0.95
+
+# 0 = slime highways, 1 = aurora veins
+v_blend = 0
+v_blend_target = 0
+v_blend_speed = 0.0016
+v_hold_timer = 0
+v_hold_min = 140
+v_hold_max = 240
+
+v_mix = 0.08
+v_evap = 0.968
+v_deposit = 0.36
+v_sensor_dist = 4
+v_color_base = 44
+
+v_food_count = 5
+v_food_max = 6
+v_anchor_count = 4
+v_frame = 0
+v_stir_timer = 36
+v_spore_timer = 50
+
+create_array(v_phero, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_food_x, v_food_max, numeric)
+create_array(v_food_y, v_food_max, numeric)
+create_array(v_food_vx, v_food_max, numeric)
+create_array(v_food_vy, v_food_max, numeric)
+create_array(v_ax, v_anchor_count, numeric)
+create_array(v_ay, v_anchor_count, numeric)
+create_array(v_aphase, v_anchor_count, numeric)
+create_array(v_aradius, v_anchor_count, numeric)
+create_array(v_aspeed, v_anchor_count, numeric)
+
+grid_program trails {
+    size v_size
+    cell v_cell
+    fields v_phero
+    steps 1
+    boundary wrap
+
+    step v_phero {
+        v_blur = at(v_phero) + lap(v_phero) * 0.25
+        v_phero_next = clamp((at(v_phero) * (1 - v_mix) + v_blur * v_mix) * v_evap, 0, 1.2)
+    }
+
+    draw {
+        palette_field v_phero
+        color_base v_color_base
+        color_scale 28
+        intensity_base 8
+        intensity_scale 78
+    }
+}
+
+def lerp {
+    v_out = v_a + (v_b - v_a) * v_t
+}
+
+def place_food {
+    v_food_count = int(random(4, 6, 0))
+    for v_i in (0, v_food_count - 1, 1)
+        v_food_x[v_i] = random(4, 27, 1)
+        v_food_y[v_i] = random(4, 27, 1)
+        v_food_vx[v_i] = random(0.04, 0.14, 2) * (random(0, 1, 0) * 2 - 1)
+        v_food_vy[v_i] = random(0.04, 0.14, 2) * (random(0, 1, 0) * 2 - 1)
+    endfor v_i
+}
+
+def init_anchors {
+    for v_i in (0, v_anchor_count - 1, 1)
+        v_aphase[v_i] = random(0, tau, 2)
+        v_aradius[v_i] = random(5, 12, 1)
+        v_aspeed[v_i] = random(0.014, 0.032, 3)
+        if v_i % 2 == 0 then
+            v_aspeed[v_i] = 0 - v_aspeed[v_i]
+        endif
+    endfor v_i
+}
+
+def seed_blobs {
+    # Soft starter islands so agents don't collapse to one line
+    for v_b in (0, 4, 1)
+        v_fx = int(random(6, 25, 0))
+        v_fy = int(random(6, 25, 0))
+        v_amount = 0.45
+        call scent_at
+    endfor v_b
+}
+
+def init_world {
+    grid_fill(v_phero, 0.06)
+    for v_i in (0, v_n - 1, 1)
+        v_x[v_i] = random(2, 29, 1)
+        v_y[v_i] = random(2, 29, 1)
+        v_dir[v_i] = int(random(0, 7, 0))
+    endfor v_i
+    call place_food
+    call init_anchors
+    call seed_blobs
+    v_blend = 0
+    v_blend_target = 0
+    v_hold_timer = v_hold_min + int(random(0, 40, 0))
+    v_stir_timer = 30
+    v_spore_timer = 40
+    grid_reset(trails)
+}
+
+def update_blend {
+    if v_hold_timer > 0 then
+        v_hold_timer = v_hold_timer - 1
+    else
+        v_delta = v_blend_target - v_blend
+        if abs(v_delta) < 0.002 then
+            v_blend = v_blend_target
+            v_hold_timer = v_hold_min + int(random(0, v_hold_max - v_hold_min, 0))
+            if v_blend_target < 0.5 then
+                v_blend_target = 1
+            else
+                v_blend_target = 0
+                call place_food
+            endif
+        else
+            if v_delta > 0 then
+                v_blend = v_blend + v_blend_speed
+                if v_blend > v_blend_target then
+                    v_blend = v_blend_target
+                endif
+            else
+                v_blend = v_blend - v_blend_speed
+                if v_blend < v_blend_target then
+                    v_blend = v_blend_target
+                endif
+            endif
+        endif
+    endif
+
+    v_t = v_blend
+    v_t = v_t * v_t * (3 - 2 * v_t)
+
+    v_a = 0.4
+    v_b = 0.22
+    call lerp
+    v_deposit = v_out
+
+    v_a = 0.06
+    v_b = 0.1
+    call lerp
+    v_mix = v_out
+
+    # Faster evaporate in slime mode so old highways die
+    v_a = 0.962
+    v_b = 0.978
+    call lerp
+    v_evap = v_out
+
+    v_a = 3.5
+    v_b = 5.5
+    call lerp
+    v_sensor_dist = v_out
+
+    v_a = 40
+    v_b = 54
+    call lerp
+    v_color_base = v_out
+}
+
+def update_anchors {
+    for v_i in (0, v_anchor_count - 1, 1)
+        v_aphase[v_i] = v_aphase[v_i] + v_aspeed[v_i]
+        if v_i == 0 then
+            v_cx = 11
+            v_cy = 14
+        elseif v_i == 1 then
+            v_cx = 21
+            v_cy = 11
+        elseif v_i == 2 then
+            v_cx = 16
+            v_cy = 21
+        else
+            v_cx = 18
+            v_cy = 16
+        endif
+        v_ax[v_i] = v_cx + cos(v_aphase[v_i]) * v_aradius[v_i]
+        v_ay[v_i] = v_cy + sin(v_aphase[v_i] * 1.3) * v_aradius[v_i] * 0.75
+        if v_ax[v_i] < 2 then
+            v_ax[v_i] = 2
+        elseif v_ax[v_i] > 29 then
+            v_ax[v_i] = 29
+        endif
+        if v_ay[v_i] < 2 then
+            v_ay[v_i] = 2
+        elseif v_ay[v_i] > 29 then
+            v_ay[v_i] = 29
+        endif
+    endfor v_i
+}
+
+def drift_food {
+    for v_i in (0, v_food_count - 1, 1)
+        v_food_x[v_i] = v_food_x[v_i] + v_food_vx[v_i]
+        v_food_y[v_i] = v_food_y[v_i] + v_food_vy[v_i]
+        if v_food_x[v_i] < 3 then
+            v_food_x[v_i] = 3
+            v_food_vx[v_i] = abs(v_food_vx[v_i])
+        elseif v_food_x[v_i] > 28 then
+            v_food_x[v_i] = 28
+            v_food_vx[v_i] = 0 - abs(v_food_vx[v_i])
+        endif
+        if v_food_y[v_i] < 3 then
+            v_food_y[v_i] = 3
+            v_food_vy[v_i] = abs(v_food_vy[v_i])
+        elseif v_food_y[v_i] > 28 then
+            v_food_y[v_i] = 28
+            v_food_vy[v_i] = 0 - abs(v_food_vy[v_i])
+        endif
+        # Occasional course change so paths don't settle
+        if random(0, 1, 2) < 0.02 then
+            v_food_vx[v_i] = random(0.04, 0.16, 2) * (random(0, 1, 0) * 2 - 1)
+            v_food_vy[v_i] = random(0.04, 0.16, 2) * (random(0, 1, 0) * 2 - 1)
+        endif
+    endfor v_i
+}
+
+def stir_agents {
+    # Kick a chunk of agents off the locked highway
+    v_kicks = int(random(6, 12, 0))
+    for v_k in (0, v_kicks - 1, 1)
+        v_i = int(random(0, v_n - 1, 0))
+        v_dir[v_i] = int(random(0, 7, 0))
+        if random(0, 1, 2) < 0.35 then
+            v_x[v_i] = random(3, 28, 1)
+            v_y[v_i] = random(3, 28, 1)
+        endif
+    endfor v_k
+    v_stir_timer = int(random(28, 55, 0))
+}
+
+def spore_pulse {
+    v_fx = int(random(3, 28, 0))
+    v_fy = int(random(3, 28, 0))
+    v_amount = random(0.25, 0.55, 2)
+    call scent_at
+    v_spore_timer = int(random(35, 70, 0))
+}
+
+def scent_at {
+    if v_fx >= 0 and v_fx <= v_max and v_fy >= 0 and v_fy <= v_max then
+        v_idx = v_fy * v_size + v_fx
+        v_phero[v_idx] = min(1.15, v_phero[v_idx] + v_amount)
+        if v_fx > 0 then
+            v_phero[v_idx - 1] = min(1.15, v_phero[v_idx - 1] + v_amount * 0.35)
+        endif
+        if v_fx < v_max then
+            v_phero[v_idx + 1] = min(1.15, v_phero[v_idx + 1] + v_amount * 0.35)
+        endif
+        if v_fy > 0 then
+            v_phero[v_idx - v_size] = min(1.15, v_phero[v_idx - v_size] + v_amount * 0.35)
+        endif
+        if v_fy < v_max then
+            v_phero[v_idx + v_size] = min(1.15, v_phero[v_idx + v_size] + v_amount * 0.35)
+        endif
+    endif
+}
+
+def inject_scents {
+    v_slime_w = 1 - v_blend
+    v_aurora_w = v_blend
+    v_slime_w = v_slime_w * v_slime_w
+    v_aurora_w = v_aurora_w * v_aurora_w
+
+    if v_slime_w > 0.04 then
+        call drift_food
+        if v_frame % 3 == 0 then
+            for v_i in (0, v_food_count - 1, 1)
+                v_fx = int(v_food_x[v_i])
+                v_fy = int(v_food_y[v_i])
+                v_amount = 0.42 * v_slime_w
+                call scent_at
+            endfor v_i
+        endif
+    endif
+
+    if v_aurora_w > 0.04 and v_frame % 2 == 0 then
+        for v_i in (0, v_anchor_count - 1, 1)
+            v_fx = int(v_ax[v_i])
+            v_fy = int(v_ay[v_i])
+            v_amount = 0.3 * v_aurora_w
+            call scent_at
+        endfor v_i
+    endif
+}
+
+call init_world
+
+while true then
+    call update_blend
+    call update_anchors
+    call inject_scents
+
+    v_stir_timer = v_stir_timer - 1
+    if v_stir_timer <= 0 then
+        call stir_agents
+    endif
+
+    v_spore_timer = v_spore_timer - 1
+    if v_spore_timer <= 0 then
+        call spore_pulse
+    endif
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_phero, v_size, v_sensor_dist, v_step, v_deposit, v_n, 1)
+
+    begin_frame
+        grid_step(trails)
+        for v_i in (0, v_n - 1, 1)
+            plot(v_x[v_i] * v_cell, v_y[v_i] * v_cell, sky_blue, 40)
+        endfor v_i
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile
