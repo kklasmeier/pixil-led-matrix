@@ -1,0 +1,257 @@
+# Split Brain
+# Two tribes lock to opposite-spinning wells. The poles wander the panel,
+# then collapse to a shared core and peel apart with opposite swirl.
+
+throttle(0)
+fps(60)
+
+v_n = 20
+v_half = 10
+v_time = 0
+v_cycle_duration = 16
+v_frame_scale = 0.5
+v_cx = 32
+v_cy = 32
+v_margin = 6
+v_max_pos = 57
+v_phase = 0
+v_prev_phase = -1
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_team_a, v_n, numeric)
+create_array(v_team_b, v_n, numeric)
+create_array(v_well_a_x, 1, numeric)
+create_array(v_well_a_y, 1, numeric)
+create_array(v_well_b_x, 1, numeric)
+create_array(v_well_b_y, 1, numeric)
+
+def init_split {
+    for v_i in (0, v_n - 1, 1)
+        v_vx[v_i] = random(-0.6, 0.6, 2)
+        v_vy[v_i] = random(-0.6, 0.6, 2)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+        if v_i < v_half then
+            v_x[v_i] = random(8, 28, 0)
+            v_y[v_i] = random(16, 48, 0)
+            v_team_a[v_i] = 1
+            v_team_b[v_i] = 0
+        else
+            v_x[v_i] = random(36, 56, 0)
+            v_y[v_i] = random(16, 48, 0)
+            v_team_a[v_i] = 0
+            v_team_b[v_i] = 1
+        endif
+    endfor v_i
+
+    v_awx = random(10, 24, 0)
+    v_awy = random(12, 52, 0)
+    v_bwx = random(40, 54, 0)
+    v_bwy = random(12, 52, 0)
+    v_awvx = random(0.12, 0.28, 2)
+    v_awvy = random(-0.22, 0.22, 2)
+    v_bwvx = random(-0.28, -0.12, 2)
+    v_bwvy = random(-0.22, 0.22, 2)
+    v_well_a_x[0] = v_awx
+    v_well_a_y[0] = v_awy
+    v_well_b_x[0] = v_bwx
+    v_well_b_y[0] = v_bwy
+}
+
+def bounce_pole {
+    if v_px < v_margin then
+        v_px = v_margin
+        v_pvx = abs(v_pvx)
+    elseif v_px > v_max_pos then
+        v_px = v_max_pos
+        v_pvx = 0 - abs(v_pvx)
+    endif
+    if v_py < v_margin then
+        v_py = v_margin
+        v_pvy = abs(v_pvy)
+    elseif v_py > v_max_pos then
+        v_py = v_max_pos
+        v_pvy = 0 - abs(v_pvy)
+    endif
+}
+
+def wander_poles {
+    v_awvx = v_awvx + random(-0.035, 0.035, 3)
+    v_awvy = v_awvy + random(-0.035, 0.035, 3)
+    v_bwvx = v_bwvx + random(-0.035, 0.035, 3)
+    v_bwvy = v_bwvy + random(-0.035, 0.035, 3)
+
+    v_dx = v_awx - v_bwx
+    v_dy = v_awy - v_bwy
+    v_d2 = v_dx * v_dx + v_dy * v_dy
+    if v_d2 < 144 and v_d2 > 0.4 then
+        v_sep = 0.012
+        v_awvx = v_awvx + v_dx * v_sep
+        v_awvy = v_awvy + v_dy * v_sep
+        v_bwvx = v_bwvx - v_dx * v_sep
+        v_bwvy = v_bwvy - v_dy * v_sep
+    endif
+
+    if v_awvx > 0.32 then
+        v_awvx = 0.32
+    elseif v_awvx < -0.32 then
+        v_awvx = -0.32
+    endif
+    if v_awvy > 0.32 then
+        v_awvy = 0.32
+    elseif v_awvy < -0.32 then
+        v_awvy = -0.32
+    endif
+    if v_bwvx > 0.32 then
+        v_bwvx = 0.32
+    elseif v_bwvx < -0.32 then
+        v_bwvx = -0.32
+    endif
+    if v_bwvy > 0.32 then
+        v_bwvy = 0.32
+    elseif v_bwvy < -0.32 then
+        v_bwvy = -0.32
+    endif
+
+    v_awx = v_awx + v_awvx
+    v_awy = v_awy + v_awvy
+    v_bwx = v_bwx + v_bwvx
+    v_bwy = v_bwy + v_bwvy
+
+    v_px = v_awx
+    v_py = v_awy
+    v_pvx = v_awvx
+    v_pvy = v_awvy
+    call bounce_pole
+    v_awx = v_px
+    v_awy = v_py
+    v_awvx = v_pvx
+    v_awvy = v_pvy
+
+    v_px = v_bwx
+    v_py = v_bwy
+    v_pvx = v_bwvx
+    v_pvy = v_bwvy
+    call bounce_pole
+    v_bwx = v_px
+    v_bwy = v_py
+    v_bwvx = v_pvx
+    v_bwvy = v_pvy
+}
+
+def place_wells {
+    v_cycle = v_time % v_cycle_duration
+    v_pull = 0.028
+    v_falloff = -1
+    v_soft = 1.5
+    v_max_acc = 8
+    v_swirl_a = 0.35
+    v_swirl_b = -0.35
+    v_show_wells = 1
+    v_phase = 0
+
+    if v_cycle >= 8 and v_cycle < 11 then
+        v_phase = 1
+        v_pull = 0.04
+        v_swirl_a = 0
+        v_swirl_b = 0
+    elseif v_cycle >= 11 and v_cycle < 13.5 then
+        v_phase = 2
+        v_pull = -0.09
+        v_falloff = 1
+        v_soft = 3
+        v_max_acc = 6
+        v_swirl_a = 2.2
+        v_swirl_b = -2.2
+    elseif v_cycle >= 13.5 then
+        v_phase = 3
+        v_show_wells = 0
+        v_pull = 0
+        v_swirl_a = 0
+        v_swirl_b = 0
+    endif
+
+    if v_phase == 0 then
+        if v_prev_phase == 2 or v_prev_phase == 3 then
+            v_awvx = random(0.14, 0.28, 2)
+            v_awvy = random(-0.24, 0.24, 2)
+            v_bwvx = random(-0.28, -0.14, 2)
+            v_bwvy = random(-0.24, 0.24, 2)
+        endif
+        call wander_poles
+        v_well_a_x[0] = v_awx
+        v_well_a_y[0] = v_awy
+        v_well_b_x[0] = v_bwx
+        v_well_b_y[0] = v_bwy
+    elseif v_phase == 1 then
+        v_t = (v_cycle - 8) / 3
+        v_well_a_x[0] = v_awx + (v_cx - v_awx) * v_t
+        v_well_a_y[0] = v_awy + (v_cy - v_awy) * v_t
+        v_well_b_x[0] = v_bwx + (v_cx - v_bwx) * v_t
+        v_well_b_y[0] = v_bwy + (v_cy - v_bwy) * v_t
+    else
+        v_well_a_x[0] = v_cx
+        v_well_a_y[0] = v_cy
+        v_well_b_x[0] = v_cx
+        v_well_b_y[0] = v_cy
+        v_awx = v_cx
+        v_awy = v_cy
+        v_bwx = v_cx
+        v_bwy = v_cy
+    endif
+
+    v_prev_phase = v_phase
+}
+
+def kick_noise {
+    for v_i in (0, v_n - 1, 1)
+        v_ax[v_i] = random(-0.08, 0.08, 2)
+        v_ay[v_i] = random(-0.08, 0.08, 2)
+    endfor v_i
+}
+
+call init_split
+
+while true then
+    call place_wells
+    call kick_noise
+
+    if v_show_wells == 1 then
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_well_a_x, v_well_a_y, v_pull, v_team_a, v_falloff, v_soft, v_max_acc, v_n, 1, v_swirl_a)
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_well_b_x, v_well_b_y, v_pull, v_team_b, v_falloff, v_soft, v_max_acc, v_n, 1, v_swirl_b)
+    endif
+
+    v_mood = sin(v_time * 0.12) + 1
+    v_speed_scale = 0.55 + v_mood * 1.2
+    v_move_scale = v_speed_scale * v_frame_scale
+    v_bright = 40 + v_mood * 28
+
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 1, 0, v_n, post_move, 2.2, v_move_scale)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 0, 63, 0, 63, 0.92, 0, v_wall_hit, v_n)
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 22, true)
+        if v_show_wells == 1 then
+            draw_line(v_well_a_x[0], v_well_a_y[0], v_well_b_x[0], v_well_b_y[0], indigo, 35)
+            plot(v_well_a_x[0], v_well_a_y[0], cyan, 90)
+            plot(v_well_b_x[0], v_well_b_y[0], magenta, 90)
+        endif
+        for v_i in (0, v_n - 1, 1)
+            if v_i < v_half then
+                plot(v_x[v_i], v_y[v_i], cyan, v_bright)
+            else
+                plot(v_x[v_i], v_y[v_i], magenta, v_bright)
+            endif
+        endfor v_i
+    end_frame
+
+    v_time = v_time + 0.025
+endwhile

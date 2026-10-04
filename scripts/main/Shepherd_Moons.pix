@@ -1,0 +1,293 @@
+# Shepherd Moons
+# Mini Saturn with a shuffle-bag of ring morphs. Each morph plays once
+# before any repeats: breathe, thickness, spokes, oval, clump, arc, lanes.
+
+throttle(0)
+fps(60)
+
+v_n = 26
+v_moons = 2
+v_crests = 8
+v_morphs = 7
+v_time = 0
+v_cx = 32
+v_cy = 32
+v_ring_r = 20
+v_frame_scale = 0.85
+v_planet_ang = 0
+v_morph = 0
+v_morph_t = 0
+v_morph_len = 220
+v_deck_pos = 0
+v_wobble = 1.8
+v_spoke_pulse = 0
+v_moon_sign = -1
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_lane_in, v_n, numeric)
+create_array(v_lane_out, v_n, numeric)
+
+create_array(v_well_x, 1, numeric)
+create_array(v_well_y, 1, numeric)
+create_array(v_mx, v_moons, numeric)
+create_array(v_my, v_moons, numeric)
+create_array(v_mforce, v_moons, numeric)
+create_array(v_mang, v_moons, numeric)
+create_array(v_mrad0, v_moons, numeric)
+create_array(v_mspd, v_moons, numeric)
+create_array(v_deck, v_morphs, numeric)
+create_array(v_crest_x, v_crests, numeric)
+create_array(v_crest_y, v_crests, numeric)
+
+v_well_x[0] = v_cx
+v_well_y[0] = v_cy
+v_mrad0[0] = 14
+v_mrad0[1] = 26
+v_mspd[0] = 0.052
+v_mspd[1] = 0.028
+
+def init_ring {
+    for v_i in (0, v_n - 1, 1)
+        v_a = (6.2832 * v_i) / v_n + random(-0.08, 0.08, 2)
+        v_rad = v_ring_r + random(-2.2, 2.2, 1)
+        v_x[v_i] = v_cx + cos(v_a) * v_rad
+        v_y[v_i] = v_cy + sin(v_a) * v_rad
+        v_spin = 0.5 + random(-0.08, 0.08, 2)
+        v_vx[v_i] = 0 - sin(v_a) * v_spin
+        v_vy[v_i] = cos(v_a) * v_spin
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+        if v_i < 13 then
+            v_lane_in[v_i] = 1
+            v_lane_out[v_i] = 0
+        else
+            v_lane_in[v_i] = 0
+            v_lane_out[v_i] = 1
+        endif
+    endfor v_i
+    v_mang[0] = random(0, 628, 0) / 100
+    v_mang[1] = v_mang[0] + 2.4
+}
+
+def shuffle_deck {
+    for v_i in (0, v_morphs - 1, 1)
+        v_deck[v_i] = v_i
+    endfor v_i
+    for v_i in (v_morphs - 1, 1, -1)
+        v_j = random(0, v_i, 0)
+        v_tmp = v_deck[v_i]
+        v_deck[v_i] = v_deck[v_j]
+        v_deck[v_j] = v_tmp
+    endfor v_i
+    v_deck_pos = 0
+}
+
+def place_crests {
+    # Fills v_crest_* on a circle of radius v_target_r around the well.
+    v_step = 6.2832 / v_crests
+    for v_c in (0, v_crests - 1, 1)
+        v_a = v_c * v_step + v_time * 0.15
+        v_crest_x[v_c] = v_well_x[0] + cos(v_a) * v_target_r
+        v_crest_y[v_c] = v_well_y[0] + sin(v_a) * v_target_r
+    endfor v_c
+}
+
+def enter_morph {
+    v_spoke_pulse = 0
+    v_moon_sign = -1
+    v_wobble = 1.8
+    v_ring_r = 20
+    if v_morph == 5 then
+        # Arc: hide roughly half the ring by angle.
+        for v_i in (0, v_n - 1, 1)
+            v_ang = atan2(v_y[v_i] - v_cy, v_x[v_i] - v_cx)
+            if v_ang > 0 then
+                v_active[v_i] = 0
+            else
+                v_active[v_i] = 1
+            endif
+        endfor v_i
+    else
+        for v_i in (0, v_n - 1, 1)
+            v_active[v_i] = 1
+        endfor v_i
+    endif
+}
+
+def exit_morph {
+    if v_morph == 5 then
+        for v_i in (0, v_n - 1, 1)
+            if v_active[v_i] == 0 then
+                v_a = (6.2832 * v_i) / v_n
+                v_x[v_i] = v_well_x[0] + cos(v_a) * v_ring_r
+                v_y[v_i] = v_well_y[0] + sin(v_a) * v_ring_r
+                v_vx[v_i] = 0 - sin(v_a) * 0.5
+                v_vy[v_i] = cos(v_a) * 0.5
+            endif
+            v_active[v_i] = 1
+        endfor v_i
+    endif
+}
+
+def next_morph {
+    call exit_morph
+    if v_deck_pos >= v_morphs then
+        call shuffle_deck
+    endif
+    v_morph = v_deck[v_deck_pos]
+    v_deck_pos = v_deck_pos + 1
+    v_morph_t = 0
+    v_morph_len = random(200, 300, 0)
+    call enter_morph
+}
+
+def kick_ring {
+    for v_i in (0, v_n - 1, 1)
+        if v_active[v_i] == 1 then
+            v_vx[v_i] = v_vx[v_i] + random(-0.25, 0.25, 2)
+            v_vy[v_i] = v_vy[v_i] + random(-0.25, 0.25, 2)
+        endif
+    endfor v_i
+}
+
+call init_ring
+call shuffle_deck
+call next_morph
+
+while true then
+    v_planet_ang = v_planet_ang + 0.018
+    v_morph_t = v_morph_t + 1
+    if v_morph_t >= v_morph_len then
+        call next_morph
+    endif
+
+    v_phase = v_morph_t / v_morph_len
+    v_wobble = 1.8
+    v_well_pull = 0.016
+    v_well_swirl = 0.5
+    v_moon_sign = -1
+    v_storm = 1
+    v_spoke_pulse = 0
+    v_use_crests = 0
+    v_use_lanes = 0
+    v_target_r = v_ring_r
+
+    # 0 breathe | 1 thickness | 2 spokes | 3 oval | 4 clump | 5 arc | 6 lanes
+    if v_morph == 0 then
+        v_target_r = 16 + 5 * (sin(v_time * 0.35) + 1) * 0.5
+        v_use_crests = 1
+        v_well_pull = 0.01
+    elseif v_morph == 1 then
+        v_thick = (sin(v_time * 0.4) + 1) * 0.5
+        v_well_pull = 0.01 + 0.02 * (1 - v_thick)
+        v_storm = 0.7 + 1.1 * v_thick
+        if v_morph_t % 45 == 0 then
+            call kick_ring
+        endif
+    elseif v_morph == 2 then
+        if v_morph_t % 50 < 12 then
+            v_spoke_pulse = 1
+        endif
+        v_well_pull = 0.014
+    elseif v_morph == 3 then
+        v_wobble = 6.5
+        v_well_swirl = 0.65
+    elseif v_morph == 4 then
+        if v_phase < 0.45 then
+            v_moon_sign = 1
+            v_storm = 1.3
+        else
+            v_moon_sign = -1
+            v_storm = 1.5
+        endif
+    elseif v_morph == 5 then
+        v_well_pull = 0.02
+        v_storm = 1.2
+    elseif v_morph == 6 then
+        v_use_lanes = 1
+        v_well_pull = 0.008
+    endif
+
+    v_well_x[0] = v_cx + v_wobble * sin(v_time * 0.07)
+    v_well_y[0] = v_cy + (v_wobble * 0.75) * cos(v_time * 0.055)
+
+    for v_i in (0, v_moons - 1, 1)
+        v_mang[v_i] = v_mang[v_i] + v_mspd[v_i]
+        v_mrad = v_mrad0[v_i] + 1.2 * sin(v_time * 0.2 + v_i * 1.7)
+        v_mx[v_i] = v_well_x[0] + cos(v_mang[v_i]) * v_mrad
+        v_my[v_i] = v_well_y[0] + sin(v_mang[v_i]) * v_mrad
+        v_mforce[v_i] = v_moon_sign * (0.09 + 0.025 * sin(v_time * 0.5 + v_i)) * v_storm
+    endfor v_i
+
+    v_dxm = v_mx[0] - v_mx[1]
+    v_dym = v_my[0] - v_my[1]
+    if v_dxm * v_dxm + v_dym * v_dym < 100 then
+        v_mforce[0] = v_mforce[0] * 1.4
+        v_mforce[1] = v_mforce[1] * 1.4
+    endif
+
+    for v_i in (0, v_n - 1, 1)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+    endfor v_i
+
+    if v_spoke_pulse == 1 then
+        # Outward burst from the planet.
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_well_x, v_well_y, -0.12, 1, 1, 3, 8, v_n, 1, 0)
+    else
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_well_x, v_well_y, v_well_pull, 1, -1, 2.5, 5, v_n, 1, v_well_swirl)
+    endif
+
+    particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_mx, v_my, v_mforce, 1, 2, 2.2, 6, v_n, v_moons, 0)
+
+    if v_use_crests == 1 then
+        call place_crests
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_crest_x, v_crest_y, 0.035, 1, -1, 1.5, 5, v_n, v_crests, 0.2)
+    endif
+
+    if v_use_lanes == 1 then
+        v_target_r = 16
+        call place_crests
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_crest_x, v_crest_y, 0.04, v_lane_in, -1, 1.5, 5, v_n, v_crests, 0.25)
+        v_target_r = 24
+        call place_crests
+        particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_crest_x, v_crest_y, 0.04, v_lane_out, -1, 1.5, 5, v_n, v_crests, 0.25)
+    endif
+
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 0.997, 0, v_n, post_move, 2.2, v_frame_scale)
+    particle_collide_circle_bounds(v_x, v_y, v_vx, v_vy, v_active, v_well_x[0], v_well_y[0], 29, 0.7, 0.4, 0, 0, v_wall_hit, v_n)
+
+    v_mood = sin(v_time * 0.1) + 1
+    v_dust_bright = 45 + v_mood * 20
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 18, true)
+        draw_circle(v_well_x[0], v_well_y[0], 3, gold, 40, true)
+        plot(v_well_x[0], v_well_y[0], yellow, 85)
+        plot(v_well_x[0] + cos(v_planet_ang) * 2, v_well_y[0] + sin(v_planet_ang) * 2, orange, 90)
+        plot(v_well_x[0] + cos(v_planet_ang + 2.2) * 1.5, v_well_y[0] + sin(v_planet_ang + 2.2) * 1.5, bronze, 70)
+        for v_i in (0, v_n - 1, 1)
+            if v_active[v_i] == 1 then
+                if v_morph == 6 and v_lane_out[v_i] == 1 then
+                    plot(v_x[v_i], v_y[v_i], silver, v_dust_bright)
+                else
+                    plot(v_x[v_i], v_y[v_i], white, v_dust_bright)
+                endif
+            endif
+        endfor v_i
+        plot(v_mx[0], v_my[0], cyan, 100)
+        plot(v_mx[0] + 1, v_my[0], cyan, 60)
+        plot(v_mx[1], v_my[1], magenta, 100)
+        plot(v_mx[1] + 1, v_my[1], magenta, 60)
+    end_frame
+
+    v_time = v_time + 0.035
+endwhile

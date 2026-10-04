@@ -1,0 +1,152 @@
+# Soap Bubbles
+# Soft metaball blobs merge when close. Centers bounce gently via collide.
+# Pops spray short burnout sparks, then the bubble reforms below.
+
+throttle(0)
+fps(60)
+
+v_n = 5
+v_sparks = 8
+v_time = 0
+v_wind_x = 0
+v_wind_y = 0
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_radius, v_n, numeric)
+create_array(v_collide_r, v_n, numeric)
+create_array(v_mass, v_n, numeric)
+create_array(v_cool, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_pair_hit, v_n, numeric)
+
+field_program soap {
+    size 64
+    sites v_x, v_y
+    weights v_radius
+    active v_active
+    mode formula
+    value {
+        v_sum = sum_sites((weight * weight) / max(dist2, 1))
+    }
+    plot_if v_sum > 0.95
+    color clamp(v_sum * 18 + 20, 15, 90)
+    opacity clamp(v_sum * 28 + 35, 40, 85)
+}
+
+def spawn_bubble {
+    v_x[v_i] = random(10, 54, 0)
+    v_y[v_i] = random(20, 52, 0)
+    v_vx[v_i] = random(-0.7, 0.7, 2)
+    v_vy[v_i] = random(-0.55, 0.55, 2)
+    v_ax[v_i] = 0
+    v_ay[v_i] = 0
+    v_radius[v_i] = random(6, 11, 1)
+    # Smaller than visual weight so soft collide still allows metaball merge.
+    v_collide_r[v_i] = v_radius[v_i] * 0.32
+    v_mass[v_i] = v_radius[v_i]
+    v_active[v_i] = 1
+    v_cool[v_i] = 0
+}
+
+def pop_bubble {
+    # Assumes called inside begin_frame so burnout sparks composite this frame.
+    v_px = v_x[v_i]
+    v_py = v_y[v_i]
+    v_pr = v_radius[v_i]
+    v_active[v_i] = 0
+    v_cool[v_i] = random(35, 70, 0)
+    draw_circle(v_px, v_py, v_pr, white, 70, false, 220, fade)
+    for v_s in (0, v_sparks - 1, 1)
+        v_ang = random(0, 628, 0) / 100
+        v_dist = random(1, v_pr + 2, 1)
+        v_sx = v_px + cos(v_ang) * v_dist
+        v_sy = v_py + sin(v_ang) * v_dist
+        if v_s % 2 == 0 then
+            plot(v_sx, v_sy, cyan, 95, 280, fade)
+        else
+            plot(v_sx, v_sy, white, 85, 220, fade)
+        endif
+    endfor v_s
+}
+
+def init_bubbles {
+    for v_i in (0, v_n - 1, 1)
+        call spawn_bubble
+        v_y[v_i] = random(16, 50, 0)
+    endfor v_i
+}
+
+call init_bubbles
+
+while true then
+    # Slow swirling current so blobs circulate instead of parking at the top.
+    v_wind_x = 0.04 * sin(v_time * 0.035) + 0.025 * cos(v_time * 0.019)
+    v_wind_y = 0.035 * cos(v_time * 0.028) + 0.02 * sin(v_time * 0.051)
+
+    for v_i in (0, v_n - 1, 1)
+        if v_active[v_i] == 1 then
+            v_ax[v_i] = v_wind_x + random(-0.02, 0.02, 3)
+            v_ay[v_i] = v_wind_y + random(-0.02, 0.02, 3)
+            # Mild lift only in the lower half; near the top, push back down.
+            if v_y[v_i] > 38 then
+                v_ay[v_i] = v_ay[v_i] - 0.02
+            elseif v_y[v_i] < 18 then
+                v_ay[v_i] = v_ay[v_i] + 0.035
+            endif
+        else
+            v_ax[v_i] = 0
+            v_ay[v_i] = 0
+        endif
+    endfor v_i
+
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 0.988, 0, v_n, post_move, 1.8, 1)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 6, 57, 6, 57, 0.85, v_collide_r, v_wall_hit, v_n)
+    # Soft squish — small collide radii leave room for metaball merge.
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_collide_r, v_mass, 0.45, v_pair_hit, v_n)
+
+    # Kick off walls so nothing lodges in a corner.
+    for v_i in (0, v_n - 1, 1)
+        if v_active[v_i] == 1 and v_wall_hit[v_i] == 1 then
+            v_vx[v_i] = v_vx[v_i] + random(-0.45, 0.45, 2)
+            v_vy[v_i] = v_vy[v_i] + random(-0.45, 0.45, 2)
+            if v_y[v_i] < 16 then
+                v_vy[v_i] = abs(v_vy[v_i]) + 0.35
+            elseif v_y[v_i] > 48 then
+                v_vy[v_i] = 0 - abs(v_vy[v_i]) - 0.25
+            endif
+        endif
+        if v_active[v_i] == 0 then
+            v_cool[v_i] = v_cool[v_i] - 1
+            if v_cool[v_i] <= 0 then
+                call spawn_bubble
+            endif
+        endif
+    endfor v_i
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 22, true)
+        field_render(soap)
+        for v_i in (0, v_n - 1, 1)
+            if v_active[v_i] == 1 then
+                plot(v_x[v_i] - v_radius[v_i] * 0.25, v_y[v_i] - v_radius[v_i] * 0.25, white, 55)
+                v_do_pop = 0
+                if v_pair_hit[v_i] == 1 and random(0, 100, 0) < 10 then
+                    v_do_pop = 1
+                elseif random(0, 320, 0) < 1 then
+                    v_do_pop = 1
+                endif
+                if v_do_pop == 1 then
+                    call pop_bubble
+                endif
+            endif
+        endfor v_i
+    end_frame
+
+    v_time = v_time + 1
+endwhile

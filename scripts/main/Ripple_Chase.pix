@@ -1,0 +1,151 @@
+# Ripple Chase
+# Drops splash expanding rings. Crest attractors ride the front; dust
+# chases those beads. Kernels: attractors, integrate, wall bounce.
+
+throttle(0)
+fps(60)
+
+v_n = 18
+v_crests = 4
+v_time = 0
+v_drop_x = 32
+v_drop_y = 32
+v_radius = 3
+v_grow = 0.55
+v_max_r = 34
+v_ring_life = 0
+v_frame_scale = 0.9
+v_ring_dir = 1
+v_crest_angle = 0
+v_swirl = -0.45
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_crest_x, v_crests, numeric)
+create_array(v_crest_y, v_crests, numeric)
+create_array(v_force, v_crests, numeric)
+
+# Up to two ghost rings (radius only; drawn with burnout outlines)
+v_ghost1_r = 0
+v_ghost1_x = 32
+v_ghost1_y = 32
+v_ghost2_r = 0
+v_ghost2_x = 32
+v_ghost2_y = 32
+
+def init_dust {
+    for v_i in (0, v_n - 1, 1)
+        v_x[v_i] = random(8, 56, 0)
+        v_y[v_i] = random(8, 56, 0)
+        v_vx[v_i] = random(-0.4, 0.4, 2)
+        v_vy[v_i] = random(-0.4, 0.4, 2)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+    endfor v_i
+}
+
+def new_drop {
+    v_ghost2_r = v_ghost1_r
+    v_ghost2_x = v_ghost1_x
+    v_ghost2_y = v_ghost1_y
+    v_ghost1_r = v_radius
+    v_ghost1_x = v_drop_x
+    v_ghost1_y = v_drop_y
+    v_drop_x = random(12, 52, 0)
+    v_drop_y = random(12, 52, 0)
+    v_radius = 3
+    v_ring_life = 0
+    v_grow = random(0.45, 0.7, 2)
+    # +1 = crest beads CCW, -1 = CW. Dust swirl is always opposite.
+    if random(0, 1, 0) == 0 then
+        v_ring_dir = 1
+    else
+        v_ring_dir = -1
+    endif
+    v_swirl = 0 - v_ring_dir * 0.45
+}
+
+def place_crests {
+    v_crest_angle = v_crest_angle + v_ring_dir * 0.05
+    v_pull = 0.04 + 0.02 * sin(v_time * 0.8)
+    v_step = 6.2832 / v_crests
+    for v_i in (0, v_crests - 1, 1)
+        v_a = v_crest_angle + v_i * v_step
+        v_crest_x[v_i] = v_drop_x + cos(v_a) * v_radius
+        v_crest_y[v_i] = v_drop_y + sin(v_a) * v_radius
+        v_force[v_i] = v_pull
+    endfor v_i
+}
+
+call init_dust
+call new_drop
+
+while true then
+    v_radius = v_radius + v_grow
+    v_ring_life = v_ring_life + 1
+    if v_radius >= v_max_r then
+        call new_drop
+    endif
+    if v_ghost1_r > 0 then
+        v_ghost1_r = v_ghost1_r + v_grow * 0.85
+        if v_ghost1_r > v_max_r + 6 then
+            v_ghost1_r = 0
+        endif
+    endif
+    if v_ghost2_r > 0 then
+        v_ghost2_r = v_ghost2_r + v_grow * 0.7
+        if v_ghost2_r > v_max_r + 10 then
+            v_ghost2_r = 0
+        endif
+    endif
+
+    call place_crests
+
+    for v_i in (0, v_n - 1, 1)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+    endfor v_i
+
+    # Spring-like crest pull; swirl opposite the ring's crest spin.
+    particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_crest_x, v_crest_y, v_force, 1, -1, 1.5, 8, v_n, v_crests, v_swirl)
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 0.99, 0, v_n, post_move, 2.6, v_frame_scale)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 0, 63, 0, 63, 0.9, 0, v_wall_hit, v_n)
+
+    v_mood = sin(v_time * 0.15) + 1
+    v_dust_bright = 60 + v_mood * 20
+    v_ring_bright = 70 - v_radius * 1.2
+    if v_ring_bright < 25 then
+        v_ring_bright = 25
+    endif
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 18, true)
+        if v_ghost2_r > 2 then
+            draw_circle(v_ghost2_x, v_ghost2_y, v_ghost2_r, indigo, 22, false)
+        endif
+        if v_ghost1_r > 2 then
+            draw_circle(v_ghost1_x, v_ghost1_y, v_ghost1_r, azure, 35, false)
+        endif
+        draw_circle(v_drop_x, v_drop_y, v_radius, cyan, v_ring_bright, false)
+        mplot(v_drop_x, v_drop_y, white, 55)
+        for v_i in (0, v_crests - 1, 1)
+            mplot(v_crest_x[v_i], v_crest_y[v_i], yellow, 80)
+        endfor v_i
+        for v_i in (0, 8, 1)
+            mplot(v_x[v_i], v_y[v_i], cyan, v_dust_bright)
+        endfor v_i
+        for v_i in (9, v_n - 1, 1)
+            mplot(v_x[v_i], v_y[v_i], magenta, v_dust_bright)
+        endfor v_i
+        mflush
+    end_frame
+
+    v_time = v_time + 0.035
+endwhile

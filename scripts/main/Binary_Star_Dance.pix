@@ -1,0 +1,144 @@
+# Binary Star Dance
+# Unequal-mass pair orbit a wandering barycenter. Dust feels both wells.
+# Kernels: attractors, integrate, wall bounce, star-core bounce.
+# Pixil only places the stars and mplots — no wrap/swallow/color math per dust.
+
+throttle(0)
+fps(60)
+
+v_n = 22
+v_time = 0
+v_frame_scale = 0.85
+v_mass_a = 2
+v_mass_b = 1
+v_mass_sum = 3
+v_bx = 32
+v_by = 32
+v_bvx = 0.12
+v_bvy = 0.08
+v_bmin = 18
+v_bmax = 45
+
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_active, v_n, numeric)
+create_array(v_wall_hit, v_n, numeric)
+create_array(v_star_hit, v_n, numeric)
+create_array(v_star_x, 2, numeric)
+create_array(v_star_y, 2, numeric)
+create_array(v_star_r, 2, numeric)
+create_array(v_force, 2, numeric)
+
+v_star_r[0] = 2.2
+v_star_r[1] = 1.4
+
+def init_dust {
+    for v_i in (0, v_n - 1, 1)
+        v_ang = random(0, 628, 0) / 100
+        v_rad = random(9, 20, 1)
+        v_spin = random(0.25, 0.55, 2)
+        v_x[v_i] = v_bx + cos(v_ang) * v_rad
+        v_y[v_i] = v_by + sin(v_ang) * v_rad
+        v_vx[v_i] = 0 - sin(v_ang) * v_spin
+        v_vy[v_i] = cos(v_ang) * v_spin
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_active[v_i] = 1
+    endfor v_i
+}
+
+def wander_barycenter {
+    v_bvx = v_bvx + random(-0.02, 0.02, 3)
+    v_bvy = v_bvy + random(-0.02, 0.02, 3)
+    if v_bvx > 0.22 then
+        v_bvx = 0.22
+    elseif v_bvx < -0.22 then
+        v_bvx = -0.22
+    endif
+    if v_bvy > 0.22 then
+        v_bvy = 0.22
+    elseif v_bvy < -0.22 then
+        v_bvy = -0.22
+    endif
+    v_bx = v_bx + v_bvx
+    v_by = v_by + v_bvy
+    if v_bx < v_bmin then
+        v_bx = v_bmin
+        v_bvx = abs(v_bvx)
+    elseif v_bx > v_bmax then
+        v_bx = v_bmax
+        v_bvx = 0 - abs(v_bvx)
+    endif
+    if v_by < v_bmin then
+        v_by = v_bmin
+        v_bvy = abs(v_bvy)
+    elseif v_by > v_bmax then
+        v_by = v_bmax
+        v_bvy = 0 - abs(v_bvy)
+    endif
+}
+
+def place_stars {
+    v_sep = 12 + 7 * (sin(v_time * 0.22) + 1) * 0.5
+    v_ang = v_time * 0.95
+    v_ra = v_sep * v_mass_b / v_mass_sum
+    v_rb = v_sep * v_mass_a / v_mass_sum
+    v_star_x[0] = v_bx + cos(v_ang) * v_ra
+    v_star_y[0] = v_by + sin(v_ang) * v_ra
+    v_star_x[1] = v_bx + cos(v_ang + 3.1416) * v_rb
+    v_star_y[1] = v_by + sin(v_ang + 3.1416) * v_rb
+    v_close = 1 - (v_sep - 12) / 7
+    if v_close < 0 then
+        v_close = 0
+    endif
+    v_pulse = 0.85 + 0.15 * sin(v_time * 2.2)
+    v_force[0] = (0.055 + 0.025 * v_close) * v_pulse
+    v_force[1] = (0.028 + 0.015 * v_close) * v_pulse
+    v_swirl = 0.35 + v_close * 1.6
+}
+
+call init_dust
+
+while true then
+    call wander_barycenter
+    call place_stars
+
+    for v_i in (0, v_n - 1, 1)
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+    endfor v_i
+
+    particle_apply_attractors(v_x, v_y, v_ax, v_ay, v_active, v_star_x, v_star_y, v_force, 1, 2, 3.2, 7, v_n, 2, v_swirl)
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, 0.992, 0, v_n, post_move, 2.4, v_frame_scale)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, 0, 63, 0, 63, 0.85, 0, v_wall_hit, v_n)
+    particle_collide_static_circles(v_x, v_y, v_vx, v_vy, v_active, v_star_x, v_star_y, 0, v_star_r, 0.7, v_star_hit, v_n, 2)
+
+    v_mood = sin(v_time * 0.09) + 1
+    v_dust_bright = 45 + v_mood * 22
+    v_core_a = 80 + v_close * 20
+    v_core_b = 70 + v_close * 25
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, navy, 18, true)
+        draw_line(v_star_x[0], v_star_y[0], v_star_x[1], v_star_y[1], gold, 28)
+        mplot(v_star_x[0], v_star_y[0], yellow, v_core_a)
+        mplot(v_star_x[0] + 1, v_star_y[0], yellow, 70)
+        mplot(v_star_x[0], v_star_y[0] + 1, yellow, 70)
+        mplot(v_star_x[1], v_star_y[1], orange, v_core_b)
+        mplot(v_star_x[0], v_star_y[0], white, 100)
+        mplot(v_star_x[1], v_star_y[1], gold, 95)
+        for v_i in (0, 10, 1)
+            mplot(v_x[v_i], v_y[v_i], cyan, v_dust_bright)
+        endfor v_i
+        for v_i in (11, v_n - 1, 1)
+            mplot(v_x[v_i], v_y[v_i], magenta, v_dust_bright)
+        endfor v_i
+        mflush
+    end_frame
+
+    v_time = v_time + 0.04
+endwhile

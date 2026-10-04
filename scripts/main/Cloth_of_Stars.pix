@@ -1,0 +1,220 @@
+# Cloth of Stars
+# Verlet net pinned at the corners. Wind gusts ripples through; springs
+# settle into a night-sky mesh. Stars sit on every node.
+
+throttle(0)
+fps(60)
+
+v_cols = 5
+v_rows = 4
+v_point_count = 20
+v_link_count = 31
+v_spacing = 12
+v_start_x = 8
+v_start_y = 10
+v_rest = 12
+v_damping = 0.97
+v_stiffness = 0.45
+v_iters = 2
+v_frame = 0
+v_phase = 0
+v_phase_t = 0
+v_dir = 1
+v_mesh_base = 32
+
+create_array(v_px, v_point_count, numeric)
+create_array(v_py, v_point_count, numeric)
+create_array(v_ox, v_point_count, numeric)
+create_array(v_oy, v_point_count, numeric)
+create_array(v_ax, v_point_count, numeric)
+create_array(v_ay, v_point_count, numeric)
+create_array(v_active, v_point_count, numeric)
+create_array(v_link_from, v_link_count, numeric)
+create_array(v_link_to, v_link_count, numeric)
+create_array(v_link_tension, v_link_count, numeric)
+create_array(v_star_hue, v_point_count, numeric)
+
+def build_net {
+    v_idx = 0
+    for v_row in (0, v_rows - 1, 1)
+        for v_col in (0, v_cols - 1, 1)
+            v_px[v_idx] = v_start_x + v_col * v_spacing
+            v_py[v_idx] = v_start_y + v_row * v_spacing
+            v_ox[v_idx] = v_px[v_idx]
+            v_oy[v_idx] = v_py[v_idx]
+            v_ax[v_idx] = 0
+            v_ay[v_idx] = 0
+            v_active[v_idx] = 1
+            v_star_hue[v_idx] = random(0, 2, 0)
+            v_idx = v_idx + 1
+        endfor v_col
+    endfor v_row
+
+    v_active[0] = 0
+    v_active[v_cols - 1] = 0
+    v_active[(v_rows - 1) * v_cols] = 0
+    v_active[v_point_count - 1] = 0
+
+    v_link = 0
+    for v_row in (0, v_rows - 1, 1)
+        for v_col in (0, v_cols - 2, 1)
+            v_from = v_row * v_cols + v_col
+            v_link_from[v_link] = v_from
+            v_link_to[v_link] = v_from + 1
+            v_link = v_link + 1
+        endfor v_col
+    endfor v_row
+    for v_row in (0, v_rows - 2, 1)
+        for v_col in (0, v_cols - 1, 1)
+            v_from = v_row * v_cols + v_col
+            v_link_from[v_link] = v_from
+            v_link_to[v_link] = v_from + v_cols
+            v_link = v_link + 1
+        endfor v_col
+    endfor v_row
+}
+
+call build_net
+
+while true then
+    v_phase_t = v_phase_t + 1
+
+    if v_phase == 0 then
+        v_wind_x = sin(v_frame * 0.025) * 0.025
+        v_wind_y = cos(v_frame * 0.02) * 0.012
+        v_grav = 0.04
+        v_stiffness = 0.42
+        v_damping = 0.97
+        if v_phase_t > 140 then
+            v_phase = 1
+            v_phase_t = 0
+        endif
+    elseif v_phase == 1 then
+        v_wind_x = sin(v_frame * 0.06) * 0.09 + 0.04
+        v_wind_y = sin(v_frame * 0.05) * 0.035
+        v_grav = 0.055
+        v_stiffness = 0.32
+        v_damping = 0.96
+        if v_phase_t % 30 == 15 then
+            for v_i in (0, v_point_count - 1, 1)
+                if v_active[v_i] == 1 then
+                    v_px[v_i] = v_px[v_i] + 1.2
+                endif
+            endfor v_i
+        endif
+        if v_phase_t > 100 then
+            v_phase = 2
+            v_phase_t = 0
+        endif
+    elseif v_phase == 2 then
+        if v_phase_t == 1 then
+            if random(0, 1, 0) == 0 then
+                v_dir = 1
+            else
+                v_dir = -1
+            endif
+            # Hard shove so the mesh really billows.
+            for v_i in (0, v_point_count - 1, 1)
+                if v_active[v_i] == 1 then
+                    v_row = int(v_i / v_cols)
+                    v_px[v_i] = v_px[v_i] + v_dir * (2.8 + v_row * 0.6)
+                    v_py[v_i] = v_py[v_i] + random(-0.8, 1.2, 1)
+                endif
+            endfor v_i
+        endif
+        v_gust = sin(v_phase_t * 0.14)
+        if v_gust < 0 then
+            v_gust = 0
+        endif
+        v_wind_x = 0.22 * v_gust * v_dir
+        v_wind_y = 0.09 * v_gust
+        v_grav = 0.07
+        v_stiffness = 0.28
+        v_damping = 0.95
+        if v_phase_t == 28 then
+            for v_i in (0, v_point_count - 1, 1)
+                if v_active[v_i] == 1 then
+                    v_px[v_i] = v_px[v_i] - v_dir * 2.0
+                endif
+            endfor v_i
+        endif
+        if v_phase_t > 70 then
+            v_phase = 3
+            v_phase_t = 0
+        endif
+    else
+        v_wind_x = sin(v_frame * 0.02) * 0.02
+        v_wind_y = 0
+        v_grav = 0.03
+        v_stiffness = 0.78
+        v_damping = 0.98
+        if v_phase_t > 150 then
+            v_phase = 0
+            v_phase_t = 0
+            for v_i in (0, v_point_count - 1, 1)
+                if v_active[v_i] == 1 then
+                    v_row = int(v_i / v_cols)
+                    v_col = v_i - v_row * v_cols
+                    v_tx = v_start_x + v_col * v_spacing
+                    v_ty = v_start_y + v_row * v_spacing
+                    v_px[v_i] = v_px[v_i] + (v_tx - v_px[v_i]) * 0.4
+                    v_py[v_i] = v_py[v_i] + (v_ty - v_py[v_i]) * 0.4
+                    v_ox[v_i] = v_px[v_i]
+                    v_oy[v_i] = v_py[v_i]
+                endif
+            endfor v_i
+        endif
+    endif
+
+    for v_i in (0, v_point_count - 1, 1)
+        if v_active[v_i] == 1 then
+            v_row = int(v_i / v_cols)
+            v_catch = 0.7 + v_row * 0.35
+            v_ax[v_i] = v_wind_x * v_catch
+            v_ay[v_i] = v_grav + v_wind_y * v_catch
+        else
+            v_ax[v_i] = 0
+            v_ay[v_i] = 0
+        endif
+    endfor v_i
+
+    particle_verlet_integrate(v_px, v_py, v_ox, v_oy, v_active, v_ax, v_ay, v_damping, v_point_count)
+    particle_constrain_distances(v_px, v_py, v_active, v_link_from, v_link_to, v_rest, v_stiffness, v_iters, v_link_tension, v_point_count, v_link_count, 0.4)
+
+    for v_i in (0, v_point_count - 1, 1)
+        if v_active[v_i] == 1 then
+            if v_px[v_i] < 1 then
+                v_px[v_i] = 1
+            elseif v_px[v_i] > 62 then
+                v_px[v_i] = 62
+            endif
+            if v_py[v_i] < 1 then
+                v_py[v_i] = 1
+            elseif v_py[v_i] > 62 then
+                v_py[v_i] = 62
+            endif
+        endif
+    endfor v_i
+
+    begin_frame
+        draw_rectangle(0, 0, 64, 64, black, 100, true)
+        for v_link in (0, v_link_count - 1, 1)
+            v_from = v_link_from[v_link]
+            v_to = v_link_to[v_link]
+            v_tint = v_mesh_base + min(v_link_tension[v_link] * 28, 30)
+            draw_line(v_px[v_from], v_py[v_from], v_px[v_to], v_py[v_to], indigo, v_tint)
+        endfor v_link
+        for v_i in (0, v_point_count - 1, 1)
+            v_twinkle = 70 + 25 * sin(v_frame * 0.11 + v_i * 0.7)
+            if v_star_hue[v_i] == 0 then
+                plot(v_px[v_i], v_py[v_i], white, v_twinkle)
+            elseif v_star_hue[v_i] == 1 then
+                plot(v_px[v_i], v_py[v_i], cyan, v_twinkle)
+            else
+                plot(v_px[v_i], v_py[v_i], gold, v_twinkle)
+            endif
+        endfor v_i
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile
