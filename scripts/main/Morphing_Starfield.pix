@@ -1,0 +1,455 @@
+# ==============================================================================
+# MORPHING STARFIELD  (64x64 matrix)
+#
+# A tumbling cloud of stars morphs through sphere, disk, spiral, halo, torus,
+# helix, cube lattice, and hourglass. Depth picks star size/brightness cels.
+# A slow parallax nebula background sits behind the sprites (dim on purpose).
+#
+# Producer kernels: array_lerp, points_project3d, move_sprites.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+v_count = 56
+v_last = 55
+v_nshapes = 8
+
+v_scale = 26
+v_camera = 54
+v_sprite_cx = 30          # 32 - 2 (5x5 star centre)
+v_sprite_cy = 30
+
+v_speed_x = 0.011
+v_speed_y = 0.014
+v_speed_z = 0.008
+
+v_hold_frames = 110
+v_morph_frames = 70
+v_cel_refresh = 2
+
+# Background drift (pixels per frame, accumulated then snapped)
+v_bg_far_dx = 0.08
+v_bg_far_dy = 0.03
+v_bg_near_dx = 0.14
+v_bg_near_dy = 0.055
+
+# ---------------- scrolling nebula (must stay transparent on draw buffer) ----------------
+# Do NOT paint opaque black on the drawing buffer — it sits above backgrounds
+# and begin_frame(true) would keep blocking them forever.
+sync_queue
+
+print("Rendering nebula...")
+
+# Far layer: large soft gas, low intensity so stars stay the hero
+define_sprite(nebula_far, 96, 96)
+    draw_ellipse(18, 28, 22, 12, indigo, 14, true, 20)
+    draw_ellipse(28, 24, 12, 7, purple, 10, true, -15)
+    draw_ellipse(58, 50, 24, 14, navy, 12, true, 35)
+    draw_ellipse(70, 46, 14, 8, indigo, 9, true, -25)
+    draw_ellipse(40, 72, 18, 10, violet, 11, true, 50)
+    draw_ellipse(78, 16, 16, 9, navy, 10, true, -40)
+    draw_ellipse(8, 64, 14, 8, purple, 9, true, 70)
+    plot(22, 30, cyan, 18)
+    plot(62, 52, sky_blue, 16)
+    plot(44, 74, lavender, 18)
+    plot(80, 20, cyan, 14)
+endsprite
+
+# Near layer: thinner wisps — parallax scrolls a bit faster
+define_sprite(nebula_near, 80, 80)
+    draw_ellipse(16, 14, 10, 5, violet, 16, true, 25)
+    draw_ellipse(22, 12, 6, 3, magenta, 11, true, -12)
+    draw_ellipse(50, 48, 11, 6, purple, 14, true, -30)
+    draw_ellipse(56, 45, 6, 3, indigo, 10, true, 18)
+    draw_ellipse(12, 58, 9, 4, violet, 12, true, 40)
+    draw_ellipse(64, 22, 10, 5, magenta, 11, true, -45)
+    draw_ellipse(36, 68, 10, 5, purple, 12, true, 15)
+    plot(18, 15, cyan, 22)
+    plot(52, 49, sky_blue, 18)
+    plot(66, 24, lavender, 20)
+endsprite
+
+set_background(nebula_far, 0)
+set_background(nebula_near, 1)
+
+print("Rendering star cels...")
+
+# 5x5 star: cel 0 = far/dim speck … cel 4 = near/bright twinkle
+define_sprite(star, 5, 5)
+    sprite_cel(0)
+        plot(2, 2, white, 35)
+    sprite_cel(1)
+        plot(2, 2, white, 55)
+        plot(1, 2, sky_blue, 20)
+        plot(3, 2, sky_blue, 20)
+    sprite_cel(2)
+        plot(2, 2, white, 75)
+        plot(1, 2, lavender, 40)
+        plot(3, 2, lavender, 40)
+        plot(2, 1, lavender, 40)
+        plot(2, 3, lavender, 40)
+    sprite_cel(3)
+        plot(2, 2, white, 95)
+        plot(1, 2, white, 55)
+        plot(3, 2, white, 55)
+        plot(2, 1, white, 55)
+        plot(2, 3, white, 55)
+        plot(0, 2, sky_blue, 25)
+        plot(4, 2, sky_blue, 25)
+        plot(2, 0, sky_blue, 25)
+        plot(2, 4, sky_blue, 25)
+    sprite_cel(4)
+        plot(2, 2, white, 100)
+        plot(1, 2, white, 80)
+        plot(3, 2, white, 80)
+        plot(2, 1, white, 80)
+        plot(2, 3, white, 80)
+        plot(1, 1, lavender, 45)
+        plot(3, 1, lavender, 45)
+        plot(1, 3, lavender, 45)
+        plot(3, 3, lavender, 45)
+        plot(0, 2, cyan, 35)
+        plot(4, 2, cyan, 35)
+        plot(2, 0, cyan, 35)
+        plot(2, 4, cyan, 35)
+endsprite
+
+print("Building galaxies...")
+
+# ---------------- shape tables: flat [shape * count + star] ----------------
+v_shape_len = v_nshapes * v_count
+create_array(v_sx, v_shape_len, numeric)
+create_array(v_sy, v_shape_len, numeric)
+create_array(v_sz, v_shape_len, numeric)
+
+# ---- shape 0: sphere shell / volume (golden spiral) ----
+v_base = 0
+for v_i in (0, v_last, 1)
+    v_fy = 1 - 2 * v_i / v_last
+    v_fr = sqrt(max(0, 1 - v_fy * v_fy))
+    v_th = v_i * 2.399963
+    # Slight radial jitter so it reads as a volume, not a perfect shell
+    v_rad = 0.72 + 0.28 * ((v_i * 17) % 10) / 9
+    v_sx[v_base + v_i] = cos(v_th) * v_fr * v_rad
+    v_sy[v_base + v_i] = v_fy * v_rad
+    v_sz[v_base + v_i] = sin(v_th) * v_fr * v_rad
+endfor v_i
+
+# ---- shape 1: galactic disk (thin, denser toward centre) ----
+v_base = v_count
+for v_i in (0, v_last, 1)
+    v_u = v_i / v_last
+    v_r = sqrt(v_u)                      # more stars near the hub
+    v_th = v_i * 2.399963
+    v_sx[v_base + v_i] = cos(v_th) * v_r
+    v_sy[v_base + v_i] = (fmod(v_i * 13, 11) / 10 - 0.5) * 0.12
+    v_sz[v_base + v_i] = sin(v_th) * v_r
+endfor v_i
+
+# ---- shape 2: twin spiral arms ----
+v_base = v_count * 2
+for v_i in (0, v_last, 1)
+    v_arm = fmod(v_i, 2)
+    v_u = floor(v_i / 2) / 27
+    if v_u > 1 then
+        v_u = 1
+    endif
+    v_r = 0.2 + 0.8 * v_u
+    v_th = v_arm * pi + v_u * 3.2 + v_i * 0.03
+    v_sx[v_base + v_i] = cos(v_th) * v_r
+    v_sy[v_base + v_i] = (fmod(v_i * 7, 9) / 8 - 0.5) * 0.1
+    v_sz[v_base + v_i] = sin(v_th) * v_r
+endfor v_i
+
+# ---- shape 3: sparse halo / outer shell ----
+v_base = v_count * 3
+for v_i in (0, v_last, 1)
+    v_fy = 1 - 2 * v_i / v_last
+    v_fr = sqrt(max(0, 1 - v_fy * v_fy))
+    v_th = v_i * 2.399963 + 0.7
+    v_sx[v_base + v_i] = cos(v_th) * v_fr
+    v_sy[v_base + v_i] = v_fy
+    v_sz[v_base + v_i] = sin(v_th) * v_fr
+endfor v_i
+
+# ---- shape 4: torus (ring galaxy) ----
+v_base = v_count * 4
+for v_i in (0, v_last, 1)
+    v_u = v_i / v_last * tau
+    v_v = v_i * 2.399963
+    v_R = 0.72
+    v_rr = 0.28
+    v_sx[v_base + v_i] = (v_R + v_rr * cos(v_v)) * cos(v_u)
+    v_sy[v_base + v_i] = v_rr * sin(v_v)
+    v_sz[v_base + v_i] = (v_R + v_rr * cos(v_v)) * sin(v_u)
+endfor v_i
+
+# ---- shape 5: double helix ----
+v_base = v_count * 5
+for v_i in (0, v_last, 1)
+    v_arm = fmod(v_i, 2)
+    v_t = floor(v_i / 2) / 27
+    if v_t > 1 then
+        v_t = 1
+    endif
+    v_th = v_t * tau * 2.2 + v_arm * pi
+    v_sx[v_base + v_i] = cos(v_th) * 0.55
+    v_sy[v_base + v_i] = v_t * 2 - 1
+    v_sz[v_base + v_i] = sin(v_th) * 0.55
+endfor v_i
+
+# ---- shape 6: cube lattice (edges) ----
+v_base = v_count * 6
+for v_i in (0, v_last, 1)
+    v_edge = fmod(v_i, 12)
+    v_t = (floor(v_i / 12) + fmod(v_i * 3, 5) / 5) / 5
+    if v_t > 1 then
+        v_t = 1
+    endif
+    v_a = v_t * 2 - 1
+    # 12 cube edges: 4 bottom, 4 top, 4 vertical
+    if v_edge < 4 then
+        v_sx[v_base + v_i] = v_a
+        v_sy[v_base + v_i] = -1
+        if v_edge == 0 then
+            v_sz[v_base + v_i] = -1
+        endif
+        if v_edge == 1 then
+            v_sz[v_base + v_i] = 1
+        endif
+        if v_edge == 2 then
+            v_sx[v_base + v_i] = -1
+            v_sz[v_base + v_i] = v_a
+        endif
+        if v_edge == 3 then
+            v_sx[v_base + v_i] = 1
+            v_sz[v_base + v_i] = v_a
+        endif
+    endif
+    if v_edge >= 4 then
+        if v_edge < 8 then
+            v_sx[v_base + v_i] = v_a
+            v_sy[v_base + v_i] = 1
+            if v_edge == 4 then
+                v_sz[v_base + v_i] = -1
+            endif
+            if v_edge == 5 then
+                v_sz[v_base + v_i] = 1
+            endif
+            if v_edge == 6 then
+                v_sx[v_base + v_i] = -1
+                v_sz[v_base + v_i] = v_a
+            endif
+            if v_edge == 7 then
+                v_sx[v_base + v_i] = 1
+                v_sz[v_base + v_i] = v_a
+            endif
+        endif
+    endif
+    if v_edge >= 8 then
+        v_sy[v_base + v_i] = v_a
+        if v_edge == 8 then
+            v_sx[v_base + v_i] = -1
+            v_sz[v_base + v_i] = -1
+        endif
+        if v_edge == 9 then
+            v_sx[v_base + v_i] = 1
+            v_sz[v_base + v_i] = -1
+        endif
+        if v_edge == 10 then
+            v_sx[v_base + v_i] = -1
+            v_sz[v_base + v_i] = 1
+        endif
+        if v_edge == 11 then
+            v_sx[v_base + v_i] = 1
+            v_sz[v_base + v_i] = 1
+        endif
+    endif
+endfor v_i
+
+# ---- shape 7: hourglass / diabolo ----
+v_base = v_count * 7
+for v_i in (0, v_last, 1)
+    v_t = v_i / v_last
+    v_y = v_t * 2 - 1
+    v_r = abs(v_y) * 0.85 + 0.08
+    v_th = v_i * 2.399963 + v_y * 1.4
+    v_sx[v_base + v_i] = cos(v_th) * v_r
+    v_sy[v_base + v_i] = v_y
+    v_sz[v_base + v_i] = sin(v_th) * v_r
+endfor v_i
+
+# Normalize each shape by max |axis|
+for v_sh in (0, 7, 1)
+    v_base = v_sh * v_count
+    v_maxc = 0.01
+    for v_i in (0, v_last, 1)
+        v_axv = abs(v_sx[v_base + v_i])
+        v_ayv = abs(v_sy[v_base + v_i])
+        v_azv = abs(v_sz[v_base + v_i])
+        if v_axv > v_maxc then
+            v_maxc = v_axv
+        endif
+        if v_ayv > v_maxc then
+            v_maxc = v_ayv
+        endif
+        if v_azv > v_maxc then
+            v_maxc = v_azv
+        endif
+    endfor v_i
+    for v_i in (0, v_last, 1)
+        v_sx[v_base + v_i] = v_sx[v_base + v_i] / v_maxc
+        v_sy[v_base + v_i] = v_sy[v_base + v_i] / v_maxc
+        v_sz[v_base + v_i] = v_sz[v_base + v_i] / v_maxc
+    endfor v_i
+endfor v_sh
+
+# Working buffers
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_z, v_count, numeric)
+create_array(v_axp, v_count, numeric)
+create_array(v_ayp, v_count, numeric)
+create_array(v_azp, v_count, numeric)
+create_array(v_bx, v_count, numeric)
+create_array(v_by, v_count, numeric)
+create_array(v_bz, v_count, numeric)
+create_array(v_px, v_count, numeric)
+create_array(v_py, v_count, numeric)
+create_array(v_depth, v_count, numeric)
+create_array(v_cel, v_count, numeric)
+
+print("Starfield ready")
+
+for v_i in (0, v_last, 1)
+    show_sprite(star, 30, 30, v_i, 0, 2)
+    v_cel[v_i] = 2
+endfor v_i
+
+# ---------------- animation state ----------------
+v_ax = 0.2
+v_ay = 0.4
+v_az = 0.1
+v_shape = 0
+v_next = 1
+v_phase = 0
+v_timer = 0
+v_frame = 0
+v_world_ready = 0
+v_acc_far_x = 0
+v_acc_far_y = 0
+v_acc_near_x = 0
+v_acc_near_y = 0
+
+while true then
+    v_ax = v_ax + v_speed_x
+    v_ay = v_ay + v_speed_y
+    v_az = v_az + v_speed_z
+    if v_ax > tau then
+        v_ax = v_ax - tau
+    endif
+    if v_ay > tau then
+        v_ay = v_ay - tau
+    endif
+    if v_az > tau then
+        v_az = v_az - tau
+    endif
+
+    # Slow parallax drift (fractional accumulators → integer offsets)
+    v_acc_far_x = v_acc_far_x + v_bg_far_dx
+    v_acc_far_y = v_acc_far_y + v_bg_far_dy
+    v_acc_near_x = v_acc_near_x + v_bg_near_dx
+    v_acc_near_y = v_acc_near_y + v_bg_near_dy
+    # Gentle sway so it doesn't feel like a conveyor belt
+    v_sway = sin(v_frame * 0.011)
+
+    if v_phase == 0 then
+        v_timer = v_timer + 1
+        v_blend = 0
+        if v_timer >= v_hold_frames then
+            v_phase = 1
+            v_timer = 0
+            # Jump to a random different shape
+            v_next = int(random(0, v_nshapes - 1, 0))
+            if v_next == v_shape then
+                v_next = fmod(v_shape + 1 + int(random(0, v_nshapes - 2, 0)), v_nshapes)
+            endif
+            v_base_b = v_next * v_count
+            for v_i in (0, v_last, 1)
+                v_axp[v_i] = v_x[v_i]
+                v_ayp[v_i] = v_y[v_i]
+                v_azp[v_i] = v_z[v_i]
+                v_bx[v_i] = v_sx[v_base_b + v_i]
+                v_by[v_i] = v_sy[v_base_b + v_i]
+                v_bz[v_i] = v_sz[v_base_b + v_i]
+            endfor v_i
+        endif
+    else
+        v_timer = v_timer + 1
+        v_morph_t = v_timer / v_morph_frames
+        if v_morph_t > 1 then
+            v_morph_t = 1
+        endif
+        v_blend = v_morph_t * v_morph_t * (3 - 2 * v_morph_t)
+        if v_timer >= v_morph_frames then
+            v_shape = v_next
+            v_phase = 0
+            v_timer = 0
+            v_blend = 0
+            v_world_ready = 1
+        endif
+    endif
+
+    if v_world_ready == 0 then
+        v_base_a = v_shape * v_count
+        for v_i in (0, v_last, 1)
+            v_x[v_i] = v_sx[v_base_a + v_i]
+            v_y[v_i] = v_sy[v_base_a + v_i]
+            v_z[v_i] = v_sz[v_base_a + v_i]
+        endfor v_i
+        v_world_ready = 1
+    endif
+
+    if v_blend > 0 then
+        array_lerp(v_axp, v_bx, v_x, v_blend)
+        array_lerp(v_ayp, v_by, v_y, v_blend)
+        array_lerp(v_azp, v_bz, v_z, v_blend)
+    endif
+
+    # Subtle breath so the field feels alive between morphs
+    v_scale_live = v_scale + sin(v_frame * 0.028) * 2.2
+    points_project3d(v_x, v_y, v_z, v_px, v_py, v_ax, v_ay, v_az, v_scale_live, v_camera, v_sprite_cx, v_sprite_cy, v_depth)
+
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, v_last, 1)
+            # depth → cel 0..4
+            v_si = int((v_depth[v_i] + 1.2) * 1.7)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 4 then
+                v_si = 4
+            endif
+            v_cel[v_i] = v_si
+        endfor v_i
+    endif
+
+    begin_frame(true)
+        set_background_offset(int(v_acc_far_x + v_sway * 2), int(v_acc_far_y), 0, 0)
+        set_background_offset(int(v_acc_near_x + v_sway * 4), int(v_acc_near_y - v_sway * 1.5), 1, 0)
+        move_sprites(star, v_px, v_py, v_cel)
+    end_frame
+
+    v_frame = v_frame + 1
+
+    # Tile wrap so accumulators stay bounded (seamless)
+    if fmod(v_frame, 10000) == 0 then
+        v_acc_far_x = v_acc_far_x - floor(v_acc_far_x / 96) * 96
+        v_acc_far_y = v_acc_far_y - floor(v_acc_far_y / 96) * 96
+        v_acc_near_x = v_acc_near_x - floor(v_acc_near_x / 80) * 80
+        v_acc_near_y = v_acc_near_y - floor(v_acc_near_y / 80) * 80
+    endif
+endwhile

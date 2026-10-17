@@ -384,20 +384,22 @@ class CommandExecutor:
         self.api.hide_sprite(name, instance_id)
 
     def _handle_move_sprite(self, name: str, x: float, y: float, instance_id: int = 0,
-                            cel_idx: Optional[int] = None):
+                            cel_idx: Optional[int] = None, z_index: Optional[int] = None):
         """
-        Handle move_sprite command with optional cel index.
+        Handle move_sprite command with optional cel index and z_index.
         
         Args:
             name: Sprite template name
             x, y: New position on screen
             instance_id: Instance identifier (default 0)
             cel_idx: If specified, set to this cel. If None, auto-advance to next cel.
+            z_index: If specified, update draw order (higher = in front).
         """
         debug(f"Handling move_sprite command: '{name}' to ({x}, {y}) instance {instance_id}" +
-              (f" cel={cel_idx}" if cel_idx is not None else " (auto-advance)"), 
+              (f" cel={cel_idx}" if cel_idx is not None else " (auto-advance)") +
+              (f" z={z_index}" if z_index is not None else ""),
             Level.DEBUG, Component.COMMAND)
-        self.api.move_sprite(name, x, y, instance_id, cel_idx)
+        self.api.move_sprite(name, x, y, instance_id, cel_idx, z_index)
 
     def _handle_dispose_sprite(self, name: str, instance_id: int = 0):
         """Handle new dispose_sprite command to remove a specific instance."""

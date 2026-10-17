@@ -1,45 +1,50 @@
 # ================================================================
-# TEST 19: Sprite with Arc - Pac-Man Animation
+# Pac-Man sprite cel animation smoke test
 # ================================================================
 clear()
-print("TEST 19: Pac-Man Animation")
+print("TEST: Pac-Man cel animation")
+fps(20)
 sync_queue
 
-# Animate Pac-Man opening and closing mouth
-define_sprite(pacman, 24, 24)
+define_sprite(pacman, 12, 12)
+    sprite_cel(0)
+        # Closed mouth
+        draw_circle(6, 6, 5, yellow, 100, true)
+        plot(8, 4, black, 100)
+
+    sprite_cel(1)
+        # Slightly open
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+
+    sprite_cel(2)
+        # Wide open
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 5, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+
+    sprite_cel(3)
+        # Slightly open (closing)
+        draw_circle(6, 6, 5, yellow, 100, true)
+        draw_polygon(11, 6, 4, 3, black, 100, 0, true)
+        plot(8, 4, black, 100)
+endsprite
+
+show_sprite(pacman, 0, 26, 0, 0, 0)
 sync_queue
 
-for v_mouth = 0 to 10
-    # Clear sprite
-    sprite_draw(pacman, draw_rectangle, 0, 0, 24, 24, 0, 100, true)
-    
-    # Draw Pac-Man body
-    sprite_draw(pacman, draw_circle, 12, 12, 10, yellow, 100, true)
-    
-    # Draw mouth (arc)
-    v_mouth_height = v_mouth
-    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, v_mouth_height, black, 100, true)
-    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, -v_mouth_height, black, 100, true)
-    
-    show_sprite(pacman, 20, 20, 0)
-    rest(0.1)
-next
+# Chomp across the screen (move_sprite auto-advances cels)
+for v_x in (0, 50, 1)
+    move_sprite(pacman, v_x, 26, 0)
+    rest(0.05)
+endfor v_x
 
-# Close mouth
-for v_mouth = 10 to 0 step -1
-    sprite_draw(pacman, draw_rectangle, 0, 0, 24, 24, 0, 100, true)
-    sprite_draw(pacman, draw_circle, 12, 12, 10, yellow, 100, true)
-    
-    v_mouth_height = v_mouth
-    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, v_mouth_height, black, 100, true)
-    sprite_draw(pacman, draw_arc, 12, 12, 22, 12, -v_mouth_height, black, 100, true)
-    
-    show_sprite(pacman, 20, 20, 0)
-    rest(0.1)
-next
-
-rest(5)
 sync_queue
+rest(1)
+
 hide_sprite(pacman, 0)
 dispose_sprite(pacman, 0)
 sync_queue
+
+print("TEST COMPLETE: Pac-Man cel animation")

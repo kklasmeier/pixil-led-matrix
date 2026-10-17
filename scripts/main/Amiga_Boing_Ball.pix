@@ -1,0 +1,210 @@
+# ==============================================================================
+# AMIGA BOING BALL  (64x64 matrix)
+# Red/white checkered ball, rendered per-pixel onto a rotating sphere and
+# stored as a 16-cel animated sprite. The checker pattern repeats every 90
+# degrees of spin (8 longitude bands), so 16 cels = one seamless rotation loop.
+# ==============================================================================
+
+clear()
+fps(60)
+
+# ---------------- tunable settings ----------------
+v_radius = 12            # ball radius in pixels (sprite is 24x24)
+v_tilt = radians(17)     # spin-axis lean, like the original demo
+v_spin_sign = 1          # change to -1 if the ball spins the "wrong" way
+v_g = 0.0875             # gravity (pixels per frame^2, tuned for 60 fps)
+v_top = 3                # sprite y at the top of the bounce
+v_floor = 36             # sprite y when the ball touches the floor (36+24 = 60)
+v_xmin = 0
+v_xmax = 40
+v_dx = 0.35              # horizontal speed (pixels per frame)
+v_spin_rate = 0.32       # cels advanced per frame (16 cels = 90 degrees)
+
+v_ct = cos(v_tilt)
+v_st = sin(v_tilt)
+v_q = pi / 4             # one checker band = 45 degrees
+v_cx = 12                # sphere centre inside sprite
+
+# ---------------- scene first (visible while ball cels render) ----------------
+# Back wall (ends at the horizon, y = 47)
+v_horizon = 48
+v_fk = 1.6               # how much the floor lines fan out by the bottom edge
+draw_rectangle(0, 0, 64, v_horizon, purple, 30, true)
+for v_gx in (0, 56, 8)
+    draw_line(v_gx, 0, v_gx, v_horizon - 1, magenta, 45)
+endfor v_gx
+for v_gy in (0, 40, 8)
+    draw_line(0, v_gy, 63, v_gy, magenta, 45)
+endfor v_gy
+
+# Floor: each line starts exactly where a wall line meets the horizon,
+# then fans out toward the viewer (clipped at the screen edges)
+draw_rectangle(0, v_horizon, 64, 16, indigo, 40, true)
+draw_line(0, v_horizon, 63, v_horizon, lavender, 80)
+for v_fx in (0, 56, 8)
+    v_xb = 32 + (v_fx - 32) * v_fk
+    v_yb = 63
+    if v_xb < 0 then
+        v_t = (0 - v_fx) / (v_xb - v_fx)
+        v_yb = v_horizon + 15 * v_t
+        v_xb = 0
+    endif
+    if v_xb > 63 then
+        v_t = (63 - v_fx) / (v_xb - v_fx)
+        v_yb = v_horizon + 15 * v_t
+        v_xb = 63
+    endif
+    draw_line(v_fx, v_horizon, round(v_xb), round(v_yb), lavender, 60)
+endfor v_fx
+
+# Floor cross lines, spaced wider toward the viewer
+draw_line(0, 50, 63, 50, lavender, 60)
+draw_line(0, 53, 63, 53, lavender, 60)
+draw_line(0, 57, 63, 57, lavender, 60)
+draw_line(0, 62, 63, 62, lavender, 60)
+sync_queue
+
+# ---------------- ball renderer (uses global v_spin) ----------------
+def draw_ball {
+    v_cs = cos(v_spin)
+    v_sn = sin(v_spin)
+    for v_py in (0, 23, 1)
+        for v_px in (0, 23, 1)
+            v_nx = (v_px + 0.5 - v_cx) / v_radius
+            v_ny = (v_py + 0.5 - v_cx) / v_radius
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                v_x1 = v_nx * v_ct + v_ny * v_st
+                v_y1 = v_ny * v_ct - v_nx * v_st
+                v_x2 = v_x1 * v_cs + v_nz * v_sn
+                v_z2 = v_nz * v_cs - v_x1 * v_sn
+                v_lon = atan2(v_x2, v_z2)
+                v_lat = asin(max(-1, min(1, v_y1)))
+                v_iu = floor((v_lon + pi) / v_q)
+                v_iv = min(floor((v_lat + pi / 2) / v_q), 3)
+                v_chk = fmod(v_iu + v_iv, 2)
+                v_dot = -0.45 * v_nx - 0.5 * v_ny + 0.74 * v_nz
+                v_inten = int(45 + 55 * max(v_dot, 0))
+                if v_chk == 0 then
+                    plot(v_px, v_py, red, v_inten)
+                else
+                    plot(v_px, v_py, white, v_inten)
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+# ---------------- sprites (grid already on screen) ----------------
+print("Rendering ball cels...")
+
+define_sprite(ball, 24, 24)
+    sprite_cel(0)
+        v_spin = 0
+        call draw_ball
+    sprite_cel(1)
+        v_spin = 0.09818 * v_spin_sign
+        call draw_ball
+    sprite_cel(2)
+        v_spin = 0.19635 * v_spin_sign
+        call draw_ball
+    sprite_cel(3)
+        v_spin = 0.29453 * v_spin_sign
+        call draw_ball
+    sprite_cel(4)
+        v_spin = 0.3927 * v_spin_sign
+        call draw_ball
+    sprite_cel(5)
+        v_spin = 0.49088 * v_spin_sign
+        call draw_ball
+    sprite_cel(6)
+        v_spin = 0.58905 * v_spin_sign
+        call draw_ball
+    sprite_cel(7)
+        v_spin = 0.68723 * v_spin_sign
+        call draw_ball
+    sprite_cel(8)
+        v_spin = 0.7854 * v_spin_sign
+        call draw_ball
+    sprite_cel(9)
+        v_spin = 0.88358 * v_spin_sign
+        call draw_ball
+    sprite_cel(10)
+        v_spin = 0.98175 * v_spin_sign
+        call draw_ball
+    sprite_cel(11)
+        v_spin = 1.07993 * v_spin_sign
+        call draw_ball
+    sprite_cel(12)
+        v_spin = 1.1781 * v_spin_sign
+        call draw_ball
+    sprite_cel(13)
+        v_spin = 1.27628 * v_spin_sign
+        call draw_ball
+    sprite_cel(14)
+        v_spin = 1.37445 * v_spin_sign
+        call draw_ball
+    sprite_cel(15)
+        v_spin = 1.47263 * v_spin_sign
+        call draw_ball
+endsprite
+
+# Shadow cast on the back wall
+define_sprite(shadow, 24, 24)
+    draw_circle(12, 12, 11, navy, 45, true)
+endsprite
+
+print("Ball ready")
+
+# ---------------- animation state ----------------
+v_x = 10
+v_y = v_top
+v_vy = 0
+v_dir = 1
+v_cf = 0
+v_cel = 0
+v_bounce = sqrt(2 * v_g * (v_floor - v_top))
+
+show_sprite(shadow, 14, 4, 0, 0, 0)
+show_sprite(ball, 10, 3, 0, 1, 0)
+
+# ---------------- main loop ----------------
+while true then
+    # vertical motion
+    v_vy = v_vy + v_g
+    v_y = v_y + v_vy
+    if v_y >= v_floor then
+        v_y = v_floor
+        v_vy = 0 - v_bounce
+    endif
+    if v_y < 0 then
+        v_y = 0
+    endif
+
+    # horizontal motion, reverse spin at the side walls
+    v_x = v_x + v_dx * v_dir
+    if v_x >= v_xmax then
+        v_x = v_xmax
+        v_dir = -1
+    endif
+    if v_x <= v_xmin then
+        v_x = v_xmin
+        v_dir = 1
+    endif
+
+    # spin follows travel direction
+    v_cf = v_cf + v_spin_rate * v_dir
+    if v_cf >= 16 then
+        v_cf = v_cf - 16
+    endif
+    if v_cf < 0 then
+        v_cf = v_cf + 16
+    endif
+    v_cel = int(v_cf)
+
+    begin_frame(true)
+        move_sprite(shadow, round(v_x * 0.85 + 5), round(v_y * 0.55 + 1), 0)
+        move_sprite(ball, round(v_x), round(v_y), 0, v_cel)
+    end_frame
+endwhile

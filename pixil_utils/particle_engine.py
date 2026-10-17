@@ -705,6 +705,59 @@ def particle_collide_circle_bounds(
         _mark_hit(hit_data, i)
 
 
+# Below this active count, nested all-pairs is cheaper than building a grid.
+_CIRCLE_GRID_THRESHOLD = 32
+
+
+def _circle_collision_grid_pairs(
+    xd: list,
+    yd: list,
+    active_ids: list[int],
+    max_radius: float,
+) -> list[tuple[int, int]]:
+    """Uniform-grid broadphase: candidate pairs (i, j) with i < j.
+
+    Cell size is ``2 * max_radius`` so any overlapping pair shares a cell or
+    an adjacent one. Each particle queries its 3x3 neighbourhood. Pair order
+    is sorted by (i, j) so narrowphase matches the classic all-pairs order
+    as closely as a one-shot broadphase allows.
+    """
+    cell = max(2.0 * max(max_radius, 1e-6), 1.0)
+    inv_cell = 1.0 / cell
+    grid: dict[tuple[int, int], list[int]] = {}
+    cells: list[tuple[int, int]] = []
+
+    for i in active_ids:
+        cx = int(math.floor(float(xd[i]) * inv_cell))
+        cy = int(math.floor(float(yd[i]) * inv_cell))
+        cells.append((cx, cy))
+        bucket = grid.get((cx, cy))
+        if bucket is None:
+            grid[(cx, cy)] = [i]
+        else:
+            bucket.append(i)
+
+    pairs: list[tuple[int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for idx, i in enumerate(active_ids):
+        cx, cy = cells[idx]
+        for ox in (-1, 0, 1):
+            for oy in (-1, 0, 1):
+                bucket = grid.get((cx + ox, cy + oy))
+                if not bucket:
+                    continue
+                for j in bucket:
+                    if j <= i:
+                        continue
+                    key = (i, j)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    pairs.append(key)
+    pairs.sort()
+    return pairs
+
+
 def particle_collide_circles(
     x: NumericSeq,
     y: NumericSeq,
@@ -726,6 +779,10 @@ def particle_collide_circles(
     Two fully stationary overlapping particles are still separated so a
     packed rack does not remain stuck; impulse is skipped if relative
     velocity along the normal is not approaching.
+
+    For larger active counts, a uniform-grid broadphase gathers nearby
+    candidate pairs; narrowphase contact math is unchanged. Small counts
+    still use nested all-pairs (cheaper than building a grid).
     """
     xd, yd, vxd, vyd, ad = (
         _data(x),
@@ -738,35 +795,84 @@ def particle_collide_circles(
     hit_data = _zero_hit(hit, n)
     pair_hits = 0
 
-    for i in range(n - 1):
-        if not _is_active(ad, i):
-            continue
-        ri = _component(radius, i)
-        mi = _component(mass, i)
-        if mi <= 0.0:
-            continue
-        speed_i = abs(vxd[i]) + abs(vyd[i])
-        for j in range(i + 1, n):
-            if not _is_active(ad, j):
+    active_ids = [i for i in range(n) if float(ad[i]) != 0.0]
+    n_active = len(active_ids)
+    if n_active < 2:
+        return 0
+
+    radius_scalar = isinstance(radius, (int, float))
+    mass_scalar = isinstance(mass, (int, float))
+    rest_scalar = isinstance(restitution, (int, float))
+
+    if radius_scalar:
+        r_scalar = float(radius)
+        max_radius = max(0.0, r_scalar)
+    else:
+        rd = _data(radius)
+        r_list = [float(rd[i]) for i in range(n)]
+        max_radius = max((max(0.0, r_list[i]) for i in active_ids), default=0.0)
+
+    if mass_scalar:
+        m_scalar = float(mass)
+        if m_scalar <= 0.0:
+            return 0
+        inv_scalar = 1.0 / m_scalar
+    else:
+        md = _data(mass)
+        m_list = [float(md[i]) for i in range(n)]
+        # Drop zero-mass bodies from broadphase / all-pairs outer side.
+        active_ids = [i for i in active_ids if m_list[i] > 0.0]
+        n_active = len(active_ids)
+        if n_active < 2:
+            return 0
+
+    if rest_scalar:
+        bounce_scalar = float(restitution)
+    else:
+        rstd = _data(restitution)
+        bounce_list = [float(rstd[i]) for i in range(n)]
+
+    use_grid = n_active >= _CIRCLE_GRID_THRESHOLD
+    if use_grid:
+        pair_iter = _circle_collision_grid_pairs(xd, yd, active_ids, max_radius)
+    else:
+        pair_iter = (
+            (active_ids[ii], active_ids[jj])
+            for ii in range(n_active - 1)
+            for jj in range(ii + 1, n_active)
+        )
+
+    # Fast path: equal radius + equal mass + scalar restitution (Gravity_Flip etc.)
+    if radius_scalar and mass_scalar and rest_scalar:
+        min_dist = r_scalar + r_scalar
+        min_dist_sq = min_dist * min_dist
+        inv_i = inv_scalar
+        inv_j = inv_scalar
+        inv_sum = inv_i + inv_j
+        bounce = bounce_scalar
+        # Cache last-i kinematics when walking sorted (i, j) pairs.
+        last_i = -1
+        xi = yi = speed_i = 0.0
+        for i, j in pair_iter:
+            if i != last_i:
+                last_i = i
+                xi = xd[i]
+                yi = yd[i]
+                speed_i = abs(vxd[i]) + abs(vyd[i])
+            dx = xd[j] - xi
+            if dx >= min_dist or dx <= -min_dist:
                 continue
-            rj = _component(radius, j)
-            mj = _component(mass, j)
-            if mj <= 0.0:
-                continue
-            min_dist = ri + rj
-            dx = xd[j] - xd[i]
-            if abs(dx) >= min_dist:
-                continue
-            dy = yd[j] - yd[i]
-            if abs(dy) >= min_dist:
+            dy = yd[j] - yi
+            if dy >= min_dist or dy <= -min_dist:
                 continue
             dist_sq = dx * dx + dy * dy
-            if dist_sq >= min_dist * min_dist:
+            if dist_sq >= min_dist_sq:
                 continue
 
             pair_hits += 1
-            _mark_hit(hit_data, i)
-            _mark_hit(hit_data, j)
+            if hit_data is not None:
+                hit_data[i] = 1.0
+                hit_data[j] = 1.0
 
             if dist_sq <= 1e-12:
                 nx, ny = 1.0, 0.0
@@ -777,29 +883,98 @@ def particle_collide_circles(
                 ny = dy / dist
 
             overlap = min_dist - dist
-            inv_i = 1.0 / mi
-            inv_j = 1.0 / mj
-            inv_sum = inv_i + inv_j
-            if inv_sum <= 0.0:
-                continue
-            corr_i = overlap * (inv_i / inv_sum)
-            corr_j = overlap * (inv_j / inv_sum)
-            xd[i] -= nx * corr_i
-            yd[i] -= ny * corr_i
-            xd[j] += nx * corr_j
-            yd[j] += ny * corr_j
+            corr = overlap * 0.5
+            xd[i] = xi = xi - nx * corr
+            yd[i] = yi = yi - ny * corr
+            xd[j] += nx * corr
+            yd[j] += ny * corr
 
             if speed_i + abs(vxd[j]) + abs(vyd[j]) == 0.0:
                 continue
             relative = (vxd[j] - vxd[i]) * nx + (vyd[j] - vyd[i]) * ny
             if relative >= 0.0:
                 continue
-            bounce = min(_component(restitution, i), _component(restitution, j))
             impulse = -(1.0 + bounce) * relative / inv_sum
             vxd[i] -= (impulse * inv_i) * nx
             vyd[i] -= (impulse * inv_i) * ny
             vxd[j] += (impulse * inv_j) * nx
             vyd[j] += (impulse * inv_j) * ny
+        return pair_hits
+
+    # General path: per-particle radius / mass / restitution.
+    last_i = -1
+    xi = yi = speed_i = 0.0
+    inv_i = bi = ri = 0.0
+    for i, j in pair_iter:
+        if i != last_i:
+            last_i = i
+            if mass_scalar:
+                inv_i = inv_scalar
+            else:
+                mi = m_list[i]
+                if mi <= 0.0:
+                    continue
+                inv_i = 1.0 / mi
+            ri = r_scalar if radius_scalar else r_list[i]
+            bi = bounce_scalar if rest_scalar else bounce_list[i]
+            xi = xd[i]
+            yi = yd[i]
+            speed_i = abs(vxd[i]) + abs(vyd[i])
+        if mass_scalar:
+            inv_j = inv_scalar
+        else:
+            mj = m_list[j]
+            if mj <= 0.0:
+                continue
+            inv_j = 1.0 / mj
+        rj = r_scalar if radius_scalar else r_list[j]
+        min_dist = ri + rj
+        dx = xd[j] - xi
+        if dx >= min_dist or dx <= -min_dist:
+            continue
+        dy = yd[j] - yi
+        if dy >= min_dist or dy <= -min_dist:
+            continue
+        dist_sq = dx * dx + dy * dy
+        if dist_sq >= min_dist * min_dist:
+            continue
+
+        pair_hits += 1
+        if hit_data is not None:
+            hit_data[i] = 1.0
+            hit_data[j] = 1.0
+
+        if dist_sq <= 1e-12:
+            nx, ny = 1.0, 0.0
+            dist = 0.0
+        else:
+            dist = math.sqrt(dist_sq)
+            nx = dx / dist
+            ny = dy / dist
+
+        overlap = min_dist - dist
+        inv_sum = inv_i + inv_j
+        if inv_sum <= 0.0:
+            continue
+        corr_i = overlap * (inv_i / inv_sum)
+        corr_j = overlap * (inv_j / inv_sum)
+        xd[i] = xi = xi - nx * corr_i
+        yd[i] = yi = yi - ny * corr_i
+        xd[j] += nx * corr_j
+        yd[j] += ny * corr_j
+
+        if speed_i + abs(vxd[j]) + abs(vyd[j]) == 0.0:
+            continue
+        relative = (vxd[j] - vxd[i]) * nx + (vyd[j] - vyd[i]) * ny
+        if relative >= 0.0:
+            continue
+        bj = bounce_scalar if rest_scalar else bounce_list[j]
+        bounce = bi if bi < bj else bj
+        impulse = -(1.0 + bounce) * relative / inv_sum
+        vxd[i] -= (impulse * inv_i) * nx
+        vyd[i] -= (impulse * inv_i) * ny
+        vxd[j] += (impulse * inv_j) * nx
+        vyd[j] += (impulse * inv_j) * ny
 
     return pair_hits
 

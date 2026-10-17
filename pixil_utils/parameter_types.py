@@ -104,7 +104,8 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'x', 'type': 'int', 'position': 1},
         {'name': 'y', 'type': 'int', 'position': 2},
         {'name': 'instance_id', 'type': 'int', 'position': 3, 'optional': True, 'default': '0'},
-        {'name': 'cel_idx', 'type': 'int', 'position': 4, 'optional': True}
+        {'name': 'cel_idx', 'type': 'int', 'position': 4, 'optional': True},
+        {'name': 'z_index', 'type': 'int', 'position': 5, 'optional': True},
     ],
     'dispose_sprite': [
         {'name': 'name', 'type': 'str', 'position': 0},
@@ -357,6 +358,37 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'count', 'type': 'int', 'position': 11, 'optional': True},
         {'name': 'obstacle_count', 'type': 'int', 'position': 12, 'optional': True},
         {'name': 'response', 'type': 'str', 'position': 13, 'optional': True},
+    ],
+    'points_project3d': [
+        {'name': 'x', 'type': 'str', 'position': 0},
+        {'name': 'y', 'type': 'str', 'position': 1},
+        {'name': 'z', 'type': 'str', 'position': 2},
+        {'name': 'sx', 'type': 'str', 'position': 3},
+        {'name': 'sy', 'type': 'str', 'position': 4},
+        {'name': 'ax', 'type': 'float', 'position': 5},
+        {'name': 'ay', 'type': 'float', 'position': 6},
+        {'name': 'az', 'type': 'float', 'position': 7},
+        {'name': 'scale', 'type': 'float', 'position': 8},
+        {'name': 'camera', 'type': 'float', 'position': 9},
+        {'name': 'cx', 'type': 'float', 'position': 10},
+        {'name': 'cy', 'type': 'float', 'position': 11},
+        {'name': 'depth', 'type': 'str', 'position': 12, 'optional': True},
+        {'name': 'count', 'type': 'int', 'position': 13, 'optional': True},
+    ],
+    'array_lerp': [
+        {'name': 'a', 'type': 'str', 'position': 0},
+        {'name': 'b', 'type': 'str', 'position': 1},
+        {'name': 'out', 'type': 'str', 'position': 2},
+        {'name': 't', 'type': 'float', 'position': 3},
+        {'name': 'count', 'type': 'int', 'position': 4, 'optional': True},
+    ],
+    'move_sprites': [
+        {'name': 'name', 'type': 'str', 'position': 0},
+        {'name': 'x', 'type': 'str', 'position': 1},
+        {'name': 'y', 'type': 'str', 'position': 2},
+        {'name': 'cel', 'type': 'str', 'position': 3, 'optional': True},
+        {'name': 'z', 'type': 'str', 'position': 4, 'optional': True},
+        {'name': 'count', 'type': 'int', 'position': 5, 'optional': True},
     ],
 }
 

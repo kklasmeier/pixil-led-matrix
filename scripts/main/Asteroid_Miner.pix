@@ -52,8 +52,8 @@ create_array(v_spark_y, 10, numeric)
 create_array(v_spark_life, 10, numeric)
 v_spark_head = 0
 
-# Star positions must be filled outside define_sprite: for-loops inside a
-# sprite body are ignored, which used to leave a single random background pixel.
+# Star field is built at runtime (twinkle/parallax), so positions live in arrays
+# rather than a static define_sprite background.
 v_num_stars = 32
 create_array(v_star_x, v_num_stars, numeric)
 create_array(v_star_y, v_num_stars, numeric)

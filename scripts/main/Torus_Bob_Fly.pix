@@ -1,0 +1,300 @@
+# ==============================================================================
+# BOBS ON A TORUS — CAMERA FLY  (64x64 matrix)
+#
+# Faceted ice / amethyst crystals stud a torus (not the shared gold chrome
+# bob). The camera orbits, banks, and dollies — periodically diving through
+# the doughnut hole — while the ring itself slowly tumbles.
+#
+# Producer kernels: points_project3d, move_sprites (with depth z_index).
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+v_nu = 12                 # major ring samples
+v_nv = 4                  # tube samples
+v_count = 48              # nu * nv
+v_last = 47
+v_half = 24               # per crystal colour
+v_half_last = 23
+
+v_R = 0.92                # major radius
+v_r = 0.38                # tube radius
+
+v_sprite_cx = 28          # 32 - 4 (9x9 crystal)
+v_sprite_cy = 28
+
+v_cel_refresh = 2
+v_fly_speed = 0.014
+
+# ---------------- faceted crystal renderer ----------------
+# Globals: v_rad (half-extent), v_bright, v_body, v_edge, v_glow
+def draw_crystal {
+    v_cx = 4
+    v_cy = 4
+    # Clear — transparent by default in sprite buffer
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_dx = abs(v_px - v_cx)
+            v_dy = abs(v_py - v_cy)
+            # Diamond (octahedron silhouette): |dx|/rx + |dy|/ry <= 1
+            v_rx = v_rad
+            v_ry = v_rad * 1.15
+            v_m = v_dx / v_rx + v_dy / v_ry
+            if v_m <= 1 then
+                v_nd = 1 - v_m
+                v_inten = int((18 + 70 * v_nd) * v_bright)
+                if v_inten < 8 then
+                    v_inten = 8
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                # Facet bands
+                if v_m > 0.72 then
+                    plot(v_px, v_py, v_edge, v_inten)
+                else
+                    if v_m > 0.38 then
+                        plot(v_px, v_py, v_body, v_inten)
+                    else
+                        plot(v_px, v_py, v_glow, v_inten)
+                    endif
+                endif
+                # Hot sparkle near centre-top
+                if v_dx + v_dy <= v_rad * 0.35 then
+                    if v_py <= v_cy then
+                        v_spec = int(90 * v_bright)
+                        if v_spec > 100 then
+                            v_spec = 100
+                        endif
+                        plot(v_px, v_py, white, v_spec)
+                    endif
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+print("Rendering crystals...")
+
+define_sprite(crystal_ice, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.6
+        v_bright = 0.45
+        v_body = "sky_blue"
+        v_edge = "cyan"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(1)
+        v_rad = 2.0
+        v_bright = 0.58
+        v_body = "sky_blue"
+        v_edge = "cyan"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(2)
+        v_rad = 2.45
+        v_bright = 0.7
+        v_body = "cyan"
+        v_edge = "sky_blue"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(3)
+        v_rad = 2.9
+        v_bright = 0.82
+        v_body = "cyan"
+        v_edge = "turquoise"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(4)
+        v_rad = 3.35
+        v_bright = 0.9
+        v_body = "turquoise"
+        v_edge = "cyan"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(5)
+        v_rad = 3.8
+        v_bright = 0.96
+        v_body = "turquoise"
+        v_edge = "cyan"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(6)
+        v_rad = 4.3
+        v_bright = 1.0
+        v_body = "white"
+        v_edge = "cyan"
+        v_glow = "turquoise"
+        call draw_crystal
+endsprite
+
+define_sprite(crystal_amethyst, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.6
+        v_bright = 0.45
+        v_body = "purple"
+        v_edge = "magenta"
+        v_glow = "lavender"
+        call draw_crystal
+    sprite_cel(1)
+        v_rad = 2.0
+        v_bright = 0.58
+        v_body = "purple"
+        v_edge = "magenta"
+        v_glow = "lavender"
+        call draw_crystal
+    sprite_cel(2)
+        v_rad = 2.45
+        v_bright = 0.7
+        v_body = "magenta"
+        v_edge = "violet"
+        v_glow = "lavender"
+        call draw_crystal
+    sprite_cel(3)
+        v_rad = 2.9
+        v_bright = 0.82
+        v_body = "magenta"
+        v_edge = "violet"
+        v_glow = "pink"
+        call draw_crystal
+    sprite_cel(4)
+        v_rad = 3.35
+        v_bright = 0.9
+        v_body = "violet"
+        v_edge = "magenta"
+        v_glow = "pink"
+        call draw_crystal
+    sprite_cel(5)
+        v_rad = 3.8
+        v_bright = 0.96
+        v_body = "violet"
+        v_edge = "magenta"
+        v_glow = "white"
+        call draw_crystal
+    sprite_cel(6)
+        v_rad = 4.3
+        v_bright = 1.0
+        v_body = "lavender"
+        v_edge = "magenta"
+        v_glow = "white"
+        call draw_crystal
+endsprite
+
+print("Building torus...")
+
+# Ice crystals (even major-ring index) and amethyst (odd)
+create_array(v_ix, v_half, numeric)
+create_array(v_iy, v_half, numeric)
+create_array(v_iz, v_half, numeric)
+create_array(v_ipx, v_half, numeric)
+create_array(v_ipy, v_half, numeric)
+create_array(v_idepth, v_half, numeric)
+create_array(v_icel, v_half, numeric)
+create_array(v_izord, v_half, numeric)
+
+create_array(v_ax, v_half, numeric)
+create_array(v_ay, v_half, numeric)
+create_array(v_az, v_half, numeric)
+create_array(v_apx, v_half, numeric)
+create_array(v_apy, v_half, numeric)
+create_array(v_adepth, v_half, numeric)
+create_array(v_acel, v_half, numeric)
+create_array(v_azord, v_half, numeric)
+
+v_ii = 0
+v_ai = 0
+for v_v in (0, 3, 1)
+    for v_u in (0, 11, 1)
+        v_au = v_u * tau / 12
+        v_av = v_v * tau / 4
+        v_pxw = (v_R + v_r * cos(v_av)) * cos(v_au)
+        v_pyw = (v_R + v_r * cos(v_av)) * sin(v_au)
+        v_pzw = v_r * sin(v_av)
+        if fmod(v_u, 2) == 0 then
+            v_ix[v_ii] = v_pxw
+            v_iy[v_ii] = v_pyw
+            v_iz[v_ii] = v_pzw
+            v_ii = v_ii + 1
+        else
+            v_ax[v_ai] = v_pxw
+            v_ay[v_ai] = v_pyw
+            v_az[v_ai] = v_pzw
+            v_ai = v_ai + 1
+        endif
+    endfor v_u
+endfor v_v
+
+print("Torus ready")
+
+for v_i in (0, v_half_last, 1)
+    show_sprite(crystal_ice, 28, 28, v_i, 0, 3)
+    show_sprite(crystal_amethyst, 28, 28, v_i, 0, 3)
+    v_icel[v_i] = 3
+    v_acel[v_i] = 3
+    v_izord[v_i] = 0
+    v_azord[v_i] = 0
+endfor v_i
+
+# ---------------- camera fly state ----------------
+v_t = 0
+v_frame = 0
+v_spin = 0
+
+while true then
+    v_t = v_t + v_fly_speed
+    if v_t > tau * 16 then
+        v_t = v_t - tau * 16
+    endif
+    v_spin = v_spin + 0.008
+    if v_spin > tau then
+        v_spin = v_spin - tau
+    endif
+
+    # Cinematic camera path: orbit + bank + periodic dive through the hole
+    v_ry = v_t * 0.55 + v_spin
+    v_rx = 0.35 + sin(v_t * 0.28) * 0.95
+    v_rz = sin(v_t * 0.19) * 0.35
+
+    v_dive = 0.5 + 0.5 * sin(v_t * 0.28 + 0.9)
+    v_camera = 36 + v_dive * 30
+    v_scale = 17 + (1 - v_dive) * 12
+
+    points_project3d(v_ix, v_iy, v_iz, v_ipx, v_ipy, v_rx, v_ry, v_rz, v_scale, v_camera, v_sprite_cx, v_sprite_cy, v_idepth)
+    points_project3d(v_ax, v_ay, v_az, v_apx, v_apy, v_rx, v_ry, v_rz, v_scale, v_camera, v_sprite_cx, v_sprite_cy, v_adepth)
+
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, v_half_last, 1)
+            v_si = int((v_idepth[v_i] + 1.2) * 2.4)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 6 then
+                v_si = 6
+            endif
+            v_icel[v_i] = v_si
+            v_si = int((v_adepth[v_i] + 1.2) * 2.4)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 6 then
+                v_si = 6
+            endif
+            v_acel[v_i] = v_si
+        endfor v_i
+    endif
+
+    for v_i in (0, v_half_last, 1)
+        v_izord[v_i] = int((v_idepth[v_i] + 2.5) * 40)
+        v_azord[v_i] = int((v_adepth[v_i] + 2.5) * 40)
+    endfor v_i
+
+    begin_frame(true)
+        move_sprites(crystal_ice, v_ipx, v_ipy, v_icel, v_izord)
+        move_sprites(crystal_amethyst, v_apx, v_apy, v_acel, v_azord)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

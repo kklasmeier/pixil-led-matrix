@@ -1,0 +1,387 @@
+# ==============================================================================
+# DNA / DOUBLE HELIX RIBBON  (64x64 matrix)
+#
+# Twin coloured ribbons corkscrew around the axis with base-pair rungs between
+# them. The helix crawls along its axis while the whole molecule tumbles;
+# radius and twist gently breathe so it never looks locked.
+#
+# Gold rungs sit on the centre axis; move_sprites z arrays follow projected
+# depth so they stay between the near and far backbone ribbons.
+#
+# Producer kernels: points_project3d, move_sprites (per strand / rungs).
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+v_n = 22                  # bobs per strand
+v_last = 21
+v_rungs = 11              # base pairs (every other step)
+v_rung_last = 10
+
+v_scale = 24
+v_camera = 54
+v_sprite_cx = 28          # 32 - 4 (9x9 bob)
+v_sprite_cy = 28
+
+v_speed_x = 0.007
+v_speed_y = 0.010
+v_speed_z = 0.005
+
+v_crawl = 0.045           # phase advance along the helix
+v_spacing = 0.22          # phase lag between neighbouring bobs
+v_twists = 1.15           # radians of twist per unit phase
+v_height = 1.05           # vertical span of the molecule
+
+v_cel_refresh = 2
+
+sync_queue
+
+# ---------------- shaded bob renderer ----------------
+# Globals: v_rad, v_bright
+def draw_bob_cyan {
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_nx = (v_px + 0.5 - 4.5) / v_rad
+            v_ny = (v_py + 0.5 - 4.5) / v_rad
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                v_dot = 0 - 0.42 * v_nx - 0.48 * v_ny + 0.76 * v_nz
+                if v_dot < 0 then
+                    v_dot = 0
+                endif
+                v_inten = int((18 + 78 * v_dot) * v_bright)
+                if v_inten < 10 then
+                    v_inten = 10
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                plot(v_px, v_py, cyan, v_inten)
+                if v_nz < 0.45 then
+                    v_rim = int((0.45 - v_nz) * 110 * v_bright)
+                    if v_rim > 100 then
+                        v_rim = 100
+                    endif
+                    if v_rim > 12 then
+                        plot(v_px, v_py, sky_blue, v_rim)
+                    endif
+                endif
+                if v_dot > 0.86 then
+                    v_spec = int((v_dot - 0.86) * 700 * v_bright)
+                    if v_spec > 100 then
+                        v_spec = 100
+                    endif
+                    plot(v_px, v_py, white, v_spec)
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+def draw_bob_magenta {
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_nx = (v_px + 0.5 - 4.5) / v_rad
+            v_ny = (v_py + 0.5 - 4.5) / v_rad
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                v_dot = 0 - 0.42 * v_nx - 0.48 * v_ny + 0.76 * v_nz
+                if v_dot < 0 then
+                    v_dot = 0
+                endif
+                v_inten = int((18 + 78 * v_dot) * v_bright)
+                if v_inten < 10 then
+                    v_inten = 10
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                plot(v_px, v_py, magenta, v_inten)
+                if v_nz < 0.45 then
+                    v_rim = int((0.45 - v_nz) * 110 * v_bright)
+                    if v_rim > 100 then
+                        v_rim = 100
+                    endif
+                    if v_rim > 12 then
+                        plot(v_px, v_py, pink, v_rim)
+                    endif
+                endif
+                if v_dot > 0.86 then
+                    v_spec = int((v_dot - 0.86) * 700 * v_bright)
+                    if v_spec > 100 then
+                        v_spec = 100
+                    endif
+                    plot(v_px, v_py, white, v_spec)
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+def draw_bob_gold {
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_nx = (v_px + 0.5 - 4.5) / v_rad
+            v_ny = (v_py + 0.5 - 4.5) / v_rad
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                v_dot = 0 - 0.42 * v_nx - 0.48 * v_ny + 0.76 * v_nz
+                if v_dot < 0 then
+                    v_dot = 0
+                endif
+                v_inten = int((16 + 70 * v_dot) * v_bright)
+                if v_inten < 8 then
+                    v_inten = 8
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                plot(v_px, v_py, gold, v_inten)
+                if v_dot > 0.88 then
+                    plot(v_px, v_py, white, int((v_dot - 0.88) * 600 * v_bright))
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+print("Rendering strand cels...")
+
+define_sprite(strand_a, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.45
+        v_bright = 0.4
+        call draw_bob_cyan
+    sprite_cel(1)
+        v_rad = 1.85
+        v_bright = 0.55
+        call draw_bob_cyan
+    sprite_cel(2)
+        v_rad = 2.3
+        v_bright = 0.68
+        call draw_bob_cyan
+    sprite_cel(3)
+        v_rad = 2.75
+        v_bright = 0.8
+        call draw_bob_cyan
+    sprite_cel(4)
+        v_rad = 3.2
+        v_bright = 0.9
+        call draw_bob_cyan
+    sprite_cel(5)
+        v_rad = 3.65
+        v_bright = 0.97
+        call draw_bob_cyan
+endsprite
+
+define_sprite(strand_b, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.45
+        v_bright = 0.4
+        call draw_bob_magenta
+    sprite_cel(1)
+        v_rad = 1.85
+        v_bright = 0.55
+        call draw_bob_magenta
+    sprite_cel(2)
+        v_rad = 2.3
+        v_bright = 0.68
+        call draw_bob_magenta
+    sprite_cel(3)
+        v_rad = 2.75
+        v_bright = 0.8
+        call draw_bob_magenta
+    sprite_cel(4)
+        v_rad = 3.2
+        v_bright = 0.9
+        call draw_bob_magenta
+    sprite_cel(5)
+        v_rad = 3.65
+        v_bright = 0.97
+        call draw_bob_magenta
+endsprite
+
+define_sprite(rung, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.15
+        v_bright = 0.35
+        call draw_bob_gold
+    sprite_cel(1)
+        v_rad = 1.45
+        v_bright = 0.5
+        call draw_bob_gold
+    sprite_cel(2)
+        v_rad = 1.8
+        v_bright = 0.62
+        call draw_bob_gold
+    sprite_cel(3)
+        v_rad = 2.15
+        v_bright = 0.74
+        call draw_bob_gold
+    sprite_cel(4)
+        v_rad = 2.5
+        v_bright = 0.85
+        call draw_bob_gold
+endsprite
+
+print("Helix ready")
+
+# Strand A
+create_array(v_ax, v_n, numeric)
+create_array(v_ay, v_n, numeric)
+create_array(v_az, v_n, numeric)
+create_array(v_apx, v_n, numeric)
+create_array(v_apy, v_n, numeric)
+create_array(v_adepth, v_n, numeric)
+create_array(v_acel, v_n, numeric)
+create_array(v_azord, v_n, numeric)
+
+# Strand B
+create_array(v_bx, v_n, numeric)
+create_array(v_by, v_n, numeric)
+create_array(v_bz, v_n, numeric)
+create_array(v_bpx, v_n, numeric)
+create_array(v_bpy, v_n, numeric)
+create_array(v_bdepth, v_n, numeric)
+create_array(v_bcel, v_n, numeric)
+create_array(v_bzord, v_n, numeric)
+
+# Base-pair rungs (on the axis between opposite backbone beads)
+create_array(v_rx, v_rungs, numeric)
+create_array(v_ry, v_rungs, numeric)
+create_array(v_rz, v_rungs, numeric)
+create_array(v_rpx, v_rungs, numeric)
+create_array(v_rpy, v_rungs, numeric)
+create_array(v_rdepth, v_rungs, numeric)
+create_array(v_rcel, v_rungs, numeric)
+create_array(v_rzord, v_rungs, numeric)
+
+for v_i in (0, v_rung_last, 1)
+    show_sprite(rung, 28, 28, v_i, 0, 1)
+    v_rcel[v_i] = 1
+    v_rzord[v_i] = 0
+endfor v_i
+
+for v_i in (0, v_last, 1)
+    show_sprite(strand_a, 28, 28, v_i, 0, 2)
+    show_sprite(strand_b, 28, 28, v_i, 0, 2)
+    v_acel[v_i] = 2
+    v_bcel[v_i] = 2
+    v_azord[v_i] = 0
+    v_bzord[v_i] = 0
+endfor v_i
+
+# ---------------- animation state ----------------
+v_rot_x = 0.25
+v_rot_y = 0.4
+v_rot_z = 0.1
+v_phase = 0
+v_frame = 0
+
+while true then
+    v_rot_x = v_rot_x + v_speed_x
+    v_rot_y = v_rot_y + v_speed_y
+    v_rot_z = v_rot_z + v_speed_z
+    if v_rot_x > tau then
+        v_rot_x = v_rot_x - tau
+    endif
+    if v_rot_y > tau then
+        v_rot_y = v_rot_y - tau
+    endif
+    if v_rot_z > tau then
+        v_rot_z = v_rot_z - tau
+    endif
+
+    v_phase = v_phase + v_crawl
+    if v_phase > tau * 16 then
+        v_phase = v_phase - tau * 16
+    endif
+
+    # Gentle biological motion
+    v_radius = 0.58 + sin(v_frame * 0.019) * 0.07
+    v_twist = v_twists + sin(v_frame * 0.011) * 0.12
+    v_scale_live = v_scale + sin(v_frame * 0.023) * 1.6
+
+    # Sample both backbone ribbons around the Y axis
+    for v_i in (0, v_last, 1)
+        v_t = v_phase - v_i * v_spacing
+        v_u = v_i / v_last
+        v_y = (0.5 - v_u) * 2 * v_height
+        v_th = v_t * v_twist
+        v_ax[v_i] = cos(v_th) * v_radius
+        v_ay[v_i] = v_y
+        v_az[v_i] = sin(v_th) * v_radius
+        v_bx[v_i] = cos(v_th + pi) * v_radius
+        v_by[v_i] = v_y
+        v_bz[v_i] = sin(v_th + pi) * v_radius
+    endfor v_i
+
+    # Base pairs on the axis between opposite backbone beads
+    for v_i in (0, v_rung_last, 1)
+        v_idx = v_i * 2
+        if v_idx > v_last then
+            v_idx = v_last
+        endif
+        v_rx[v_i] = (v_ax[v_idx] + v_bx[v_idx]) * 0.5
+        v_ry[v_i] = (v_ay[v_idx] + v_by[v_idx]) * 0.5
+        v_rz[v_i] = (v_az[v_idx] + v_bz[v_idx]) * 0.5
+    endfor v_i
+
+    points_project3d(v_ax, v_ay, v_az, v_apx, v_apy, v_rot_x, v_rot_y, v_rot_z, v_scale_live, v_camera, v_sprite_cx, v_sprite_cy, v_adepth)
+    points_project3d(v_bx, v_by, v_bz, v_bpx, v_bpy, v_rot_x, v_rot_y, v_rot_z, v_scale_live, v_camera, v_sprite_cx, v_sprite_cy, v_bdepth)
+    points_project3d(v_rx, v_ry, v_rz, v_rpx, v_rpy, v_rot_x, v_rot_y, v_rot_z, v_scale_live, v_camera, v_sprite_cx, v_sprite_cy, v_rdepth)
+
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, v_last, 1)
+            v_si = int((v_adepth[v_i] + 1.2) * 2.1)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 5 then
+                v_si = 5
+            endif
+            v_acel[v_i] = v_si
+            v_si = int((v_bdepth[v_i] + 1.2) * 2.1)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 5 then
+                v_si = 5
+            endif
+            v_bcel[v_i] = v_si
+        endfor v_i
+        for v_i in (0, v_rung_last, 1)
+            v_si = int((v_rdepth[v_i] + 1.2) * 1.7)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 4 then
+                v_si = 4
+            endif
+            v_rcel[v_i] = v_si
+        endfor v_i
+    endif
+
+    # Depth → z_index so centre gold sits between near/far ribbons
+    for v_i in (0, v_last, 1)
+        v_azord[v_i] = int((v_adepth[v_i] + 2.5) * 40)
+        v_bzord[v_i] = int((v_bdepth[v_i] + 2.5) * 40)
+    endfor v_i
+    for v_i in (0, v_rung_last, 1)
+        v_rzord[v_i] = int((v_rdepth[v_i] + 2.5) * 40)
+    endfor v_i
+
+    begin_frame(true)
+        move_sprites(rung, v_rpx, v_rpy, v_rcel, v_rzord)
+        move_sprites(strand_a, v_apx, v_apy, v_acel, v_azord)
+        move_sprites(strand_b, v_bpx, v_bpy, v_bcel, v_bzord)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

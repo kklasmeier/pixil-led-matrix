@@ -1,23 +1,39 @@
-"""Generic grid-following agent kernels for Pixil.
+"""Producer-side agent kernels (chemotaxis / trail followers).
 
-agent_chemotaxis: 8-way Physarum-style sense → turn → move → deposit.
-Mutates position/heading arrays and the flat field array in place.
-Does not draw and does not diffuse — pair with grid_program / grid_step.
+Mutate caller-owned arrays and field buffers. Do not draw.
 """
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 
 from .array_manager import PixilArray
 
-# 8 compass steps (E, SE, S, SW, W, NW, N, NE)
+NumericSeq = Union[PixilArray, Sequence[float], list]
+
+# 8-way: 0=E 1=SE 2=S 3=SW 4=W 5=NW 6=N 7=NE
 _DX = np.array([1.0, 1.0, 0.0, -1.0, -1.0, -1.0, 0.0, 1.0], dtype=np.float64)
 _DY = np.array([0.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, -1.0], dtype=np.float64)
 
-NumericSeq = PixilArray
+_DEFAULT_SENSOR = 5.0
+_DEFAULT_STEP = 1.0
+_DEFAULT_DEPOSIT = 0.55
+_FIELD_CAP = 1.5
+
+
+def _data(value: NumericSeq) -> list:
+    if isinstance(value, PixilArray):
+        return value.data
+    return value  # type: ignore[return-value]
+
+
+def _count(*arrays: NumericSeq, count: Optional[int] = None) -> int:
+    n = min(len(_data(a)) for a in arrays)
+    if count is not None:
+        n = min(n, int(count))
+    return n
 
 
 def agent_chemotaxis(
@@ -26,123 +42,95 @@ def agent_chemotaxis(
     heading: NumericSeq,
     field: NumericSeq,
     size: int,
-    sensor_dist: float = 5.0,
-    step: float = 1.0,
-    deposit: float = 0.55,
+    sensor_dist: float = _DEFAULT_SENSOR,
+    step: float = _DEFAULT_STEP,
+    deposit: float = _DEFAULT_DEPOSIT,
     count: Optional[int] = None,
-    wrap: Union[int, float] = 1,
+    wrap: bool = True,
 ) -> None:
-    """Sense a flat grid field, steer 8-way headings, move, and deposit.
+    """Sense a scent field, turn toward the strongest sample, step, deposit.
 
-    ``heading[i]`` is an integer direction 0..7 (E, SE, S, SW, W, NW, N, NE).
-    ``field`` is row-major length ``size * size``. Positive ``deposit`` adds
-    scent at the landing cell; use 0 for pure followers. ``wrap`` non-zero
-    uses toroidal edges; zero clamps agents and sensors to the field.
+    ``heading`` uses 8-way codes 0..7 (E, SE, S, SW, W, NW, N, NE).
+    ``field`` is a flat row-major ``size*size`` pheromone buffer. Deposits are
+    capped at 1.5 so grid evaporation can keep trails bounded.
     """
-    size_i = int(size)
-    if size_i < 2:
+    size = int(size)
+    if size < 2:
         raise ValueError(f"agent_chemotaxis: size must be >= 2 (got {size})")
-    expected = size_i * size_i
-    if field.size != expected:
+
+    n = _count(x, y, heading, count=count)
+    if n <= 0:
+        return
+
+    fd = _data(field)
+    if len(fd) < size * size:
         raise ValueError(
-            f"agent_chemotaxis: field length {field.size} != size*size ({expected})"
+            f"agent_chemotaxis: field length {len(fd)} < size*size ({size * size})"
         )
-    if x.size != y.size or x.size != heading.size:
-        raise ValueError("agent_chemotaxis: x, y, heading must be the same length")
-    if sensor_dist < 0 or step < 0:
-        raise ValueError("agent_chemotaxis: sensor_dist and step must be >= 0")
-    if deposit < 0:
-        raise ValueError("agent_chemotaxis: deposit must be >= 0")
 
-    n = x.size if count is None else int(count)
-    if n < 0 or n > x.size:
-        raise ValueError(f"agent_chemotaxis: count must be 0..{x.size} (got {n})")
+    xd = _data(x)
+    yd = _data(y)
+    hd = _data(heading)
 
-    wrap_on = float(wrap) != 0.0
-    max_c = size_i - 1
-    phero = np.asarray(field.data, dtype=np.float64)
-    xd = x.data
-    yd = y.data
-    hd = heading.data
-    wrote = False
+    xa = np.asarray(xd[:n], dtype=np.float64)
+    ya = np.asarray(yd[:n], dtype=np.float64)
+    h = np.floor(np.asarray(hd[:n], dtype=np.float64)).astype(np.int64) % 8
+
+    grid = np.asarray(fd[: size * size], dtype=np.float64).reshape(size, size)
+
+    sensor_dist = float(sensor_dist)
+    step = float(step)
+    deposit = float(deposit)
+
+    def _sample(dirs: np.ndarray) -> np.ndarray:
+        sx = xa + _DX[dirs] * sensor_dist
+        sy = ya + _DY[dirs] * sensor_dist
+        if wrap:
+            ix = np.floor(sx).astype(np.int64) % size
+            iy = np.floor(sy).astype(np.int64) % size
+        else:
+            ix = np.clip(np.floor(sx).astype(np.int64), 0, size - 1)
+            iy = np.clip(np.floor(sy).astype(np.int64), 0, size - 1)
+        return grid[iy, ix]
+
+    hl = (h - 1) % 8
+    hr = (h + 1) % 8
+    fl = _sample(hl)
+    fa = _sample(h)
+    fr = _sample(hr)
+
+    # Prefer ahead on ties; otherwise turn toward the stronger side.
+    turn = np.zeros(n, dtype=np.int64)
+    best = fa.copy()
+    left_wins = fl > best
+    turn = np.where(left_wins, -1, turn)
+    best = np.where(left_wins, fl, best)
+    right_wins = fr > best
+    turn = np.where(right_wins, 1, turn)
+
+    h = (h + turn) % 8
+    xa = xa + _DX[h] * step
+    ya = ya + _DY[h] * step
+
+    if wrap:
+        xa = np.mod(xa, size)
+        ya = np.mod(ya, size)
+    else:
+        xa = np.clip(xa, 0.0, size - 1.0000001)
+        ya = np.clip(ya, 0.0, size - 1.0000001)
 
     for i in range(n):
-        d = int(hd[i]) % 8
-        cx = float(xd[i])
-        cy = float(yd[i])
-        left_d = (d - 1) % 8
-        right_d = (d + 1) % 8
+        xd[i] = float(xa[i])
+        yd[i] = float(ya[i])
+        hd[i] = float(h[i])
 
-        # Forward / left / right sensors
-        samples = []
-        for sd in (d, left_d, right_d):
-            sx = cx + _DX[sd] * sensor_dist
-            sy = cy + _DY[sd] * sensor_dist
-            if wrap_on:
-                gx = int(np.floor(sx)) % size_i
-                gy = int(np.floor(sy)) % size_i
-            else:
-                gx = int(np.floor(sx))
-                gy = int(np.floor(sy))
-                if gx < 0:
-                    gx = 0
-                elif gx > max_c:
-                    gx = max_c
-                if gy < 0:
-                    gy = 0
-                elif gy > max_c:
-                    gy = max_c
-            samples.append(float(phero[gy * size_i + gx]))
-
-        fwd, left, right = samples
-        if left > fwd and left >= right:
-            d = left_d
-        elif right > fwd:
-            d = right_d
-
-        cx = cx + _DX[d] * step
-        cy = cy + _DY[d] * step
-
-        if wrap_on:
-            cx %= size_i
-            cy %= size_i
-            if cx < 0:
-                cx += size_i
-            if cy < 0:
-                cy += size_i
+    if deposit != 0.0:
+        if wrap:
+            ix = np.floor(xa).astype(np.int64) % size
+            iy = np.floor(ya).astype(np.int64) % size
         else:
-            if cx < 0:
-                cx = 0.0
-            elif cx > max_c:
-                cx = float(max_c)
-            if cy < 0:
-                cy = 0.0
-            elif cy > max_c:
-                cy = float(max_c)
-
-        xd[i] = cx
-        yd[i] = cy
-        hd[i] = float(d)
-
-        if deposit > 0:
-            if wrap_on:
-                gx = int(cx) % size_i
-                gy = int(cy) % size_i
-            else:
-                gx = int(cx)
-                gy = int(cy)
-                if gx < 0:
-                    gx = 0
-                elif gx > max_c:
-                    gx = max_c
-                if gy < 0:
-                    gy = 0
-                elif gy > max_c:
-                    gy = max_c
-            idx = gy * size_i + gx
-            val = phero[idx] + deposit
-            phero[idx] = 1.5 if val > 1.5 else val
-            wrote = True
-
-    if wrote:
-        field.data = phero.tolist()
+            ix = np.clip(np.floor(xa).astype(np.int64), 0, size - 1)
+            iy = np.clip(np.floor(ya).astype(np.int64), 0, size - 1)
+        np.add.at(grid, (iy, ix), deposit)
+        np.clip(grid, 0.0, _FIELD_CAP, out=grid)
+        fd[: size * size] = grid.ravel().tolist()

@@ -1,0 +1,139 @@
+# Twin Star Vortex - binary star gravity slingshot
+# Two pulsing stars orbit a common center. Particles are pulled and swirled
+# by both attractors, glow from blue to white-hot with speed, and leave
+# fading comet trails. Particles flung off-screen respawn on a new orbit.
+# Uses particle_apply_attractors (with swirl) + particle_integrate.
+# The stars are animated sprites (4-cel pulse) so they never leave pixels behind.
+#
+# SPEED TUNING: lower v_n (particle count) and v_trail_ms (trail length).
+# v_n is the only place the count is set; arrays, loops, and physics follow it.
+
+fps(30)
+throttle(0)
+
+# ---- Tunables ----
+v_n = 40
+v_trail_ms = 200
+v_orbit_r = 17
+v_orbit_speed = 0.065
+v_base_pull = 1.5
+v_pull_pulse = 2.5
+v_swirl = 0.9
+
+v_last = v_n - 1
+
+# ---- Star sprites: 13x13, center at (6,6), cel 0 = smallest pulse, cel 3 = largest ----
+define_sprite(star_a, 13, 13)
+    sprite_cel(0)
+        draw_circle(6, 6, 3, cyan, 35, false)
+        draw_circle(6, 6, 2, white, 100, true)
+    sprite_cel(1)
+        draw_circle(6, 6, 4, cyan, 50, false)
+        draw_circle(6, 6, 2, white, 100, true)
+    sprite_cel(2)
+        draw_circle(6, 6, 5, cyan, 65, false)
+        draw_circle(6, 6, 2, white, 100, true)
+    sprite_cel(3)
+        draw_circle(6, 6, 6, cyan, 80, false)
+        draw_circle(6, 6, 2, white, 100, true)
+endsprite
+
+define_sprite(star_b, 13, 13)
+    sprite_cel(0)
+        draw_circle(6, 6, 3, orange, 35, false)
+        draw_circle(6, 6, 2, yellow, 100, true)
+    sprite_cel(1)
+        draw_circle(6, 6, 4, orange, 50, false)
+        draw_circle(6, 6, 2, yellow, 100, true)
+    sprite_cel(2)
+        draw_circle(6, 6, 5, orange, 65, false)
+        draw_circle(6, 6, 2, yellow, 100, true)
+    sprite_cel(3)
+        draw_circle(6, 6, 6, orange, 80, false)
+        draw_circle(6, 6, 2, yellow, 100, true)
+endsprite
+
+# ---- Particle state ----
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_vx, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_pax, v_n, numeric)
+create_array(v_pay, v_n, numeric)
+create_array(v_act, v_n, numeric)
+
+# ---- Attractor state (two stars) ----
+create_array(v_sx, 2, numeric)
+create_array(v_sy, 2, numeric)
+create_array(v_sstr, 2, numeric)
+
+# ---- Speed palette: cold to white-hot ----
+create_array(v_pal, 6, string)
+v_pal[0] = "navy"
+v_pal[1] = "blue"
+v_pal[2] = "azure"
+v_pal[3] = "cyan"
+v_pal[4] = "white"
+v_pal[5] = "yellow"
+
+# ---- Seed particles on rough circular orbits ----
+for v_i in (0, v_last, 1)
+    v_ang = random(0, 6.28, 2)
+    v_rad = random(10, 30, 1)
+    v_x[v_i] = 32 + cos(v_ang) * v_rad
+    v_y[v_i] = 32 + sin(v_ang) * v_rad
+    v_vx[v_i] = 0 - sin(v_ang) * 1.0
+    v_vy[v_i] = cos(v_ang) * 1.0
+    v_act[v_i] = 1
+endfor v_i
+
+v_t = 0
+
+# ---- Show the stars once; they are moved (not redrawn) each frame ----
+show_sprite(star_a, 32, 32, 0, 1, 0)
+show_sprite(star_b, 32, 32, 0, 1, 0)
+
+# ---- Main loop ----
+while true then
+    # stars orbit the center, pulling in alternating pulses
+    v_t = v_t + v_orbit_speed
+    v_sx[0] = 32 + cos(v_t) * v_orbit_r
+    v_sy[0] = 32 + sin(v_t) * v_orbit_r
+    v_sx[1] = 32 - cos(v_t) * v_orbit_r
+    v_sy[1] = 32 - sin(v_t) * v_orbit_r
+    v_sstr[0] = v_base_pull + sin(v_t * 3) * v_pull_pulse
+    v_sstr[1] = v_base_pull - sin(v_t * 3) * v_pull_pulse
+
+    # pulse cel (0-3) follows each star's pull strength; star B is opposite phase
+    v_cel_a = int(min(max((sin(v_t * 3) + 1) * 1.99, 0), 3))
+    v_cel_b = 3 - v_cel_a
+
+    # forces: clear, attract, integrate
+    grid_fill(v_pax, 0)
+    grid_fill(v_pay, 0)
+    particle_apply_attractors(v_x, v_y, v_pax, v_pay, v_act, v_sx, v_sy, v_sstr, 1, 1, 3, 0.6, v_n, 2, v_swirl)
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_act, v_pax, v_pay, 0.997, 0, v_n, post_move, 3)
+
+    begin_frame(true)
+        # trails + respawn
+        for v_i in (0, v_last, 1)
+            if v_x[v_i] < -6 or v_x[v_i] > 70 or v_y[v_i] < -6 or v_y[v_i] > 70 then
+                v_ang = random(0, 6.28, 2)
+                v_rad = random(22, 30, 1)
+                v_x[v_i] = 32 + cos(v_ang) * v_rad
+                v_y[v_i] = 32 + sin(v_ang) * v_rad
+                v_vx[v_i] = 0 - sin(v_ang) * 1.0
+                v_vy[v_i] = cos(v_ang) * 1.0
+            else
+                v_sp = sqrt(v_vx[v_i] * v_vx[v_i] + v_vy[v_i] * v_vy[v_i])
+                v_k = int(min(v_sp * 1.6, 5))
+                v_c = v_pal[v_k]
+                plot(v_x[v_i], v_y[v_i], v_c, 95, v_trail_ms, fade)
+            endif
+        endfor v_i
+
+        # stars: sprite top-left = star center - 6
+        move_sprite(star_a, v_sx[0] - 6, v_sy[0] - 6, 0, v_cel_a)
+        move_sprite(star_b, v_sx[1] - 6, v_sy[1] - 6, 0, v_cel_b)
+    end_frame
+endwhile

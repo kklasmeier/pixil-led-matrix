@@ -103,6 +103,16 @@ Galton_Board.pix, Hourglass_Marbles.pix. Optional response=reflect on
 static-circle collide uses full-velocity bounce then restitution scale
 (see Scripting Guide §20).
 
+GENERIC POINTS / ARRAY KERNELS (PRODUCER-SIDE)
+---------------------------------------------
+points_project3d and array_lerp run in the producer
+(pixil_utils/points_engine.py via points_commands.py). They mutate
+numeric arrays only — no drawing, no queue commands. Same purity bar as
+particle kernels: Pixil owns timing, camera scalars, and rendering.
+
+Script syntax reference: Pixil_Scripting_Guide.txt section 21.
+Example script: Vector_Balls.pix.
+
 ================================================================================
 3. FILE MAP
 ================================================================================
@@ -132,6 +142,8 @@ static-circle collide uses full-velocity bounce then restitution scale
 │   ├── grid_engine.py       # NumPy step/render for grid_step / field_render
 │   ├── chladni_engine.py    # Vectorized Chladni particle step (chladni_step)
 │   ├── particle_engine.py   # Generic particle kernels (integrate / collide)
+│   ├── points_engine.py     # points_project3d / array_lerp kernels
+│   ├── points_commands.py   # Pixil dispatch for points/array kernels
 │   ├── particle_commands.py # Pixil dispatch for particle_* commands
 │   ├── agent_engine.py      # Grid-following agent kernels (chemotaxis)
 │   ├── agent_commands.py    # Pixil dispatch for agent_* commands
@@ -272,7 +284,7 @@ To add a parameterized agent kernel (preferred over a new *_step show hook):
 3. Pixil.py: agent_ line dispatch (beside particle_) and compiled-loop handler
 4. loop_compiler.py: add name to _AGENT_COMMANDS
 5. Tier 1 tests: tests/pixil/test_agent_engine.py
-6. Pixil_Scripting_Guide.txt section 21
+6. Pixil_Scripting_Guide.txt section 22
 
 Prefer agent_chemotaxis-style APIs (explicit array args) over fixed-name
 show steps like slime_step / ink_step when the behavior is reusable.
@@ -499,6 +511,15 @@ ADDING GENERIC PARTICLE KERNELS
 4. Tests: tests/pixil/test_particle_engine.py and test_particle_commands.py
 5. Document the command in Pixil_Scripting_Guide.txt section 20
 
+ADDING POINTS / ARRAY KERNELS
+-----------------------------
+1. Implement in pixil_utils/points_engine.py (no drawing, no show rules)
+2. Wire validation/dispatch in pixil_utils/points_commands.py
+3. PARAMETER_TYPES entry; Pixil.py dispatch beside particle_
+4. loop_compiler.py: add name to _POINTS_COMMANDS
+5. Tests: tests/pixil/test_points_engine.py and test_points_commands.py
+6. Document in Pixil_Scripting_Guide.txt section 21
+
 ADDING A SPECIALIZED ENGINE (e.g. particles that draw)
 --------------------------------------------
 When logic is not a full-grid or site-sum field (like Chladni):
@@ -548,6 +569,8 @@ grid/field compiler or engine        tests/pixil/test_grid_field_compiler.py,
                                      test_grid_engine.py, test_chladni_engine.py
 particle kernels                     tests/pixil/test_particle_engine.py,
                                      test_particle_commands.py
+points/array kernels                 tests/pixil/test_points_engine.py,
+                                     test_points_commands.py
 new/changed drawing on matrix        Tier 2 script in scripts/testing/ + manifest
 parser bug you can assert in Python  Tier 1 first; optional Tier 2 smoke .pix
 live clock or runtime on screen        Tier 2 with "volatile" (no buffer golden)
@@ -563,6 +586,8 @@ Grid/field Tier 1 tests (no hardware):
                                 including per-particle restitution arrays
   test_particle_commands.py   — particle_* validation and dispatch, including
                                 restitution arrays as command arguments
+  test_points_engine.py       — points_project3d / array_lerp kernels
+  test_points_commands.py     — points_* / array_lerp validation and dispatch
 
 Example Tier 2 / manual on Pi:
   ./run main/game_of_life.pix
@@ -788,6 +813,16 @@ pixil_utils/particle_engine.py / particle_commands.py
   particle_collide_static_circles optional response=reflect uses full-velocity
   bounce then restitution scale; default response=impulse is approach-only.
   Mutate arrays only; Pixil draws. See Scripting Guide §20.
+
+pixil_utils/points_engine.py / points_commands.py
+  points_project3d: Rx→Ry→Rz then perspective project to sx/sy; optional
+  depth out is post-rotate z'. array_lerp: out = a*(1-t)+b*t (t unclamped;
+  out may alias a/b). Mutate arrays only; Pixil draws. See Scripting Guide §21.
+
+move_sprites (Pixil.py + sprite_batch_dispatch.append_move_sprites)
+  Producer packs N move_sprite records from x/y/[cel] arrays into the frame
+  sprite_batch (instance ids 0..n-1). Avoids a Pixil for-loop of move_sprite.
+  See Scripting Guide §21.
 
 PIXIL.PY INTEGRATION
 --------------------

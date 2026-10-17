@@ -62,7 +62,10 @@ from pixil_utils.regex_patterns import (
     # Legacy patterns  
     ARRAY_CREATE_PATTERN, ARRAY_ASSIGN_PATTERN, SPRITE_DEF_PATTERN, COMMAND_PATTERN,
     SPRITE_OP_PATTERN, PROCEDURE_DEF_PATTERN, GRID_PROGRAM_DEF_PATTERN, FIELD_PROGRAM_DEF_PATTERN, PROCEDURE_CALL_PATTERN, FRAME_PARAM_PATTERN,
-    FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN
+    FOR_LOOP_PATTERN, WHILE_LOOP_PATTERN, IF_PATTERN, RANDOM_PATTERN,
+    SPRITE_DEFINITION_DRAW_COMMANDS,
+    sprite_definition_allows_fallthrough,
+    sprite_definition_emit_command,
 )
 
 # Multi-plot buffer management (legacy when ENABLE_DRAW_BATCH is off)
@@ -1276,6 +1279,30 @@ def process_script(filename, execute_func=None):
         debug_print(f"DEBUG: Sprite creation command sent")
         return True
 
+    def _format_sprite_draw_arg(value):
+        """Format a parsed value for inclusion in a sprite_draw queue command."""
+        if isinstance(value, str):
+            # Named colors / modes must stay quoted for the consumer parser.
+            if value == "" or value.isidentifier() or any(c.isalpha() for c in value):
+                escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+                return f'"{escaped}"'
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value)
+
+    def _emit_sprite_draw(cmd_name, parsed_args):
+        """Queue sprite_draw for the sprite currently being defined."""
+        emit_name = sprite_definition_emit_command(cmd_name)
+        if emit_name == "draw_ellipse" and len(parsed_args) > 8:
+            parsed_args = parsed_args[:8]
+        args_str = ", ".join(_format_sprite_draw_arg(a) for a in parsed_args)
+        sprite_cmd = (
+            f"sprite_draw({sprite_context.current_sprite}, {emit_name}, {args_str})"
+        )
+        execute_command(sprite_cmd)
+        if DEBUG_LEVEL >= DEBUG_VERBOSE:
+            debug_print(f"Sprite draw command: {sprite_cmd}", DEBUG_VERBOSE)
+
     def process_sprite_command(line):
         """Convert normal drawing commands to sprite drawing commands, and handle sprite_cel()."""
         # Check for sprite_cel command first
@@ -1295,34 +1322,32 @@ def process_script(filename, execute_func=None):
                 return
         
         command_match = COMMAND_PATTERN.match(line)
-        if command_match:
-            cmd_name = command_match.group(1)
-            valid_commands = ['plot', 'draw_line', 'draw_rectangle', 'draw_circle', 'draw_polygon', 'draw_text', 'draw_ellipse', 'draw_arc']
-            if cmd_name not in valid_commands:
-                debug_print(f"Warning: '{cmd_name}' is not a valid drawing command for sprite definition", DEBUG_CONCISE)
-                return
-            try:
-                args = validate_command_params(cmd_name, command_match.group(2))
-                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Sprite command: {cmd_name}", DEBUG_VERBOSE)
-                    debug_print(f"Parameters: {args}", DEBUG_VERBOSE)
+        if not command_match:
+            raise ValueError(
+                f"Unsupported line during sprite definition: {line}"
+            )
 
-                parsed_args = [
-                    parse_value(arg, cmd_name, position) 
-                    for position, arg in enumerate(args)
-                ]
-                
-                # Exclude burnout for draw_ellipse in sprites
-                if cmd_name == 'draw_ellipse' and len(parsed_args) > 8:
-                    parsed_args = parsed_args[:8]  # Keep only x_center to rotation
-                
-                sprite_cmd = f"sprite_draw({sprite_context.current_sprite}, {cmd_name}, {', '.join(parsed_args)})"
-                execute_command(sprite_cmd)
-                if DEBUG_LEVEL >= DEBUG_VERBOSE:
-                    debug_print(f"Sprite draw command: {sprite_cmd}", DEBUG_VERBOSE)
-            except (ValueError, KeyError) as e:
-                debug_print(f"Error processing sprite command '{cmd_name}': {str(e)}", DEBUG_SUMMARY)
-                raise
+        cmd_name = command_match.group(1)
+        if cmd_name not in SPRITE_DEFINITION_DRAW_COMMANDS:
+            raise ValueError(
+                f"'{cmd_name}' is not supported during sprite definition"
+            )
+        try:
+            # validate against the script-facing command (mplot keeps plot params)
+            validate_name = "plot" if cmd_name == "mplot" else cmd_name
+            args = validate_command_params(validate_name, command_match.group(2))
+            if DEBUG_LEVEL >= DEBUG_VERBOSE:
+                debug_print(f"Sprite command: {cmd_name}", DEBUG_VERBOSE)
+                debug_print(f"Parameters: {args}", DEBUG_VERBOSE)
+
+            parsed_args = [
+                parse_value(arg, validate_name, position)
+                for position, arg in enumerate(args)
+            ]
+            _emit_sprite_draw(cmd_name, parsed_args)
+        except (ValueError, KeyError) as e:
+            debug_print(f"Error processing sprite command '{cmd_name}': {str(e)}", DEBUG_SUMMARY)
+            raise
             
     def process_sprite_operation(line):
         """Handle show_sprite, hide_sprite, move_sprite, and dispose_sprite operations."""
@@ -1505,6 +1530,16 @@ def process_script(filename, execute_func=None):
     def _compiled_plot(x, y, color, intensity, burnout=None, burnout_mode=None):
         """Compiled plot(): batch in frame mode; flush immediately otherwise."""
         global mplot_buffer, mplot_count, draw_buffer, draw_count
+        if sprite_context.in_sprite_definition:
+            # Sprite buffers are small; still clamp to matrix-sized coords.
+            if not (0 <= x <= 63 and 0 <= y <= 63):
+                return
+            from shared.mplot_protocol import normalize_mplot_color
+            _emit_sprite_draw(
+                "plot",
+                [x, y, normalize_mplot_color(color), intensity],
+            )
+            return
         if not (0 <= x <= 63 and 0 <= y <= 63):
             return
         from shared.mplot_protocol import normalize_mplot_color
@@ -1523,6 +1558,11 @@ def process_script(filename, execute_func=None):
         """Compiled draw_line(): batch in frame mode; flush immediately otherwise."""
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
+        if sprite_context.in_sprite_definition:
+            _emit_sprite_draw(
+                "draw_line", [x0, y0, x1, y1, final_color, intensity]
+            )
+            return
         if _use_draw_batch_for('draw_line'):
             _append_to_draw_batch('draw_line', [x0, y0, x1, y1, final_color, intensity, burnout, burnout_mode])
             return
@@ -1538,6 +1578,12 @@ def process_script(filename, execute_func=None):
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
         filled_flag = bool(filled)
+        if sprite_context.in_sprite_definition:
+            _emit_sprite_draw(
+                "draw_circle",
+                [x, y, radius, final_color, intensity, filled_flag],
+            )
+            return
         if _use_draw_batch_for('draw_circle'):
             _append_to_draw_batch(
                 'draw_circle',
@@ -1559,6 +1605,12 @@ def process_script(filename, execute_func=None):
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
         filled_flag = bool(filled)
+        if sprite_context.in_sprite_definition:
+            _emit_sprite_draw(
+                "draw_polygon",
+                [x, y, radius, sides, final_color, intensity, rotation, filled_flag],
+            )
+            return
         if _use_draw_batch_for('draw_polygon'):
             _append_to_draw_batch(
                 'draw_polygon',
@@ -1583,6 +1635,12 @@ def process_script(filename, execute_func=None):
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
         filled_flag = bool(filled)
+        if sprite_context.in_sprite_definition:
+            _emit_sprite_draw(
+                "draw_arc",
+                [x1, y1, x2, y2, bulge, final_color, intensity, filled_flag],
+            )
+            return
         if _use_draw_batch_for('draw_arc'):
             _append_to_draw_batch(
                 'draw_arc',
@@ -1607,6 +1665,12 @@ def process_script(filename, execute_func=None):
         from shared.mplot_protocol import normalize_mplot_color
         final_color = normalize_mplot_color(color)
         filled_flag = bool(filled)
+        if sprite_context.in_sprite_definition:
+            _emit_sprite_draw(
+                "draw_rectangle",
+                [x, y, width, height, final_color, intensity, filled_flag],
+            )
+            return
         if _use_draw_batch_for('draw_rectangle'):
             _append_to_draw_batch(
                 'draw_rectangle',
@@ -1625,6 +1689,15 @@ def process_script(filename, execute_func=None):
 
     def _compiled_mplot(x, y, color, intensity, burnout=None, burnout_mode=None):
         global mplot_buffer, mplot_count, draw_buffer, draw_count
+        if sprite_context.in_sprite_definition:
+            if not (0 <= x <= 63 and 0 <= y <= 63):
+                return
+            from shared.mplot_protocol import normalize_mplot_color
+            _emit_sprite_draw(
+                "mplot",
+                [x, y, normalize_mplot_color(color), intensity],
+            )
+            return
         if not (0 <= x <= 63 and 0 <= y <= 63):
             return
         from shared.mplot_protocol import normalize_mplot_color
@@ -1635,6 +1708,102 @@ def process_script(filename, execute_func=None):
         record = pack_mplot(x, y, final_color, intensity, burnout, burnout_mode)
         mplot_buffer.extend(record)
         mplot_count += 1
+
+    def _run_move_sprites(arg_exprs):
+        """Pack many move_sprite ops from arrays into the frame sprite_batch."""
+        global sprite_buffer, sprite_count
+        from pixil_utils.optimization_flags import ENABLE_SPRITE_BATCH
+        from pixil_utils.particle_commands import (
+            _optional_count,
+            _optional_token,
+            require_array_name,
+            require_numeric_array,
+        )
+        from pixil_utils.sprite_batch_dispatch import append_move_sprites
+
+        tokens = validate_command_params(
+            "move_sprites", ", ".join(arg_exprs) if arg_exprs else ""
+        )
+        name = tokens[0].strip().strip('"').strip("'")
+        x_name = require_array_name("move_sprites", tokens[1], "x")
+        y_name = require_array_name("move_sprites", tokens[2], "y")
+        x_arr = require_numeric_array(variables, x_name, "move_sprites", "x")
+        y_arr = require_numeric_array(variables, y_name, "move_sprites", "y")
+        if x_arr.size != y_arr.size:
+            raise ValueError(
+                f"move_sprites: x/y arrays must be the same length "
+                f"({x_name}={x_arr.size}, {y_name}={y_arr.size})"
+            )
+
+        cel_arr = None
+        z_arr = None
+        count = None
+        tok3 = _optional_token(tokens, 3)
+        if tok3 is not None:
+            stripped = tok3.strip().strip('"').strip("'")
+            if stripped.startswith("v_"):
+                cel_name = require_array_name("move_sprites", tok3, "cel")
+                cel_arr = require_numeric_array(
+                    variables, cel_name, "move_sprites", "cel"
+                )
+                if cel_arr.size != x_arr.size:
+                    raise ValueError(
+                        f"move_sprites: cel array length {cel_arr.size} "
+                        f"does not match x/y length {x_arr.size}"
+                    )
+                tok4 = _optional_token(tokens, 4)
+                if tok4 is not None:
+                    stripped4 = tok4.strip().strip('"').strip("'")
+                    if stripped4.startswith("v_"):
+                        z_name = require_array_name("move_sprites", tok4, "z")
+                        z_arr = require_numeric_array(
+                            variables, z_name, "move_sprites", "z"
+                        )
+                        if z_arr.size != x_arr.size:
+                            raise ValueError(
+                                f"move_sprites: z array length {z_arr.size} "
+                                f"does not match x/y length {x_arr.size}"
+                            )
+                        count = _optional_count(
+                            "move_sprites",
+                            _optional_token(tokens, 5),
+                            variables,
+                            x_arr.size,
+                        )
+                    else:
+                        count = _optional_count(
+                            "move_sprites", tok4, variables, x_arr.size
+                        )
+            else:
+                count = _optional_count("move_sprites", tok3, variables, x_arr.size)
+
+        n = x_arr.size if count is None else count
+        if in_frame_mode and ENABLE_SPRITE_BATCH:
+            added = append_move_sprites(
+                sprite_buffer, name, x_arr, y_arr, cel_arr, n, z_arr
+            )
+            sprite_count += added
+            return
+
+        xd = x_arr.data
+        yd = y_arr.data
+        cd = cel_arr.data if cel_arr is not None else None
+        zd = z_arr.data if z_arr is not None else None
+        for i in range(n):
+            if cd is None and zd is None:
+                execute_command(
+                    f"move_sprite({name}, {int(xd[i])}, {int(yd[i])}, {i})"
+                )
+            elif zd is None:
+                execute_command(
+                    f"move_sprite({name}, {int(xd[i])}, {int(yd[i])}, {i}, {int(cd[i])})"
+                )
+            else:
+                cel_part = 0 if cd is None else int(cd[i])
+                execute_command(
+                    f"move_sprite({name}, {int(xd[i])}, {int(yd[i])}, {i}, "
+                    f"{cel_part}, {int(zd[i])})"
+                )
 
     def _run_compiled_command(cmd_name, arg_exprs):
         global mplot_buffer, mplot_count
@@ -1673,6 +1842,11 @@ def process_script(filename, execute_func=None):
         elif cmd_name.startswith('particle_'):
             from pixil_utils.particle_commands import run_particle_command
             run_particle_command(cmd_name, arg_exprs, variables)
+        elif cmd_name.startswith('points_') or cmd_name == 'array_lerp':
+            from pixil_utils.points_commands import run_points_command
+            run_points_command(cmd_name, arg_exprs, variables)
+        elif cmd_name == 'move_sprites':
+            _run_move_sprites(arg_exprs)
         elif cmd_name.startswith('agent_'):
             from pixil_utils.agent_commands import run_agent_command
             run_agent_command(cmd_name, arg_exprs, variables)
@@ -1794,14 +1968,14 @@ def process_script(filename, execute_func=None):
                 sprite_context.current_sprite = None
                 continue
 
-            # Handle sprite operations (show/hide/move) - MOVED UP
-            if process_sprite_operation(line):
-                continue
-
-            # Handle commands inside sprite definition
-            # Only process as sprite commands if we're inside a sprite definition
+            # Inside define_sprite: drawing → sprite_draw; assignments/call/loops/if
+            # fall through so procedures can procedurally paint cels.
             if sprite_context.in_sprite_definition:
-                process_sprite_command(line)
+                if not sprite_definition_allows_fallthrough(line):
+                    process_sprite_command(line)
+                    continue
+            elif process_sprite_operation(line):
+                # show/hide/move/dispose only outside sprite definition
                 continue
 
             # Variable assignment logic
@@ -1927,6 +2101,15 @@ def process_script(filename, execute_func=None):
             elif line.startswith('particle_') and '(' in line:
                 from pixil_utils.particle_commands import run_particle_line
                 run_particle_line(line, variables)
+
+            elif (line.startswith('points_') or line.startswith('array_lerp')) and '(' in line:
+                from pixil_utils.points_commands import run_points_line
+                run_points_line(line, variables)
+
+            elif line.startswith('move_sprites('):
+                from pixil_utils.parameter_types import split_command_parameters
+                inner = line[line.index('(') + 1 : line.rindex(')')]
+                _run_move_sprites(split_command_parameters(inner))
 
             elif (grid_fill_match := re.match(r'grid_fill\((v_\w+),\s*(.+)\)', line)):
                 array_name = grid_fill_match.group(1)

@@ -1,0 +1,359 @@
+# ==============================================================================
+# VECTOR BALLS  (64x64 matrix)
+#
+# Classic Amiga / Atari ST demoscene "bobs": shaded ball sprites placed at
+# points of a 3D shape. The shape rotates, projects with perspective, and
+# morphs between a cube, sphere, torus and double helix.
+#
+# Heavy work uses producer-side kernels (array_lerp, points_project3d,
+# move_sprites). Lighting is pre-rendered into copper-chrome sprite cels;
+# depth picks cel size/brightness.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+v_count = 32
+v_nshapes = 4
+
+v_center_x = 32
+v_center_y = 32
+# Screen half-extent for a point at |coord|=1, z=0. 24 fills most of 64x64
+# while leaving room for the 9x9 bob sprites at the edges.
+v_scale = 24
+v_camera = 56
+
+v_speed_x = 0.021
+v_speed_y = 0.029
+v_speed_z = 0.013
+
+v_hold_frames = 100       # frames spent resting on each shape
+v_morph_frames = 48       # frames spent easing to the next shape
+v_cel_refresh = 2         # recompute depth cels every N frames
+
+# ---------------- background ----------------
+draw_rectangle(0, 0, 64, 64, black, 100, true)
+for v_i in (0, 24, 1)
+    plot(random(0, 63, 0), random(0, 63, 0), navy, random(15, 40, 0))
+endfor v_i
+sync_queue
+
+# ---------------- shaded bob renderer ----------------
+# Uses globals: v_rad (sphere radius in sprite pixels), v_bright (0..1)
+# Copper-chrome sphere: warm body, cool rim, tight specular highlight.
+def draw_bob {
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_nx = (v_px + 0.5 - 4.5) / v_rad
+            v_ny = (v_py + 0.5 - 4.5) / v_rad
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                # Light from upper-left, slightly toward the viewer
+                v_dot = 0 - 0.42 * v_nx - 0.48 * v_ny + 0.76 * v_nz
+                if v_dot < 0 then
+                    v_dot = 0
+                endif
+                v_inten = int((20 + 75 * v_dot) * v_bright)
+                if v_inten < 10 then
+                    v_inten = 10
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                plot(v_px, v_py, gold, v_inten)
+                # Cool rim along the silhouette
+                if v_nz < 0.45 then
+                    v_rim = int((0.45 - v_nz) * 120 * v_bright)
+                    if v_rim > 100 then
+                        v_rim = 100
+                    endif
+                    if v_rim > 14 then
+                        plot(v_px, v_py, cyan, v_rim)
+                    endif
+                endif
+                # Specular hotspot
+                if v_dot > 0.86 then
+                    v_spec = int((v_dot - 0.86) * 700 * v_bright)
+                    if v_spec > 100 then
+                        v_spec = 100
+                    endif
+                    plot(v_px, v_py, white, v_spec)
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+print("Rendering bob cels...")
+
+# Sprite is always 9x9; smaller balls sit centred with transparent margins.
+# Cel index = depth size (0 = far/small/dim ... 6 = near/large/bright).
+# sprite_cel() requires literal indices, so cels are unrolled.
+define_sprite(bob, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.55
+        v_bright = 0.42
+        call draw_bob
+    sprite_cel(1)
+        v_rad = 1.95
+        v_bright = 0.55
+        call draw_bob
+    sprite_cel(2)
+        v_rad = 2.4
+        v_bright = 0.68
+        call draw_bob
+    sprite_cel(3)
+        v_rad = 2.9
+        v_bright = 0.8
+        call draw_bob
+    sprite_cel(4)
+        v_rad = 3.35
+        v_bright = 0.9
+        call draw_bob
+    sprite_cel(5)
+        v_rad = 3.85
+        v_bright = 0.97
+        call draw_bob
+    sprite_cel(6)
+        v_rad = 4.35
+        v_bright = 1.0
+        call draw_bob
+endsprite
+
+print("Building shapes...")
+
+# ---------------- shape tables: flat [shape * count + ball] ----------------
+v_shape_len = v_nshapes * v_count
+create_array(v_sx, v_shape_len, numeric)
+create_array(v_sy, v_shape_len, numeric)
+create_array(v_sz, v_shape_len, numeric)
+
+# ---- shape 0: cube (3x3x3 + 5 face accents) ----
+v_base = 0
+v_i = 0
+for v_gz in (-1, 1, 1)
+    for v_gy in (-1, 1, 1)
+        for v_gx in (-1, 1, 1)
+            v_sx[v_base + v_i] = v_gx
+            v_sy[v_base + v_i] = v_gy
+            v_sz[v_base + v_i] = v_gz
+            v_i = v_i + 1
+        endfor v_gx
+    endfor v_gy
+endfor v_gz
+v_sx[v_base + 27] = 0
+v_sy[v_base + 27] = 0
+v_sz[v_base + 27] = 1.45
+v_sx[v_base + 28] = 0
+v_sy[v_base + 28] = 0
+v_sz[v_base + 28] = 0 - 1.45
+v_sx[v_base + 29] = 1.45
+v_sy[v_base + 29] = 0
+v_sz[v_base + 29] = 0
+v_sx[v_base + 30] = 0 - 1.45
+v_sy[v_base + 30] = 0
+v_sz[v_base + 30] = 0
+v_sx[v_base + 31] = 0
+v_sy[v_base + 31] = 1.45
+v_sz[v_base + 31] = 0
+
+# ---- shape 1: sphere (golden spiral) ----
+v_base = v_count
+for v_i in (0, 31, 1)
+    v_fy = 1 - 2 * v_i / 31
+    v_fr = sqrt(max(0, 1 - v_fy * v_fy))
+    v_th = v_i * 2.399963
+    v_sx[v_base + v_i] = cos(v_th) * v_fr
+    v_sy[v_base + v_i] = v_fy
+    v_sz[v_base + v_i] = sin(v_th) * v_fr
+endfor v_i
+
+# ---- shape 2: torus (8 x 4) ----
+v_base = v_count * 2
+v_R = 0.95
+v_r = 0.42
+v_i = 0
+for v_v in (0, 3, 1)
+    for v_u in (0, 7, 1)
+        v_au = v_u * tau / 8
+        v_av = v_v * tau / 4
+        v_sx[v_base + v_i] = (v_R + v_r * cos(v_av)) * cos(v_au)
+        v_sy[v_base + v_i] = (v_R + v_r * cos(v_av)) * sin(v_au)
+        v_sz[v_base + v_i] = v_r * sin(v_av)
+        v_i = v_i + 1
+    endfor v_u
+endfor v_v
+
+# ---- shape 3: double helix ----
+v_base = v_count * 3
+for v_i in (0, 15, 1)
+    v_t = v_i / 15 * tau * 2
+    v_y = v_i / 15 * 2 - 1
+    v_sx[v_base + v_i] = cos(v_t) * 0.75
+    v_sy[v_base + v_i] = v_y
+    v_sz[v_base + v_i] = sin(v_t) * 0.75
+    v_sx[v_base + 16 + v_i] = cos(v_t + pi) * 0.75
+    v_sy[v_base + 16 + v_i] = v_y
+    v_sz[v_base + 16 + v_i] = sin(v_t + pi) * 0.75
+endfor v_i
+
+# Normalize by max |axis| (not Euclidean radius). Radius-normalize shrank the
+# cube to ~0.58 on each axis so everything sat in a tiny clump at the centre.
+for v_sh in (0, 3, 1)
+    v_base = v_sh * v_count
+    v_maxc = 0.01
+    for v_i in (0, 31, 1)
+        v_x = abs(v_sx[v_base + v_i])
+        v_y = abs(v_sy[v_base + v_i])
+        v_z = abs(v_sz[v_base + v_i])
+        if v_x > v_maxc then
+            v_maxc = v_x
+        endif
+        if v_y > v_maxc then
+            v_maxc = v_y
+        endif
+        if v_z > v_maxc then
+            v_maxc = v_z
+        endif
+    endfor v_i
+    for v_i in (0, 31, 1)
+        v_sx[v_base + v_i] = v_sx[v_base + v_i] / v_maxc
+        v_sy[v_base + v_i] = v_sy[v_base + v_i] / v_maxc
+        v_sz[v_base + v_i] = v_sz[v_base + v_i] / v_maxc
+    endfor v_i
+endfor v_sh
+
+# Working world points (cached on hold), morph endpoints, projected screen coords.
+# Projection center is sprite top-left for a 9x9 bob (ball centre at +4,+4).
+v_sprite_cx = v_center_x - 4
+v_sprite_cy = v_center_y - 4
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_z, v_count, numeric)
+create_array(v_axp, v_count, numeric)
+create_array(v_ayp, v_count, numeric)
+create_array(v_azp, v_count, numeric)
+create_array(v_bx, v_count, numeric)
+create_array(v_by, v_count, numeric)
+create_array(v_bz, v_count, numeric)
+create_array(v_px, v_count, numeric)
+create_array(v_py, v_count, numeric)
+create_array(v_depth, v_count, numeric)
+create_array(v_cel, v_count, numeric)
+
+# ---------------- spawn instances ----------------
+print("Vector balls ready")
+for v_i in (0, 31, 1)
+    show_sprite(bob, 28, 28, v_i, 0, 3)
+    v_cel[v_i] = 3
+endfor v_i
+
+# ---------------- animation state ----------------
+v_ax = 0.4
+v_ay = 0.2
+v_az = 0.1
+v_shape = 0
+v_next = 1
+v_phase = 0            # 0 = hold, 1 = morph
+v_timer = 0
+v_frame = 0
+v_world_ready = 0      # 0 = need to load shape A into v_x/y/z
+
+while true then
+    v_ax = v_ax + v_speed_x
+    v_ay = v_ay + v_speed_y
+    v_az = v_az + v_speed_z
+    if v_ax > tau then
+        v_ax = v_ax - tau
+    endif
+    if v_ay > tau then
+        v_ay = v_ay - tau
+    endif
+    if v_az > tau then
+        v_az = v_az - tau
+    endif
+
+    # Shape hold / morph state machine
+    if v_phase == 0 then
+        v_timer = v_timer + 1
+        v_blend = 0
+        if v_timer >= v_hold_frames then
+            v_phase = 1
+            v_timer = 0
+            v_next = v_shape + 1
+            if v_next >= v_nshapes then
+                v_next = 0
+            endif
+            # Cache morph endpoints once (A = current world, B = next shape)
+            v_base_b = v_next * v_count
+            for v_i in (0, 31, 1)
+                v_axp[v_i] = v_x[v_i]
+                v_ayp[v_i] = v_y[v_i]
+                v_azp[v_i] = v_z[v_i]
+                v_bx[v_i] = v_sx[v_base_b + v_i]
+                v_by[v_i] = v_sy[v_base_b + v_i]
+                v_bz[v_i] = v_sz[v_base_b + v_i]
+            endfor v_i
+        endif
+    else
+        v_timer = v_timer + 1
+        v_morph_t = v_timer / v_morph_frames
+        if v_morph_t > 1 then
+            v_morph_t = 1
+        endif
+        v_blend = (1 - cos(v_morph_t * pi)) * 0.5
+        if v_timer >= v_morph_frames then
+            v_shape = v_next
+            v_phase = 0
+            v_timer = 0
+            v_blend = 0
+            # World points already at shape B from final lerp
+            v_world_ready = 1
+        endif
+    endif
+
+    # Load shape A once at startup / whenever world cache is cold
+    if v_world_ready == 0 then
+        v_base_a = v_shape * v_count
+        for v_i in (0, 31, 1)
+            v_x[v_i] = v_sx[v_base_a + v_i]
+            v_y[v_i] = v_sy[v_base_a + v_i]
+            v_z[v_i] = v_sz[v_base_a + v_i]
+        endfor v_i
+        v_world_ready = 1
+    endif
+
+    # Morph: lerp cached endpoints into working world points
+    if v_blend > 0 then
+        array_lerp(v_axp, v_bx, v_x, v_blend)
+        array_lerp(v_ayp, v_by, v_y, v_blend)
+        array_lerp(v_azp, v_bz, v_z, v_blend)
+    endif
+
+    # Rotate + project (sprite top-left centre so no per-ball -4 in Pixil)
+    points_project3d(v_x, v_y, v_z, v_px, v_py, v_ax, v_ay, v_az, v_scale, v_camera, v_sprite_cx, v_sprite_cy, v_depth)
+
+    # Depth -> cel (size band). Skip most frames; positions still update every frame.
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, 31, 1)
+            v_si = int((v_depth[v_i] + 1.15) * 2.8)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 6 then
+                v_si = 6
+            endif
+            v_cel[v_i] = v_si
+        endfor v_i
+    endif
+
+    begin_frame(true)
+        # One producer-side pack of 32 moves (not 32 Pixil move_sprite calls)
+        move_sprites(bob, v_px, v_py, v_cel)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

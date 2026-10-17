@@ -113,6 +113,46 @@ WHILE_LOOP_PATTERN = re.compile(r'while (.+?) then')
 IF_PATTERN = re.compile(r'if (.+?) then')
 RANDOM_PATTERN = re.compile(r'random\s*\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*\)')
 
+
+# Drawing commands accepted inside define_sprite...endsprite.
+# mplot is accepted as an alias for plot (sprites have no mplot buffer).
+# draw_text is intentionally excluded (not supported on sprite buffers).
+SPRITE_DEFINITION_DRAW_COMMANDS = frozenset({
+    'plot',
+    'mplot',
+    'draw_line',
+    'draw_rectangle',
+    'draw_circle',
+    'draw_polygon',
+    'draw_ellipse',
+    'draw_arc',
+    'clear',
+})
+
+
+def sprite_definition_emit_command(cmd_name: str) -> str:
+    """Map a script draw command to the sprite_draw backend command name."""
+    if cmd_name == 'mplot':
+        return 'plot'
+    return cmd_name
+
+
+def sprite_definition_allows_fallthrough(line: str) -> bool:
+    """
+    During define_sprite...endsprite, drawing commands become sprite_draw.
+    Assignments, call, loops, if, print, and break must fall through to the
+    normal handlers so procedures can procedurally paint cels.
+    """
+    return (
+        (line.startswith('v_') and '=' in line)
+        or PROCEDURE_CALL_PATTERN.match(line) is not None
+        or FOR_LOOP_PATTERN.match(line) is not None
+        or WHILE_LOOP_PATTERN.match(line) is not None
+        or IF_PATTERN.match(line) is not None
+        or line.lower().startswith('print(')
+        or line.strip().lower() == 'break'
+    )
+
 # Random with simple variables: random(num_or_var, num_or_var, num_or_var)
 # Captures each argument which can be a number (-?\d*\.?\d+) or a variable (v_\w+)
 RANDOM_WITH_VARS_PATTERN = re.compile(r'^random\s*\(\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(-?\d*\.?\d+|v_\w+)\s*,\s*(\d+|v_\w+)\s*\)$')

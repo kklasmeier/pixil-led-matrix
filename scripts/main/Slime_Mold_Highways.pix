@@ -1,0 +1,281 @@
+# ==============================================================================
+# SLIME-MOLD HIGHWAYS  (64x64 matrix)
+#
+# Trail agents reinforce a pheromone field between moving food sources.
+# Moods cycle so the network never freezes: bloom, migrate, drought, storm.
+# The glowing field is the show; agents are sparse sparks on top.
+#
+# Producer kernels: agent_chemotaxis + grid_step (no sprites).
+# ==============================================================================
+
+clear()
+fps(30)
+throttle(0)
+
+# ---------------- world ----------------
+v_size = 32
+v_cell = 2
+v_cells = 1024
+v_max = 31
+
+v_n = 160
+v_last = 159
+v_sensor_dist = 4
+v_step = 1
+v_deposit = 0.55
+
+# Base field physics (moods nudge these).
+# v_mix = blend toward 4-neighbor average (0..1). Keep well under 1.0 —
+# using raw lap() with k>=0.25 causes a flashing checkerboard.
+v_mix = 0.45
+v_evap = 0.94
+
+v_food_n = 5
+v_food_last = 4
+v_food_boost = 0.95
+v_color_base = 48
+
+create_array(v_phero, v_cells, numeric)
+create_array(v_x, v_n, numeric)
+create_array(v_y, v_n, numeric)
+create_array(v_dir, v_n, numeric)
+create_array(v_food_x, v_food_n, numeric)
+create_array(v_food_y, v_food_n, numeric)
+create_array(v_food_vx, v_food_n, numeric)
+create_array(v_food_vy, v_food_n, numeric)
+
+grid_fill(v_phero, 0)
+
+for v_i in (0, v_last, 1)
+    v_x[v_i] = random(0, v_max, 0)
+    v_y[v_i] = random(0, v_max, 0)
+    v_dir[v_i] = random(0, 7, 0)
+endfor v_i
+
+def place_food {
+    for v_i in (0, v_food_last, 1)
+        v_food_x[v_i] = random(4, v_max - 4, 0)
+        v_food_y[v_i] = random(4, v_max - 4, 0)
+        # Slow drift so attractors keep roaming
+        v_food_vx[v_i] = (random(0, 100, 0) - 50) / 80
+        v_food_vy[v_i] = (random(0, 100, 0) - 50) / 80
+        if v_food_vx[v_i] == 0 then
+            v_food_vx[v_i] = 0.15
+        endif
+        if v_food_vy[v_i] == 0 then
+            v_food_vy[v_i] = 0 - 0.12
+        endif
+    endfor v_i
+}
+
+def drift_food {
+    for v_i in (0, v_food_last, 1)
+        v_food_x[v_i] = v_food_x[v_i] + v_food_vx[v_i]
+        v_food_y[v_i] = v_food_y[v_i] + v_food_vy[v_i]
+        if v_food_x[v_i] < 2 then
+            v_food_x[v_i] = 2
+            v_food_vx[v_i] = abs(v_food_vx[v_i])
+        endif
+        if v_food_x[v_i] > v_max - 2 then
+            v_food_x[v_i] = v_max - 2
+            v_food_vx[v_i] = 0 - abs(v_food_vx[v_i])
+        endif
+        if v_food_y[v_i] < 2 then
+            v_food_y[v_i] = 2
+            v_food_vy[v_i] = abs(v_food_vy[v_i])
+        endif
+        if v_food_y[v_i] > v_max - 2 then
+            v_food_y[v_i] = v_max - 2
+            v_food_vy[v_i] = 0 - abs(v_food_vy[v_i])
+        endif
+        # Occasional course change
+        if random(0, 100, 0) < 3 then
+            v_food_vx[v_i] = (random(0, 100, 0) - 50) / 70
+            v_food_vy[v_i] = (random(0, 100, 0) - 50) / 70
+        endif
+    endfor v_i
+}
+
+def inject_food {
+    # Pulse so food breathes instead of sitting as a hard clamp
+    v_pulse = 0.55 + 0.45 * (0.5 + 0.5 * sin(v_frame * 0.11))
+    v_boost = v_food_boost * v_pulse
+    for v_i in (0, v_food_last, 1)
+        v_fx = int(v_food_x[v_i])
+        v_fy = int(v_food_y[v_i])
+        for v_dy in (-1, 1, 1)
+            for v_dx in (-1, 1, 1)
+                v_px = v_fx + v_dx
+                v_py = v_fy + v_dy
+                if v_px < 0 then
+                    v_px = v_px + v_size
+                endif
+                if v_px >= v_size then
+                    v_px = v_px - v_size
+                endif
+                if v_py < 0 then
+                    v_py = v_py + v_size
+                endif
+                if v_py >= v_size then
+                    v_py = v_py - v_size
+                endif
+                v_idx = v_py * v_size + v_px
+                v_phero[v_idx] = v_phero[v_idx] + v_boost * 0.35
+                if v_phero[v_idx] > 1.5 then
+                    v_phero[v_idx] = 1.5
+                endif
+            endfor v_dx
+        endfor v_dy
+        # Hot core
+        v_idx = v_fy * v_size + v_fx
+        v_phero[v_idx] = v_boost
+    endfor v_i
+}
+
+def wander_agents {
+    # Break straight-line lock when sensors are flat
+    for v_i in (0, v_last, 1)
+        if random(0, 100, 0) < v_wander_pct then
+            v_dir[v_i] = fmod(v_dir[v_i] + random(-1, 1, 0) + 8, 8)
+        endif
+    endfor v_i
+}
+
+def scramble_agents {
+    for v_i in (0, v_last, 1)
+        if random(0, 100, 0) < 35 then
+            v_x[v_i] = random(0, v_max, 0)
+            v_y[v_i] = random(0, v_max, 0)
+            v_dir[v_i] = random(0, 7, 0)
+        endif
+    endfor v_i
+}
+
+def drought_field {
+    for v_i in (0, v_cells - 1, 1)
+        v_phero[v_i] = v_phero[v_i] * 0.35
+    endfor v_i
+}
+
+def storm_noise {
+    for v_k in (0, 40, 1)
+        v_idx = random(0, v_cells - 1, 0)
+        v_phero[v_idx] = v_phero[v_idx] + random(20, 80, 0) / 100
+        if v_phero[v_idx] > 1.5 then
+            v_phero[v_idx] = 1.5
+        endif
+    endfor v_k
+}
+
+call place_food
+
+grid_program slime {
+    size v_size
+    cell v_cell
+    fields v_phero
+    steps 1
+    boundary wrap
+
+    step v_phero {
+        # Stable blur: C' = (1-mix)*C + mix*avg4  ==  C + (mix/4)*lap
+        v_phero_next = clamp((at(v_phero) + (v_mix * 0.25) * lap(v_phero)) * v_evap, 0, 1.5)
+    }
+
+    draw {
+        palette_field v_phero
+        color_base v_color_base
+        color_scale 45
+        intensity_base 4
+        intensity_scale 96
+    }
+}
+
+print("Slime mold highways...")
+
+v_frame = 0
+# Mood: 0=bloom 1=migrate 2=drought 3=storm
+v_mood = 0
+v_mood_timer = 0
+v_mood_len = 220
+v_wander_pct = 8
+v_deposit_live = v_deposit
+v_sensor_live = v_sensor_dist
+
+while true then
+    v_mood_timer = v_mood_timer + 1
+    if v_mood_timer >= v_mood_len then
+        v_mood_timer = 0
+        v_mood = fmod(v_mood + 1, 4)
+        v_color_base = fmod(v_color_base + 9 + random(0, 7, 0), 80)
+        v_mood_len = 160 + random(0, 120, 0)
+
+        if v_mood == 0 then
+            # Bloom — thick trails, steady food
+            v_evap = 0.95
+            v_mix = 0.4
+            v_deposit_live = 0.6
+            v_sensor_live = 5
+            v_wander_pct = 6
+            v_food_boost = 1.0
+        endif
+        if v_mood == 1 then
+            # Migrate — food relocates, agents explore
+            v_evap = 0.93
+            v_mix = 0.55
+            v_deposit_live = 0.4
+            v_sensor_live = 6
+            v_wander_pct = 14
+            v_food_boost = 0.85
+            call place_food
+            call scramble_agents
+        endif
+        if v_mood == 2 then
+            # Drought — trails die back, only strong highways survive
+            v_evap = 0.88
+            v_mix = 0.5
+            v_deposit_live = 0.7
+            v_sensor_live = 3
+            v_wander_pct = 4
+            v_food_boost = 0.55
+            call drought_field
+        endif
+        if v_mood == 3 then
+            # Storm — noise + reshuffle, then network rebuilds
+            v_evap = 0.91
+            v_mix = 0.6
+            v_deposit_live = 0.5
+            v_sensor_live = 5
+            v_wander_pct = 18
+            v_food_boost = 0.7
+            call storm_noise
+            call place_food
+            call scramble_agents
+        endif
+    endif
+
+    call drift_food
+    call inject_food
+    call wander_agents
+
+    # Mid-mood food hops keep paths rewriting
+    if fmod(v_frame, 180) == 0 then
+        v_food_x[random(0, v_food_last, 0)] = random(4, v_max - 4, 0)
+        v_food_y[random(0, v_food_last, 0)] = random(4, v_max - 4, 0)
+    endif
+
+    agent_chemotaxis(v_x, v_y, v_dir, v_phero, v_size, v_sensor_live, v_step, v_deposit_live, v_n, 1)
+
+    begin_frame
+        grid_step(slime)
+        # Sparse agent sparks — field stays readable
+        for v_i in (0, v_last, 4)
+            plot(int(v_x[v_i]) * v_cell, int(v_y[v_i]) * v_cell, lime, 85)
+        endfor v_i
+        # Food markers (dim rings)
+        for v_i in (0, v_food_last, 1)
+            plot(int(v_food_x[v_i]) * v_cell, int(v_food_y[v_i]) * v_cell, yellow, 100)
+        endfor v_i
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

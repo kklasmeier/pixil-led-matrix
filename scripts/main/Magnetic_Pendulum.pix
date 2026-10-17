@@ -1,0 +1,152 @@
+# Magnetic Pendulum v3 - roaming bobs, three orbiting pulsing magnets
+# Bobs start scattered around the display with a little spin. Three magnets orbit
+# the center and pulse in strength (sometimes repelling), with a sideways swirl
+# so bobs orbit and get flung from magnet to magnet instead of clumping.
+# Physics runs natively (particle_apply_attractors / particle_integrate /
+# particle_collide_bounds); Pixil only draws trails and moves the magnet sprites.
+# Magnet sprites grow with strength: biggest = strong pull, smallest = repelling.
+#
+# TUNING:
+#   v_n            number of bobs (max 12 - palette has 12 entries)
+#   v_magnet_r     magnet orbit radius from center
+#   v_spin         magnet orbit speed (radians per frame)
+#   v_base, v_amp  magnet strength swings between base-amp and base+amp
+#   v_pulse        how fast the strengths cycle
+#   v_swirl        sideways spin around magnets (more = more orbiting)
+#   v_damp         friction (1 = none, lower = bobs slow down)
+#   v_vmax         speed limit
+#   v_trail_ms     trail length (lower if the Pi struggles)
+
+fps(60)
+throttle(0)
+
+# ---- Tunables ----
+v_n = 12
+v_magnet_r = 22
+v_breathe = 4
+v_spin = 0.02
+v_base = 3
+v_amp = 4
+v_pulse = 0.05
+v_swirl = 0.3
+v_damp = 0.996
+v_vmax = 2.2
+v_trail_ms = 400
+v_round_len = 1500
+
+v_last = v_n - 1
+v_smin = v_base - v_amp
+
+# ---- Magnet sprite: 9x9, cel 0 = repelling/weak, cel 3 = strongest ----
+define_sprite(magnet, 9, 9)
+    sprite_cel(0)
+        draw_circle(4, 4, 2, violet, 45, false)
+        draw_circle(4, 4, 1, white, 100, true)
+    sprite_cel(1)
+        draw_circle(4, 4, 3, violet, 65, false)
+        draw_circle(4, 4, 1, white, 100, true)
+    sprite_cel(2)
+        draw_circle(4, 4, 4, violet, 85, false)
+        draw_circle(4, 4, 1, white, 100, true)
+    sprite_cel(3)
+        draw_circle(4, 4, 4, magenta, 100, false)
+        draw_circle(4, 4, 2, white, 100, true)
+endsprite
+
+# ---- Bob state ----
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+create_array(v_pvx, v_n, numeric)
+create_array(v_pvy, v_n, numeric)
+create_array(v_pax, v_n, numeric)
+create_array(v_pay, v_n, numeric)
+create_array(v_act, v_n, numeric)
+
+# ---- Magnet state ----
+create_array(v_mx, 3, numeric)
+create_array(v_my, 3, numeric)
+create_array(v_ms, 3, numeric)
+
+# ---- Trail colors: one per bob (6 colors repeated) ----
+create_array(v_pal, 12, string)
+v_pal[0] = "red"
+v_pal[1] = "gold"
+v_pal[2] = "lime"
+v_pal[3] = "cyan"
+v_pal[4] = "azure"
+v_pal[5] = "magenta"
+v_pal[6] = "orange"
+v_pal[7] = "spring_green"
+v_pal[8] = "sky_blue"
+v_pal[9] = "violet"
+v_pal[10] = "pink"
+v_pal[11] = "yellow"
+
+# ---- New round: scatter bobs around the display with a little spin ----
+def reset_round {
+    for v_i in (0, v_last, 1)
+        v_ra = random(0, 6.28, 2)
+        v_rr0 = random(8, 26, 1)
+        v_px[v_i] = 32 + cos(v_ra) * v_rr0
+        v_py[v_i] = 32 + sin(v_ra) * v_rr0
+        v_pvx[v_i] = 0 - sin(v_ra) * random(0.4, 1.0, 2)
+        v_pvy[v_i] = cos(v_ra) * random(0.4, 1.0, 2)
+        v_act[v_i] = 1
+    endfor v_i
+    v_round_f = 0
+}
+
+# ---- Place magnet sprites once (moved every frame afterwards) ----
+for v_m in (0, 2, 1)
+    show_sprite(magnet, 28, 28, v_m, 1, 1)
+endfor v_m
+
+v_f = 0
+call reset_round
+
+# ---- Main loop ----
+while true then
+    # magnets orbit, breathe, and pulse out of phase with each other
+    v_ma0 = v_f * v_spin
+    v_rr = v_magnet_r + sin(v_f * 0.021) * v_breathe
+    for v_m in (0, 2, 1)
+        v_mang = v_ma0 + v_m * tau / 3
+        v_mx[v_m] = 32 + cos(v_mang) * v_rr
+        v_my[v_m] = 32 + sin(v_mang) * v_rr
+        v_ms[v_m] = v_base + v_amp * sin(v_f * v_pulse + v_m * 2.1)
+    endfor v_m
+
+    # occasionally nudge one random bob so nothing ever idles
+    if fmod(v_f, 20) == 0 then
+        v_ki = random(0, v_last, 0)
+        v_pvx[v_ki] = v_pvx[v_ki] + random(-1.2, 1.2, 2)
+        v_pvy[v_ki] = v_pvy[v_ki] + random(-1.2, 1.2, 2)
+    endif
+
+    # native physics: clear forces, magnets pull/swirl, move, bounce off the edges
+    grid_fill(v_pax, 0)
+    grid_fill(v_pay, 0)
+    particle_apply_attractors(v_px, v_py, v_pax, v_pay, v_act, v_mx, v_my, v_ms, 1, 1, 3, 0.5, v_n, 3, v_swirl)
+    particle_integrate(v_px, v_py, v_pvx, v_pvy, v_act, v_pax, v_pay, v_damp, 0, v_n, post_move, v_vmax)
+    particle_collide_bounds(v_px, v_py, v_pvx, v_pvy, v_act, 2, 61, 2, 61, 0.9, 0)
+
+    begin_frame(true)
+        for v_i in (0, v_last, 1)
+            v_c = v_pal[v_i]
+            mplot(v_px[v_i], v_py[v_i], v_c, 95, v_trail_ms, fade)
+        endfor v_i
+        mflush
+        
+        # magnet sprites follow their orbit; size shows current strength
+        for v_m in (0, 2, 1)
+            v_cel = int(min(max((v_ms[v_m] - v_smin) / (v_amp * 2) * 3.99, 0), 3))
+            move_sprite(magnet, v_mx[v_m] - 4, v_my[v_m] - 4, v_m, v_cel)
+        endfor v_m
+    end_frame
+
+    v_f = v_f + 1
+    v_round_f = v_round_f + 1
+    if v_round_f > v_round_len then
+        call reset_round
+    endif
+endwhile

@@ -238,8 +238,8 @@ class RGB_Api:
                 pil_image = Image.fromarray(bg_viewport, mode='RGB')
                 self.canvas.SetImage(pil_image)
 
-                # Layer 3: Sprites on top
-                for sprite_name, instance_id in self.sprite_manager.z_order:
+                # Layer 3: Sprites on top (sorted by z_index, then creation order)
+                for sprite_name, instance_id in self.sprite_manager.iter_draw_order():
                     instance = self.sprite_manager.get_instance(sprite_name, instance_id)
                     if instance and instance.visible:
                         self.copy_sprite_to_buffer(instance, self.canvas)
@@ -264,7 +264,7 @@ class RGB_Api:
                 if not self.preserve_frame_changes:
                     self._blit_array_to_canvas(self._drawing_buffer_for_display())
 
-                for sprite_name, instance_id in self.sprite_manager.z_order:
+                for sprite_name, instance_id in self.sprite_manager.iter_draw_order():
                     instance = self.sprite_manager.get_instance(sprite_name, instance_id)
                     if instance and instance.visible:
                         self.copy_sprite_to_buffer(instance, self.canvas)
@@ -1103,6 +1103,9 @@ class RGB_Api:
         instance.x = int(x)
         instance.y = int(y)
         instance.visible = True
+        # Re-show can change layering; new instances already got z_index at create
+        if not is_new_instance:
+            instance.z_index = int(z_index)
         
         # Only change cel if explicitly specified, or if this is a new instance
         if cel_idx is not None:
@@ -1131,7 +1134,8 @@ class RGB_Api:
             if not self.frame_mode:
                 self._present_sprite_update()
 
-    def move_sprite(self, name: str, x: float, y: float, instance_id: int = 0, cel_idx: Optional[int] = None):
+    def move_sprite(self, name: str, x: float, y: float, instance_id: int = 0,
+                    cel_idx: Optional[int] = None, z_index: Optional[int] = None):
         """
         Move a specific sprite instance to a new position.
         
@@ -1140,6 +1144,7 @@ class RGB_Api:
             x, y: New position on screen
             instance_id: Instance identifier (default 0)
             cel_idx: If specified, set to this cel. If None, auto-advance to next cel.
+            z_index: If specified, update draw order (higher = in front).
         
         Auto-Advance Behavior:
             - Without cel_idx: Automatically advances to next cel (current_cel + 1)
@@ -1147,7 +1152,8 @@ class RGB_Api:
             - Wrapping: When reaching last cel, wraps to cel 0
         """
         debug(f"Moving sprite '{name}' instance {instance_id} to ({x}, {y})" + 
-              (f" cel {cel_idx}" if cel_idx is not None else " (auto-advance)"), 
+              (f" cel {cel_idx}" if cel_idx is not None else " (auto-advance)") +
+              (f" z={z_index}" if z_index is not None else ""),
             Level.INFO, Component.SPRITE)
         
         instance = self.sprite_manager.get_instance(name, instance_id)
@@ -1159,6 +1165,9 @@ class RGB_Api:
             # Update position
             instance.x = int(x)
             instance.y = int(y)
+
+            if z_index is not None:
+                instance.z_index = int(z_index)
             
             # Handle cel animation
             if cel_idx is not None:
@@ -1207,7 +1216,7 @@ class RGB_Api:
             self.canvas.SetImage(pil_image)
 
         # Then draw all visible sprites on top in z-order
-        for sprite_name, instance_id in self.sprite_manager.z_order:
+        for sprite_name, instance_id in self.sprite_manager.iter_draw_order():
             instance = self.sprite_manager.get_instance(sprite_name, instance_id)
             if instance and instance.visible:
                 self.copy_sprite_to_buffer(instance, self.canvas)

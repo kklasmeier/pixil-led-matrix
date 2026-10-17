@@ -1,0 +1,921 @@
+# ==============================================================================
+# SPINNING EARTH  (64x64 matrix)
+#
+# A realistic Earth rendered once into 72 sprite cels (5 degrees per cel),
+# then played back as a slow, seamless rotation (west to east, 23.4 deg tilt).
+#
+# The cels are split across 8 sprites (earth0..earth7, 9 cels each) so a
+# loading screen can show real progress between chunks. Playback swaps between
+# the chunks invisibly.
+#
+# Surface data: a 72x36 land map (5 degree cells) built from continent outlines,
+# coloured by biome (rainforest, boreal forest, desert, steppe, mountains, ice).
+# Extras: cloud bands, day/night terminator, city lights on the dark side and
+# a thin atmosphere halo.
+# ==============================================================================
+
+clear()
+fps(45)
+
+# ---------------- tunable settings ----------------
+v_radius = 24            # planet radius in pixels (sprite is 52x52)
+v_cx = 26                # planet centre inside the sprite
+v_cy = 26
+v_tilt = radians(23.4)   # axial tilt (north pole leans up-right)
+v_spin_sign = 1          # change to -1 to spin the other way
+v_rate = 0.2             # cels per loop pass: 0.2 = one rotation in about 12 s
+v_thn = 1.25             # cloud threshold, thin clouds (lower = cloudier)
+v_thk = 2.4              # cloud threshold, thick clouds
+v_fs = 6                 # loading-screen font size (lower if text is too wide)
+
+v_ct = cos(v_tilt)
+v_st = sin(v_tilt)
+
+# Sun direction (from the upper left, slightly toward the viewer)
+v_lgx = -0.72
+v_lgy = -0.30
+v_lgz = 0.62
+
+# ---------------- loading screen ----------------
+# Uses globals v_status, v_detail (short text) and v_pct (0-100)
+def show_loading {
+    v_pctn = int(v_pct)
+    v_bw = int(46 * v_pct / 100)
+    begin_frame
+        draw_text(32, 4, "EARTH", tiny64_font, v_fs + 2, sky_blue, 100, NORMAL, CENTER)
+        draw_text(32, 20, v_status, tiny64_font, v_fs, white, 100, NORMAL, CENTER)
+        draw_text(32, 29, v_detail, tiny64_font, v_fs, gray, 80, NORMAL, CENTER)
+        draw_text(30, 40, v_pctn, tiny64_font, v_fs, yellow, 100, NORMAL, RIGHT)
+        draw_text(31, 40, "%", tiny64_font, v_fs, yellow, 100)
+        draw_rectangle(8, 52, 48, 6, gray, 60, false)
+        if v_bw > 0 then
+            draw_rectangle(9, 53, v_bw, 4, lime, 100, true)
+        endif
+    end_frame
+}
+
+v_status = "Starting"
+v_detail = "please wait"
+v_pct = 0
+call show_loading
+
+# ---------------- arrays ----------------
+create_array(v_map, 2592)       # 72 x 36 cells, index = row * 72 + col
+grid_fill(v_map, 0)
+
+# Disc pixels (precomputed once)
+create_array(v_gx, 1900)
+create_array(v_gy, 1900)
+create_array(v_rw, 1900)
+create_array(v_c0, 1900)
+create_array(v_sh, 1900)
+# Halo pixels
+create_array(v_hx_p, 320)
+create_array(v_hy_p, 320)
+create_array(v_hi, 320)
+
+# ---------------- land runs ----------------
+v_status = "Land map"
+v_detail = "coastlines"
+v_pct = 1
+call show_loading
+
+# Each entry = row * 10000 + start_col * 100 + end_col (end exclusive).
+# Row 0 is the north pole band; each row is 5 degrees of latitude, each column
+# is 5 degrees of longitude starting at 180W.
+create_array(v_run, 118)
+v_run[0] = 11931
+v_run[1] = 21431
+v_run[2] = 23842
+v_run[3] = 24650
+v_run[4] = 30308
+v_run[5] = 31124
+v_run[6] = 32532
+v_run[7] = 34043
+v_run[8] = 34648
+v_run[9] = 35052
+v_run[10] = 35470
+v_run[11] = 40024
+v_run[12] = 42532
+v_run[13] = 43872
+v_run[14] = 50317
+v_run[15] = 52124
+v_run[16] = 52628
+v_run[17] = 53133
+v_run[18] = 53769
+v_run[19] = 60317
+v_run[20] = 62025
+v_run[21] = 63536
+v_run[22] = 63764
+v_run[23] = 66769
+v_run[24] = 71025
+v_run[25] = 73464
+v_run[26] = 81126
+v_run[27] = 83563
+v_run[28] = 86465
+v_run[29] = 91124
+v_run[30] = 93441
+v_run[31] = 94446
+v_run[32] = 94762
+v_run[33] = 96466
+v_run[34] = 101121
+v_run[35] = 103436
+v_run[36] = 103839
+v_run[37] = 104046
+v_run[38] = 104760
+v_run[39] = 106162
+v_run[40] = 106465
+v_run[41] = 111220
+v_run[42] = 113441
+v_run[43] = 114361
+v_run[44] = 116365
+v_run[45] = 121317
+v_run[46] = 121920
+v_run[47] = 123346
+v_run[48] = 124760
+v_run[49] = 131314
+v_run[50] = 131517
+v_run[51] = 131822
+v_run[52] = 133243
+v_run[53] = 134448
+v_run[54] = 135061
+v_run[55] = 141519
+v_run[56] = 142023
+v_run[57] = 143244
+v_run[58] = 144548
+v_run[59] = 145052
+v_run[60] = 145558
+v_run[61] = 146061
+v_run[62] = 151720
+v_run[63] = 152123
+v_run[64] = 153246
+v_run[65] = 155152
+v_run[66] = 155558
+v_run[67] = 156061
+v_run[68] = 161926
+v_run[69] = 163346
+v_run[70] = 165253
+v_run[71] = 165657
+v_run[72] = 165960
+v_run[73] = 166061
+v_run[74] = 172026
+v_run[75] = 173845
+v_run[76] = 175657
+v_run[77] = 175860
+v_run[78] = 182027
+v_run[79] = 183844
+v_run[80] = 185657
+v_run[81] = 185860
+v_run[82] = 186265
+v_run[83] = 192029
+v_run[84] = 193844
+v_run[85] = 195759
+v_run[86] = 196364
+v_run[87] = 202029
+v_run[88] = 203844
+v_run[89] = 204546
+v_run[90] = 206265
+v_run[91] = 212228
+v_run[92] = 213843
+v_run[93] = 214446
+v_run[94] = 216063
+v_run[95] = 216465
+v_run[96] = 222228
+v_run[97] = 223943
+v_run[98] = 224446
+v_run[99] = 225966
+v_run[100] = 232226
+v_run[101] = 233943
+v_run[102] = 235967
+v_run[103] = 242225
+v_run[104] = 243942
+v_run[105] = 245966
+v_run[106] = 252124
+v_run[107] = 256366
+v_run[108] = 257072
+v_run[109] = 262123
+v_run[110] = 266566
+v_run[111] = 267071
+v_run[112] = 272123
+v_run[113] = 276971
+v_run[114] = 282123
+v_run[115] = 282425
+v_run[116] = 292829
+v_run[117] = 302425
+
+# Stamp the runs into the map as land flags (1)
+for v_k in (0, 117, 1)
+    v_e = v_run[v_k]
+    v_r = floor(v_e / 10000)
+    v_rem = v_e - v_r * 10000
+    v_a = floor(v_rem / 100)
+    v_b = v_rem - v_a * 100
+    for v_c in (v_a, v_b - 1, 1)
+        v_map[v_r * 72 + v_c] = 1
+    endfor v_c
+endfor v_k
+
+# ---------------- biome classification ----------------
+# Classes: 1 green, 2 dark forest/jungle, 3 desert, 4 ice, 5 steppe/savanna/
+# tundra (olive), 6 mountains (brown). Uses v_lat / v_lon, sets v_cl.
+def classify {
+    if v_lat > 72 then
+        v_cl = 4
+    elseif v_lat > 58 and v_lon > -58 and v_lon < -18 then
+        v_cl = 4
+    elseif v_lat > 66 then
+        v_cl = 5
+    elseif v_lat > -55 and v_lat < 10 and v_lon > -80 and v_lon < -66 then
+        v_cl = 6
+    elseif v_lat > -13 and v_lat < 7 and v_lon > -76 and v_lon < -48 then
+        v_cl = 2
+    elseif v_lat > -27 and v_lat < -12 and v_lon > -60 and v_lon < -38 then
+        v_cl = 5
+    elseif v_lat < -38 and v_lon > -76 and v_lon < -60 then
+        v_cl = 5
+    elseif v_lat > 22 and v_lat < 36 and v_lon > -118 and v_lon < -100 then
+        v_cl = 3
+    elseif v_lat > 36 and v_lat < 56 and v_lon > -122 and v_lon < -104 then
+        v_cl = 6
+    elseif v_lat > 36 and v_lat < 52 and v_lon > -104 and v_lon < -94 then
+        v_cl = 5
+    elseif v_lat > 50 and v_lat < 67 and v_lon > -168 and v_lon < -58 then
+        v_cl = 2
+    elseif v_lat > 7 and v_lat < 21 and v_lon > -93 and v_lon < -76 then
+        v_cl = 2
+    elseif v_lat > -8 and v_lat < 5 and v_lon > 8 and v_lon < 32 then
+        v_cl = 2
+    elseif v_lat > 3 and v_lat < 9 and v_lon > -15 and v_lon < 12 then
+        v_cl = 2
+    elseif v_lat > 14 and v_lat < 33 and v_lon > -18 and v_lon < 62 then
+        v_cl = 3
+    elseif v_lat > 24 and v_lat < 38 and v_lon > 42 and v_lon < 68 then
+        v_cl = 3
+    elseif v_lat > 24 and v_lat < 32 and v_lon > 60 and v_lon < 75 then
+        v_cl = 3
+    elseif v_lat > 26 and v_lat < 38 and v_lon > 74 and v_lon < 104 then
+        v_cl = 6
+    elseif v_lat > 36 and v_lat < 48 and v_lon > 78 and v_lon < 114 then
+        v_cl = 3
+    elseif v_lat > 40 and v_lat < 54 and v_lon > 44 and v_lon < 82 then
+        v_cl = 5
+    elseif v_lat > 4 and v_lat < 14 and v_lon > -18 and v_lon < 48 then
+        v_cl = 5
+    elseif v_lat > -10 and v_lat < 6 and v_lon > 30 and v_lon < 48 then
+        v_cl = 5
+    elseif v_lat > -30 and v_lat < -17 and v_lon > 11 and v_lon < 26 then
+        v_cl = 3
+    elseif v_lat > -17 and v_lat < -6 and v_lon > 12 and v_lon < 42 then
+        v_cl = 5
+    elseif v_lat > 54 and v_lat < 67 and v_lon > 5 and v_lon < 175 then
+        v_cl = 2
+    elseif v_lat > -12 and v_lat < 24 and v_lon > 92 and v_lon < 150 then
+        v_cl = 2
+    elseif v_lat > -32 and v_lat < -19 and v_lon > 116 and v_lon < 142 then
+        v_cl = 3
+    elseif v_lat > -19 and v_lat < -10 and v_lon > 120 and v_lon < 146 then
+        v_cl = 5
+    else
+        v_cl = 1
+    endif
+}
+
+v_status = "Biomes"
+v_detail = "land+clouds"
+v_pct = 3
+call show_loading
+
+# Walk every map cell: classify land, force polar ice caps, add clouds.
+# Cell codes: 0 ocean, 1-6 land class, +10 = thin cloud over it, 99 = thick cloud.
+for v_r in (0, 35, 1)
+    v_t = fmod(v_r, 12)
+    if v_t == 0 then
+        v_pct = 3 + v_r * 5 / 36
+        call show_loading
+    endif
+    v_lat = 87.5 - v_r * 5
+    v_b = radians(v_lat)
+    for v_c in (0, 71, 1)
+        v_idx = v_r * 72 + v_c
+        v_lon = v_c * 5 - 177.5
+        v_cl = 0
+        if v_map[v_idx] == 1 then
+            call classify
+        endif
+        if v_lat > 80 or v_lat < -65 then
+            v_cl = 4
+        endif
+        if v_cl != 4 then
+            v_a = v_c * 0.0872665
+            v_n = sin(3 * v_a + 2 * sin(2 * v_b)) + sin(7 * v_a - 3 * v_b + 1.3) + sin(11 * v_a + 5 * v_b + 0.7) + 0.8 * sin(2 * v_a + 9 * v_b + 2.0)
+            v_z = cos(6 * v_b)
+            v_s2 = 0.55 * v_n + 1.1 * v_z
+            if v_s2 > v_thk then
+                v_cl = 99
+            elseif v_s2 > v_thn then
+                v_cl = v_cl + 10
+            endif
+        endif
+        v_map[v_idx] = v_cl
+    endfor v_c
+endfor v_r
+
+# ---------------- precompute sphere pixels ----------------
+v_status = "Sphere"
+v_detail = "pixel map"
+v_pct = 8
+call show_loading
+
+v_np = 0
+v_nh = 0
+for v_py in (0, 51, 1)
+    v_t = fmod(v_py, 13)
+    if v_t == 0 then
+        v_pct = 8 + v_py * 5 / 52
+        call show_loading
+    endif
+    for v_px in (0, 51, 1)
+        v_nx = (v_px + 0.5 - v_cx) / v_radius
+        v_ny = (v_py + 0.5 - v_cy) / v_radius
+        v_d2 = v_nx * v_nx + v_ny * v_ny
+        if v_d2 <= 1 then
+            v_nz = sqrt(1 - v_d2)
+            v_x1 = v_nx * v_ct + v_ny * v_st
+            v_sl = v_nx * v_st - v_ny * v_ct
+            v_sl = max(-1, min(1, v_sl))
+            v_lat = degrees(asin(v_sl))
+            v_row = floor((90 - v_lat) / 5)
+            v_row = max(0, min(35, v_row))
+            v_lon = degrees(atan2(v_x1, v_nz))
+            v_gx[v_np] = v_px
+            v_gy[v_np] = v_py
+            v_rw[v_np] = v_row * 72
+            v_c0[v_np] = (v_lon + 180) / 5
+            v_dl = max(v_nx * v_lgx + v_ny * v_lgy + v_nz * v_lgz, 0)
+            v_sh[v_np] = int(6 + 94 * sqrt(v_dl))
+            v_np = v_np + 1
+        elseif v_d2 <= 1.1378 then
+            v_dd = sqrt(v_d2)
+            v_ux = v_nx / v_dd
+            v_uy = v_ny / v_dd
+            v_lit = max(v_ux * v_lgx + v_uy * v_lgy, 0)
+            v_dist = (v_dd - 1) / 0.0667
+            v_hx_p[v_nh] = v_px
+            v_hy_p[v_nh] = v_py
+            v_hi[v_nh] = int((10 + 60 * v_lit) * (1 - 0.55 * v_dist))
+            v_nh = v_nh + 1
+        endif
+    endfor v_px
+endfor v_py
+
+# ---------------- city lights (lat, lon) ----------------
+v_ncity = 38
+create_array(v_clat, 38)
+create_array(v_clon, 38)
+v_clat[0] = 40.7
+v_clon[0] = -74.0
+v_clat[1] = 41.9
+v_clon[1] = -87.6
+v_clat[2] = 34.0
+v_clon[2] = -118.2
+v_clat[3] = 29.8
+v_clon[3] = -95.4
+v_clat[4] = 19.4
+v_clon[4] = -99.1
+v_clat[5] = 43.7
+v_clon[5] = -79.4
+v_clat[6] = 4.7
+v_clon[6] = -74.1
+v_clat[7] = -12.0
+v_clon[7] = -77.0
+v_clat[8] = -23.5
+v_clon[8] = -46.6
+v_clat[9] = -22.9
+v_clon[9] = -43.2
+v_clat[10] = -34.6
+v_clon[10] = -58.4
+v_clat[11] = -33.4
+v_clon[11] = -70.7
+v_clat[12] = 51.5
+v_clon[12] = -0.1
+v_clat[13] = 48.9
+v_clon[13] = 2.3
+v_clat[14] = 40.4
+v_clon[14] = -3.7
+v_clat[15] = 41.9
+v_clon[15] = 12.5
+v_clat[16] = 52.5
+v_clon[16] = 13.4
+v_clat[17] = 55.8
+v_clon[17] = 37.6
+v_clat[18] = 41.0
+v_clon[18] = 29.0
+v_clat[19] = 30.0
+v_clon[19] = 31.2
+v_clat[20] = 6.5
+v_clon[20] = 3.4
+v_clat[21] = -1.3
+v_clon[21] = 36.8
+v_clat[22] = -26.2
+v_clon[22] = 28.0
+v_clat[23] = 35.7
+v_clon[23] = 51.4
+v_clat[24] = 28.6
+v_clon[24] = 77.2
+v_clat[25] = 19.1
+v_clon[25] = 72.9
+v_clat[26] = 13.7
+v_clon[26] = 100.5
+v_clat[27] = -6.2
+v_clon[27] = 106.8
+v_clat[28] = 39.9
+v_clon[28] = 116.4
+v_clat[29] = 31.2
+v_clon[29] = 121.5
+v_clat[30] = 37.6
+v_clon[30] = 127.0
+v_clat[31] = 35.7
+v_clon[31] = 139.7
+v_clat[32] = 14.6
+v_clon[32] = 121.0
+v_clat[33] = -33.9
+v_clon[33] = 151.2
+v_clat[34] = 22.6
+v_clon[34] = 88.4
+v_clat[35] = 24.7
+v_clon[35] = 46.7
+v_clat[36] = 23.8
+v_clon[36] = 90.4
+v_clat[37] = 25.8
+v_clon[37] = -80.2
+
+# ---------------- renderers ----------------
+# Plot a surface class at (v_xx, v_yy) with shade v_s (used for thin clouds)
+def plot_class {
+    if v_kk == 0 then
+        plot(v_xx, v_yy, royal_blue, v_s)
+    elseif v_kk == 1 then
+        plot(v_xx, v_yy, green, v_s)
+    elseif v_kk == 2 then
+        plot(v_xx, v_yy, forest_green, v_s)
+    elseif v_kk == 3 then
+        plot(v_xx, v_yy, tan, v_s)
+    elseif v_kk == 4 then
+        plot(v_xx, v_yy, white, v_s)
+    elseif v_kk == 5 then
+        plot(v_xx, v_yy, olive, v_s)
+    else
+        plot(v_xx, v_yy, brown, v_s)
+    endif
+}
+
+# Render one rotation frame; v_shift = rotation in map columns (5 degrees each)
+def draw_earth {
+    # Surface: ocean, land biomes and clouds
+    for v_i in (0, v_np - 1, 1)
+        v_m = v_rw[v_i] + floor(fmod(v_c0[v_i] + 72 - v_shift, 72))
+        v_k = v_map[v_m]
+        v_s = v_sh[v_i]
+        if v_k == 0 then
+            plot(v_gx[v_i], v_gy[v_i], royal_blue, v_s)
+        elseif v_k == 1 then
+            plot(v_gx[v_i], v_gy[v_i], green, v_s)
+        elseif v_k == 2 then
+            plot(v_gx[v_i], v_gy[v_i], forest_green, v_s)
+        elseif v_k == 3 then
+            plot(v_gx[v_i], v_gy[v_i], tan, v_s)
+        elseif v_k == 4 then
+            plot(v_gx[v_i], v_gy[v_i], white, v_s)
+        elseif v_k == 5 then
+            plot(v_gx[v_i], v_gy[v_i], olive, v_s)
+        elseif v_k == 6 then
+            plot(v_gx[v_i], v_gy[v_i], brown, v_s)
+        elseif v_k == 99 then
+            plot(v_gx[v_i], v_gy[v_i], white, v_s)
+        else
+            v_xx = v_gx[v_i]
+            v_yy = v_gy[v_i]
+            v_pr = fmod(v_xx + v_yy, 2)
+            if v_pr == 0 then
+                plot(v_xx, v_yy, white, v_s)
+            else
+                v_kk = v_k - 10
+                call plot_class
+            endif
+        endif
+    endfor v_i
+
+    # Atmosphere halo
+    for v_j in (0, v_nh - 1, 1)
+        v_t = v_hi[v_j]
+        plot(v_hx_p[v_j], v_hy_p[v_j], sky_blue, v_t)
+    endfor v_j
+
+    # City lights on the night side
+    for v_j in (0, v_ncity - 1, 1)
+        v_la = radians(v_clat[v_j])
+        v_lo = radians(v_clon[v_j] + v_shift * 5)
+        v_ex = cos(v_la) * sin(v_lo)
+        v_ey = sin(v_la)
+        v_ez = cos(v_la) * cos(v_lo)
+        if v_ez > 0.1 then
+            v_vx = v_ex * v_ct + v_ey * v_st
+            v_vy = v_ex * v_st - v_ey * v_ct
+            v_dd = v_vx * v_lgx + v_vy * v_lgy + v_ez * v_lgz
+            if v_dd < -0.05 then
+                plot(round(v_cx + v_vx * v_radius), round(v_cy + v_vy * v_radius), yellow, 90)
+            endif
+        endif
+    endfor v_j
+}
+
+# ---------------- sprites: 8 chunks x 9 cels, 5 degrees per cel ----------------
+# Chunk n holds cels 9n .. 9n+8. v_shift is the global cel number.
+
+v_status = "Rendering"
+v_detail = "cels 1-9"
+v_pct = 13
+call show_loading
+
+define_sprite(earth0, 52, 52)
+    sprite_cel(0)
+        v_shift = 0 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 1 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 2 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 3 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 4 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 5 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 6 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 7 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 8 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 10-18"
+v_pct = 23.9
+call show_loading
+
+define_sprite(earth1, 52, 52)
+    sprite_cel(0)
+        v_shift = 9 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 10 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 11 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 12 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 13 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 14 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 15 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 16 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 17 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 19-27"
+v_pct = 34.8
+call show_loading
+
+define_sprite(earth2, 52, 52)
+    sprite_cel(0)
+        v_shift = 18 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 19 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 20 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 21 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 22 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 23 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 24 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 25 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 26 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 28-36"
+v_pct = 45.6
+call show_loading
+
+define_sprite(earth3, 52, 52)
+    sprite_cel(0)
+        v_shift = 27 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 28 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 29 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 30 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 31 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 32 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 33 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 34 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 35 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 37-45"
+v_pct = 56.5
+call show_loading
+
+define_sprite(earth4, 52, 52)
+    sprite_cel(0)
+        v_shift = 36 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 37 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 38 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 39 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 40 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 41 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 42 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 43 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 44 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 46-54"
+v_pct = 67.4
+call show_loading
+
+define_sprite(earth5, 52, 52)
+    sprite_cel(0)
+        v_shift = 45 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 46 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 47 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 48 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 49 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 50 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 51 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 52 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 53 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 55-63"
+v_pct = 78.3
+call show_loading
+
+define_sprite(earth6, 52, 52)
+    sprite_cel(0)
+        v_shift = 54 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 55 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 56 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 57 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 58 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 59 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 60 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 61 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 62 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_detail = "cels 64-72"
+v_pct = 89.1
+call show_loading
+
+define_sprite(earth7, 52, 52)
+    sprite_cel(0)
+        v_shift = 63 * v_spin_sign
+        call draw_earth
+    sprite_cel(1)
+        v_shift = 64 * v_spin_sign
+        call draw_earth
+    sprite_cel(2)
+        v_shift = 65 * v_spin_sign
+        call draw_earth
+    sprite_cel(3)
+        v_shift = 66 * v_spin_sign
+        call draw_earth
+    sprite_cel(4)
+        v_shift = 67 * v_spin_sign
+        call draw_earth
+    sprite_cel(5)
+        v_shift = 68 * v_spin_sign
+        call draw_earth
+    sprite_cel(6)
+        v_shift = 69 * v_spin_sign
+        call draw_earth
+    sprite_cel(7)
+        v_shift = 70 * v_spin_sign
+        call draw_earth
+    sprite_cel(8)
+        v_shift = 71 * v_spin_sign
+        call draw_earth
+endsprite
+
+v_status = "Ready"
+v_detail = "launching"
+v_pct = 100
+call show_loading
+rest(0.8)
+
+# ---------------- chunk switching helpers ----------------
+# v_ck = chunk to show, v_lc = local cel (0-8), v_cur = chunk currently shown
+def show_chunk {
+    if v_ck == 0 then
+        show_sprite(earth0, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 1 then
+        show_sprite(earth1, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 2 then
+        show_sprite(earth2, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 3 then
+        show_sprite(earth3, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 4 then
+        show_sprite(earth4, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 5 then
+        show_sprite(earth5, 6, 6, 0, 0, v_lc)
+    elseif v_ck == 6 then
+        show_sprite(earth6, 6, 6, 0, 0, v_lc)
+    else
+        show_sprite(earth7, 6, 6, 0, 0, v_lc)
+    endif
+}
+
+def hide_chunk {
+    if v_cur == 0 then
+        hide_sprite(earth0, 0)
+    elseif v_cur == 1 then
+        hide_sprite(earth1, 0)
+    elseif v_cur == 2 then
+        hide_sprite(earth2, 0)
+    elseif v_cur == 3 then
+        hide_sprite(earth3, 0)
+    elseif v_cur == 4 then
+        hide_sprite(earth4, 0)
+    elseif v_cur == 5 then
+        hide_sprite(earth5, 0)
+    elseif v_cur == 6 then
+        hide_sprite(earth6, 0)
+    else
+        hide_sprite(earth7, 0)
+    endif
+}
+
+def move_chunk {
+    if v_ck == 0 then
+        move_sprite(earth0, 6, 6, 0, v_lc)
+    elseif v_ck == 1 then
+        move_sprite(earth1, 6, 6, 0, v_lc)
+    elseif v_ck == 2 then
+        move_sprite(earth2, 6, 6, 0, v_lc)
+    elseif v_ck == 3 then
+        move_sprite(earth3, 6, 6, 0, v_lc)
+    elseif v_ck == 4 then
+        move_sprite(earth4, 6, 6, 0, v_lc)
+    elseif v_ck == 5 then
+        move_sprite(earth5, 6, 6, 0, v_lc)
+    elseif v_ck == 6 then
+        move_sprite(earth6, 6, 6, 0, v_lc)
+    else
+        move_sprite(earth7, 6, 6, 0, v_lc)
+    endif
+}
+
+# ---------------- space background (drawn once) ----------------
+clear()
+for v_i in (0, 79, 1)
+    v_sx = random(0, 63, 0)
+    v_sy = random(0, 63, 0)
+    v_sb = random(12, 65, 0)
+    v_sc = random(0, 3, 0)
+    if v_sc == 0 then
+        plot(v_sx, v_sy, sky_blue, v_sb)
+    elseif v_sc == 1 then
+        plot(v_sx, v_sy, lavender, v_sb)
+    else
+        plot(v_sx, v_sy, white, v_sb)
+    endif
+endfor v_i
+
+# ---------------- animation ----------------
+v_cf = 0
+v_last = 0
+v_cur = 0
+v_ck = 0
+v_lc = 0
+call show_chunk
+
+while true then
+    v_cf = v_cf + v_rate
+    if v_cf >= 72 then
+        v_cf = v_cf - 72
+    endif
+    v_cel = int(v_cf)
+    if v_cel != v_last then
+        v_ck = floor(v_cel / 9)
+        v_lc = v_cel - v_ck * 9
+        begin_frame(true)
+            if v_ck != v_cur then
+                call hide_chunk
+                call show_chunk
+                v_cur = v_ck
+            else
+                call move_chunk
+            endif
+        end_frame
+        v_last = v_cel
+    endif
+    rest(0.03)
+endwhile

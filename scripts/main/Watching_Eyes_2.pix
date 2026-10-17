@@ -1,0 +1,1458 @@
+# Watching Eyes v4 - Personality Edition
+#
+# What's new vs v3:
+#   - EYEBROWS (two extra sprites) so every expression reads clearly
+#   - MOODS (neutral / happy / sleepy / grumpy / curious) that drift over time.
+#     Each mood has its own resting face, blink speed, pacing and action menu.
+#   - New expressions: happy ^ ^, content, heart eyes, sparkle, shocked,
+#     teary, scrunched, knocked-out X
+#   - New behaviors: eye roll, side-eye, double take, startle, sneeze, yawn,
+#     nodding off and sleeping (with floating Z's), giggle, glare, dizzy spin,
+#     sad pout, love, and a FLY that the eyes chase, go cross-eyed over, and
+#     either swat or lose
+#   - Idle glances while waiting so the eyes never feel frozen
+
+throttle(0.1)
+
+# Cap display refresh at 60 FPS
+fps(60)
+
+# ============================================================
+# EYE SPRITE (16x16)
+#   0-25  : same as v3 (blink cycle, wide, look-around, squint look)
+#   26    : happy ^ eye
+#   27    : heart eye
+#   28    : sparkle / excited eye
+#   29    : shocked (tiny pupil, wide)
+#   30    : sad / teary
+#   31    : scrunched shut (sneeze)
+#   32    : knocked-out X
+#   33    : content (curved-down smile eye)
+#   34-37 : normal-open look left / right / down / up
+# ============================================================
+
+define_sprite(eye, 16, 16)
+
+    sprite_cel(0)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 5, white, 100)
+        plot(7, 5, white, 80)
+
+    sprite_cel(1)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+
+    sprite_cel(2)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 2, black, 100, true)
+
+    sprite_cel(3)
+        draw_ellipse(8, 8, 7, 5, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 3, black, 100, true)
+
+    sprite_cel(4)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(8, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(8, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+
+    sprite_cel(5)
+        draw_ellipse(8, 10, 7, 3, white, 100, true, 0)
+        draw_ellipse(8, 10, 4, 2, sky_blue, 100, true, 0)
+        draw_ellipse(8, 10, 2, 1, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 7, black, 100, true)
+
+    sprite_cel(6)
+        draw_ellipse(8, 10, 7, 2, white, 100, true, 0)
+        draw_ellipse(8, 10, 3, 1, sky_blue, 100, true, 0)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+
+    sprite_cel(7)
+        draw_line(1, 8, 15, 8, dark_gray, 100)
+        draw_line(2, 9, 14, 9, dark_gray, 60)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+        draw_rectangle(0, 10, 16, 6, black, 100, true)
+
+    sprite_cel(8)
+        draw_ellipse(8, 10, 7, 2, white, 100, true, 0)
+        draw_ellipse(8, 10, 3, 1, sky_blue, 100, true, 0)
+        draw_rectangle(0, 0, 16, 8, black, 100, true)
+
+    sprite_cel(9)
+        draw_ellipse(8, 10, 7, 3, white, 100, true, 0)
+        draw_ellipse(8, 10, 4, 2, sky_blue, 100, true, 0)
+        draw_ellipse(8, 10, 2, 1, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 7, black, 100, true)
+
+    sprite_cel(10)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(8, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(8, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+
+    sprite_cel(11)
+        draw_ellipse(8, 8, 7, 5, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 3, black, 100, true)
+
+    sprite_cel(12)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        draw_rectangle(0, 0, 16, 2, black, 100, true)
+
+    sprite_cel(13)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+
+    sprite_cel(14)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 5, white, 100)
+        plot(7, 5, white, 80)
+
+    sprite_cel(15)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 8, 4, sky_blue, 100, true)
+        draw_circle(8, 8, 2, black, 100, true)
+        plot(6, 6, white, 100)
+        plot(7, 6, white, 80)
+
+    # Wide open look-around cels (16-23)
+    sprite_cel(16)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 5, 4, sky_blue, 100, true)
+        draw_circle(8, 5, 2, black, 100, true)
+        plot(6, 3, white, 100)
+        plot(7, 3, white, 80)
+
+    sprite_cel(17)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(10, 5, 4, sky_blue, 100, true)
+        draw_circle(10, 5, 2, black, 100, true)
+        plot(8, 3, white, 100)
+        plot(9, 3, white, 80)
+
+    sprite_cel(18)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(11, 8, 4, sky_blue, 100, true)
+        draw_circle(11, 8, 2, black, 100, true)
+        plot(9, 5, white, 100)
+        plot(10, 5, white, 80)
+
+    sprite_cel(19)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(10, 11, 4, sky_blue, 100, true)
+        draw_circle(10, 11, 2, black, 100, true)
+        plot(8, 9, white, 100)
+        plot(9, 9, white, 80)
+
+    sprite_cel(20)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 11, 4, sky_blue, 100, true)
+        draw_circle(8, 11, 2, black, 100, true)
+        plot(6, 9, white, 100)
+        plot(7, 9, white, 80)
+
+    sprite_cel(21)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(6, 11, 4, sky_blue, 100, true)
+        draw_circle(6, 11, 2, black, 100, true)
+        plot(4, 9, white, 100)
+        plot(5, 9, white, 80)
+
+    sprite_cel(22)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(5, 8, 4, sky_blue, 100, true)
+        draw_circle(5, 8, 2, black, 100, true)
+        plot(3, 5, white, 100)
+        plot(4, 5, white, 80)
+
+    sprite_cel(23)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(6, 5, 4, sky_blue, 100, true)
+        draw_circle(6, 5, 2, black, 100, true)
+        plot(4, 3, white, 100)
+        plot(5, 3, white, 80)
+
+    # Half closed look left / right (24-25)
+    sprite_cel(24)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(5, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(5, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+
+    sprite_cel(25)
+        draw_ellipse(8, 9, 7, 4, white, 100, true, 0)
+        draw_ellipse(11, 9, 4, 3, sky_blue, 100, true, 0)
+        draw_ellipse(11, 9, 2, 2, black, 100, true, 0)
+        draw_rectangle(0, 0, 16, 5, black, 100, true)
+
+    # ---- NEW EXPRESSIONS ----
+
+    # Cel 26: happy ^ eye (thick upward arc)
+    sprite_cel(26)
+        draw_arc(2, 11, 14, 11, 6, white, 100)
+        draw_arc(2, 10, 14, 10, 6, white, 100)
+        draw_arc(3, 12, 13, 12, 5, white, 50)
+
+    # Cel 27: heart eye
+    sprite_cel(27)
+        draw_circle(5, 6, 3, red, 100, true)
+        draw_circle(11, 6, 3, red, 100, true)
+        draw_polygon(8, 9, 6, 3, red, 100, 180, true)
+        plot(4, 5, white, 100)
+        plot(5, 5, white, 80)
+
+    # Cel 28: sparkle / excited eye
+    sprite_cel(28)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 5, sky_blue, 100, true)
+        draw_circle(8, 8, 3, black, 100, true)
+        plot(5, 5, white, 100)
+        plot(4, 5, white, 70)
+        plot(6, 5, white, 70)
+        plot(5, 4, white, 70)
+        plot(5, 6, white, 70)
+        plot(11, 10, white, 100)
+        plot(10, 10, white, 60)
+        plot(12, 10, white, 60)
+
+    # Cel 29: shocked - wide eye with a tiny pupil
+    sprite_cel(29)
+        draw_ellipse(8, 8, 7, 7, white, 100, true, 0)
+        draw_circle(8, 8, 2, sky_blue, 100, true)
+        draw_circle(8, 8, 1, black, 100, true)
+
+    # Cel 30: sad / teary - low heavy eye, big wet highlight, looking down
+    sprite_cel(30)
+        draw_ellipse(8, 9, 7, 5, white, 100, true, 0)
+        draw_circle(8, 10, 4, sky_blue, 100, true)
+        draw_circle(8, 10, 2, black, 100, true)
+        draw_rectangle(5, 8, 3, 2, white, 100, true)
+        draw_line(3, 13, 13, 13, cyan, 70)
+
+    # Cel 31: scrunched shut (sneeze)
+    sprite_cel(31)
+        draw_line(1, 8, 15, 8, white, 100)
+        draw_line(2, 9, 14, 9, light_gray, 100)
+        draw_line(2, 7, 14, 7, gray, 80)
+
+    # Cel 32: knocked-out X
+    sprite_cel(32)
+        draw_line(3, 3, 13, 13, red, 100)
+        draw_line(4, 3, 14, 13, red, 70)
+        draw_line(13, 3, 3, 13, red, 100)
+        draw_line(12, 3, 2, 13, red, 70)
+
+    # Cel 33: content - happy curved-down smile eye
+    sprite_cel(33)
+        draw_arc(2, 5, 14, 5, -5, white, 100)
+        draw_arc(2, 6, 14, 6, -5, white, 100)
+        draw_arc(3, 4, 13, 4, -5, white, 50)
+
+    # Cels 34-37: normal-open eye glancing left / right / down / up
+    sprite_cel(34)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(5, 8, 4, sky_blue, 100, true)
+        draw_circle(5, 8, 2, black, 100, true)
+        plot(3, 6, white, 100)
+        plot(4, 6, white, 80)
+
+    sprite_cel(35)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(11, 8, 4, sky_blue, 100, true)
+        draw_circle(11, 8, 2, black, 100, true)
+        plot(9, 6, white, 100)
+        plot(10, 6, white, 80)
+
+    sprite_cel(36)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 10, 4, sky_blue, 100, true)
+        draw_circle(8, 10, 2, black, 100, true)
+        plot(6, 8, white, 100)
+        plot(7, 8, white, 80)
+
+    sprite_cel(37)
+        draw_ellipse(8, 8, 7, 6, white, 100, true, 0)
+        draw_circle(8, 6, 4, sky_blue, 100, true)
+        draw_circle(8, 6, 2, black, 100, true)
+        plot(6, 4, white, 100)
+        plot(7, 4, white, 80)
+
+endsprite
+
+# ============================================================
+# EYEBROW SPRITES (16x6). Same cel numbers on both sides:
+#   0 neutral arch   1 angry   2 sad/worried   3 flat (unamused)   4 happy arch
+# Left brow: inner end is on the right. Right brow is the mirror.
+# (Change "tan" to any color name to recolor the brows.)
+# ============================================================
+
+define_sprite(brow_l, 16, 6)
+    sprite_cel(0)
+        draw_line(1, 4, 7, 2, tan, 100)
+        draw_line(7, 2, 14, 3, tan, 100)
+        draw_line(1, 5, 7, 3, tan, 50)
+        draw_line(7, 3, 14, 4, tan, 50)
+    sprite_cel(1)
+        draw_line(1, 0, 14, 4, tan, 100)
+        draw_line(1, 1, 14, 5, tan, 100)
+    sprite_cel(2)
+        draw_line(1, 4, 14, 0, tan, 100)
+        draw_line(1, 5, 14, 1, tan, 100)
+    sprite_cel(3)
+        draw_line(1, 3, 14, 3, tan, 100)
+        draw_line(1, 4, 14, 4, tan, 100)
+    sprite_cel(4)
+        draw_arc(1, 4, 14, 4, 3, tan, 100)
+        draw_arc(1, 5, 14, 5, 3, tan, 60)
+endsprite
+
+define_sprite(brow_r, 16, 6)
+    sprite_cel(0)
+        draw_line(1, 3, 8, 2, tan, 100)
+        draw_line(8, 2, 14, 4, tan, 100)
+        draw_line(1, 4, 8, 3, tan, 50)
+        draw_line(8, 3, 14, 5, tan, 50)
+    sprite_cel(1)
+        draw_line(14, 0, 1, 4, tan, 100)
+        draw_line(14, 1, 1, 5, tan, 100)
+    sprite_cel(2)
+        draw_line(14, 4, 1, 0, tan, 100)
+        draw_line(14, 5, 1, 1, tan, 100)
+    sprite_cel(3)
+        draw_line(1, 3, 14, 3, tan, 100)
+        draw_line(1, 4, 14, 4, tan, 100)
+    sprite_cel(4)
+        draw_arc(1, 4, 14, 4, 3, tan, 100)
+        draw_arc(1, 5, 14, 5, 3, tan, 60)
+endsprite
+
+# ============================================================
+# FLY SPRITE (5x4) - two wing cels, flaps automatically when moved
+# ============================================================
+
+define_sprite(fly, 5, 4)
+    sprite_cel(0)
+        plot(2, 1, gray, 100)
+        plot(2, 2, gray, 100)
+        plot(1, 0, white, 100)
+        plot(3, 0, white, 100)
+    sprite_cel(1)
+        plot(2, 1, gray, 100)
+        plot(2, 2, gray, 100)
+        plot(0, 1, white, 100)
+        plot(4, 1, white, 100)
+endsprite
+
+# ============================================================
+# ARRAYS
+# ============================================================
+
+# Wide look-around circle (index 0 = center)
+create_array(v_look_cels, 9)
+v_look_cels[0] = 0
+v_look_cels[1] = 16
+v_look_cels[2] = 17
+v_look_cels[3] = 18
+v_look_cels[4] = 19
+v_look_cels[5] = 20
+v_look_cels[6] = 21
+v_look_cels[7] = 22
+v_look_cels[8] = 23
+
+# Squint look left-right
+create_array(v_squint_cels, 5)
+v_squint_cels[0] = 4
+v_squint_cels[1] = 24
+v_squint_cels[2] = 4
+v_squint_cels[3] = 25
+v_squint_cels[4] = 4
+
+# Eye roll path: left -> up-left -> up -> up-right -> right -> down-right -> down
+create_array(v_roll_cels, 7)
+v_roll_cels[0] = 22
+v_roll_cels[1] = 23
+v_roll_cels[2] = 16
+v_roll_cels[3] = 17
+v_roll_cels[4] = 18
+v_roll_cels[5] = 19
+v_roll_cels[6] = 20
+
+# Blink sequence (0-2 closing, 3-5 opening)
+create_array(v_blink_seq, 6)
+v_blink_seq[0] = 3
+v_blink_seq[1] = 5
+v_blink_seq[2] = 7
+v_blink_seq[3] = 9
+v_blink_seq[4] = 11
+v_blink_seq[5] = 13
+
+# Direction -> wide look cel, indexed by round(angle / 45deg) + 4
+create_array(v_dir_cels, 9)
+v_dir_cels[0] = 22
+v_dir_cels[1] = 23
+v_dir_cels[2] = 16
+v_dir_cels[3] = 17
+v_dir_cels[4] = 18
+v_dir_cels[5] = 19
+v_dir_cels[6] = 20
+v_dir_cels[7] = 21
+v_dir_cels[8] = 22
+
+# Idle glance cels (left, right, down, up) for each resting eye style
+create_array(v_glance_norm, 4)
+v_glance_norm[0] = 34
+v_glance_norm[1] = 35
+v_glance_norm[2] = 36
+v_glance_norm[3] = 37
+create_array(v_glance_wide, 4)
+v_glance_wide[0] = 22
+v_glance_wide[1] = 18
+v_glance_wide[2] = 20
+v_glance_wide[3] = 16
+create_array(v_glance_sq, 4)
+v_glance_sq[0] = 24
+v_glance_sq[1] = 25
+v_glance_sq[2] = 24
+v_glance_sq[3] = 25
+
+# Mood picker (weighted: neutral and happy are most common)
+create_array(v_mood_pick, 7)
+v_mood_pick[0] = 0
+v_mood_pick[1] = 0
+v_mood_pick[2] = 1
+v_mood_pick[3] = 2
+v_mood_pick[4] = 3
+v_mood_pick[5] = 4
+v_mood_pick[6] = 1
+
+# ACTION MENU: 10 slots per mood. Edit these to tune personality!
+#  1 blink        2 wink        3 look around   4 squint L-R    5 side-eye
+#  6 eye roll     7 double take 8 startle       9 fly          10 love
+# 11 dizzy       12 sneeze     13 pout         14 sleep        15 yawn
+# 16 giggle      17 glare      18 surprise     19 drowsy close
+create_array(v_menu, 50)
+
+# Mood 0: neutral
+v_menu[0] = 1
+v_menu[1] = 1
+v_menu[2] = 1
+v_menu[3] = 18
+v_menu[4] = 3
+v_menu[5] = 4
+v_menu[6] = 5
+v_menu[7] = 7
+v_menu[8] = 9
+v_menu[9] = 12
+
+# Mood 1: happy
+v_menu[10] = 1
+v_menu[11] = 16
+v_menu[12] = 16
+v_menu[13] = 2
+v_menu[14] = 10
+v_menu[15] = 3
+v_menu[16] = 18
+v_menu[17] = 9
+v_menu[18] = 1
+v_menu[19] = 16
+
+# Mood 2: sleepy
+v_menu[20] = 1
+v_menu[21] = 19
+v_menu[22] = 14
+v_menu[23] = 15
+v_menu[24] = 1
+v_menu[25] = 19
+v_menu[26] = 15
+v_menu[27] = 12
+v_menu[28] = 4
+v_menu[29] = 14
+
+# Mood 3: grumpy
+v_menu[30] = 1
+v_menu[31] = 5
+v_menu[32] = 6
+v_menu[33] = 6
+v_menu[34] = 17
+v_menu[35] = 5
+v_menu[36] = 13
+v_menu[37] = 8
+v_menu[38] = 1
+v_menu[39] = 12
+
+# Mood 4: curious
+v_menu[40] = 1
+v_menu[41] = 3
+v_menu[42] = 3
+v_menu[43] = 4
+v_menu[44] = 5
+v_menu[45] = 7
+v_menu[46] = 9
+v_menu[47] = 9
+v_menu[48] = 18
+v_menu[49] = 11
+
+# ============================================================
+# STATE
+# ============================================================
+
+v_left_x = 16
+v_right_x = 34
+v_eye_y = 24
+v_brow_y = 18
+
+v_dx = 0
+v_dy = 0
+v_cel_l = 1
+v_cel_r = 1
+v_bcl = 0
+v_bcr = 0
+v_boff_l = 0
+v_boff_r = 0
+
+v_c = 1
+v_bb = 0
+v_bo = 0
+
+v_rest_cel = 1
+v_rest_brow = 0
+v_rest_boff = 0
+
+v_mood = 0
+v_acts = 0
+v_mood_len = 6
+v_wait_base = 2.0
+v_wait_var = 2.5
+v_blink_speed = 0.001
+v_look_speed = 0.15
+v_glance_chance = 25
+
+# ============================================================
+# CORE PROCEDURES
+# ============================================================
+
+# Move all four sprites to the current state variables
+def place_face {
+    v_lx = v_left_x + v_dx
+    v_rx = v_right_x + v_dx
+    v_ey = v_eye_y + v_dy
+    v_byl = v_brow_y + v_dy + v_boff_l
+    v_byr = v_brow_y + v_dy + v_boff_r
+    move_sprite(eye, v_lx, v_ey, 0, v_cel_l)
+    move_sprite(eye, v_rx, v_ey, 1, v_cel_r)
+    move_sprite(brow_l, v_lx, v_byl, 0, v_bcl)
+    move_sprite(brow_r, v_rx, v_byr, 0, v_bcr)
+}
+
+def draw_face {
+    begin_frame(true)
+        call place_face
+    end_frame
+}
+
+# Set both eyes to cel v_c and draw
+def eyes_to {
+    v_cel_l = v_c
+    v_cel_r = v_c
+    call draw_face
+}
+
+# Set both brows to cel v_bb at offset v_bo (does not draw)
+def brows_to {
+    v_bcl = v_bb
+    v_bcr = v_bb
+    v_boff_l = v_bo
+    v_boff_r = v_bo
+}
+
+# Return to the resting face for the current mood
+def set_rest {
+    v_dx = 0
+    v_dy = 0
+    if v_mood == 0 then
+        v_rest_cel = 1
+        v_rest_brow = 0
+        v_rest_boff = 0
+    elseif v_mood == 1 then
+        v_rest_cel = 1
+        v_rest_brow = 4
+        v_rest_boff = -1
+    elseif v_mood == 2 then
+        v_rest_cel = 3
+        v_rest_brow = 3
+        v_rest_boff = 1
+    elseif v_mood == 3 then
+        v_rest_cel = 3
+        v_rest_brow = 1
+        v_rest_boff = 1
+    else
+        v_rest_cel = 0
+        v_rest_brow = 0
+        v_rest_boff = -2
+    endif
+    v_c = v_rest_cel
+    v_bb = v_rest_brow
+    v_bo = v_rest_boff
+    call brows_to
+    call eyes_to
+}
+
+# Apply pacing for the current mood, then show its resting face
+def apply_mood {
+    if v_mood == 0 then
+        v_wait_base = 2.0
+        v_wait_var = 2.5
+        v_blink_speed = 0.001
+        v_glance_chance = 25
+    elseif v_mood == 1 then
+        v_wait_base = 1.6
+        v_wait_var = 2.0
+        v_blink_speed = 0.001
+        v_glance_chance = 25
+    elseif v_mood == 2 then
+        v_wait_base = 3.5
+        v_wait_var = 3.0
+        v_blink_speed = 0.05
+        v_glance_chance = 8
+    elseif v_mood == 3 then
+        v_wait_base = 2.5
+        v_wait_var = 2.0
+        v_blink_speed = 0.002
+        v_glance_chance = 15
+    else
+        v_wait_base = 1.0
+        v_wait_var = 1.6
+        v_blink_speed = 0.001
+        v_glance_chance = 40
+    endif
+    call set_rest
+}
+
+def change_mood {
+    v_mp = random(0, 6, 0)
+    v_mood = v_mood_pick[v_mp]
+    v_acts = 0
+    v_mood_len = random(4, 7, 0)
+    call apply_mood
+}
+
+# Smooth blink, honoring the mood's blink speed
+def blink {
+    for v_b in (0, 5, 1)
+        v_c = v_blink_seq[v_b]
+        call eyes_to
+        if v_b == 2 then
+            rest(0.03)
+        else
+            rest(v_blink_speed)
+        endif
+    endfor v_b
+    call set_rest
+}
+
+# ============================================================
+# ACTIONS
+# ============================================================
+
+# 1: blink (15% chance of a double blink)
+def act_blink {
+    call blink
+    v_d = random(1, 100, 0)
+    if v_d <= 15 then
+        rest(0.1)
+        call blink
+    endif
+}
+
+# Helper for winks: v_w = which eye winks, v_wc = its cel, v_oc = other eye cel
+def wink_draw {
+    if v_w == 0 then
+        v_cel_l = v_wc
+        v_cel_r = v_oc
+    else
+        v_cel_r = v_wc
+        v_cel_l = v_oc
+    endif
+    call draw_face
+}
+
+# 2: cheeky wink - the other eye sparkles and its brow lifts
+def act_wink {
+    v_w = random(0, 1, 0)
+    v_oc = v_rest_cel
+    for v_k in (0, 2, 1)
+        v_wc = v_blink_seq[v_k]
+        call wink_draw
+        rest(0.01)
+    endfor v_k
+    v_oc = 28
+    if v_w == 0 then
+        v_boff_l = v_rest_boff + 2
+        v_boff_r = v_rest_boff - 2
+        v_bcr = 0
+    else
+        v_boff_r = v_rest_boff + 2
+        v_boff_l = v_rest_boff - 2
+        v_bcl = 0
+    endif
+    call wink_draw
+    rest(0.45)
+    v_oc = v_rest_cel
+    for v_k in (3, 5, 1)
+        v_wc = v_blink_seq[v_k]
+        call wink_draw
+        rest(0.01)
+    endfor v_k
+    call set_rest
+}
+
+# 3: wide-eyed look around (random direction), brows up
+def act_lookaround {
+    v_bb = 0
+    v_bo = -2
+    call brows_to
+    v_c = 0
+    call eyes_to
+    rest(0.2)
+    v_dirn = random(0, 1, 0)
+    if v_dirn == 0 then
+        for v_i in (1, 8, 1)
+            v_c = v_look_cels[v_i]
+            call eyes_to
+            rest(v_look_speed)
+        endfor v_i
+    else
+        for v_i in (8, 1, -1)
+            v_c = v_look_cels[v_i]
+            call eyes_to
+            rest(v_look_speed)
+        endfor v_i
+    endif
+    v_c = 0
+    call eyes_to
+    rest(0.2)
+    call blink
+}
+
+# 4: squinty look left-right
+def act_squint {
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    v_c = 2
+    call eyes_to
+    rest(0.05)
+    v_c = 3
+    call eyes_to
+    rest(0.05)
+    v_c = 4
+    call eyes_to
+    rest(0.2)
+    v_dirn = random(0, 1, 0)
+    if v_dirn == 0 then
+        for v_i in (1, 4, 1)
+            v_c = v_squint_cels[v_i]
+            call eyes_to
+            rest(v_look_speed + 0.1)
+        endfor v_i
+    else
+        for v_i in (4, 1, -1)
+            v_c = v_squint_cels[v_i]
+            call eyes_to
+            rest(v_look_speed + 0.1)
+        endfor v_i
+    endif
+    v_c = 4
+    call eyes_to
+    rest(0.15)
+    v_c = 3
+    call eyes_to
+    rest(0.05)
+    v_c = 2
+    call eyes_to
+    rest(0.05)
+    call set_rest
+}
+
+# 5: suspicious side-eye with one skeptical raised brow
+def act_sideeye {
+    v_s = random(0, 1, 0)
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    v_c = 4
+    call eyes_to
+    rest(0.25)
+    if v_s == 0 then
+        v_cel_l = 24
+        v_cel_r = 24
+        v_bcl = 0
+        v_boff_l = -3
+    else
+        v_cel_l = 25
+        v_cel_r = 25
+        v_bcr = 0
+        v_boff_r = -3
+    endif
+    call draw_face
+    rest(1.2 + random(0, 0.8, 2))
+    v_c = 5
+    call eyes_to
+    rest(0.08)
+    v_c = 7
+    call eyes_to
+    rest(0.2)
+    v_c = 9
+    call eyes_to
+    rest(0.08)
+    call set_rest
+}
+
+# 6: eye roll, then an unimpressed half-lidded stare
+def act_eyeroll {
+    v_bb = 3
+    v_bo = 0
+    call brows_to
+    v_c = 1
+    call eyes_to
+    rest(0.3)
+    v_dirn = random(0, 1, 0)
+    if v_dirn == 0 then
+        for v_i in (0, 6, 1)
+            v_c = v_roll_cels[v_i]
+            call eyes_to
+            rest(0.1)
+        endfor v_i
+    else
+        for v_i in (6, 0, -1)
+            v_c = v_roll_cels[v_i]
+            call eyes_to
+            rest(0.1)
+        endfor v_i
+    endif
+    v_bo = 1
+    call brows_to
+    v_c = 4
+    call eyes_to
+    rest(0.9)
+    call set_rest
+}
+
+# 7: double take - glance, look away, then SNAP back in shock
+def act_doubletake {
+    v_s = random(0, 1, 0)
+    if v_s == 0 then
+        v_side_n = 34
+        v_side_w = 22
+    else
+        v_side_n = 35
+        v_side_w = 18
+    endif
+    v_c = v_side_n
+    call eyes_to
+    rest(0.5)
+    v_c = 1
+    call eyes_to
+    rest(0.45)
+    v_c = v_side_n
+    call eyes_to
+    rest(0.2)
+    v_bb = 0
+    v_bo = -3
+    call brows_to
+    v_c = v_side_w
+    v_dy = -1
+    call eyes_to
+    rest(0.3)
+    v_c = 0
+    v_dy = -2
+    call eyes_to
+    rest(0.15)
+    v_c = 29
+    call eyes_to
+    rest(0.6)
+    call set_rest
+}
+
+# 8: startle - jump, tiny pupils, shiver
+def act_startle {
+    v_bb = 0
+    v_bo = -3
+    call brows_to
+    v_c = 29
+    v_dy = -3
+    call eyes_to
+    rest(0.08)
+    v_dy = -1
+    call draw_face
+    rest(0.08)
+    v_dy = -3
+    call draw_face
+    rest(0.1)
+    v_dx = 1
+    for v_k in (0, 7, 1)
+        v_dx = v_dx * -1
+        call draw_face
+        rest(0.05)
+    endfor v_k
+    v_dx = 0
+    v_dy = 0
+    v_c = 0
+    call eyes_to
+    rest(0.6)
+    call blink
+}
+
+# Fly helpers ---------------------------------------------------------
+# Eyes track the fly (cross-eyed when it is near the nose)
+def fly_frame {
+    v_fdx = v_fx + 2 - 32
+    v_fdy = v_fy + 2 - 32
+    v_fdist = sqrt(v_fdx * v_fdx + v_fdy * v_fdy)
+    if v_fdist < 7 then
+        v_cel_l = 18
+        v_cel_r = 22
+    else
+        v_ang = atan2(v_fdy, v_fdx)
+        v_idx = int(round(v_ang / 0.7854)) + 4
+        v_cel_l = v_dir_cels[v_idx]
+        v_cel_r = v_cel_l
+    endif
+    begin_frame(true)
+        call place_face
+        move_sprite(fly, v_fx, v_fy, 0)
+    end_frame
+}
+
+# 9: a fly spirals in, lands between the eyes, then gets swatted or escapes
+def act_fly {
+    v_bb = 0
+    v_bo = -2
+    call brows_to
+    v_fa = random(0, 6, 2)
+    v_fx = int(max(0, min(59, 30 + cos(v_fa) * 34)))
+    v_fy = int(max(0, min(60, 28 + sin(v_fa) * 27)))
+    show_sprite(fly, v_fx, v_fy, 0, 5, 0)
+    for v_t in (0, 80, 1)
+        v_fa = v_fa + 0.28
+        v_fr = 36 - v_t * 0.42
+        v_jx = random(-2, 2, 0)
+        v_jy = random(-2, 2, 0)
+        v_fx = 30 + cos(v_fa) * v_fr + v_jx
+        v_fy = 28 + sin(v_fa) * v_fr * 0.8 + v_jy
+        v_fx = int(max(0, min(59, v_fx)))
+        v_fy = int(max(0, min(60, v_fy)))
+        call fly_frame
+        rest(0.03)
+    endfor v_t
+    # Landed on the nose: concentrate, cross-eyed
+    v_fx = 30
+    v_fy = 27
+    v_bb = 1
+    v_bo = 0
+    call brows_to
+    for v_k in (0, 7, 1)
+        call fly_frame
+        rest(0.12)
+    endfor v_k
+    v_o = random(1, 100, 0)
+    if v_o <= 50 then
+        # Swat!
+        v_bb = 1
+        v_bo = 1
+        call brows_to
+        v_c = 4
+        call eyes_to
+        rest(0.5)
+        v_c = 31
+        v_dy = 1
+        call eyes_to
+        hide_sprite(fly)
+        draw_circle(31, 27, 4, white, 100, false, 350, fade)
+        rest(0.4)
+        v_dy = 0
+        v_bb = 4
+        v_bo = -1
+        call brows_to
+        v_c = 26
+        call eyes_to
+        rest(1.3)
+    else
+        # The fly escapes
+        v_sgn = random(0, 1, 0) * 2 - 1
+        for v_t in (0, 24, 1)
+            v_fx = int(30 + v_t * 1.2 * v_sgn)
+            v_fy = int(27 - v_t + sin(v_t * 0.9) * 3)
+            call fly_frame
+            rest(0.04)
+        endfor v_t
+        hide_sprite(fly)
+        rest(0.4)
+        v_bb = 3
+        v_bo = 1
+        call brows_to
+        v_c = 4
+        call eyes_to
+        rest(0.8)
+    endif
+    hide_sprite(fly)
+    call set_rest
+}
+
+# 10: love - sparkle, then heart eyes with a heartbeat thump
+def act_love {
+    v_bb = 0
+    v_bo = -2
+    call brows_to
+    v_c = 28
+    call eyes_to
+    rest(0.5)
+    v_bb = 4
+    v_bo = -2
+    call brows_to
+    v_c = 27
+    call eyes_to
+    rest(0.2)
+    for v_k in (0, 2, 1)
+        v_dy = -1
+        call draw_face
+        rest(0.1)
+        v_dy = 0
+        call draw_face
+        rest(0.1)
+        v_dy = -1
+        call draw_face
+        rest(0.1)
+        v_dy = 0
+        call draw_face
+        rest(0.5)
+    endfor v_k
+    v_c = 33
+    call eyes_to
+    rest(0.9)
+    call set_rest
+}
+
+# 11: dizzy spin that winds down into knocked-out X eyes
+def act_dizzy {
+    v_bb = 0
+    v_bo = -2
+    call brows_to
+    for v_r in (0, 2, 1)
+        for v_i in (1, 8, 1)
+            v_c = v_look_cels[v_i]
+            v_dx = random(-1, 1, 0)
+            call eyes_to
+            rest(0.05 + v_r * 0.04)
+        endfor v_i
+    endfor v_r
+    v_bb = 2
+    v_bo = 0
+    call brows_to
+    v_c = 32
+    v_dx = 2
+    call eyes_to
+    for v_k in (0, 5, 1)
+        v_dx = v_dx * -1
+        call draw_face
+        rest(0.12)
+    endfor v_k
+    v_dx = 0
+    call draw_face
+    rest(0.4)
+    call blink
+}
+
+# 12: sneeze - build-up, ACHOO, sheepish recovery
+def act_sneeze {
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    v_c = 3
+    call eyes_to
+    rest(0.4)
+    v_bb = 0
+    v_bo = -1
+    call brows_to
+    v_c = 1
+    v_dy = -1
+    call eyes_to
+    rest(0.35)
+    v_bo = -2
+    call brows_to
+    v_c = 0
+    v_dy = -2
+    call eyes_to
+    rest(0.5)
+    v_c = 2
+    v_dy = -1
+    call eyes_to
+    rest(0.2)
+    v_bo = -3
+    call brows_to
+    v_c = 0
+    v_dy = -3
+    call eyes_to
+    rest(0.45)
+    # ACHOO
+    v_bb = 1
+    v_bo = 2
+    call brows_to
+    v_c = 31
+    v_dy = 3
+    v_dx = 2
+    call eyes_to
+    rest(0.1)
+    v_dx = -2
+    v_dy = 2
+    call draw_face
+    rest(0.08)
+    v_dx = 1
+    v_dy = 1
+    call draw_face
+    rest(0.08)
+    v_dx = 0
+    v_dy = 0
+    call draw_face
+    rest(0.5)
+    v_bb = 2
+    v_bo = 0
+    call brows_to
+    v_c = 1
+    call eyes_to
+    rest(0.6)
+    call blink
+}
+
+# 13: sad teary pout
+def act_pout {
+    v_bb = 2
+    v_bo = 1
+    call brows_to
+    v_c = 30
+    call eyes_to
+    rest(1.6 + random(0, 1, 2))
+    v_c = 7
+    call eyes_to
+    rest(0.2)
+    v_c = 30
+    call eyes_to
+    rest(0.6)
+    call set_rest
+}
+
+# Z that floats up and fades (size v_zs at v_zx, v_zy)
+def draw_z {
+    draw_line(v_zx, v_zy, v_zx + v_zs, v_zy, light_gray, 80, 2600, fade)
+    draw_line(v_zx + v_zs, v_zy, v_zx, v_zy + v_zs, light_gray, 80, 2600, fade)
+    draw_line(v_zx, v_zy + v_zs, v_zx + v_zs, v_zy + v_zs, light_gray, 80, 2600, fade)
+}
+
+# 14: nods off, jerks awake, nods off for real (breathing + Z's), then wakes up
+def act_sleep {
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    for v_k in (2, 7, 1)
+        v_c = v_k
+        v_dy = int(v_k / 3)
+        call eyes_to
+        rest(0.14)
+    endfor v_k
+    rest(0.4)
+    # Jolt awake
+    v_bb = 0
+    v_bo = -3
+    call brows_to
+    v_c = 0
+    v_dy = -1
+    call eyes_to
+    rest(0.5)
+    v_dy = 0
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    v_c = 4
+    call eyes_to
+    rest(0.7)
+    # Really falling asleep this time
+    for v_k in (4, 7, 1)
+        v_c = v_k
+        call eyes_to
+        rest(0.22)
+    endfor v_k
+    v_bb = 0
+    v_bo = 1
+    call brows_to
+    v_c = 7
+    v_n = random(4, 6, 0)
+    for v_z in (0, v_n, 1)
+        v_dy = 1
+        call eyes_to
+        v_zi = fmod(v_z, 3)
+        v_zx = 49 + v_zi * 4
+        v_zy = 22 - v_zi * 7
+        v_zs = 3 + v_zi
+        call draw_z
+        rest(0.9)
+        v_dy = 0
+        call draw_face
+        rest(0.7)
+    endfor v_z
+    # Wake up
+    v_w = random(1, 100, 0)
+    if v_w <= 50 then
+        v_dy = -2
+        v_bb = 0
+        v_bo = -3
+        call brows_to
+        v_c = 29
+        call eyes_to
+        rest(0.5)
+        v_dy = 0
+        v_c = 0
+        call eyes_to
+        rest(0.4)
+    else
+        v_dy = 0
+        v_bb = 3
+        v_bo = 1
+        call brows_to
+        for v_k in (8, 12, 1)
+            v_c = v_k
+            call eyes_to
+            rest(0.15)
+        endfor v_k
+        rest(0.3)
+    endif
+    # Force a mood change after waking up
+    v_acts = v_mood_len
+    call set_rest
+}
+
+# 15: big yawn - brows up, head tips back, eyes squeeze shut
+def act_yawn {
+    v_bb = 0
+    v_bo = -1
+    call brows_to
+    for v_k in (2, 7, 1)
+        v_c = v_k
+        v_dy = 0 - int(v_k / 3)
+        call eyes_to
+        rest(0.12)
+    endfor v_k
+    v_bo = -3
+    call brows_to
+    v_dy = -2
+    call draw_face
+    rest(0.9)
+    v_dy = 0
+    v_bo = 0
+    call brows_to
+    for v_k in (8, 12, 1)
+        v_c = v_k
+        call eyes_to
+        rest(0.1)
+    endfor v_k
+    call blink
+}
+
+# 16: giggle - happy ^ ^ eyes bouncing
+def act_giggle {
+    v_bb = 4
+    v_bo = -2
+    call brows_to
+    v_c = 26
+    call eyes_to
+    for v_k in (0, 5, 1)
+        v_dy = -1
+        call draw_face
+        rest(0.09)
+        v_dy = 0
+        call draw_face
+        rest(0.09)
+    endfor v_k
+    rest(0.3)
+    call set_rest
+}
+
+# 17: glare, then "hmph" and look away
+def act_glare {
+    v_bb = 1
+    v_bo = 1
+    call brows_to
+    v_c = 3
+    call eyes_to
+    rest(0.2)
+    v_c = 4
+    call eyes_to
+    rest(1.2)
+    v_s = random(0, 1, 0)
+    v_c = 24 + v_s
+    call eyes_to
+    rest(0.9)
+    v_c = 4
+    call eyes_to
+    rest(0.5)
+    call set_rest
+}
+
+# 18: surprise - wide eyes, brows up
+def act_surprise {
+    v_bb = 0
+    v_bo = -3
+    call brows_to
+    v_c = 0
+    call eyes_to
+    rest(0.4 + random(0, 0.3, 2))
+    call set_rest
+}
+
+# 19: slow drowsy close and reopen
+def act_drowsy {
+    v_bb = 3
+    v_bo = 1
+    call brows_to
+    for v_k in (2, 7, 1)
+        v_c = v_k
+        call eyes_to
+        rest(0.1)
+    endfor v_k
+    rest(1.0 + random(0, 1.0, 2))
+    for v_k in (8, 12, 1)
+        v_c = v_k
+        call eyes_to
+        rest(0.1)
+    endfor v_k
+    call set_rest
+}
+
+# Idle glances while waiting ---------------------------------------------
+def glance_pick {
+    v_g = random(0, 3, 0)
+    if v_rest_cel == 0 then
+        v_gc = v_glance_wide[v_g]
+    elseif v_rest_cel == 3 then
+        v_gc = v_glance_sq[v_g]
+    else
+        v_gc = v_glance_norm[v_g]
+    endif
+}
+
+def idle_glance {
+    call glance_pick
+    v_c = v_gc
+    call eyes_to
+    rest(0.5 + random(0, 0.7, 2))
+    v_g2 = random(1, 100, 0)
+    if v_g2 <= 30 then
+        call glance_pick
+        v_c = v_gc
+        call eyes_to
+        rest(0.4 + random(0, 0.5, 2))
+    endif
+    call set_rest
+}
+
+# ============================================================
+# START UP
+# ============================================================
+
+show_sprite(eye, v_left_x, v_eye_y, 0, 0, 1)
+show_sprite(eye, v_right_x, v_eye_y, 1, 0, 1)
+show_sprite(brow_l, v_left_x, v_brow_y, 0, 1, 0)
+show_sprite(brow_r, v_right_x, v_brow_y, 0, 1, 0)
+
+call apply_mood
+sync_queue
+rest(1)
+
+# ============================================================
+# MAIN LOOP
+# ============================================================
+
+while 1 == 1 then
+
+    # Wait, with occasional idle glances so the eyes feel alive
+    v_wait_left = v_wait_base + random(0, v_wait_var, 2)
+    while v_wait_left > 0 then
+        v_gr = random(1, 100, 0)
+        if v_gr <= v_glance_chance then
+            call idle_glance
+        endif
+        rest(0.4)
+        v_wait_left = v_wait_left - 0.4
+    endwhile
+
+    # Pick an action from the current mood's menu
+    v_slot = random(0, 9, 0)
+    v_action = v_menu[v_mood * 10 + v_slot]
+
+    if v_action == 1 then
+        call act_blink
+    elseif v_action == 2 then
+        call act_wink
+    elseif v_action == 3 then
+        call act_lookaround
+    elseif v_action == 4 then
+        call act_squint
+    elseif v_action == 5 then
+        call act_sideeye
+    elseif v_action == 6 then
+        call act_eyeroll
+    elseif v_action == 7 then
+        call act_doubletake
+    elseif v_action == 8 then
+        call act_startle
+    elseif v_action == 9 then
+        call act_fly
+    elseif v_action == 10 then
+        call act_love
+    elseif v_action == 11 then
+        call act_dizzy
+    elseif v_action == 12 then
+        call act_sneeze
+    elseif v_action == 13 then
+        call act_pout
+    elseif v_action == 14 then
+        call act_sleep
+    elseif v_action == 15 then
+        call act_yawn
+    elseif v_action == 16 then
+        call act_giggle
+    elseif v_action == 17 then
+        call act_glare
+    elseif v_action == 18 then
+        call act_surprise
+    else
+        call act_drowsy
+    endif
+
+    # Mood drifts after a handful of actions
+    v_acts = v_acts + 1
+    if v_acts >= v_mood_len then
+        call change_mood
+    endif
+
+endwhile

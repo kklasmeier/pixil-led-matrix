@@ -1,0 +1,273 @@
+# ==============================================================================
+# LISSAJOUS SNAKE  (64x64 matrix)
+#
+# A ribbon of copper-chrome bobs follows a 3D Lissajous path. The path ratios
+# drift so the knot slowly reshapes; the whole cloud also tumbles in space.
+#
+# Producer kernels: points_project3d + move_sprites. Shading is pre-baked into
+# depth-sized sprite cels (same trade-off as Vector_Balls).
+# ==============================================================================
+
+clear()
+fps(120)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+# Dense ribbon + small per-frame steps (producer has headroom at 60 fps).
+v_count = 48              # bobs along the snake (head = newest)
+v_last = 47
+
+v_scale = 22
+v_camera = 52
+v_sprite_cx = 28          # 32 - 4 (9x9 bob centre)
+v_sprite_cy = 28
+
+# Gentle tumble — fast spin + big freq jumps is what made it thrash
+v_speed_x = 0.005
+v_speed_y = 0.007
+v_speed_z = 0.0035
+
+v_path_speed = 0.020      # head advance per frame (small = smoother crawl)
+v_spacing = 0.085         # phase lag between bobs (tight ribbon)
+
+# Mood changes: frequency ratios drift by at most ±1 per axis (clamped).
+# Big random leaps (e.g. 2→5) rewrite the whole knot and look like flickering.
+v_fx0 = 2
+v_fy0 = 3
+v_fz0 = 4
+v_freq_min = 2
+v_freq_max = 4
+v_freq_hold = 280
+v_freq_morph = 220
+
+v_cel_refresh = 1
+
+# ---------------- background ----------------
+draw_rectangle(0, 0, 64, 64, black, 100, true)
+for v_i in (0, 18, 1)
+    plot(random(0, 63, 0), random(0, 63, 0), navy, random(12, 35, 0))
+endfor v_i
+sync_queue
+
+# ---------------- shaded bob renderer ----------------
+def draw_bob {
+    for v_py in (0, 8, 1)
+        for v_px in (0, 8, 1)
+            v_nx = (v_px + 0.5 - 4.5) / v_rad
+            v_ny = (v_py + 0.5 - 4.5) / v_rad
+            v_d2 = v_nx * v_nx + v_ny * v_ny
+            if v_d2 <= 1 then
+                v_nz = sqrt(1 - v_d2)
+                v_dot = 0 - 0.42 * v_nx - 0.48 * v_ny + 0.76 * v_nz
+                if v_dot < 0 then
+                    v_dot = 0
+                endif
+                v_inten = int((20 + 75 * v_dot) * v_bright)
+                if v_inten < 10 then
+                    v_inten = 10
+                endif
+                if v_inten > 100 then
+                    v_inten = 100
+                endif
+                plot(v_px, v_py, gold, v_inten)
+                if v_nz < 0.45 then
+                    v_rim = int((0.45 - v_nz) * 120 * v_bright)
+                    if v_rim > 100 then
+                        v_rim = 100
+                    endif
+                    if v_rim > 14 then
+                        plot(v_px, v_py, cyan, v_rim)
+                    endif
+                endif
+                if v_dot > 0.86 then
+                    v_spec = int((v_dot - 0.86) * 700 * v_bright)
+                    if v_spec > 100 then
+                        v_spec = 100
+                    endif
+                    plot(v_px, v_py, white, v_spec)
+                endif
+            endif
+        endfor v_px
+    endfor v_py
+}
+
+print("Rendering snake cels...")
+
+define_sprite(bob, 9, 9)
+    sprite_cel(0)
+        v_rad = 1.55
+        v_bright = 0.42
+        call draw_bob
+    sprite_cel(1)
+        v_rad = 1.95
+        v_bright = 0.55
+        call draw_bob
+    sprite_cel(2)
+        v_rad = 2.4
+        v_bright = 0.68
+        call draw_bob
+    sprite_cel(3)
+        v_rad = 2.9
+        v_bright = 0.8
+        call draw_bob
+    sprite_cel(4)
+        v_rad = 3.35
+        v_bright = 0.9
+        call draw_bob
+    sprite_cel(5)
+        v_rad = 3.85
+        v_bright = 0.97
+        call draw_bob
+    sprite_cel(6)
+        v_rad = 4.35
+        v_bright = 1.0
+        call draw_bob
+endsprite
+
+print("Snake ready")
+
+# ---------------- buffers ----------------
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_z, v_count, numeric)
+create_array(v_px, v_count, numeric)
+create_array(v_py, v_count, numeric)
+create_array(v_depth, v_count, numeric)
+create_array(v_cel, v_count, numeric)
+
+for v_i in (0, v_last, 1)
+    show_sprite(bob, 28, 28, v_i, 0, 3)
+    v_cel[v_i] = 3
+endfor v_i
+
+# ---------------- animation state ----------------
+v_ax = 0.3
+v_ay = 0.5
+v_az = 0.1
+v_head = 0                 # phase of the head along the curve
+v_frame = 0
+
+v_freq_phase = 0           # 0 = hold, 1 = morph
+v_freq_timer = 0
+v_fx = v_fx0
+v_fy = v_fy0
+v_fz = v_fz0
+v_fx_a = v_fx0
+v_fy_a = v_fy0
+v_fz_a = v_fz0
+v_fx_b = v_fx0
+v_fy_b = v_fy0
+v_fz_b = v_fz0
+
+while true then
+    v_ax = v_ax + v_speed_x
+    v_ay = v_ay + v_speed_y
+    v_az = v_az + v_speed_z
+    if v_ax > tau then
+        v_ax = v_ax - tau
+    endif
+    if v_ay > tau then
+        v_ay = v_ay - tau
+    endif
+    if v_az > tau then
+        v_az = v_az - tau
+    endif
+
+    v_head = v_head + v_path_speed
+    if v_head > tau * 8 then
+        v_head = v_head - tau * 8
+    endif
+
+    # Drift Lissajous frequency ratios (hold, then ease to the next pair)
+    if v_freq_phase == 0 then
+        v_freq_timer = v_freq_timer + 1
+        v_ft = 0
+        if v_freq_timer >= v_freq_hold then
+            v_freq_phase = 1
+            v_freq_timer = 0
+            v_fx_a = v_fx
+            v_fy_a = v_fy
+            v_fz_a = v_fz
+            # Nudge each axis by -1, 0, or +1; keep at least one axis changing
+            v_fx_b = v_fx_a + random(-1, 1, 0)
+            v_fy_b = v_fy_a + random(-1, 1, 0)
+            v_fz_b = v_fz_a + random(-1, 1, 0)
+            if v_fx_b < v_freq_min then
+                v_fx_b = v_freq_min
+            endif
+            if v_fx_b > v_freq_max then
+                v_fx_b = v_freq_max
+            endif
+            if v_fy_b < v_freq_min then
+                v_fy_b = v_freq_min
+            endif
+            if v_fy_b > v_freq_max then
+                v_fy_b = v_freq_max
+            endif
+            if v_fz_b < v_freq_min then
+                v_fz_b = v_freq_min
+            endif
+            if v_fz_b > v_freq_max then
+                v_fz_b = v_freq_max
+            endif
+            if v_fx_b == v_fx_a and v_fy_b == v_fy_a and v_fz_b == v_fz_a then
+                if v_fy_a < v_freq_max then
+                    v_fy_b = v_fy_a + 1
+                else
+                    v_fy_b = v_fy_a - 1
+                endif
+            endif
+        endif
+    else
+        v_freq_timer = v_freq_timer + 1
+        v_ft = v_freq_timer / v_freq_morph
+        if v_ft > 1 then
+            v_ft = 1
+        endif
+        # Extra-smooth ease (smootherstep-ish) so the knot melts, not snaps
+        v_ease = v_ft * v_ft * (3 - 2 * v_ft)
+        v_fx = v_fx_a * (1 - v_ease) + v_fx_b * v_ease
+        v_fy = v_fy_a * (1 - v_ease) + v_fy_b * v_ease
+        v_fz = v_fz_a * (1 - v_ease) + v_fz_b * v_ease
+        if v_freq_timer >= v_freq_morph then
+            v_fx = v_fx_b
+            v_fy = v_fy_b
+            v_fz = v_fz_b
+            v_freq_phase = 0
+            v_freq_timer = 0
+        endif
+    endif
+
+    # Sample the 3D Lissajous curve: head at v_head, tail trailing in phase
+    for v_i in (0, v_last, 1)
+        v_t = v_head - v_i * v_spacing
+        v_x[v_i] = sin(v_fx * v_t)
+        v_y[v_i] = sin(v_fy * v_t + 0.6)
+        v_z[v_i] = sin(v_fz * v_t + 1.1)
+    endfor v_i
+
+    points_project3d(v_x, v_y, v_z, v_px, v_py, v_ax, v_ay, v_az, v_scale, v_camera, v_sprite_cx, v_sprite_cy, v_depth)
+
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, v_last, 1)
+            # Near = large; also bias the head slightly larger
+            v_si = int((v_depth[v_i] + 1.15) * 2.6)
+            if v_i < 3 then
+                v_si = v_si + 1
+            endif
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 6 then
+                v_si = 6
+            endif
+            v_cel[v_i] = v_si
+        endfor v_i
+    endif
+
+    begin_frame(true)
+        move_sprites(bob, v_px, v_py, v_cel)
+    end_frame
+
+    v_frame = v_frame + 1
+endwhile

@@ -1,0 +1,468 @@
+# ==============================================================================
+# FORMATION FLYER  (64x64 matrix)
+#
+# A squadron of fighters banks through space, morphing between classic flight
+# formations (wedge, diamond, line, column, echelon, box, ring, spear).
+# Depth picks ship size/brightness; the whole flight path wanders while the
+# pack slowly tumbles.
+#
+# Producer kernels: array_lerp, points_project3d, move_sprites.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# ---------------- tunable settings ----------------
+v_count = 13
+v_last = 12
+v_nshapes = 8
+
+v_scale = 22
+v_camera = 52
+v_sprite_cx = 29          # 32 - 3 (7x7 ship centre)
+v_sprite_cy = 29
+
+v_speed_x = 0.009
+v_speed_y = 0.013
+v_speed_z = 0.006
+
+v_path_speed = 0.018
+v_hold_frames = 100
+v_morph_frames = 64
+v_cel_refresh = 2
+
+# ---------------- dim scrolling starfield ----------------
+# Keep the drawing buffer transparent so backgrounds show through.
+sync_queue
+
+print("Rendering starfield...")
+
+define_sprite(bg_stars, 96, 96)
+    for v_i in (0, 55, 1)
+        plot(random(0, 95, 0), random(0, 95, 0), white, random(10, 28, 0))
+    endfor v_i
+    for v_i in (0, 18, 1)
+        plot(random(0, 95, 0), random(0, 95, 0), cyan, random(8, 18, 0))
+    endfor v_i
+endsprite
+
+define_sprite(bg_haze, 80, 80)
+    draw_ellipse(20, 30, 18, 10, indigo, 10, true, 25)
+    draw_ellipse(50, 55, 16, 9, navy, 9, true, -30)
+    draw_ellipse(60, 18, 14, 8, purple, 8, true, 40)
+endsprite
+
+set_background(bg_stars, 0)
+set_background(bg_haze, 1)
+
+print("Rendering ships...")
+
+# 7x7 delta fighter — face-ish craft; cels scale with depth
+define_sprite(ship, 7, 7)
+    sprite_cel(0)
+        plot(3, 1, silver, 40)
+        plot(3, 2, cyan, 30)
+        plot(2, 3, sky_blue, 22)
+        plot(4, 3, sky_blue, 22)
+        plot(3, 5, orange, 25)
+    sprite_cel(1)
+        plot(3, 1, white, 55)
+        plot(3, 2, cyan, 45)
+        plot(2, 3, cyan, 35)
+        plot(4, 3, cyan, 35)
+        plot(1, 4, sky_blue, 22)
+        plot(5, 4, sky_blue, 22)
+        plot(3, 4, silver, 30)
+        plot(3, 5, orange, 35)
+    sprite_cel(2)
+        plot(3, 0, white, 70)
+        plot(3, 1, cyan, 65)
+        plot(2, 2, cyan, 55)
+        plot(3, 2, white, 60)
+        plot(4, 2, cyan, 55)
+        plot(1, 3, sky_blue, 40)
+        plot(5, 3, sky_blue, 40)
+        plot(2, 4, silver, 40)
+        plot(4, 4, silver, 40)
+        plot(3, 5, orange, 50)
+        plot(2, 6, orange, 28)
+        plot(4, 6, orange, 28)
+    sprite_cel(3)
+        plot(3, 0, white, 90)
+        plot(2, 1, cyan, 70)
+        plot(3, 1, white, 85)
+        plot(4, 1, cyan, 70)
+        plot(1, 2, sky_blue, 55)
+        plot(2, 2, cyan, 75)
+        plot(3, 2, white, 80)
+        plot(4, 2, cyan, 75)
+        plot(5, 2, sky_blue, 55)
+        plot(0, 3, navy, 35)
+        plot(6, 3, navy, 35)
+        plot(1, 3, silver, 50)
+        plot(5, 3, silver, 50)
+        plot(2, 4, silver, 55)
+        plot(4, 4, silver, 55)
+        plot(3, 4, cyan, 45)
+        plot(3, 5, orange, 70)
+        plot(2, 6, orange, 40)
+        plot(4, 6, orange, 40)
+    sprite_cel(4)
+        plot(3, 0, white, 100)
+        plot(2, 1, white, 85)
+        plot(3, 1, white, 100)
+        plot(4, 1, white, 85)
+        plot(1, 2, cyan, 70)
+        plot(2, 2, cyan, 90)
+        plot(3, 2, white, 95)
+        plot(4, 2, cyan, 90)
+        plot(5, 2, cyan, 70)
+        plot(0, 3, sky_blue, 45)
+        plot(1, 3, silver, 65)
+        plot(5, 3, silver, 65)
+        plot(6, 3, sky_blue, 45)
+        plot(1, 4, navy, 40)
+        plot(2, 4, silver, 70)
+        plot(3, 4, cyan, 55)
+        plot(4, 4, silver, 70)
+        plot(5, 4, navy, 40)
+        plot(3, 5, orange, 90)
+        plot(2, 6, orange, 55)
+        plot(3, 6, orange, 70)
+        plot(4, 6, orange, 55)
+endsprite
+
+print("Building formations...")
+
+# ---------------- shape tables: flat [shape * count + ship] ----------------
+# Local frame: +Z nose / forward, +X starboard, +Y up
+v_shape_len = v_nshapes * v_count
+create_array(v_sx, v_shape_len, numeric)
+create_array(v_sy, v_shape_len, numeric)
+create_array(v_sz, v_shape_len, numeric)
+
+# ---- 0: wedge / Vic ----
+v_base = 0
+v_sx[v_base + 0] = 0
+v_sy[v_base + 0] = 0
+v_sz[v_base + 0] = 1
+for v_k in (1, 6, 1)
+    v_sx[v_base + v_k] = 0 - 0.22 * v_k
+    v_sy[v_base + v_k] = 0
+    v_sz[v_base + v_k] = 1 - 0.28 * v_k
+    v_sx[v_base + 6 + v_k] = 0.22 * v_k
+    v_sy[v_base + 6 + v_k] = 0
+    v_sz[v_base + 6 + v_k] = 1 - 0.28 * v_k
+endfor v_k
+
+# ---- 1: diamond ----
+v_base = v_count
+v_sx[v_base + 0] = 0
+v_sy[v_base + 0] = 0
+v_sz[v_base + 0] = 1
+v_sx[v_base + 1] = 0
+v_sy[v_base + 1] = 0
+v_sz[v_base + 1] = -1
+v_sx[v_base + 2] = -1
+v_sy[v_base + 2] = 0
+v_sz[v_base + 2] = 0
+v_sx[v_base + 3] = 1
+v_sy[v_base + 3] = 0
+v_sz[v_base + 3] = 0
+v_sx[v_base + 4] = -0.55
+v_sy[v_base + 4] = 0
+v_sz[v_base + 4] = 0.55
+v_sx[v_base + 5] = 0.55
+v_sy[v_base + 5] = 0
+v_sz[v_base + 5] = 0.55
+v_sx[v_base + 6] = -0.55
+v_sy[v_base + 6] = 0
+v_sz[v_base + 6] = -0.55
+v_sx[v_base + 7] = 0.55
+v_sy[v_base + 7] = 0
+v_sz[v_base + 7] = -0.55
+v_sx[v_base + 8] = 0
+v_sy[v_base + 8] = 0.35
+v_sz[v_base + 8] = 0.35
+v_sx[v_base + 9] = 0
+v_sy[v_base + 9] = -0.35
+v_sz[v_base + 9] = 0.35
+v_sx[v_base + 10] = 0
+v_sy[v_base + 10] = 0.35
+v_sz[v_base + 10] = -0.35
+v_sx[v_base + 11] = 0
+v_sy[v_base + 11] = -0.35
+v_sz[v_base + 11] = -0.35
+v_sx[v_base + 12] = 0
+v_sy[v_base + 12] = 0
+v_sz[v_base + 12] = 0
+
+# ---- 2: line abreast ----
+v_base = v_count * 2
+for v_i in (0, v_last, 1)
+    v_sx[v_base + v_i] = (v_i - 6) / 6
+    v_sy[v_base + v_i] = 0
+    v_sz[v_base + v_i] = 0
+endfor v_i
+
+# ---- 3: trail column ----
+v_base = v_count * 3
+for v_i in (0, v_last, 1)
+    v_sx[v_base + v_i] = 0
+    v_sy[v_base + v_i] = 0
+    v_sz[v_base + v_i] = 1 - v_i * 0.16
+endfor v_i
+
+# ---- 4: echelon right ----
+v_base = v_count * 4
+for v_i in (0, v_last, 1)
+    v_sx[v_base + v_i] = v_i * 0.14
+    v_sy[v_base + v_i] = 0
+    v_sz[v_base + v_i] = 1 - v_i * 0.14
+endfor v_i
+
+# ---- 5: box (3 x ~4) ----
+v_base = v_count * 5
+for v_i in (0, v_last, 1)
+    v_col = fmod(v_i, 4)
+    v_row = floor(v_i / 4)
+    v_sx[v_base + v_i] = (v_col - 1.5) * 0.45
+    v_sy[v_base + v_i] = 0
+    v_sz[v_base + v_i] = 0.7 - v_row * 0.55
+endfor v_i
+
+# ---- 6: defensive ring ----
+v_base = v_count * 6
+v_sx[v_base + 0] = 0
+v_sy[v_base + 0] = 0
+v_sz[v_base + 0] = 0
+for v_i in (1, v_last, 1)
+    v_th = (v_i - 1) / 12 * tau
+    v_sx[v_base + v_i] = cos(v_th)
+    v_sy[v_base + v_i] = sin(v_th) * 0.35
+    v_sz[v_base + v_i] = sin(v_th)
+endfor v_i
+
+# ---- 7: spear / arrowhead ----
+v_base = v_count * 7
+v_sx[v_base + 0] = 0
+v_sy[v_base + 0] = 0
+v_sz[v_base + 0] = 1
+for v_i in (1, 4, 1)
+    v_sx[v_base + v_i] = 0 - 0.18 * v_i
+    v_sy[v_base + v_i] = 0
+    v_sz[v_base + v_i] = 1 - 0.22 * v_i
+    v_sx[v_base + 4 + v_i] = 0.18 * v_i
+    v_sy[v_base + 4 + v_i] = 0
+    v_sz[v_base + 4 + v_i] = 1 - 0.22 * v_i
+endfor v_i
+v_sx[v_base + 9] = 0
+v_sy[v_base + 9] = 0
+v_sz[v_base + 9] = 0.1
+v_sx[v_base + 10] = 0
+v_sy[v_base + 10] = 0
+v_sz[v_base + 10] = -0.25
+v_sx[v_base + 11] = 0
+v_sy[v_base + 11] = 0
+v_sz[v_base + 11] = -0.55
+v_sx[v_base + 12] = 0
+v_sy[v_base + 12] = 0
+v_sz[v_base + 12] = -0.85
+
+# Normalize each formation by max |axis|
+for v_sh in (0, 7, 1)
+    v_base = v_sh * v_count
+    v_maxc = 0.01
+    for v_i in (0, v_last, 1)
+        v_axv = abs(v_sx[v_base + v_i])
+        v_ayv = abs(v_sy[v_base + v_i])
+        v_azv = abs(v_sz[v_base + v_i])
+        if v_axv > v_maxc then
+            v_maxc = v_axv
+        endif
+        if v_ayv > v_maxc then
+            v_maxc = v_ayv
+        endif
+        if v_azv > v_maxc then
+            v_maxc = v_azv
+        endif
+    endfor v_i
+    for v_i in (0, v_last, 1)
+        v_sx[v_base + v_i] = v_sx[v_base + v_i] / v_maxc
+        v_sy[v_base + v_i] = v_sy[v_base + v_i] / v_maxc
+        v_sz[v_base + v_i] = v_sz[v_base + v_i] / v_maxc
+    endfor v_i
+endfor v_sh
+
+# Working buffers
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_z, v_count, numeric)
+create_array(v_axp, v_count, numeric)
+create_array(v_ayp, v_count, numeric)
+create_array(v_azp, v_count, numeric)
+create_array(v_bx, v_count, numeric)
+create_array(v_by, v_count, numeric)
+create_array(v_bz, v_count, numeric)
+create_array(v_px, v_count, numeric)
+create_array(v_py, v_count, numeric)
+create_array(v_depth, v_count, numeric)
+create_array(v_cel, v_count, numeric)
+
+print("Squadron ready")
+
+for v_i in (0, v_last, 1)
+    show_sprite(ship, 29, 29, v_i, 0, 2)
+    v_cel[v_i] = 2
+endfor v_i
+
+# ---------------- animation state ----------------
+v_ax = 0.35
+v_ay = 0.55
+v_az = 0.12
+v_shape = 0
+v_next = 1
+v_phase = 0
+v_timer = 0
+v_frame = 0
+v_world_ready = 0
+v_path_t = 0
+v_acc_star_x = 0
+v_acc_star_y = 0
+v_acc_haze_x = 0
+v_acc_haze_y = 0
+
+while true then
+    # Bank / tumble
+    v_ax = v_ax + v_speed_x
+    v_ay = v_ay + v_speed_y
+    v_az = v_az + v_speed_z
+    if v_ax > tau then
+        v_ax = v_ax - tau
+    endif
+    if v_ay > tau then
+        v_ay = v_ay - tau
+    endif
+    if v_az > tau then
+        v_az = v_az - tau
+    endif
+
+    # Flight path wander (formation centre)
+    v_path_t = v_path_t + v_path_speed
+    if v_path_t > tau * 8 then
+        v_path_t = v_path_t - tau * 8
+    endif
+    v_path_x = sin(v_path_t) * 0.32
+    v_path_y = sin(v_path_t * 0.73 + 0.4) * 0.22
+    v_path_z = cos(v_path_t * 0.51) * 0.28
+
+    # Parallax backgrounds drift opposite the flight feel
+    v_acc_star_x = v_acc_star_x + 0.06 + v_path_x * 0.02
+    v_acc_star_y = v_acc_star_y + 0.025 + v_path_y * 0.015
+    v_acc_haze_x = v_acc_haze_x + 0.11 + v_path_x * 0.04
+    v_acc_haze_y = v_acc_haze_y + 0.045 + v_path_y * 0.03
+
+    if v_phase == 0 then
+        v_timer = v_timer + 1
+        v_blend = 0
+        if v_timer >= v_hold_frames then
+            v_phase = 1
+            v_timer = 0
+            v_next = int(random(0, v_nshapes - 1, 0))
+            if v_next == v_shape then
+                v_next = fmod(v_shape + 1 + int(random(0, v_nshapes - 2, 0)), v_nshapes)
+            endif
+            v_base_b = v_next * v_count
+            for v_i in (0, v_last, 1)
+                v_axp[v_i] = v_x[v_i] - v_path_x
+                v_ayp[v_i] = v_y[v_i] - v_path_y
+                v_azp[v_i] = v_z[v_i] - v_path_z
+                v_bx[v_i] = v_sx[v_base_b + v_i]
+                v_by[v_i] = v_sy[v_base_b + v_i]
+                v_bz[v_i] = v_sz[v_base_b + v_i]
+            endfor v_i
+        endif
+    else
+        v_timer = v_timer + 1
+        v_morph_t = v_timer / v_morph_frames
+        if v_morph_t > 1 then
+            v_morph_t = 1
+        endif
+        v_blend = v_morph_t * v_morph_t * (3 - 2 * v_morph_t)
+        if v_timer >= v_morph_frames then
+            v_shape = v_next
+            v_phase = 0
+            v_timer = 0
+            v_blend = 0
+            v_world_ready = 1
+        endif
+    endif
+
+    if v_world_ready == 0 then
+        v_base_a = v_shape * v_count
+        for v_i in (0, v_last, 1)
+            v_x[v_i] = v_sx[v_base_a + v_i]
+            v_y[v_i] = v_sy[v_base_a + v_i]
+            v_z[v_i] = v_sz[v_base_a + v_i]
+        endfor v_i
+        v_world_ready = 1
+    endif
+
+    if v_blend > 0 then
+        array_lerp(v_axp, v_bx, v_x, v_blend)
+        array_lerp(v_ayp, v_by, v_y, v_blend)
+        array_lerp(v_azp, v_bz, v_z, v_blend)
+    else
+        if v_phase == 0 then
+            v_base_a = v_shape * v_count
+            for v_i in (0, v_last, 1)
+                v_x[v_i] = v_sx[v_base_a + v_i]
+                v_y[v_i] = v_sy[v_base_a + v_i]
+                v_z[v_i] = v_sz[v_base_a + v_i]
+            endfor v_i
+        endif
+    endif
+
+    # Translate formation along flight path
+    for v_i in (0, v_last, 1)
+        v_x[v_i] = v_x[v_i] + v_path_x
+        v_y[v_i] = v_y[v_i] + v_path_y
+        v_z[v_i] = v_z[v_i] + v_path_z
+    endfor v_i
+
+    v_scale_live = v_scale + sin(v_frame * 0.025) * 1.8
+    points_project3d(v_x, v_y, v_z, v_px, v_py, v_ax, v_ay, v_az, v_scale_live, v_camera, v_sprite_cx, v_sprite_cy, v_depth)
+
+    if fmod(v_frame, v_cel_refresh) == 0 then
+        for v_i in (0, v_last, 1)
+            v_si = int((v_depth[v_i] + 1.15) * 1.65)
+            if v_si < 0 then
+                v_si = 0
+            endif
+            if v_si > 4 then
+                v_si = 4
+            endif
+            v_cel[v_i] = v_si
+        endfor v_i
+        # Leader always a touch brighter
+        if v_cel[0] < 4 then
+            v_cel[0] = v_cel[0] + 1
+        endif
+    endif
+
+    begin_frame(true)
+        set_background_offset(int(v_acc_star_x), int(v_acc_star_y), 0, 0)
+        set_background_offset(int(v_acc_haze_x), int(v_acc_haze_y), 1, 0)
+        move_sprites(ship, v_px, v_py, v_cel)
+    end_frame
+
+    v_frame = v_frame + 1
+
+    if fmod(v_frame, 10000) == 0 then
+        v_acc_star_x = v_acc_star_x - floor(v_acc_star_x / 96) * 96
+        v_acc_star_y = v_acc_star_y - floor(v_acc_star_y / 96) * 96
+        v_acc_haze_x = v_acc_haze_x - floor(v_acc_haze_x / 80) * 80
+        v_acc_haze_y = v_acc_haze_y - floor(v_acc_haze_y / 80) * 80
+    endif
+endwhile

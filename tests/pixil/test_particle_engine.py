@@ -461,6 +461,34 @@ def test_circle_collision_uses_lower_material_restitution():
     assert vx[1] == pytest.approx(0.4)
 
 
+def test_circle_collision_grid_broadphase_resolves_overlapping_pair():
+    """n >= grid threshold: a clear overlapping pair still separates."""
+    from pixil_utils.particle_engine import _CIRCLE_GRID_THRESHOLD
+
+    n = max(40, _CIRCLE_GRID_THRESHOLD + 8)
+    radius = 0.55
+    # Spread bodies so only indices 10 and 11 overlap.
+    xs = [float(i) * 2.5 for i in range(n)]
+    ys = [20.0] * n
+    xs[10] = 30.0
+    xs[11] = 30.5
+    ys[10] = 30.0
+    ys[11] = 30.0
+    x = _arr(xs)
+    y = _arr(ys)
+    vx = _arr([0.0] * n)
+    vy = _arr([0.0] * n)
+    active = _arr([1.0] * n)
+
+    pairs = particle_collide_circles(
+        x, y, vx, vy, active, radius=radius, mass=1.0, restitution=0.5,
+    )
+    assert pairs >= 1
+    dx = x[11] - x[10]
+    dy = y[11] - y[10]
+    assert dx * dx + dy * dy >= (radius + radius - 1e-9) ** 2
+
+
 def test_static_circle_projects_and_bounces_particle():
     x = _arr([10.5])
     y = _arr([10.0])

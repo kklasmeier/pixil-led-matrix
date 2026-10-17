@@ -1,0 +1,868 @@
+# Molecule Viewer
+# Picks a random molecule and shows it as a slowly rotating 3D ball-and-stick
+# model with correct geometry. Single, double and triple bonds are drawn as
+# 1, 2 or 3 parallel lines. Bonds are split in half and colored by each atom.
+# Name is top-left, molecular shape/angle sits under it, and the formula with
+# subscripts is bottom-left.
+# Atom colors: H white, C gray, N blue, O red, S yellow.
+# Run: ./run main/Molecule_Viewer
+
+fps(60)
+
+# ---------------- Element styling (type 0=H 1=C 2=N 3=O 4=S) ----------------
+create_array(v_ecol, 5, string)
+create_array(v_erad, 5, numeric)
+v_ecol[0] = "white"
+v_ecol[1] = "gray"
+v_ecol[2] = "royal_blue"
+v_ecol[3] = "red"
+v_erad[0] = 2
+v_erad[1] = 4
+v_erad[2] = 4
+v_erad[3] = 4
+v_ecol[4] = "yellow"
+v_erad[4] = 5
+
+# ---------------- Working arrays (max 12 atoms, 12 bonds, 3 formula parts) ----------------
+create_array(v_at, 12, numeric)
+create_array(v_ax, 12, numeric)
+create_array(v_ay, 12, numeric)
+create_array(v_az, 12, numeric)
+create_array(v_sx, 12, numeric)
+create_array(v_sy, 12, numeric)
+create_array(v_zk, 12, numeric)
+create_array(v_ord, 12, numeric)
+create_array(v_bf, 12, numeric)
+create_array(v_bt, 12, numeric)
+create_array(v_bo, 12, numeric)
+create_array(v_fsym, 3, string)
+create_array(v_fcnt, 3, numeric)
+create_array(v_fw, 3, numeric)
+
+v_cx = 34
+v_cy = 34
+v_hold = 450
+v_last = -1
+v_ang = 0
+
+# ---------------- Molecule loaders ----------------
+def reset_mol {
+    v_rs = 1
+    for v_i in (0, 11, 1)
+        v_at[v_i] = 0
+        v_ax[v_i] = 0
+        v_ay[v_i] = 0
+        v_az[v_i] = 0
+    endfor v_i
+}
+
+def load_water {
+    call reset_mol
+    v_name = "Water"
+    v_shape = "Bent 104.5"
+    v_scale = 14
+    v_na = 3
+    v_nb = 2
+    v_nf = 2
+    v_fsym[0] = "H"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "O"
+    v_fcnt[1] = 1
+    v_fw[1] = 4
+    v_at[0] = 3
+    v_ay[0] = -0.2
+    v_at[1] = 0
+    v_ax[1] = -0.76
+    v_ay[1] = 0.38
+    v_at[2] = 0
+    v_ax[2] = 0.76
+    v_ay[2] = 0.38
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 1
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+}
+
+def load_co2 {
+    call reset_mol
+    v_name = "Carbon Dioxide"
+    v_shape = "Linear 180"
+    v_scale = 14
+    v_na = 3
+    v_nb = 2
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "O"
+    v_fcnt[1] = 2
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_at[1] = 3
+    v_ax[1] = -1.16
+    v_at[2] = 3
+    v_ax[2] = 1.16
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 2
+}
+
+def load_methane {
+    call reset_mol
+    v_name = "Methane"
+    v_shape = "Tetrahedral"
+    v_scale = 17
+    v_na = 5
+    v_nb = 4
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 4
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_at[1] = 0
+    v_ax[1] = 0.63
+    v_ay[1] = 0.63
+    v_az[1] = 0.63
+    v_at[2] = 0
+    v_ax[2] = -0.63
+    v_ay[2] = -0.63
+    v_az[2] = 0.63
+    v_at[3] = 0
+    v_ax[3] = -0.63
+    v_ay[3] = 0.63
+    v_az[3] = -0.63
+    v_at[4] = 0
+    v_ax[4] = 0.63
+    v_ay[4] = -0.63
+    v_az[4] = -0.63
+    for v_i in (0, 3, 1)
+        v_bf[v_i] = 0
+        v_bt[v_i] = v_i + 1
+        v_bo[v_i] = 1
+    endfor v_i
+}
+
+def load_ammonia {
+    call reset_mol
+    v_name = "Ammonia"
+    v_shape = "Pyramidal 107"
+    v_scale = 16
+    v_na = 4
+    v_nb = 3
+    v_nf = 2
+    v_fsym[0] = "N"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 3
+    v_fw[1] = 4
+    v_at[0] = 2
+    v_ay[0] = -0.3
+    v_at[1] = 0
+    v_ax[1] = 0.94
+    v_ay[1] = 0.07
+    v_at[2] = 0
+    v_ax[2] = -0.47
+    v_ay[2] = 0.07
+    v_az[2] = 0.81
+    v_at[3] = 0
+    v_ax[3] = -0.47
+    v_ay[3] = 0.07
+    v_az[3] = -0.81
+    for v_i in (0, 2, 1)
+        v_bf[v_i] = 0
+        v_bt[v_i] = v_i + 1
+        v_bo[v_i] = 1
+    endfor v_i
+}
+
+def load_oxygen {
+    call reset_mol
+    v_name = "Oxygen"
+    v_shape = "Linear"
+    v_scale = 18
+    v_na = 2
+    v_nb = 1
+    v_nf = 1
+    v_fsym[0] = "O"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_at[0] = 3
+    v_ax[0] = -0.6
+    v_at[1] = 3
+    v_ax[1] = 0.6
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+}
+
+def load_nitrogen {
+    call reset_mol
+    v_name = "Nitrogen"
+    v_shape = "Linear"
+    v_scale = 18
+    v_na = 2
+    v_nb = 1
+    v_nf = 1
+    v_fsym[0] = "N"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_at[0] = 2
+    v_ax[0] = -0.55
+    v_at[1] = 2
+    v_ax[1] = 0.55
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 3
+}
+
+def load_acetylene {
+    call reset_mol
+    v_name = "Acetylene"
+    v_shape = "Linear 180"
+    v_scale = 9
+    v_na = 4
+    v_nb = 3
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 2
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_ax[0] = -0.6
+    v_at[1] = 1
+    v_ax[1] = 0.6
+    v_at[2] = 0
+    v_ax[2] = -1.66
+    v_at[3] = 0
+    v_ax[3] = 1.66
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 3
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 1
+    v_bt[2] = 3
+    v_bo[2] = 1
+}
+
+def load_ethylene {
+    call reset_mol
+    v_name = "Ethylene"
+    v_shape = "Planar 120"
+    v_scale = 11
+    v_na = 6
+    v_nb = 5
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 4
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_ax[0] = -0.67
+    v_at[1] = 1
+    v_ax[1] = 0.67
+    v_at[2] = 0
+    v_ax[2] = -1.24
+    v_ay[2] = -0.92
+    v_at[3] = 0
+    v_ax[3] = -1.24
+    v_ay[3] = 0.92
+    v_at[4] = 0
+    v_ax[4] = 1.24
+    v_ay[4] = -0.92
+    v_at[5] = 0
+    v_ax[5] = 1.24
+    v_ay[5] = 0.92
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 0
+    v_bt[2] = 3
+    v_bo[2] = 1
+    v_bf[3] = 1
+    v_bt[3] = 4
+    v_bo[3] = 1
+    v_bf[4] = 1
+    v_bt[4] = 5
+    v_bo[4] = 1
+}
+
+def load_hydrogen {
+    call reset_mol
+    v_name = "Hydrogen"
+    v_shape = "Linear"
+    v_scale = 22
+    v_na = 2
+    v_nb = 1
+    v_nf = 1
+    v_fsym[0] = "H"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_at[0] = 0
+    v_ax[0] = -0.37
+    v_at[1] = 0
+    v_ax[1] = 0.37
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 1
+}
+
+def load_co {
+    call reset_mol
+    v_name = "Carbon Monoxide"
+    v_shape = "Linear"
+    v_scale = 18
+    v_na = 2
+    v_nb = 1
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "O"
+    v_fcnt[1] = 1
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_ax[0] = -0.565
+    v_at[1] = 3
+    v_ax[1] = 0.565
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 3
+}
+
+def load_ozone {
+    call reset_mol
+    v_name = "Ozone"
+    v_shape = "Bent 116.8"
+    v_scale = 13
+    v_na = 3
+    v_nb = 2
+    v_nf = 1
+    v_fsym[0] = "O"
+    v_fcnt[0] = 3
+    v_fw[0] = 4
+    v_at[0] = 3
+    v_ay[0] = -0.33
+    v_at[1] = 3
+    v_ax[1] = -1.09
+    v_ay[1] = 0.34
+    v_at[2] = 3
+    v_ax[2] = 1.09
+    v_ay[2] = 0.34
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+}
+
+def load_so2 {
+    call reset_mol
+    v_name = "Sulfur Dioxide"
+    v_shape = "Bent 119.5"
+    v_scale = 12
+    v_na = 3
+    v_nb = 2
+    v_nf = 2
+    v_fsym[0] = "S"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "O"
+    v_fcnt[1] = 2
+    v_fw[1] = 4
+    v_at[0] = 4
+    v_ay[0] = -0.36
+    v_at[1] = 3
+    v_ax[1] = -1.23
+    v_ay[1] = 0.36
+    v_at[2] = 3
+    v_ax[2] = 1.23
+    v_ay[2] = 0.36
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 2
+}
+
+def load_formaldehyde {
+    call reset_mol
+    v_name = "Formaldehyde"
+    v_shape = "Planar 120"
+    v_scale = 14
+    v_na = 4
+    v_nb = 3
+    v_nf = 3
+    v_fsym[0] = "C"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 2
+    v_fw[1] = 4
+    v_fsym[2] = "O"
+    v_fcnt[2] = 1
+    v_fw[2] = 4
+    v_at[0] = 1
+    v_ay[0] = 0.4
+    v_at[1] = 3
+    v_ay[1] = -0.81
+    v_at[2] = 0
+    v_ax[2] = -0.93
+    v_ay[2] = 0.98
+    v_at[3] = 0
+    v_ax[3] = 0.93
+    v_ay[3] = 0.98
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 0
+    v_bt[2] = 3
+    v_bo[2] = 1
+}
+
+def load_methanol {
+    call reset_mol
+    v_name = "Methanol"
+    v_shape = "Tetrahedral"
+    v_scale = 12
+    v_na = 6
+    v_nb = 5
+    v_nf = 3
+    v_fsym[0] = "C"
+    v_fcnt[0] = 1
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 4
+    v_fw[1] = 4
+    v_fsym[2] = "O"
+    v_fcnt[2] = 1
+    v_fw[2] = 4
+    v_at[0] = 1
+    v_ax[0] = -0.7
+    v_at[1] = 3
+    v_ax[1] = 0.71
+    v_at[2] = 0
+    v_ax[2] = 1.02
+    v_ay[2] = 0.91
+    v_at[3] = 0
+    v_ax[3] = -1.06
+    v_ay[3] = -1.03
+    v_at[4] = 0
+    v_ax[4] = -1.06
+    v_ay[4] = 0.51
+    v_az[4] = 0.89
+    v_at[5] = 0
+    v_ax[5] = -1.06
+    v_ay[5] = 0.51
+    v_az[5] = -0.89
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 1
+    v_bf[1] = 1
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 0
+    v_bt[2] = 3
+    v_bo[2] = 1
+    v_bf[3] = 0
+    v_bt[3] = 4
+    v_bo[3] = 1
+    v_bf[4] = 0
+    v_bt[4] = 5
+    v_bo[4] = 1
+}
+
+def load_ethane {
+    call reset_mol
+    v_name = "Ethane"
+    v_shape = "Tetrahedral"
+    v_scale = 11
+    v_na = 8
+    v_nb = 7
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 6
+    v_fw[1] = 4
+    v_at[0] = 1
+    v_ax[0] = -0.77
+    v_at[1] = 1
+    v_ax[1] = 0.77
+    v_at[2] = 0
+    v_ax[2] = -1.13
+    v_ay[2] = 1.03
+    v_at[3] = 0
+    v_ax[3] = -1.13
+    v_ay[3] = -0.51
+    v_az[3] = 0.89
+    v_at[4] = 0
+    v_ax[4] = -1.13
+    v_ay[4] = -0.51
+    v_az[4] = -0.89
+    v_at[5] = 0
+    v_ax[5] = 1.13
+    v_ay[5] = -1.03
+    v_at[6] = 0
+    v_ax[6] = 1.13
+    v_ay[6] = 0.51
+    v_az[6] = 0.89
+    v_at[7] = 0
+    v_ax[7] = 1.13
+    v_ay[7] = 0.51
+    v_az[7] = -0.89
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 1
+    for v_i in (2, 4, 1)
+        v_bf[v_i - 1] = 0
+        v_bt[v_i - 1] = v_i
+        v_bo[v_i - 1] = 1
+    endfor v_i
+    for v_i in (5, 7, 1)
+        v_bf[v_i - 1] = 1
+        v_bt[v_i - 1] = v_i
+        v_bo[v_i - 1] = 1
+    endfor v_i
+}
+
+def load_ethanol {
+    call reset_mol
+    v_name = "Ethanol"
+    v_shape = "Alcohol"
+    v_scale = 10
+    v_na = 9
+    v_nb = 8
+    v_nf = 3
+    v_fsym[0] = "C"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 6
+    v_fw[1] = 4
+    v_fsym[2] = "O"
+    v_fcnt[2] = 1
+    v_fw[2] = 4
+    v_at[0] = 1
+    v_ax[0] = -1.26
+    v_ay[0] = 0.15
+    v_at[1] = 1
+    v_ax[1] = 0.26
+    v_ay[1] = 0.15
+    v_at[2] = 0
+    v_ax[2] = -1.62
+    v_ay[2] = 1.18
+    v_at[3] = 0
+    v_ax[3] = -1.62
+    v_ay[3] = -0.36
+    v_az[3] = 0.89
+    v_at[4] = 0
+    v_ax[4] = -1.62
+    v_ay[4] = -0.36
+    v_az[4] = -0.89
+    v_at[5] = 0
+    v_ax[5] = 0.62
+    v_ay[5] = 0.66
+    v_az[5] = 0.89
+    v_at[6] = 0
+    v_ax[6] = 0.62
+    v_ay[6] = 0.66
+    v_az[6] = -0.89
+    v_at[7] = 3
+    v_ax[7] = 0.74
+    v_ay[7] = -1.2
+    v_at[8] = 0
+    v_ax[8] = 1.7
+    v_ay[8] = -1.17
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 1
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 0
+    v_bt[2] = 3
+    v_bo[2] = 1
+    v_bf[3] = 0
+    v_bt[3] = 4
+    v_bo[3] = 1
+    v_bf[4] = 1
+    v_bt[4] = 5
+    v_bo[4] = 1
+    v_bf[5] = 1
+    v_bt[5] = 6
+    v_bo[5] = 1
+    v_bf[6] = 1
+    v_bt[6] = 7
+    v_bo[6] = 1
+    v_bf[7] = 7
+    v_bt[7] = 8
+    v_bo[7] = 1
+}
+
+def load_acetic {
+    call reset_mol
+    v_name = "Acetic Acid"
+    v_shape = "Carboxylic"
+    v_scale = 10
+    v_na = 8
+    v_nb = 7
+    v_nf = 3
+    v_fsym[0] = "C"
+    v_fcnt[0] = 2
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 4
+    v_fw[1] = 4
+    v_fsym[2] = "O"
+    v_fcnt[2] = 2
+    v_fw[2] = 4
+    v_at[0] = 1
+    v_ay[0] = -0.3
+    v_at[1] = 3
+    v_ay[1] = -1.51
+    v_at[2] = 3
+    v_ax[2] = 1.16
+    v_ay[2] = 0.38
+    v_at[3] = 1
+    v_ax[3] = -1.31
+    v_ay[3] = 0.46
+    v_at[4] = 0
+    v_ax[4] = 1.88
+    v_ay[4] = -0.28
+    v_at[5] = 0
+    v_ax[5] = -1.11
+    v_ay[5] = 1.53
+    v_at[6] = 0
+    v_ax[6] = -1.88
+    v_ay[6] = 0.2
+    v_az[6] = 0.89
+    v_at[7] = 0
+    v_ax[7] = -1.88
+    v_ay[7] = 0.2
+    v_az[7] = -0.89
+    v_bf[0] = 0
+    v_bt[0] = 1
+    v_bo[0] = 2
+    v_bf[1] = 0
+    v_bt[1] = 2
+    v_bo[1] = 1
+    v_bf[2] = 0
+    v_bt[2] = 3
+    v_bo[2] = 1
+    v_bf[3] = 2
+    v_bt[3] = 4
+    v_bo[3] = 1
+    v_bf[4] = 3
+    v_bt[4] = 5
+    v_bo[4] = 1
+    v_bf[5] = 3
+    v_bt[5] = 6
+    v_bo[5] = 1
+    v_bf[6] = 3
+    v_bt[6] = 7
+    v_bo[6] = 1
+}
+
+def load_benzene {
+    call reset_mol
+    v_name = "Benzene"
+    v_shape = "Planar 120"
+    v_scale = 6.5
+    v_rs = 0.75
+    v_na = 12
+    v_nb = 12
+    v_nf = 2
+    v_fsym[0] = "C"
+    v_fcnt[0] = 6
+    v_fw[0] = 4
+    v_fsym[1] = "H"
+    v_fcnt[1] = 6
+    v_fw[1] = 4
+    for v_k in (0, 5, 1)
+        v_bang = v_k * pi / 3
+        v_at[v_k] = 1
+        v_ax[v_k] = cos(v_bang) * 1.4
+        v_ay[v_k] = sin(v_bang) * 1.4
+        v_at[v_k + 6] = 0
+        v_ax[v_k + 6] = cos(v_bang) * 2.48
+        v_ay[v_k + 6] = sin(v_bang) * 2.48
+        v_bf[v_k] = v_k
+        v_bt[v_k] = fmod(v_k + 1, 6)
+        v_bo[v_k] = 1 + fmod(v_k + 1, 2)
+        v_bf[v_k + 6] = v_k
+        v_bt[v_k + 6] = v_k + 6
+        v_bo[v_k + 6] = 1
+    endfor v_k
+}
+
+# Formula with subscripts, bottom-left
+def draw_formula {
+    v_fxc = 1
+    for v_s in (0, v_nf - 1, 1)
+        draw_text(v_fxc, 56, v_fsym[v_s], tiny64_font, 5, white, 100)
+        v_fxc = v_fxc + v_fw[v_s]
+        if v_fcnt[v_s] > 1 then
+            draw_text(v_fxc, 59, v_fcnt[v_s], tiny64_font, 5, yellow, 100)
+            v_fxc = v_fxc + 4
+        endif
+    endfor v_s
+}
+
+fps(30)
+clear()
+
+while true then
+    # ---------- Pick a new molecule (never the same twice in a row) ----------
+    v_pick = random(0, 17, 0)
+    while v_pick == v_last then
+        v_pick = random(0, 17, 0)
+    endwhile
+    v_last = v_pick
+
+    if v_pick == 0 then
+        call load_water
+    elseif v_pick == 1 then
+        call load_co2
+    elseif v_pick == 2 then
+        call load_methane
+    elseif v_pick == 3 then
+        call load_ammonia
+    elseif v_pick == 4 then
+        call load_oxygen
+    elseif v_pick == 5 then
+        call load_nitrogen
+    elseif v_pick == 6 then
+        call load_acetylene
+    elseif v_pick == 7 then
+        call load_ethylene
+    elseif v_pick == 8 then
+        call load_hydrogen
+    elseif v_pick == 9 then
+        call load_co
+    elseif v_pick == 10 then
+        call load_ozone
+    elseif v_pick == 11 then
+        call load_so2
+    elseif v_pick == 12 then
+        call load_formaldehyde
+    elseif v_pick == 13 then
+        call load_methanol
+    elseif v_pick == 14 then
+        call load_ethane
+    elseif v_pick == 15 then
+        call load_ethanol
+    elseif v_pick == 16 then
+        call load_acetic
+    else
+        call load_benzene
+    endif
+
+    for v_f in (0, v_hold, 1)
+        # ---------- Rotate and project ----------
+        v_ang = v_ang + 0.035
+        v_tilt = 0.5 + sin(v_f * 0.03) * 0.3
+        v_ca = cos(v_ang)
+        v_sa = sin(v_ang)
+        v_ct = cos(v_tilt)
+        v_st = sin(v_tilt)
+
+        for v_i in (0, v_na - 1, 1)
+            v_x1 = v_ax[v_i] * v_ca + v_az[v_i] * v_sa
+            v_z1 = v_az[v_i] * v_ca - v_ax[v_i] * v_sa
+            v_y2 = v_ay[v_i] * v_ct - v_z1 * v_st
+            v_z2 = v_ay[v_i] * v_st + v_z1 * v_ct
+            v_sx[v_i] = v_cx + v_x1 * v_scale
+            v_sy[v_i] = v_cy + v_y2 * v_scale
+            v_zk[v_i] = v_z2
+            v_ord[v_i] = v_i
+        endfor v_i
+
+        # ---------- Sort atoms back to front (bubble sort on depth) ----------
+        for v_p in (0, v_na - 2, 1)
+            for v_q in (0, v_na - 2 - v_p, 1)
+                if v_zk[v_q] > v_zk[v_q + 1] then
+                    v_tz = v_zk[v_q]
+                    v_zk[v_q] = v_zk[v_q + 1]
+                    v_zk[v_q + 1] = v_tz
+                    v_to = v_ord[v_q]
+                    v_ord[v_q] = v_ord[v_q + 1]
+                    v_ord[v_q + 1] = v_to
+                endif
+            endfor v_q
+        endfor v_p
+
+        begin_frame
+            draw_text(1, 1, v_name, tiny64_font, 5, white, 100)
+            draw_text(1, 8, v_shape, tiny64_font, 5, light_gray, 65)
+            call draw_formula
+
+            for v_q in (0, v_na - 1, 1)
+                v_ai = v_ord[v_q]
+                v_ty = v_at[v_ai]
+                v_col = v_ecol[v_ty]
+                v_rad = max(1, round(v_erad[v_ty] * v_rs))
+                v_dep = v_zk[v_q]
+                v_int = min(100, max(45, 78 + v_dep * 12))
+
+                # Half-bonds from this atom toward the midpoint of each bond
+                for v_b in (0, v_nb - 1, 1)
+                    v_hit = 0
+                    if v_bf[v_b] == v_ai then
+                        v_oj = v_bt[v_b]
+                        v_hit = 1
+                    elseif v_bt[v_b] == v_ai then
+                        v_oj = v_bf[v_b]
+                        v_hit = 1
+                    endif
+                    if v_hit == 1 then
+                        v_mx = (v_sx[v_ai] + v_sx[v_oj]) / 2
+                        v_my = (v_sy[v_ai] + v_sy[v_oj]) / 2
+                        v_dx = v_mx - v_sx[v_ai]
+                        v_dy = v_my - v_sy[v_ai]
+                        v_len = sqrt(v_dx * v_dx + v_dy * v_dy)
+                        if v_len > 0.5 then
+                            v_px = 0 - v_dy / v_len
+                            v_py = v_dx / v_len
+                            for v_o in (0, v_bo[v_b] - 1, 1)
+                                v_off = (v_o - (v_bo[v_b] - 1) / 2) * 2.4
+                                draw_line(round(v_sx[v_ai] + v_px * v_off), round(v_sy[v_ai] + v_py * v_off), round(v_mx + v_px * v_off), round(v_my + v_py * v_off), v_col, v_int * 0.8)
+                            endfor v_o
+                        endif
+                    endif
+                endfor v_b
+
+                # Atom body with a small highlight for a spherical look
+                draw_circle(round(v_sx[v_ai]), round(v_sy[v_ai]), v_rad, v_col, v_int, true)
+                if v_rad >= 3 then
+                    mplot(round(v_sx[v_ai]) - 1, round(v_sy[v_ai]) - 1, white, 70)
+                endif
+            endfor v_q
+            mflush
+        end_frame
+    endfor v_f
+endwhile

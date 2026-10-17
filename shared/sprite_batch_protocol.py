@@ -14,11 +14,13 @@ from shared.mplot_protocol import encode_buffer, decode_buffer
 OP_SHOW = 1
 OP_MOVE = 2
 OP_HIDE = 3
+OP_MOVE_Z = 4  # move + explicit z_index (int16)
 
 _MAX_NAME_LEN = 48
-# op B, name_len B, name[name_len], x h, y h, instance B, flags B, cel b (optional -1 = none)
+# op B, name_len B, name[name_len], x h, y h, instance B, cel B (255 = none)
 _SHOW_MOVE_FMT = "<2B"
 _SHOW_MOVE_TAIL = "<2h2B"
+_MOVE_Z_TAIL = "<2h2Bh"  # x, y, instance, cel, z_index
 _HIDE_FMT = "<2B"
 _HIDE_TAIL = "<B"
 
@@ -50,12 +52,32 @@ def pack_show_record(name: str, x: int, y: int, instance_id: int = 0, cel_idx: O
     )
 
 
-def pack_move_record(name: str, x: int, y: int, instance_id: int = 0, cel_idx: Optional[int] = None) -> bytes:
+def pack_move_record(
+    name: str,
+    x: int,
+    y: int,
+    instance_id: int = 0,
+    cel_idx: Optional[int] = None,
+    z_index: Optional[int] = None,
+) -> bytes:
     cel_byte = 255 if cel_idx is None else int(cel_idx) & 0xFF
+    if z_index is None:
+        return (
+            bytes([OP_MOVE])
+            + _pack_name(name)
+            + struct.pack("<2h2B", int(x), int(y), int(instance_id) & 0xFF, cel_byte)
+        )
     return (
-        bytes([OP_MOVE])
+        bytes([OP_MOVE_Z])
         + _pack_name(name)
-        + struct.pack("<2h2B", int(x), int(y), int(instance_id) & 0xFF, cel_byte)
+        + struct.pack(
+            _MOVE_Z_TAIL,
+            int(x),
+            int(y),
+            int(instance_id) & 0xFF,
+            cel_byte,
+            int(z_index),
+        )
     )
 
 
@@ -73,14 +95,18 @@ def pack_sprite_op(cmd_name: str, args: List[Any]) -> bytes:
     y = int(float(args[2]))
     instance_id = int(args[3]) if len(args) > 3 else 0
     cel_idx: Optional[int] = None
+    z_index: Optional[int] = None
     if cmd_name == "show_sprite" and len(args) > 5:
         cel_idx = int(args[5])
-    elif cmd_name == "move_sprite" and len(args) > 4:
-        cel_idx = int(args[4])
+    elif cmd_name == "move_sprite":
+        if len(args) > 4:
+            cel_idx = int(args[4])
+        if len(args) > 5:
+            z_index = int(args[5])
     if cmd_name == "show_sprite":
         return pack_show_record(name, x, y, instance_id, cel_idx)
     if cmd_name == "move_sprite":
-        return pack_move_record(name, x, y, instance_id, cel_idx)
+        return pack_move_record(name, x, y, instance_id, cel_idx, z_index)
     raise ValueError(f"sprite_batch unsupported command: {cmd_name}")
 
 
@@ -114,6 +140,20 @@ def unpack_sprite_batch(binary_data: bytes) -> Iterator[Tuple[str, tuple]]:
                 yield (cmd, (name, x, y, int(instance_id), 0, cel_idx))
             else:
                 yield (cmd, (name, x, y, int(instance_id), cel_idx))
+            continue
+        if op == OP_MOVE_Z:
+            tail = struct.calcsize(_MOVE_Z_TAIL)
+            if offset + tail > n:
+                raise ValueError("truncated move_sprite+z record")
+            x, y, instance_id, cel_b, z_index = struct.unpack(
+                _MOVE_Z_TAIL, binary_data[offset : offset + tail]
+            )
+            offset += tail
+            cel_idx = None if cel_b == 255 else int(cel_b)
+            yield (
+                "move_sprite",
+                (name, x, y, int(instance_id), cel_idx, int(z_index)),
+            )
             continue
         raise ValueError(f"unknown sprite_batch op code: {op}")
 

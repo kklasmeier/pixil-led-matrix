@@ -1,0 +1,91 @@
+# Lava Lamp
+# Heat-driven metaball blobs. Blobs heat up near the base and rise, cool near
+# the top and sink. Color drifts slowly and warms toward the bottom.
+# Run: ./run main/Lava_Lamp
+
+v_n = 7
+v_t = 0
+v_hue_phase = 0
+v_hue = 20
+
+create_array(v_px, v_n, numeric)
+create_array(v_py, v_n, numeric)
+create_array(v_vy, v_n, numeric)
+create_array(v_r, v_n, numeric)
+create_array(v_heat, v_n, numeric)
+create_array(v_ph, v_n, numeric)
+create_array(v_amp, v_n, numeric)
+create_array(v_spd, v_n, numeric)
+
+# Seed blobs spread through the lamp with random sizes and sway
+for v_i in (0, v_n - 1, 1)
+    v_px[v_i] = random(20, 44, 1)
+    v_py[v_i] = random(8, 52, 1)
+    v_vy[v_i] = 0
+    v_r[v_i] = random(4, 8, 1)
+    v_heat[v_i] = random(0, 1, 2)
+    v_ph[v_i] = random(0, 6, 2)
+    v_amp[v_i] = random(6, 16, 1)
+    v_spd[v_i] = random(0.3, 0.9, 2)
+endfor v_i
+
+field_program lava {
+    size 64
+    sites v_px, v_py
+    weights v_r
+    mode formula
+    value {
+        v_sum = sum_sites((weight * weight) / max(dist2, 1))
+    }
+    plot_if v_sum > 1 and grid_x > 12 and grid_x < 51 and grid_y > 2 and grid_y < 56
+    color clamp(v_hue + grid_y * 0.3 + min(v_sum, 3) * 4, 1, 99)
+    opacity min(45 + v_sum * 22, 100)
+}
+
+fps(30)
+clear()
+
+while true then
+    v_t = v_t + 0.033
+    v_hue_phase = v_hue_phase + 0.004
+    v_hue = 25 + sin(v_hue_phase) * 22
+
+    # Physics: heat near the base, cool near the top, buoyancy follows heat
+    for v_i in (0, v_n - 1, 1)
+        if v_py[v_i] > 46 then
+            v_heat[v_i] = min(v_heat[v_i] + 0.012, 1)
+        endif
+        if v_py[v_i] < 18 then
+            v_heat[v_i] = max(v_heat[v_i] - 0.012, 0)
+        endif
+
+        # y grows downward, so hot (heat > 0.5) gives negative acceleration (rise)
+        v_vy[v_i] = (v_vy[v_i] + (0.5 - v_heat[v_i]) * 0.03) * 0.97
+        v_py[v_i] = v_py[v_i] + v_vy[v_i]
+
+        if v_py[v_i] < 4 then
+            v_py[v_i] = 4
+            v_vy[v_i] = v_vy[v_i] * -0.3
+        endif
+        if v_py[v_i] > 54 then
+            v_py[v_i] = 54
+            v_vy[v_i] = v_vy[v_i] * -0.3
+        endif
+
+        # Lazy horizontal sway inside the glass
+        v_px[v_i] = 32 + sin(v_t * v_spd[v_i] + v_ph[v_i]) * v_amp[v_i]
+    endfor v_i
+
+    begin_frame
+        # Faint glow behind the wax
+        draw_rectangle(13, 3, 38, 53, navy, 14, true)
+        field_render(lava)
+        # Lamp base and cap
+        draw_rectangle(10, 58, 44, 6, dark_gray, 70, true)
+        draw_rectangle(14, 56, 36, 2, gray, 60, true)
+        draw_rectangle(14, 0, 36, 3, dark_gray, 70, true)
+        # Glass edges
+        draw_line(12, 3, 12, 56, silver, 25)
+        draw_line(51, 3, 51, 56, silver, 25)
+    end_frame
+endwhile

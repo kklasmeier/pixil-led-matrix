@@ -1,0 +1,577 @@
+# Nuclear Fission
+# Three scenes that repeat forever.
+#
+# Scene 1, "U-235 Fission": a slow neutron strikes a uranium-235 nucleus. The
+# nucleus absorbs it (becoming unstable U-236), wobbles, stretches along a
+# random axis into a dumbbell, and splits. Each run picks a different real
+# fission pair (Ba-141/Kr-92, Xe-140/Sr-94, Cs-137/Rb-96, Te-134/Zr-100) with
+# its own colors and neutron count. The heavier fragment recoils more slowly
+# than the lighter one, as momentum conservation says it should.
+#
+# Scene 2, "Chain Reaction": a lattice of U-235 fuel atoms with three control
+# rods. The fuel heats up as it fissions, glowing green, yellow, orange, red,
+# then white, with a temperature gauge at the bottom. The rods are slowly
+# withdrawn (subcritical, critical, supercritical). If it gets too hot the
+# rods SCRAM back in automatically.
+#
+# Scene 3, "Uncontrolled": the same lattice with no rods at all. One fission
+# in the middle sets off a wave of fissions that spreads outward, the core
+# heats up and the screen ends in a white flash.
+#
+# Run: ./run main/Nuclear_Fission
+
+# ---------------- Arrays ----------------
+# Scene 1: 36 stylized nucleons
+create_array(v_ox, 36, numeric)
+create_array(v_oy, 36, numeric)
+create_array(v_pj, 36, numeric)
+create_array(v_pb, 36, numeric)
+create_array(v_qx, 36, numeric)
+create_array(v_qy, 36, numeric)
+create_array(v_ig, 36, numeric)
+create_array(v_ic, 36, numeric)
+
+# Free neutrons (shared by all scenes)
+create_array(v_nex, 48, numeric)
+create_array(v_ney, 48, numeric)
+create_array(v_nvx, 48, numeric)
+create_array(v_nvy, 48, numeric)
+create_array(v_nal, 48, numeric)
+
+# Scenes 2 and 3: 7x5 fuel lattice (0 fuel, 1 fissioning, 2 spent)
+create_array(v_fs, 35, numeric)
+create_array(v_ft, 35, numeric)
+
+v_cx = 32
+v_cy = 36
+v_slot = 0
+v_fiss = 0
+v_temp = 0
+v_lastp = -1
+
+# ---------------- Procedures ----------------
+def spawn_n {
+    v_nex[v_slot] = v_s_x
+    v_ney[v_slot] = v_s_y
+    v_nvx[v_slot] = v_s_vx
+    v_nvy[v_slot] = v_s_vy
+    v_nal[v_slot] = 1
+    v_slot = fmod(v_slot + 1, 48)
+}
+
+# Fission of lattice atom v_fi: flash, count it, add heat, release 2 or 3 neutrons
+def do_fission {
+    v_fs[v_fi] = 1
+    v_ft[v_fi] = 10
+    v_fiss = v_fiss + 1
+    v_temp = min(100, v_temp + 5)
+    v_fx = 5 + fmod(v_fi, 7) * 9
+    v_fy = 18 + floor(v_fi / 7) * 9
+    v_nsp = random(2, 3, 0)
+    for v_q in (1, v_nsp, 1)
+        v_fa = random(0, 6.28, 2)
+        v_fsp = random(1.1, 1.6, 2)
+        v_s_x = v_fx
+        v_s_y = v_fy
+        v_s_vx = cos(v_fa) * v_fsp
+        v_s_vy = sin(v_fa) * v_fsp
+        call spawn_n
+    endfor v_q
+}
+
+# Fission products for scene 1: names, colors, neutrons released, heavy-fragment size
+def load_prod {
+    if v_prod == 0 then
+        v_nm0 = "Ba-141"
+        v_nm1 = "Kr-92"
+        v_c0 = "orange"
+        v_c1 = "magenta"
+        v_nrel = 3
+        v_nstr = "+3n"
+        v_nh = 22
+    elseif v_prod == 1 then
+        v_nm0 = "Xe-140"
+        v_nm1 = "Sr-94"
+        v_c0 = "gold"
+        v_c1 = "violet"
+        v_nrel = 2
+        v_nstr = "+2n"
+        v_nh = 21
+    elseif v_prod == 2 then
+        v_nm0 = "Cs-137"
+        v_nm1 = "Rb-96"
+        v_c0 = "pink"
+        v_c1 = "teal"
+        v_nrel = 3
+        v_nstr = "+3n"
+        v_nh = 21
+    else
+        v_nm0 = "Te-134"
+        v_nm1 = "Zr-100"
+        v_c0 = "salmon"
+        v_c1 = "mint"
+        v_nrel = 2
+        v_nstr = "+2n"
+        v_nh = 20
+    endif
+}
+
+fps(30)
+clear()
+
+while true then
+    # ======================================================================
+    # SCENE 1: single U-235 fission close-up
+    # ======================================================================
+
+    # Pick a fission pair (never the same twice in a row)
+    v_prod = random(0, 3, 0)
+    while v_prod == v_lastp then
+        v_prod = random(0, 3, 0)
+    endwhile
+    v_lastp = v_prod
+    call load_prod
+
+    # Random fission axis (heavy fragment goes to a random side)
+    v_fax = random(-0.9, 0.9, 2)
+    v_flip = random(0, 1, 0)
+    if v_flip == 1 then
+        v_fax = v_fax + 3.14159
+    endif
+    v_cax = cos(v_fax)
+    v_sax = sin(v_fax)
+
+    # Nucleon layout: sunflower spiral, ~14 protons
+    for v_i in (0, 35, 1)
+        v_ang = v_i * 2.39996
+        v_rad = 1.35 * sqrt(v_i + 0.5)
+        v_ox[v_i] = cos(v_ang) * v_rad
+        v_oy[v_i] = sin(v_ang) * v_rad
+        v_ic[v_i] = floor((v_i + 1) * 14 / 36) - floor(v_i * 14 / 36)
+        v_pj[v_i] = v_ox[v_i] * v_cax + v_oy[v_i] * v_sax
+        v_pb[v_i] = 0 - v_ox[v_i] * v_sax + v_oy[v_i] * v_cax
+    endfor v_i
+
+    # Split into two groups along the axis: lowest v_nh projections = heavy fragment
+    for v_i in (0, 35, 1)
+        v_rank = 0
+        for v_j in (0, 35, 1)
+            if v_pj[v_j] < v_pj[v_i] then
+                v_rank = v_rank + 1
+            endif
+        endfor v_j
+        if v_rank < v_nh then
+            v_ig[v_i] = 0
+        else
+            v_ig[v_i] = 1
+        endif
+    endfor v_i
+
+    # Packed layout for each fragment (round blobs centered on their group)
+    v_gc0 = 0
+    v_gc1 = 0
+    for v_i in (0, 35, 1)
+        if v_ig[v_i] == 0 then
+            v_j = v_gc0
+            v_gc0 = v_gc0 + 1
+        else
+            v_j = v_gc1
+            v_gc1 = v_gc1 + 1
+        endif
+        v_ang = v_j * 2.39996
+        v_rad = 1.3 * sqrt(v_j + 0.5)
+        v_qx[v_i] = cos(v_ang) * v_rad
+        v_qy[v_i] = sin(v_ang) * v_rad
+    endfor v_i
+
+    for v_i in (0, 47, 1)
+        v_nal[v_i] = 0
+    endfor v_i
+
+    # Neutron comes in at a random height; absorbed when it reaches the nucleus edge
+    v_off = random(-4, 4, 0)
+    v_absx = v_cx - sqrt(64 - v_off * v_off)
+    v_t0 = round((v_absx - 1) / 0.5)
+    v_t1 = v_t0 + 60
+    v_t2 = v_t1 + 30
+    v_aend = v_t2 + 190
+    v_g1 = 0
+    v_g2 = 0
+
+    for v_t in (0, v_aend, 1)
+        if v_t < v_t0 then
+            v_ph = 0
+        elseif v_t < v_t1 then
+            v_ph = 1
+        elseif v_t < v_t2 then
+            v_ph = 2
+        else
+            v_ph = 3
+        endif
+
+        # The moment of fission: neutrons and 2 gamma rays
+        if v_t == v_t2 then
+            v_a0 = random(0, 6.28, 2)
+            for v_i in (0, v_nrel - 1, 1)
+                v_nex[v_i] = v_cx
+                v_ney[v_i] = v_cy
+                v_nvx[v_i] = cos(v_a0 + v_i * 6.283 / v_nrel) * 1.5
+                v_nvy[v_i] = sin(v_a0 + v_i * 6.283 / v_nrel) * 1.5
+                v_nal[v_i] = 1
+            endfor v_i
+            v_g1 = random(0, 6.28, 2)
+            v_g2 = random(0, 6.28, 2)
+        endif
+
+        for v_i in (0, 2, 1)
+            if v_nal[v_i] == 1 then
+                v_nex[v_i] = v_nex[v_i] + v_nvx[v_i]
+                v_ney[v_i] = v_ney[v_i] + v_nvy[v_i]
+                if v_nex[v_i] < 0 or v_nex[v_i] > 63 or v_ney[v_i] < 0 or v_ney[v_i] > 63 then
+                    v_nal[v_i] = 0
+                endif
+            endif
+        endfor v_i
+
+        # Deformation parameters for this phase (stretch is along the fission axis)
+        v_scx = 1
+        v_scy = 1
+        v_w = 0
+        v_d = 0
+        v_jit = 0.3
+        if v_ph == 1 then
+            v_amp = (v_t - v_t0) / 60
+            v_s = 0.3 * v_amp * sin((v_t - v_t0) * 0.4)
+            v_scx = 1 + v_s
+            v_scy = 1 - v_s * 0.6
+            v_jit = 0.3 + v_amp * 0.4
+        elseif v_ph == 2 then
+            v_u = (v_t - v_t1) / 30
+            v_scx = 1 + 0.45 * v_u
+            v_scy = 1 - 0.3 * v_u
+            v_w = v_u * v_u
+            v_d = v_u * v_u * 8
+            v_jit = 0.2
+        elseif v_ph == 3 then
+            v_w = 1
+            v_d = min(8 + (v_t - v_t2) * 0.3, 20)
+            v_jit = 0.15
+        endif
+
+        begin_frame
+            draw_text(1, 1, "U-235 Fission", tiny64_font, 5, white, 100)
+            if v_ph == 0 then
+                draw_text(1, 8, "n + U-235", tiny64_font, 5, light_gray, 80)
+            elseif v_ph < 3 then
+                draw_text(1, 8, "U-236*", tiny64_font, 5, yellow, 100)
+            else
+                draw_text(1, 8, v_nm0, tiny64_font, 5, v_c0, 100)
+                draw_text(26, 8, v_nm1, tiny64_font, 5, v_c1, 100)
+                draw_text(51, 8, v_nstr, tiny64_font, 5, white, 100)
+                draw_text(1, 59, "~200 MeV", tiny64_font, 5, yellow, 100)
+            endif
+
+            # Incoming slow neutron with a short tail
+            if v_ph == 0 then
+                v_inx = 1 + v_t * 0.5
+                v_iny = v_cy + v_off
+                draw_circle(round(v_inx), round(v_iny), 1, white, 100, true)
+                plot(round(v_inx - 2), round(v_iny), cyan, 55)
+                plot(round(v_inx - 3), round(v_iny), cyan, 30)
+            endif
+
+            # Nucleus / fragments (heavy fragment recoils less than the light one)
+            for v_i in (0, 35, 1)
+                if v_ig[v_i] == 0 then
+                    v_dsh = 0 - 0.8 * v_d
+                else
+                    v_dsh = 1.2 * v_d
+                endif
+                v_aa = v_pj[v_i] * v_scx
+                v_bb = v_pb[v_i] * v_scy
+                v_x1 = v_cx + (1 - v_w) * (v_aa * v_cax - v_bb * v_sax) + v_w * v_qx[v_i] + v_dsh * v_cax + random(0 - v_jit, v_jit, 1)
+                v_y1 = v_cy + (1 - v_w) * (v_aa * v_sax + v_bb * v_cax) + v_w * v_qy[v_i] + v_dsh * v_sax + random(0 - v_jit, v_jit, 1)
+                if v_ph >= 2 then
+                    if v_ig[v_i] == 0 then
+                        v_col = v_c0
+                    else
+                        v_col = v_c1
+                    endif
+                else
+                    if v_ic[v_i] == 1 then
+                        v_col = "red"
+                    else
+                        v_col = "sky_blue"
+                    endif
+                endif
+                draw_circle(round(v_x1), round(v_y1), 1, v_col, 100, true)
+            endfor v_i
+
+            # Energy flash and gamma rays just after the split
+            if v_ph == 3 then
+                v_el = v_t - v_t2
+                if v_el < 12 then
+                    v_fr = round(2 + v_el * 2.2)
+                    v_fint = 100 - v_el * 8
+                    draw_circle(v_cx, v_cy, v_fr, white, v_fint, false)
+                    draw_circle(v_cx, v_cy, round(v_fr * 0.6), yellow, v_fint, false)
+                endif
+                if v_el < 14 then
+                    v_r1 = 4 + v_el * 3
+                    v_r2 = v_r1 + 5
+                    v_gx1 = v_cx + cos(v_g1) * v_r1
+                    v_gy1 = v_cy + sin(v_g1) * v_r1
+                    v_gx2 = v_cx + cos(v_g1) * v_r2
+                    v_gy2 = v_cy + sin(v_g1) * v_r2
+                    if v_gx2 >= 0 and v_gx2 <= 63 and v_gy2 >= 0 and v_gy2 <= 63 then
+                        draw_line(round(v_gx1), round(v_gy1), round(v_gx2), round(v_gy2), white, 90)
+                    endif
+                    v_gx1 = v_cx + cos(v_g2) * v_r1
+                    v_gy1 = v_cy + sin(v_g2) * v_r1
+                    v_gx2 = v_cx + cos(v_g2) * v_r2
+                    v_gy2 = v_cy + sin(v_g2) * v_r2
+                    if v_gx2 >= 0 and v_gx2 <= 63 and v_gy2 >= 0 and v_gy2 <= 63 then
+                        draw_line(round(v_gx1), round(v_gy1), round(v_gx2), round(v_gy2), white, 90)
+                    endif
+                endif
+            endif
+
+            # Released neutrons
+            for v_i in (0, 2, 1)
+                if v_nal[v_i] == 1 then
+                    draw_circle(round(v_nex[v_i]), round(v_ney[v_i]), 1, white, 100, true)
+                    plot(round(v_nex[v_i] - v_nvx[v_i] * 1.5), round(v_ney[v_i] - v_nvy[v_i] * 1.5), cyan, 55)
+                    plot(round(v_nex[v_i] - v_nvx[v_i] * 3), round(v_ney[v_i] - v_nvy[v_i] * 3), cyan, 30)
+                endif
+            endfor v_i
+        end_frame
+    endfor v_t
+
+    # ======================================================================
+    # SCENES 2 and 3: chain reaction (run 0 = controlled, run 1 = uncontrolled)
+    # ======================================================================
+    for v_run in (0, 1, 1)
+        for v_i in (0, 34, 1)
+            v_fs[v_i] = 0
+            v_ft[v_i] = 0
+        endfor v_i
+        for v_i in (0, 47, 1)
+            v_nal[v_i] = 0
+        endfor v_i
+        v_fiss = 0
+        v_slot = 0
+        v_nalive = 0
+        v_temp = 0
+        v_scram = 0
+        v_rfs = 0
+
+        if v_run == 0 then
+            v_len = 600
+            v_pabs = 0.3
+            v_title = "Chain Reaction"
+        else
+            v_len = 270
+            v_pabs = 0.5
+            v_title = "Uncontrolled"
+        endif
+
+        for v_t in (0, v_len, 1)
+            # Control rods: controlled run follows a schedule (in, slowly out, hold,
+            # back in) and SCRAMs if too hot; the uncontrolled run has no rods at all
+            if v_run == 0 then
+                if v_t < 60 then
+                    v_rf = 0.9
+                elseif v_t < 260 then
+                    v_rf = 0.9 - 0.85 * (v_t - 60) / 200
+                elseif v_t < 400 then
+                    v_rf = 0.05
+                elseif v_t < 480 then
+                    v_rf = 0.05 + 0.95 * (v_t - 400) / 80
+                else
+                    v_rf = 1
+                endif
+                if v_temp > 85 then
+                    v_scram = 1
+                endif
+                if v_scram == 1 then
+                    v_rfs = min(1, v_rfs + 0.05)
+                    v_rf = max(v_rf, v_rfs)
+                endif
+            else
+                v_rf = 0
+            endif
+            v_rh = round(v_rf * 44)
+            v_rbot = 14 + v_rh
+
+            # Uncontrolled run: first fission in the middle of the lattice
+            if v_run == 1 and v_t == 3 then
+                v_fi = 17
+                call do_fission
+            endif
+
+            # A stray neutron restarts things if the reactor has gone quiet
+            if v_nalive == 0 and v_t < 440 then
+                if fmod(v_t, 30) == 0 then
+                    if v_run == 0 or v_t >= 30 then
+                        v_s_x = 0
+                        v_s_y = random(18, 54, 0)
+                        v_s_vx = 1.4
+                        v_s_vy = random(-0.3, 0.3, 1)
+                        call spawn_n
+                    endif
+                endif
+            endif
+
+            # Move neutrons; walls and rods absorb, fuel atoms may fission
+            v_nalive = 0
+            for v_i in (0, 47, 1)
+                if v_nal[v_i] == 1 then
+                    v_nex[v_i] = v_nex[v_i] + v_nvx[v_i]
+                    v_ney[v_i] = v_ney[v_i] + v_nvy[v_i]
+                    if v_nex[v_i] < 0 or v_nex[v_i] > 63 or v_ney[v_i] < 14 or v_ney[v_i] > 58 then
+                        v_nal[v_i] = 0
+                    endif
+                endif
+
+                if v_nal[v_i] == 1 then
+                    for v_r in (0, 2, 1)
+                        v_adx = abs(v_nex[v_i] - (19 + v_r * 18))
+                        if v_adx < 1.2 and v_ney[v_i] < v_rbot then
+                            v_nal[v_i] = 0
+                        endif
+                    endfor v_r
+                endif
+
+                if v_nal[v_i] == 1 then
+                    v_col2 = round((v_nex[v_i] - 5) / 9)
+                    v_row2 = round((v_ney[v_i] - 18) / 9)
+                    if v_col2 >= 0 and v_col2 <= 6 and v_row2 >= 0 and v_row2 <= 4 then
+                        v_fi = v_row2 * 7 + v_col2
+                        if v_fs[v_fi] == 0 then
+                            v_ddx = v_nex[v_i] - (5 + v_col2 * 9)
+                            v_ddy = v_ney[v_i] - (18 + v_row2 * 9)
+                            v_dist2 = v_ddx * v_ddx + v_ddy * v_ddy
+                            if v_dist2 < 12 then
+                                if random(0, 1, 2) < v_pabs then
+                                    v_nal[v_i] = 0
+                                    call do_fission
+                                endif
+                            endif
+                        endif
+                    endif
+                endif
+
+                if v_nal[v_i] == 1 then
+                    v_nalive = v_nalive + 1
+                endif
+            endfor v_i
+
+            # Fission flash timers, and the core slowly cools
+            for v_i in (0, 34, 1)
+                if v_fs[v_i] == 1 then
+                    v_ft[v_i] = v_ft[v_i] - 1
+                    if v_ft[v_i] <= 0 then
+                        v_fs[v_i] = 2
+                    endif
+                endif
+            endfor v_i
+            v_temp = v_temp * 0.985
+
+            # Reactor status label
+            if v_run == 1 then
+                v_stat = "Runaway!"
+                v_scol = "red"
+            elseif v_scram == 1 then
+                v_stat = "SCRAM!"
+                v_scol = "red"
+            elseif v_rf > 0.75 then
+                v_stat = "Subcritical"
+                v_scol = "sky_blue"
+            elseif v_rf > 0.3 then
+                v_stat = "Critical"
+                v_scol = "yellow"
+            else
+                v_stat = "Supercritical"
+                v_scol = "red"
+            endif
+
+            # Fuel glow color follows core temperature
+            if v_temp < 30 then
+                v_fcol = "lime"
+            elseif v_temp < 55 then
+                v_fcol = "yellow"
+            elseif v_temp < 80 then
+                v_fcol = "orange"
+            elseif v_temp < 90 then
+                v_fcol = "red"
+            else
+                v_fcol = "white"
+            endif
+
+            begin_frame
+                # Red heat glow behind the core
+                if v_temp > 15 then
+                    draw_rectangle(0, 14, 64, 45, red, v_temp * 0.25, true)
+                endif
+
+                draw_text(1, 1, v_title, tiny64_font, 5, white, 100)
+                draw_text(1, 8, v_stat, tiny64_font, 5, v_scol, 100)
+                draw_text(1, 59, "Fissions", tiny64_font, 5, light_gray, 70)
+                draw_text(35, 59, v_fiss, tiny64_font, 5, yellow, 100)
+
+                # Temperature gauge
+                draw_text(47, 59, "T", tiny64_font, 5, light_gray, 70)
+                v_tw = round(v_temp * 0.11)
+                if v_tw > 0 then
+                    draw_rectangle(52, 60, v_tw, 3, v_fcol, 100, true)
+                endif
+
+                # Fuel lattice
+                for v_i in (0, 34, 1)
+                    v_ax = 5 + fmod(v_i, 7) * 9
+                    v_ay = 18 + floor(v_i / 7) * 9
+                    if v_fs[v_i] == 0 then
+                        draw_circle(v_ax, v_ay, 3, v_fcol, 85, true)
+                    elseif v_fs[v_i] == 1 then
+                        v_rr = round(3 + (10 - v_ft[v_i]) * 0.5)
+                        draw_circle(v_ax, v_ay, 3, white, 100, true)
+                        draw_circle(v_ax, v_ay, v_rr, orange, v_ft[v_i] * 10, false)
+                    else
+                        draw_circle(v_ax - 2, v_ay, 1, orange, 45, true)
+                        draw_circle(v_ax + 2, v_ay, 1, magenta, 45, true)
+                    endif
+                endfor v_i
+
+                # Control rods
+                if v_rh > 0 then
+                    for v_r in (0, 2, 1)
+                        v_rxd = 18 + v_r * 18
+                        draw_rectangle(v_rxd, 14, 2, v_rh, gray, 100, true)
+                        draw_rectangle(v_rxd, 13 + v_rh, 2, 2, yellow, 100, true)
+                    endfor v_r
+                endif
+
+                # Neutrons
+                for v_i in (0, 47, 1)
+                    if v_nal[v_i] == 1 then
+                        plot(round(v_nex[v_i]), round(v_ney[v_i]), white, 100)
+                        plot(round(v_nex[v_i] - v_nvx[v_i]), round(v_ney[v_i] - v_nvy[v_i]), cyan, 50)
+                    endif
+                endfor v_i
+
+                # Uncontrolled run ends in a white flash that fades out
+                if v_run == 1 then
+                    v_e = v_t - (v_len - 40)
+                    if v_e > 0 then
+                        if v_e < 20 then
+                            v_flint = v_e * 5
+                        else
+                            v_flint = (40 - v_e) * 5
+                        endif
+                        draw_rectangle(0, 0, 64, 64, white, v_flint, true)
+                    endif
+                endif
+            end_frame
+        endfor v_t
+    endfor v_run
+endwhile

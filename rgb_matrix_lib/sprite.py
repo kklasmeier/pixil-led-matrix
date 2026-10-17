@@ -878,12 +878,28 @@ class SpriteManager:
               Level.DEBUG, Component.SPRITE)
         return instance
 
+    def iter_draw_order(self) -> List[Tuple[str, int]]:
+        """
+        Return (name, instance_id) pairs sorted for compositing.
+
+        Lower z_index is drawn first (behind). Ties keep creation order.
+        """
+        indexed: List[Tuple[int, int, str, int]] = []
+        for creation_idx, (name, instance_id) in enumerate(self.z_order):
+            instance = None
+            if name in self.instances:
+                instance = self.instances[name].get(instance_id)
+            z = instance.z_index if instance is not None else 0
+            indexed.append((z, creation_idx, name, instance_id))
+        indexed.sort()
+        return [(name, instance_id) for _z, _i, name, instance_id in indexed]
+
     def get_overlapping_sprites(self, cells: List[Tuple[int, int]]) -> List[SpriteInstance]:
         """Get all visible sprite instances that overlap given grid cells in z-order."""
         overlapping = []
         cells_set = set(cells)
         
-        for name, instance_id in self.z_order:
+        for name, instance_id in self.iter_draw_order():
             if name in self.instances and instance_id in self.instances[name]:
                 instance = self.instances[name][instance_id]
                 if instance.visible and instance.occupied_cells.intersection(cells_set):

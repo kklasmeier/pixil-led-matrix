@@ -1,35 +1,37 @@
-"""Backward-compatible slime_step() → agent_chemotaxis.
-
-New scripts should call agent_chemotaxis(...) directly with explicit arrays.
-"""
+"""Legacy slime_step() wrapper around agent_chemotaxis."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from .agent_engine import agent_chemotaxis
-from .array_manager import PixilArray
-from .grid_expr import resolve_scalar
+from .particle_commands import require_numeric_array
 
 
-def _get_array(variables: Any, name: str) -> PixilArray:
-    arr = variables.get(name) if hasattr(variables, "get") else variables[name]
-    if not isinstance(arr, PixilArray):
-        raise ValueError(f"{name} is not an array")
-    return arr
+def run_slime_step(variables: Any) -> None:
+    """Call agent_chemotaxis with the fixed Slime_Mold array names."""
+    x = require_numeric_array(variables, "v_x", "slime_step", "x")
+    y = require_numeric_array(variables, "v_y", "slime_step", "y")
+    heading = require_numeric_array(variables, "v_dir", "slime_step", "heading")
+    field = require_numeric_array(variables, "v_phero", "slime_step", "field")
 
+    def _scalar(name: str, default: float) -> float:
+        try:
+            return float(variables.get(name))
+        except Exception:
+            return default
 
-def run_slime_step(variables: Any, append_draw=None) -> None:
-    """Legacy fixed-name wrapper around agent_chemotaxis."""
+    size = int(_scalar("v_size", 32))
+    sensor_dist = _scalar("v_sensor_dist", 5.0)
+    step = _scalar("v_step", 1.0)
+    deposit = _scalar("v_deposit", 0.55)
+    n = int(_scalar("v_n", x.size))
+
     agent_chemotaxis(
-        _get_array(variables, "v_x"),
-        _get_array(variables, "v_y"),
-        _get_array(variables, "v_dir"),
-        _get_array(variables, "v_phero"),
-        int(resolve_scalar("v_size", variables)),
-        sensor_dist=float(resolve_scalar("v_sensor_dist", variables)),
-        step=float(resolve_scalar("v_step", variables)),
-        deposit=float(resolve_scalar("v_deposit", variables)),
-        count=int(resolve_scalar("v_n", variables)),
-        wrap=1,
+        x, y, heading, field, size,
+        sensor_dist=sensor_dist,
+        step=step,
+        deposit=deposit,
+        count=n,
+        wrap=True,
     )

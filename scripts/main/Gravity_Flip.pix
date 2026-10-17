@@ -1,0 +1,321 @@
+# Gravity Flip
+# Tiny ball bearings drop and settle, then gravity snaps to a new wall every
+# few seconds. Palette reshuffles every few flips.
+# Physics stays in particle_* kernels; Pixil only owns spawn, flips, and draw.
+
+throttle(0)
+fps(33)
+
+v_count = 100
+v_radius = 0.55
+v_gravity = 0.16
+v_air = 0.998
+v_wall_bounce = 0.78
+v_pair_bounce = 0.72
+v_max_speed = 2.8
+v_sleep_speed = 0.04
+
+v_left = 0
+v_right = 63
+v_top = 0
+v_bottom = 63
+# Hard ceiling for plotted pixels so nothing draws on the double floor line.
+v_floor_limit = 61
+
+# Gravity direction: 0=down, 1=up, 2=left, 3=right
+v_dir = 0
+v_ax = 0
+v_ay = v_gravity
+
+# Hard-stop after this many physics frames so micro-jitter never delays the flip.
+v_cycle = 0
+v_max_cycles = 300
+v_flip_count = 0
+v_palette_every = 3
+v_palette_id = 0
+# On 180° flips, stuck bearings peel off over this many frames.
+v_stick_max = 55
+
+create_array(v_x, v_count, numeric)
+create_array(v_y, v_count, numeric)
+create_array(v_vx, v_count, numeric)
+create_array(v_vy, v_count, numeric)
+create_array(v_active, v_count, numeric)
+create_array(v_stick, v_count, numeric)
+create_array(v_wall_hit, v_count, numeric)
+create_array(v_pair_hit, v_count, numeric)
+create_array(v_color, v_count, string)
+create_array(v_intensity, v_count, numeric)
+
+create_array(v_pal, 4, string)
+
+def pick_palette {
+    v_palette_id = random(0, 5, 0)
+    if v_palette_id == 0 then
+        v_pal[0] = "silver"
+        v_pal[1] = "light_gray"
+        v_pal[2] = "white"
+        v_pal[3] = "gray"
+    elseif v_palette_id == 1 then
+        v_pal[0] = "gold"
+        v_pal[1] = "yellow"
+        v_pal[2] = "orange"
+        v_pal[3] = "tan"
+    elseif v_palette_id == 2 then
+        v_pal[0] = "cyan"
+        v_pal[1] = "sky_blue"
+        v_pal[2] = "azure"
+        v_pal[3] = "white"
+    elseif v_palette_id == 3 then
+        v_pal[0] = "magenta"
+        v_pal[1] = "pink"
+        v_pal[2] = "violet"
+        v_pal[3] = "rose"
+    elseif v_palette_id == 4 then
+        v_pal[0] = "red"
+        v_pal[1] = "orange"
+        v_pal[2] = "gold"
+        v_pal[3] = "crimson"
+    else
+        v_pal[0] = "lime"
+        v_pal[1] = "green"
+        v_pal[2] = "mint"
+        v_pal[3] = "teal"
+    endif
+}
+
+def colorize {
+    for v_i in (0, v_count - 1, 1)
+        v_ci = random(0, 3, 0)
+        v_color[v_i] = v_pal[v_ci]
+        v_intensity[v_i] = random(70, 100, 0)
+    endfor v_i
+}
+
+def spawn_drop {
+    # Scatter bearings across the full top band (pixels 0-63).
+    for v_i in (0, v_count - 1, 1)
+        v_x[v_i] = random(0, 63, 1)
+        v_y[v_i] = random(2, 14, 1)
+        v_vx[v_i] = random(-0.25, 0.25, 2)
+        v_vy[v_i] = random(0, 0.35, 2)
+        v_active[v_i] = 1
+        v_stick[v_i] = 0
+        v_wall_hit[v_i] = 0
+        v_pair_hit[v_i] = 0
+    endfor v_i
+}
+
+def apply_direction {
+    # Radius insets every wall, so open sides are padded outward by v_radius
+    # so centres can reach 0 and 63 (first/last pixel). Floor side stays inset.
+    v_pad = v_radius
+    if v_dir == 0 then
+        v_ax = 0
+        v_ay = v_gravity
+        v_left = 0 - v_pad
+        v_right = 63 + v_pad
+        v_top = 0 - v_pad
+        v_bottom = 61.5
+        v_floor_limit = 61
+    elseif v_dir == 1 then
+        v_ax = 0
+        v_ay = -v_gravity
+        v_left = 0 - v_pad
+        v_right = 63 + v_pad
+        v_top = 1.5
+        v_bottom = 63 + v_pad
+        v_floor_limit = 2
+    elseif v_dir == 2 then
+        v_ax = -v_gravity
+        v_ay = 0
+        v_left = 1.5
+        v_right = 63 + v_pad
+        v_top = 0 - v_pad
+        v_bottom = 63 + v_pad
+        v_floor_limit = 2
+    else
+        v_ax = v_gravity
+        v_ay = 0
+        v_left = 0 - v_pad
+        v_right = 61.5
+        v_top = 0 - v_pad
+        v_bottom = 63 + v_pad
+        v_floor_limit = 61
+    endif
+}
+
+def contain_floor {
+    # Safety after circle collisions, which can shove centres past the wall.
+    for v_i in (0, v_count - 1, 1)
+        if v_dir == 0 then
+            if v_y[v_i] > v_floor_limit then
+                v_y[v_i] = v_floor_limit
+                if v_vy[v_i] > 0 then
+                    v_vy[v_i] = 0
+                endif
+            endif
+        elseif v_dir == 1 then
+            if v_y[v_i] < v_floor_limit then
+                v_y[v_i] = v_floor_limit
+                if v_vy[v_i] < 0 then
+                    v_vy[v_i] = 0
+                endif
+            endif
+        elseif v_dir == 2 then
+            if v_x[v_i] < v_floor_limit then
+                v_x[v_i] = v_floor_limit
+                if v_vx[v_i] < 0 then
+                    v_vx[v_i] = 0
+                endif
+            endif
+        else
+            if v_x[v_i] > v_floor_limit then
+                v_x[v_i] = v_floor_limit
+                if v_vx[v_i] > 0 then
+                    v_vx[v_i] = 0
+                endif
+            endif
+        endif
+    endfor v_i
+}
+
+def freeze_bearings {
+    for v_i in (0, v_count - 1, 1)
+        v_vx[v_i] = 0
+        v_vy[v_i] = 0
+        v_stick[v_i] = 0
+        v_active[v_i] = 1
+    endfor v_i
+}
+
+def release_stuck {
+    # Peel stuck bearings off over time after a 180° flip.
+    for v_i in (0, v_count - 1, 1)
+        if v_stick[v_i] > 0 then
+            v_stick[v_i] = v_stick[v_i] - 1
+            if v_stick[v_i] == 0 then
+                v_active[v_i] = 1
+                v_vx[v_i] = v_ax * 2.2 + random(-0.12, 0.12, 2)
+                v_vy[v_i] = v_ay * 2.2 + random(-0.12, 0.12, 2)
+            endif
+        endif
+    endfor v_i
+}
+
+def flip_gravity {
+    v_old = v_dir
+    v_new = random(0, 3, 0)
+    if v_new == v_dir then
+        v_new = v_new + 1
+        if v_new > 3 then
+            v_new = 0
+        endif
+    endif
+
+    # Opposite wall: down<->up or left<->right.
+    v_is_180 = 0
+    if v_old == 0 and v_new == 1 then
+        v_is_180 = 1
+    endif
+    if v_old == 1 and v_new == 0 then
+        v_is_180 = 1
+    endif
+    if v_old == 2 and v_new == 3 then
+        v_is_180 = 1
+    endif
+    if v_old == 3 and v_new == 2 then
+        v_is_180 = 1
+    endif
+
+    v_dir = v_new
+    call apply_direction
+
+    if v_is_180 == 1 then
+        # Stagger the peel: some drop now, others cling then release.
+        for v_i in (0, v_count - 1, 1)
+            v_stick[v_i] = random(0, v_stick_max, 0)
+            if v_stick[v_i] == 0 then
+                v_active[v_i] = 1
+                v_vx[v_i] = v_ax * 2.5 + random(-0.08, 0.08, 2)
+                v_vy[v_i] = v_ay * 2.5 + random(-0.08, 0.08, 2)
+            else
+                v_active[v_i] = 0
+                v_vx[v_i] = 0
+                v_vy[v_i] = 0
+            endif
+        endfor v_i
+    else
+        for v_i in (0, v_count - 1, 1)
+            v_stick[v_i] = 0
+            v_active[v_i] = 1
+            v_vx[v_i] = v_ax * 2.5 + random(-0.08, 0.08, 2)
+            v_vy[v_i] = v_ay * 2.5 + random(-0.08, 0.08, 2)
+        endfor v_i
+    endif
+
+    v_cycle = 0
+    v_flip_count = v_flip_count + 1
+    if v_flip_count >= v_palette_every then
+        v_flip_count = 0
+        call pick_palette
+        call colorize
+    endif
+}
+
+def draw_floor_hint {
+    # Bright double line edge-to-edge on the current floor wall.
+    if v_dir == 0 then
+        draw_line(0, 62, 63, 62, light_gray, 60)
+        draw_line(0, 63, 63, 63, white, 100)
+    elseif v_dir == 1 then
+        draw_line(0, 0, 63, 0, white, 100)
+        draw_line(0, 1, 63, 1, light_gray, 60)
+    elseif v_dir == 2 then
+        draw_line(0, 0, 0, 63, white, 100)
+        draw_line(1, 0, 1, 63, light_gray, 60)
+    else
+        draw_line(62, 0, 62, 63, light_gray, 60)
+        draw_line(63, 0, 63, 63, white, 100)
+    endif
+}
+
+def draw_bearings {
+    for v_i in (0, v_count - 1, 1)
+        mplot(int(v_x[v_i] + 0.5), int(v_y[v_i] + 0.5), v_color[v_i], v_intensity[v_i])
+    endfor v_i
+    mflush
+}
+
+call pick_palette
+call colorize
+call spawn_drop
+call apply_direction
+
+while 1 == 1 then
+    call release_stuck
+
+    # Integrate carries ax/ay, damping, sleep, and max_speed (no Pixil clamp loop).
+    # Stuck bearings stay inactive until release_stuck peels them off.
+    particle_integrate(v_x, v_y, v_vx, v_vy, v_active, v_ax, v_ay, v_air, v_sleep_speed, v_count, post_move, v_max_speed)
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, v_wall_bounce, v_radius, v_wall_hit, v_count)
+    particle_collide_circles(v_x, v_y, v_vx, v_vy, v_active, v_radius, 1, v_pair_bounce, v_pair_hit, v_count)
+    # Circles can push bodies into the floor — resolve walls again, then hard clamp.
+    particle_collide_bounds(v_x, v_y, v_vx, v_vy, v_active, v_left, v_right, v_top, v_bottom, v_wall_bounce, v_radius, v_wall_hit, v_count)
+    call contain_floor
+
+    v_cycle = v_cycle + 1
+    if v_cycle >= v_max_cycles then
+        call freeze_bearings
+    endif
+
+    begin_frame
+        call draw_floor_hint
+        call draw_bearings
+    end_frame
+
+    if v_cycle >= v_max_cycles then
+        rest(3)
+        call flip_gravity
+    endif
+endwhile
