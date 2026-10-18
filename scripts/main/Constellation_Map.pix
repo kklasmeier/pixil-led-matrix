@@ -1,0 +1,799 @@
+# ==============================================================================
+# CONSTELLATION MAP  (64x64 matrix)
+#
+# A slow-turning night sky: dense scrolling field + sprite-batched stars, with
+# named stick-figure constellations on top. Morphs crossfade in place (no
+# collapse-to-center). Uses points_project3d + move_sprites + draw_lines.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+# Keep the draw buffer transparent so the scrolling sky shows through.
+sync_queue
+
+v_max_v = 12
+v_max_e = 16
+v_nfield = 48
+v_field_last = 47
+
+v_cx = 32
+v_cy = 32
+v_scale = 26
+v_camera = 52
+# 3x3 field-star sprite: centre at matrix (32,32) → top-left (31,31)
+v_sprite_cx = 31
+v_sprite_cy = 31
+
+v_rx = 0.12
+v_ry = 0.0
+v_rz = 0.0
+v_t = 0.0
+v_frame = 0
+v_bg_x = 0.0
+v_bg_y = 0.0
+
+v_shape = 0
+v_nshapes = 6
+v_phase = 0
+v_hold = 0
+v_hold_max = 200
+v_morph = 0
+v_morph_max = 64
+v_blend = 0.0
+v_fade_a = 1.0
+v_fade_b = 0.0
+
+v_nverts = 7
+v_nedges = 7
+v_nv_a = 7
+v_ne_a = 7
+v_nv_b = 7
+v_ne_b = 7
+v_nv_last = 6
+v_ne_last = 6
+v_nv_a_last = 6
+v_nv_b_last = 6
+
+v_glow = 12
+v_wire = 62
+v_c_a = 62
+v_c_b = 62
+v_line_base = 24
+
+v_i = 0
+v_a = 0
+v_b = 0
+v_d = 0.0
+v_bright = 0
+v_s = 0.0
+v_vx = 0.0
+v_vy = 0.0
+v_vz = 0.0
+v_tw = 0.0
+v_cel_i = 0
+
+v_spx = 0.004
+v_spy = 0.009
+v_spz = 0.002
+
+create_array(v_wx, v_max_v, numeric)
+create_array(v_wy, v_max_v, numeric)
+create_array(v_wz, v_max_v, numeric)
+create_array(v_ax, v_max_v, numeric)
+create_array(v_ay, v_max_v, numeric)
+create_array(v_az, v_max_v, numeric)
+create_array(v_bx, v_max_v, numeric)
+create_array(v_by, v_max_v, numeric)
+create_array(v_bz, v_max_v, numeric)
+create_array(v_sx, v_max_v, numeric)
+create_array(v_sy, v_max_v, numeric)
+create_array(v_depth, v_max_v, numeric)
+create_array(v_asx, v_max_v, numeric)
+create_array(v_asy, v_max_v, numeric)
+create_array(v_adepth, v_max_v, numeric)
+create_array(v_bsx, v_max_v, numeric)
+create_array(v_bsy, v_max_v, numeric)
+create_array(v_bdepth, v_max_v, numeric)
+create_array(v_ea, v_max_e, numeric)
+create_array(v_eb, v_max_e, numeric)
+create_array(v_ea_a, v_max_e, numeric)
+create_array(v_eb_a, v_max_e, numeric)
+create_array(v_ea_b, v_max_e, numeric)
+create_array(v_eb_b, v_max_e, numeric)
+create_array(v_x0, v_max_e, numeric)
+create_array(v_y0, v_max_e, numeric)
+create_array(v_x1, v_max_e, numeric)
+create_array(v_y1, v_max_e, numeric)
+create_array(v_inten, v_max_e, numeric)
+create_array(v_star_w, v_max_v, numeric)
+create_array(v_star_wa, v_max_v, numeric)
+create_array(v_star_wb, v_max_v, numeric)
+
+create_array(v_fx_w, v_nfield, numeric)
+create_array(v_fy_w, v_nfield, numeric)
+create_array(v_fz_w, v_nfield, numeric)
+create_array(v_fph, v_nfield, numeric)
+create_array(v_fsx, v_nfield, numeric)
+create_array(v_fsy, v_nfield, numeric)
+create_array(v_fdepth, v_nfield, numeric)
+create_array(v_fcel, v_nfield, numeric)
+
+create_array(v_palette, v_nshapes, numeric)
+v_palette[0] = 62
+v_palette[1] = 48
+v_palette[2] = 74
+v_palette[3] = 55
+v_palette[4] = 38
+v_palette[5] = 82
+
+print("Rendering sky...")
+
+# Dense far field — scrolls cheaply as a background
+define_sprite(sky, 96, 96)
+    for v_i in (0, 140, 1)
+        plot(random(0, 95, 0), random(0, 95, 0), navy, random(8, 22, 0))
+    endfor v_i
+    for v_i in (0, 50, 1)
+        plot(random(0, 95, 0), random(0, 95, 0), white, random(10, 28, 0))
+    endfor v_i
+    for v_i in (0, 18, 1)
+        plot(random(0, 95, 0), random(0, 95, 0), azure, random(12, 26, 0))
+    endfor v_i
+endsprite
+
+# Mid-layer wisps of slightly brighter stars
+define_sprite(sky_near, 80, 80)
+    for v_i in (0, 55, 1)
+        plot(random(0, 79, 0), random(0, 79, 0), white, random(12, 32, 0))
+    endfor v_i
+    for v_i in (0, 20, 1)
+        plot(random(0, 79, 0), random(0, 79, 0), sky_blue, random(10, 24, 0))
+    endfor v_i
+endsprite
+
+set_background(sky, 0)
+set_background(sky_near, 1)
+
+print("Rendering field stars...")
+
+define_sprite(field_star, 3, 3)
+    sprite_cel(0)
+        plot(1, 1, navy, 40)
+    sprite_cel(1)
+        plot(1, 1, white, 55)
+    sprite_cel(2)
+        plot(1, 1, white, 75)
+        plot(0, 1, azure, 30)
+        plot(2, 1, azure, 30)
+    sprite_cel(3)
+        plot(1, 1, white, 95)
+        plot(0, 1, white, 45)
+        plot(2, 1, white, 45)
+        plot(1, 0, white, 45)
+        plot(1, 2, white, 45)
+endsprite
+
+# Seed mid-field stars (sprite-batched each frame)
+for v_i in (0, v_field_last, 1)
+    v_fx_w[v_i] = random(0 - 1.55, 1.55, 2)
+    v_fy_w[v_i] = random(0 - 1.55, 1.55, 2)
+    v_fz_w[v_i] = random(0 - 0.55, 0.65, 2)
+    v_fph[v_i] = random(0, 6.28, 2)
+    v_fcel[v_i] = random(0, 2, 0)
+    show_sprite(field_star, 31, 31, v_i, 0, 0)
+endfor v_i
+
+def set_vert {
+    v_wx[v_i] = v_vx
+    v_wy[v_i] = v_vy
+    v_wz[v_i] = v_vz
+    v_i = v_i + 1
+}
+
+def set_edge {
+    v_ea[v_i] = v_a
+    v_eb[v_i] = v_b
+    v_i = v_i + 1
+}
+
+def load_dipper {
+    v_nverts = 7
+    v_nedges = 7
+    v_i = 0
+    v_vx = 0 - 0.75
+    v_vy = 0.45
+    v_vz = 0.05
+    call set_vert
+    v_vx = 0 - 0.7
+    v_vy = 0.05
+    v_vz = 0.0
+    call set_vert
+    v_vx = 0 - 0.2
+    v_vy = 0.0
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0 - 0.25
+    v_vy = 0.4
+    v_vz = 0.04
+    call set_vert
+    v_vx = 0.2
+    v_vy = 0.48
+    v_vz = 0.06
+    call set_vert
+    v_vx = 0.55
+    v_vy = 0.62
+    v_vz = 0.08
+    call set_vert
+    v_vx = 0.95
+    v_vy = 0.5
+    v_vz = 0.1
+    call set_vert
+    v_star_w[0] = 1.0
+    v_star_w[1] = 0.95
+    v_star_w[2] = 0.85
+    v_star_w[3] = 0.8
+    v_star_w[4] = 0.9
+    v_star_w[5] = 1.0
+    v_star_w[6] = 0.95
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 1
+    v_b = 2
+    call set_edge
+    v_a = 2
+    v_b = 3
+    call set_edge
+    v_a = 3
+    v_b = 0
+    call set_edge
+    v_a = 3
+    v_b = 4
+    call set_edge
+    v_a = 4
+    v_b = 5
+    call set_edge
+    v_a = 5
+    v_b = 6
+    call set_edge
+}
+
+def load_orion {
+    v_nverts = 8
+    v_nedges = 9
+    v_i = 0
+    v_vx = 0.0
+    v_vy = 0.95
+    v_vz = 0.05
+    call set_vert
+    v_vx = 0 - 0.55
+    v_vy = 0.55
+    v_vz = 0.08
+    call set_vert
+    v_vx = 0.55
+    v_vy = 0.58
+    v_vz = 0.06
+    call set_vert
+    v_vx = 0 - 0.28
+    v_vy = 0.08
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0.0
+    v_vy = 0.05
+    v_vz = 0.0
+    call set_vert
+    v_vx = 0.28
+    v_vy = 0.1
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0 - 0.42
+    v_vy = 0 - 0.65
+    v_vz = 0.04
+    call set_vert
+    v_vx = 0.48
+    v_vy = 0 - 0.7
+    v_vz = 0.1
+    call set_vert
+    v_star_w[0] = 0.75
+    v_star_w[1] = 1.0
+    v_star_w[2] = 0.9
+    v_star_w[3] = 0.85
+    v_star_w[4] = 0.9
+    v_star_w[5] = 0.85
+    v_star_w[6] = 0.8
+    v_star_w[7] = 1.0
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 0
+    v_b = 2
+    call set_edge
+    v_a = 1
+    v_b = 3
+    call set_edge
+    v_a = 2
+    v_b = 5
+    call set_edge
+    v_a = 3
+    v_b = 4
+    call set_edge
+    v_a = 4
+    v_b = 5
+    call set_edge
+    v_a = 3
+    v_b = 6
+    call set_edge
+    v_a = 5
+    v_b = 7
+    call set_edge
+    v_a = 1
+    v_b = 2
+    call set_edge
+}
+
+def load_cass {
+    v_nverts = 5
+    v_nedges = 4
+    v_i = 0
+    v_vx = 0 - 0.95
+    v_vy = 0.15
+    v_vz = 0.0
+    call set_vert
+    v_vx = 0 - 0.45
+    v_vy = 0.65
+    v_vz = 0.04
+    call set_vert
+    v_vx = 0.0
+    v_vy = 0.1
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0.45
+    v_vy = 0.7
+    v_vz = 0.05
+    call set_vert
+    v_vx = 0.95
+    v_vy = 0.2
+    v_vz = 0.0
+    call set_vert
+    v_star_w[0] = 0.9
+    v_star_w[1] = 0.85
+    v_star_w[2] = 0.8
+    v_star_w[3] = 0.95
+    v_star_w[4] = 0.9
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 1
+    v_b = 2
+    call set_edge
+    v_a = 2
+    v_b = 3
+    call set_edge
+    v_a = 3
+    v_b = 4
+    call set_edge
+}
+
+def load_cygnus {
+    v_nverts = 5
+    v_nedges = 4
+    v_i = 0
+    v_vx = 0.0
+    v_vy = 0.95
+    v_vz = 0.08
+    call set_vert
+    v_vx = 0.0
+    v_vy = 0.15
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0.0
+    v_vy = 0 - 0.85
+    v_vz = 0.0
+    call set_vert
+    v_vx = 0 - 0.8
+    v_vy = 0.2
+    v_vz = 0.04
+    call set_vert
+    v_vx = 0.8
+    v_vy = 0.22
+    v_vz = 0.04
+    call set_vert
+    v_star_w[0] = 1.0
+    v_star_w[1] = 0.85
+    v_star_w[2] = 0.8
+    v_star_w[3] = 0.75
+    v_star_w[4] = 0.75
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 1
+    v_b = 2
+    call set_edge
+    v_a = 3
+    v_b = 1
+    call set_edge
+    v_a = 1
+    v_b = 4
+    call set_edge
+}
+
+def load_crux {
+    v_nverts = 5
+    v_nedges = 4
+    v_i = 0
+    v_vx = 0.05
+    v_vy = 0.85
+    v_vz = 0.05
+    call set_vert
+    v_vx = 0.0
+    v_vy = 0 - 0.8
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0 - 0.55
+    v_vy = 0.05
+    v_vz = 0.0
+    call set_vert
+    v_vx = 0.65
+    v_vy = 0.2
+    v_vz = 0.04
+    call set_vert
+    v_vx = 0 - 0.25
+    v_vy = 0.35
+    v_vz = 0.06
+    call set_vert
+    v_star_w[0] = 1.0
+    v_star_w[1] = 0.95
+    v_star_w[2] = 0.85
+    v_star_w[3] = 0.8
+    v_star_w[4] = 0.7
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 2
+    v_b = 3
+    call set_edge
+    v_a = 0
+    v_b = 4
+    call set_edge
+    v_a = 4
+    v_b = 1
+    call set_edge
+}
+
+def load_triangle {
+    v_nverts = 3
+    v_nedges = 3
+    v_i = 0
+    v_vx = 0.25
+    v_vy = 0.75
+    v_vz = 0.1
+    call set_vert
+    v_vx = 0 - 0.7
+    v_vy = 0.45
+    v_vz = 0.08
+    call set_vert
+    v_vx = 0.35
+    v_vy = 0 - 0.7
+    v_vz = 0.05
+    call set_vert
+    v_star_w[0] = 1.0
+    v_star_w[1] = 0.95
+    v_star_w[2] = 0.9
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_edge
+    v_a = 1
+    v_b = 2
+    call set_edge
+    v_a = 2
+    v_b = 0
+    call set_edge
+}
+
+def load_shape {
+    if v_shape == 0 then
+        call load_dipper
+    endif
+    if v_shape == 1 then
+        call load_orion
+    endif
+    if v_shape == 2 then
+        call load_cass
+    endif
+    if v_shape == 3 then
+        call load_cygnus
+    endif
+    if v_shape == 4 then
+        call load_crux
+    endif
+    if v_shape == 5 then
+        call load_triangle
+    endif
+    v_nv_last = v_nverts - 1
+    v_ne_last = v_nedges - 1
+    v_wire = v_palette[v_shape]
+}
+
+def copy_world_to_a {
+    v_nv_a = v_nverts
+    v_ne_a = v_nedges
+    v_nv_a_last = v_nverts - 1
+    v_ne_last = v_nedges - 1
+    for v_i in (0, v_nv_a_last, 1)
+        v_ax[v_i] = v_wx[v_i]
+        v_ay[v_i] = v_wy[v_i]
+        v_az[v_i] = v_wz[v_i]
+        v_star_wa[v_i] = v_star_w[v_i]
+    endfor v_i
+    for v_i in (0, v_ne_last, 1)
+        v_ea_a[v_i] = v_ea[v_i]
+        v_eb_a[v_i] = v_eb[v_i]
+    endfor v_i
+}
+
+def copy_world_to_b {
+    v_nv_b = v_nverts
+    v_ne_b = v_nedges
+    v_nv_b_last = v_nverts - 1
+    v_ne_last = v_nedges - 1
+    for v_i in (0, v_nv_b_last, 1)
+        v_bx[v_i] = v_wx[v_i]
+        v_by[v_i] = v_wy[v_i]
+        v_bz[v_i] = v_wz[v_i]
+        v_star_wb[v_i] = v_star_w[v_i]
+    endfor v_i
+    for v_i in (0, v_ne_last, 1)
+        v_ea_b[v_i] = v_ea[v_i]
+        v_eb_b[v_i] = v_eb[v_i]
+    endfor v_i
+}
+
+# Crossfade morph — keep both figures in place (no centroid collapse)
+def begin_morph {
+    call copy_world_to_a
+    v_c_a = v_palette[v_shape]
+    v_shape = v_shape + 1
+    if v_shape >= v_nshapes then
+        v_shape = 0
+    endif
+    v_c_b = v_palette[v_shape]
+    call load_shape
+    call copy_world_to_b
+    v_phase = 1
+    v_morph = 0
+    v_blend = 0
+    v_fade_a = 1
+    v_fade_b = 0
+}
+
+def finish_morph {
+    v_nverts = v_nv_b
+    v_nedges = v_ne_b
+    v_nv_last = v_nverts - 1
+    v_ne_last = v_nedges - 1
+    for v_i in (0, v_nv_last, 1)
+        v_wx[v_i] = v_bx[v_i]
+        v_wy[v_i] = v_by[v_i]
+        v_wz[v_i] = v_bz[v_i]
+        v_star_w[v_i] = v_star_wb[v_i]
+    endfor v_i
+    for v_i in (0, v_ne_last, 1)
+        v_ea[v_i] = v_ea_b[v_i]
+        v_eb[v_i] = v_eb_b[v_i]
+    endfor v_i
+    v_wire = v_c_b
+    v_phase = 0
+    v_hold = 0
+    v_morph = 0
+    v_blend = 0
+    v_fade_a = 1
+    v_fade_b = 0
+}
+
+def pack_edges_hold {
+    v_ne_last = v_nedges - 1
+    for v_i in (0, v_ne_last, 1)
+        v_a = int(v_ea[v_i])
+        v_b = int(v_eb[v_i])
+        v_x0[v_i] = v_sx[v_a]
+        v_y0[v_i] = v_sy[v_a]
+        v_x1[v_i] = v_sx[v_b]
+        v_y1[v_i] = v_sy[v_b]
+        v_d = (v_depth[v_a] + v_depth[v_b]) * 0.5
+        v_bright = v_line_base + int((1.1 - v_d) * 26)
+        if v_bright < 12 then
+            v_bright = 12
+        endif
+        if v_bright > 68 then
+            v_bright = 68
+        endif
+        v_inten[v_i] = v_bright
+    endfor v_i
+}
+
+def pack_edges_a {
+    v_ne_last = v_ne_a - 1
+    for v_i in (0, v_ne_last, 1)
+        v_a = int(v_ea_a[v_i])
+        v_b = int(v_eb_a[v_i])
+        v_x0[v_i] = v_asx[v_a]
+        v_y0[v_i] = v_asy[v_a]
+        v_x1[v_i] = v_asx[v_b]
+        v_y1[v_i] = v_asy[v_b]
+        v_d = (v_adepth[v_a] + v_adepth[v_b]) * 0.5
+        v_bright = v_line_base + int((1.1 - v_d) * 26)
+        if v_bright < 12 then
+            v_bright = 12
+        endif
+        if v_bright > 68 then
+            v_bright = 68
+        endif
+        v_inten[v_i] = int(v_bright * v_fade_a)
+    endfor v_i
+}
+
+def pack_edges_b {
+    v_ne_last = v_ne_b - 1
+    for v_i in (0, v_ne_last, 1)
+        v_a = int(v_ea_b[v_i])
+        v_b = int(v_eb_b[v_i])
+        v_x0[v_i] = v_bsx[v_a]
+        v_y0[v_i] = v_bsy[v_a]
+        v_x1[v_i] = v_bsx[v_b]
+        v_y1[v_i] = v_bsy[v_b]
+        v_d = (v_bdepth[v_a] + v_bdepth[v_b]) * 0.5
+        v_bright = v_line_base + int((1.1 - v_d) * 26)
+        if v_bright < 12 then
+            v_bright = 12
+        endif
+        if v_bright > 68 then
+            v_bright = 68
+        endif
+        v_inten[v_i] = int(v_bright * v_fade_b)
+    endfor v_i
+}
+
+print("Constellation Map")
+call load_shape
+
+while true then
+    v_t = v_t + 0.01
+    if v_t > tau * 64 then
+        v_t = v_t - tau * 64
+    endif
+    v_frame = v_frame + 1
+
+    # Slow planetarium drift
+    v_spy = 0.0075 + 0.0025 * sin(v_t * 0.11)
+    v_spx = 0.0022 * cos(v_t * 0.07)
+    v_spz = 0.0012 * sin(v_t * 0.05)
+    v_rx = v_rx + v_spx
+    v_ry = v_ry + v_spy
+    v_rz = v_rz + v_spz
+    if v_rx > 0.38 then
+        v_rx = 0.38
+    endif
+    if v_rx < 0 - 0.38 then
+        v_rx = 0 - 0.38
+    endif
+    if v_ry > tau then
+        v_ry = v_ry - tau
+    endif
+    if v_rz > tau then
+        v_rz = v_rz - tau
+    endif
+
+    # Parallax scroll on the dense sky layers
+    v_bg_x = v_bg_x + 0.09 + v_spy * 4
+    v_bg_y = v_bg_y + 0.035 + v_spx * 3
+
+    if v_phase == 0 then
+        v_hold = v_hold + 1
+        if v_hold >= v_hold_max then
+            call begin_morph
+        endif
+    else
+        v_morph = v_morph + 1
+        v_s = v_morph / v_morph_max
+        if v_s > 1 then
+            v_s = 1
+        endif
+        v_blend = v_s * v_s * (3 - 2 * v_s)
+        v_fade_a = 1 - v_blend
+        v_fade_b = v_blend
+        if v_morph >= v_morph_max then
+            call finish_morph
+        endif
+    endif
+
+    v_scale = 24.5 + 1.5 * sin(v_t * 0.19)
+
+    # Field stars: one producer project + cel refresh every other frame
+    points_project3d(v_fx_w, v_fy_w, v_fz_w, v_fsx, v_fsy, v_rx, v_ry, v_rz, v_scale, v_camera, v_sprite_cx, v_sprite_cy, v_fdepth, v_nfield)
+    if fmod(v_frame, 2) == 0 then
+        for v_i in (0, v_field_last, 1)
+            v_tw = 0.5 + 0.5 * sin(v_t * 1.8 + v_fph[v_i])
+            v_cel_i = int((1.05 - v_fdepth[v_i]) * 1.4 + v_tw * 1.2)
+            if v_cel_i < 0 then
+                v_cel_i = 0
+            endif
+            if v_cel_i > 3 then
+                v_cel_i = 3
+            endif
+            v_fcel[v_i] = v_cel_i
+        endfor v_i
+    endif
+
+    # Clear the draw buffer each frame (not begin_frame(true)) so lines/plots
+    # do not stack. Sky backgrounds + sprites still composite underneath.
+    if v_phase == 0 then
+        points_project3d(v_wx, v_wy, v_wz, v_sx, v_sy, v_rx, v_ry, v_rz, v_scale, v_camera, v_cx, v_cy, v_depth, v_nverts)
+        call pack_edges_hold
+    else
+        points_project3d(v_ax, v_ay, v_az, v_asx, v_asy, v_rx, v_ry, v_rz, v_scale, v_camera, v_cx, v_cy, v_adepth, v_nv_a)
+        points_project3d(v_bx, v_by, v_bz, v_bsx, v_bsy, v_rx, v_ry, v_rz, v_scale, v_camera, v_cx, v_cy, v_bdepth, v_nv_b)
+    endif
+
+    begin_frame
+        set_background_offset(int(v_bg_x), int(v_bg_y), 0, 0)
+        set_background_offset(int(v_bg_x * 1.45), int(v_bg_y * 1.45), 1, 0)
+        move_sprites(field_star, v_fsx, v_fsy, v_fcel)
+
+        if v_phase == 0 then
+            draw_lines(v_x0, v_y0, v_x1, v_y1, v_wire, v_inten, v_nedges)
+            for v_i in (0, v_nv_last, 1)
+                v_tw = 0.8 + 0.2 * sin(v_t * 1.3 + v_i * 0.85)
+                v_bright = int((42 + (1.05 - v_depth[v_i]) * 48) * v_star_w[v_i] * v_tw)
+                if v_bright < 18 then
+                    v_bright = 18
+                endif
+                if v_bright > 100 then
+                    v_bright = 100
+                endif
+                plot(int(v_sx[v_i]), int(v_sy[v_i]), white, v_bright)
+            endfor v_i
+        else
+            if v_fade_a > 0.03 then
+                call pack_edges_a
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_c_a, v_inten, v_ne_a)
+                for v_i in (0, v_nv_a_last, 1)
+                    v_bright = int((42 + (1.05 - v_adepth[v_i]) * 48) * v_star_wa[v_i] * v_fade_a)
+                    if v_bright < 10 then
+                        v_bright = 10
+                    endif
+                    if v_bright > 100 then
+                        v_bright = 100
+                    endif
+                    plot(int(v_asx[v_i]), int(v_asy[v_i]), white, v_bright)
+                endfor v_i
+            endif
+            if v_fade_b > 0.03 then
+                call pack_edges_b
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_c_b, v_inten, v_ne_b)
+                for v_i in (0, v_nv_b_last, 1)
+                    v_bright = int((42 + (1.05 - v_bdepth[v_i]) * 48) * v_star_wb[v_i] * v_fade_b)
+                    if v_bright < 10 then
+                        v_bright = 10
+                    endif
+                    if v_bright > 100 then
+                        v_bright = 100
+                    endif
+                    plot(int(v_bsx[v_i]), int(v_bsy[v_i]), white, v_bright)
+                endfor v_i
+            endif
+        endif
+    end_frame
+
+    if fmod(v_frame, 8000) == 0 then
+        v_bg_x = v_bg_x - floor(v_bg_x / 96) * 96
+        v_bg_y = v_bg_y - floor(v_bg_y / 96) * 96
+    endif
+endwhile

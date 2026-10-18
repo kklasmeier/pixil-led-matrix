@@ -1,0 +1,944 @@
+# ==============================================================================
+# TENSEGRITY FIGURE  (64x64 matrix)
+#
+# Floating compression struts held by a cable net — classic tensegrity prisms
+# and a stick-figure body built the same way. Struts glow warm; cables stay
+# cool and thin. Shape morphs via array_lerp + edge crossfade.
+# Uses points_project3d + array_lerp + draw_lines.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+v_max_v = 16
+v_max_s = 12
+v_max_c = 24
+
+v_cx = 32
+v_cy = 32
+v_scale = 20
+v_camera = 50
+
+v_rx = 0.35
+v_ry = 0.0
+v_rz = 0.12
+v_t = 0.0
+
+v_shape = 0
+v_nshapes = 4
+v_phase = 0
+v_hold = 0
+v_hold_max = 170
+v_morph = 0
+v_morph_max = 60
+v_blend = 0.0
+v_fade_a = 1.0
+v_fade_b = 0.0
+
+v_nverts = 6
+v_nstruts = 3
+v_ncables = 9
+v_nv_a = 6
+v_ns_a = 3
+v_nc_a = 9
+v_nv_b = 6
+v_ns_b = 3
+v_nc_b = 9
+v_nv_last = 5
+v_ns_last = 2
+v_nc_last = 8
+
+v_glow = 14
+v_wire_s = 14
+v_wire_c = 58
+v_cs_a = 14
+v_cs_b = 14
+v_cc_a = 58
+v_cc_b = 58
+v_fade = 1.0
+v_base = 18
+
+v_i = 0
+v_a = 0
+v_b = 0
+v_d = 0.0
+v_bright = 0
+v_s = 0.0
+v_vx = 0.0
+v_vy = 0.0
+v_vz = 0.0
+v_ang = 0.0
+v_r = 1.0
+v_h = 0.9
+v_twist = 0.7
+v_cxa = 0.0
+v_cya = 0.0
+v_cza = 0.0
+v_cxb = 0.0
+v_cyb = 0.0
+v_czb = 0.0
+v_pulse = 1.0
+
+v_spmod = 1.0
+v_spx = 0.014
+v_spy = 0.019
+v_spz = 0.009
+
+create_array(v_wx, v_max_v, numeric)
+create_array(v_wy, v_max_v, numeric)
+create_array(v_wz, v_max_v, numeric)
+create_array(v_ax, v_max_v, numeric)
+create_array(v_ay, v_max_v, numeric)
+create_array(v_az, v_max_v, numeric)
+create_array(v_bx, v_max_v, numeric)
+create_array(v_by, v_max_v, numeric)
+create_array(v_bz, v_max_v, numeric)
+create_array(v_sx, v_max_v, numeric)
+create_array(v_sy, v_max_v, numeric)
+create_array(v_depth, v_max_v, numeric)
+
+create_array(v_sa, v_max_s, numeric)
+create_array(v_sb, v_max_s, numeric)
+create_array(v_sa_a, v_max_s, numeric)
+create_array(v_sb_a, v_max_s, numeric)
+create_array(v_sa_b, v_max_s, numeric)
+create_array(v_sb_b, v_max_s, numeric)
+
+create_array(v_ca, v_max_c, numeric)
+create_array(v_cb, v_max_c, numeric)
+create_array(v_ca_a, v_max_c, numeric)
+create_array(v_cb_a, v_max_c, numeric)
+create_array(v_ca_b, v_max_c, numeric)
+create_array(v_cb_b, v_max_c, numeric)
+
+create_array(v_x0, v_max_c, numeric)
+create_array(v_y0, v_max_c, numeric)
+create_array(v_x1, v_max_c, numeric)
+create_array(v_y1, v_max_c, numeric)
+create_array(v_inten, v_max_c, numeric)
+
+# Strut / cable spectral pairs per shape
+create_array(v_pal_s, v_nshapes, numeric)
+create_array(v_pal_c, v_nshapes, numeric)
+v_pal_s[0] = 14
+v_pal_c[0] = 58
+v_pal_s[1] = 8
+v_pal_c[1] = 72
+v_pal_s[2] = 18
+v_pal_c[2] = 48
+v_pal_s[3] = 6
+v_pal_c[3] = 86
+
+def set_vert {
+    v_wx[v_i] = v_vx
+    v_wy[v_i] = v_vy
+    v_wz[v_i] = v_vz
+    v_i = v_i + 1
+}
+
+def set_strut {
+    v_sa[v_i] = v_a
+    v_sb[v_i] = v_b
+    v_i = v_i + 1
+}
+
+def set_cable {
+    v_ca[v_i] = v_a
+    v_cb[v_i] = v_b
+    v_i = v_i + 1
+}
+
+# ---- 3-strut tensegrity prism (classic Snelson-style) ----
+def load_prism3 {
+    v_nverts = 6
+    v_nstruts = 3
+    v_ncables = 9
+    v_r = 1.05
+    v_h = 0.95
+    v_twist = 0.85
+    v_i = 0
+    for v_a in (0, 2, 1)
+        v_ang = v_a * tau / 3
+        v_vx = v_r * cos(v_ang)
+        v_vy = 0 - v_h
+        v_vz = v_r * sin(v_ang)
+        call set_vert
+    endfor v_a
+    for v_a in (0, 2, 1)
+        v_ang = v_a * tau / 3 + v_twist
+        v_vx = v_r * cos(v_ang)
+        v_vy = v_h
+        v_vz = v_r * sin(v_ang)
+        call set_vert
+    endfor v_a
+    v_i = 0
+    v_a = 0
+    v_b = 4
+    call set_strut
+    v_a = 1
+    v_b = 5
+    call set_strut
+    v_a = 2
+    v_b = 3
+    call set_strut
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_cable
+    v_a = 1
+    v_b = 2
+    call set_cable
+    v_a = 2
+    v_b = 0
+    call set_cable
+    v_a = 3
+    v_b = 4
+    call set_cable
+    v_a = 4
+    v_b = 5
+    call set_cable
+    v_a = 5
+    v_b = 3
+    call set_cable
+    v_a = 0
+    v_b = 3
+    call set_cable
+    v_a = 1
+    v_b = 4
+    call set_cable
+    v_a = 2
+    v_b = 5
+    call set_cable
+}
+
+# ---- 4-strut tensegrity prism ----
+def load_prism4 {
+    v_nverts = 8
+    v_nstruts = 4
+    v_ncables = 12
+    v_r = 1.0
+    v_h = 0.9
+    v_twist = 0.7
+    v_i = 0
+    for v_a in (0, 3, 1)
+        v_ang = v_a * tau / 4
+        v_vx = v_r * cos(v_ang)
+        v_vy = 0 - v_h
+        v_vz = v_r * sin(v_ang)
+        call set_vert
+    endfor v_a
+    for v_a in (0, 3, 1)
+        v_ang = v_a * tau / 4 + v_twist
+        v_vx = v_r * cos(v_ang)
+        v_vy = v_h
+        v_vz = v_r * sin(v_ang)
+        call set_vert
+    endfor v_a
+    v_i = 0
+    v_a = 0
+    v_b = 5
+    call set_strut
+    v_a = 1
+    v_b = 6
+    call set_strut
+    v_a = 2
+    v_b = 7
+    call set_strut
+    v_a = 3
+    v_b = 4
+    call set_strut
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_cable
+    v_a = 1
+    v_b = 2
+    call set_cable
+    v_a = 2
+    v_b = 3
+    call set_cable
+    v_a = 3
+    v_b = 0
+    call set_cable
+    v_a = 4
+    v_b = 5
+    call set_cable
+    v_a = 5
+    v_b = 6
+    call set_cable
+    v_a = 6
+    v_b = 7
+    call set_cable
+    v_a = 7
+    v_b = 4
+    call set_cable
+    v_a = 0
+    v_b = 4
+    call set_cable
+    v_a = 1
+    v_b = 5
+    call set_cable
+    v_a = 2
+    v_b = 6
+    call set_cable
+    v_a = 3
+    v_b = 7
+    call set_cable
+}
+
+# ---- Stick figure: bone struts + ligament cables ----
+def load_stick {
+    v_nverts = 11
+    v_nstruts = 10
+    v_ncables = 12
+    v_i = 0
+    # 0 head
+    v_vx = 0
+    v_vy = 1.35
+    v_vz = 0.05
+    call set_vert
+    # 1 neck / upper chest
+    v_vx = 0
+    v_vy = 0.95
+    v_vz = 0
+    call set_vert
+    # 2 L shoulder  3 R shoulder
+    v_vx = 0 - 0.55
+    v_vy = 0.85
+    v_vz = 0.05
+    call set_vert
+    v_vx = 0.55
+    v_vy = 0.85
+    v_vz = 0.05
+    call set_vert
+    # 4 L hand  5 R hand
+    v_vx = 0 - 0.85
+    v_vy = 0.15
+    v_vz = 0.25
+    call set_vert
+    v_vx = 0.85
+    v_vy = 0.15
+    v_vz = 0.25
+    call set_vert
+    # 6 pelvis
+    v_vx = 0
+    v_vy = 0.1
+    v_vz = 0
+    call set_vert
+    # 7 L hip  8 R hip
+    v_vx = 0 - 0.28
+    v_vy = 0.05
+    v_vz = 0.02
+    call set_vert
+    v_vx = 0.28
+    v_vy = 0.05
+    v_vz = 0.02
+    call set_vert
+    # 9 L foot  10 R foot
+    v_vx = 0 - 0.35
+    v_vy = 0 - 1.2
+    v_vz = 0.1
+    call set_vert
+    v_vx = 0.35
+    v_vy = 0 - 1.2
+    v_vz = 0.1
+    call set_vert
+
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_strut
+    v_a = 1
+    v_b = 2
+    call set_strut
+    v_a = 1
+    v_b = 3
+    call set_strut
+    v_a = 2
+    v_b = 4
+    call set_strut
+    v_a = 3
+    v_b = 5
+    call set_strut
+    v_a = 1
+    v_b = 6
+    call set_strut
+    v_a = 6
+    v_b = 7
+    call set_strut
+    v_a = 6
+    v_b = 8
+    call set_strut
+    v_a = 7
+    v_b = 9
+    call set_strut
+    v_a = 8
+    v_b = 10
+    call set_strut
+
+    v_i = 0
+    v_a = 2
+    v_b = 3
+    call set_cable
+    v_a = 4
+    v_b = 5
+    call set_cable
+    v_a = 2
+    v_b = 6
+    call set_cable
+    v_a = 3
+    v_b = 6
+    call set_cable
+    v_a = 2
+    v_b = 8
+    call set_cable
+    v_a = 3
+    v_b = 7
+    call set_cable
+    v_a = 4
+    v_b = 9
+    call set_cable
+    v_a = 5
+    v_b = 10
+    call set_cable
+    v_a = 4
+    v_b = 10
+    call set_cable
+    v_a = 5
+    v_b = 9
+    call set_cable
+    v_a = 7
+    v_b = 8
+    call set_cable
+    v_a = 0
+    v_b = 6
+    call set_cable
+}
+
+# ---- Expanded 6-strut "star" (octahedral tensegrity sketch) ----
+def load_star6 {
+    v_nverts = 12
+    v_nstruts = 6
+    v_ncables = 24
+    v_r = 1.15
+    v_i = 0
+    # Three mutually orthogonal strut pairs (end caps)
+    v_vx = v_r
+    v_vy = 0.2
+    v_vz = 0.15
+    call set_vert
+    v_vx = 0 - v_r
+    v_vy = 0 - 0.2
+    v_vz = 0 - 0.15
+    call set_vert
+    v_vx = 0.15
+    v_vy = v_r
+    v_vz = 0.2
+    call set_vert
+    v_vx = 0 - 0.15
+    v_vy = 0 - v_r
+    v_vz = 0 - 0.2
+    call set_vert
+    v_vx = 0.2
+    v_vy = 0.15
+    v_vz = v_r
+    call set_vert
+    v_vx = 0 - 0.2
+    v_vy = 0 - 0.15
+    v_vz = 0 - v_r
+    call set_vert
+    # Mid-ring nodes for cable net
+    v_vx = 0.7
+    v_vy = 0.7
+    v_vz = 0.15
+    call set_vert
+    v_vx = 0 - 0.7
+    v_vy = 0.7
+    v_vz = 0 - 0.15
+    call set_vert
+    v_vx = 0 - 0.7
+    v_vy = 0 - 0.7
+    v_vz = 0.15
+    call set_vert
+    v_vx = 0.7
+    v_vy = 0 - 0.7
+    v_vz = 0 - 0.15
+    call set_vert
+    v_vx = 0.15
+    v_vy = 0.55
+    v_vz = 0 - 0.75
+    call set_vert
+    v_vx = 0 - 0.15
+    v_vy = 0 - 0.55
+    v_vz = 0.75
+    call set_vert
+
+    v_i = 0
+    v_a = 0
+    v_b = 1
+    call set_strut
+    v_a = 2
+    v_b = 3
+    call set_strut
+    v_a = 4
+    v_b = 5
+    call set_strut
+    v_a = 6
+    v_b = 8
+    call set_strut
+    v_a = 7
+    v_b = 9
+    call set_strut
+    v_a = 10
+    v_b = 11
+    call set_strut
+
+    v_i = 0
+    v_a = 0
+    v_b = 6
+    call set_cable
+    v_a = 0
+    v_b = 9
+    call set_cable
+    v_a = 0
+    v_b = 4
+    call set_cable
+    v_a = 0
+    v_b = 10
+    call set_cable
+    v_a = 1
+    v_b = 7
+    call set_cable
+    v_a = 1
+    v_b = 8
+    call set_cable
+    v_a = 1
+    v_b = 5
+    call set_cable
+    v_a = 1
+    v_b = 11
+    call set_cable
+    v_a = 2
+    v_b = 6
+    call set_cable
+    v_a = 2
+    v_b = 7
+    call set_cable
+    v_a = 2
+    v_b = 4
+    call set_cable
+    v_a = 2
+    v_b = 11
+    call set_cable
+    v_a = 3
+    v_b = 8
+    call set_cable
+    v_a = 3
+    v_b = 9
+    call set_cable
+    v_a = 3
+    v_b = 5
+    call set_cable
+    v_a = 3
+    v_b = 10
+    call set_cable
+    v_a = 4
+    v_b = 6
+    call set_cable
+    v_a = 4
+    v_b = 9
+    call set_cable
+    v_a = 5
+    v_b = 7
+    call set_cable
+    v_a = 5
+    v_b = 8
+    call set_cable
+    v_a = 6
+    v_b = 11
+    call set_cable
+    v_a = 7
+    v_b = 10
+    call set_cable
+    v_a = 8
+    v_b = 11
+    call set_cable
+    v_a = 9
+    v_b = 10
+    call set_cable
+}
+
+def load_shape {
+    if v_shape == 0 then
+        call load_prism3
+    endif
+    if v_shape == 1 then
+        call load_prism4
+    endif
+    if v_shape == 2 then
+        call load_stick
+    endif
+    if v_shape == 3 then
+        call load_star6
+    endif
+    v_nv_last = v_nverts - 1
+    v_ns_last = v_nstruts - 1
+    v_nc_last = v_ncables - 1
+    v_wire_s = v_pal_s[v_shape]
+    v_wire_c = v_pal_c[v_shape]
+}
+
+def copy_world_to_a {
+    v_nv_a = v_nverts
+    v_ns_a = v_nstruts
+    v_nc_a = v_ncables
+    v_nv_last = v_nverts - 1
+    v_ns_last = v_nstruts - 1
+    v_nc_last = v_ncables - 1
+    for v_i in (0, v_nv_last, 1)
+        v_ax[v_i] = v_wx[v_i]
+        v_ay[v_i] = v_wy[v_i]
+        v_az[v_i] = v_wz[v_i]
+    endfor v_i
+    for v_i in (0, v_ns_last, 1)
+        v_sa_a[v_i] = v_sa[v_i]
+        v_sb_a[v_i] = v_sb[v_i]
+    endfor v_i
+    for v_i in (0, v_nc_last, 1)
+        v_ca_a[v_i] = v_ca[v_i]
+        v_cb_a[v_i] = v_cb[v_i]
+    endfor v_i
+}
+
+def copy_world_to_b {
+    v_nv_b = v_nverts
+    v_ns_b = v_nstruts
+    v_nc_b = v_ncables
+    v_nv_last = v_nverts - 1
+    v_ns_last = v_nstruts - 1
+    v_nc_last = v_ncables - 1
+    for v_i in (0, v_nv_last, 1)
+        v_bx[v_i] = v_wx[v_i]
+        v_by[v_i] = v_wy[v_i]
+        v_bz[v_i] = v_wz[v_i]
+    endfor v_i
+    for v_i in (0, v_ns_last, 1)
+        v_sa_b[v_i] = v_sa[v_i]
+        v_sb_b[v_i] = v_sb[v_i]
+    endfor v_i
+    for v_i in (0, v_nc_last, 1)
+        v_ca_b[v_i] = v_ca[v_i]
+        v_cb_b[v_i] = v_cb[v_i]
+    endfor v_i
+}
+
+def pad_morph_verts {
+    v_nverts = v_nv_a
+    if v_nv_b > v_nverts then
+        v_nverts = v_nv_b
+    endif
+    v_cxa = 0
+    v_cya = 0
+    v_cza = 0
+    v_nv_last = v_nv_a - 1
+    for v_i in (0, v_nv_last, 1)
+        v_cxa = v_cxa + v_ax[v_i]
+        v_cya = v_cya + v_ay[v_i]
+        v_cza = v_cza + v_az[v_i]
+    endfor v_i
+    v_cxa = v_cxa / v_nv_a
+    v_cya = v_cya / v_nv_a
+    v_cza = v_cza / v_nv_a
+    v_cxb = 0
+    v_cyb = 0
+    v_czb = 0
+    v_nv_last = v_nv_b - 1
+    for v_i in (0, v_nv_last, 1)
+        v_cxb = v_cxb + v_bx[v_i]
+        v_cyb = v_cyb + v_by[v_i]
+        v_czb = v_czb + v_bz[v_i]
+    endfor v_i
+    v_cxb = v_cxb / v_nv_b
+    v_cyb = v_cyb / v_nv_b
+    v_czb = v_czb / v_nv_b
+    if v_nv_a < v_nverts then
+        for v_i in (v_nv_a, v_nverts - 1, 1)
+            v_ax[v_i] = v_cxa
+            v_ay[v_i] = v_cya
+            v_az[v_i] = v_cza
+        endfor v_i
+    endif
+    if v_nv_b < v_nverts then
+        for v_i in (v_nv_b, v_nverts - 1, 1)
+            v_bx[v_i] = v_cxb
+            v_by[v_i] = v_cyb
+            v_bz[v_i] = v_czb
+        endfor v_i
+    endif
+    v_nv_last = v_nverts - 1
+}
+
+def begin_morph {
+    call copy_world_to_a
+    v_cs_a = v_pal_s[v_shape]
+    v_cc_a = v_pal_c[v_shape]
+    v_shape = v_shape + 1
+    if v_shape >= v_nshapes then
+        v_shape = 0
+    endif
+    v_cs_b = v_pal_s[v_shape]
+    v_cc_b = v_pal_c[v_shape]
+    call load_shape
+    call copy_world_to_b
+    call pad_morph_verts
+    v_phase = 1
+    v_morph = 0
+    v_blend = 0
+    v_fade_a = 1
+    v_fade_b = 0
+    for v_i in (0, v_nv_last, 1)
+        v_wx[v_i] = v_ax[v_i]
+        v_wy[v_i] = v_ay[v_i]
+        v_wz[v_i] = v_az[v_i]
+    endfor v_i
+}
+
+def finish_morph {
+    v_nverts = v_nv_b
+    v_nstruts = v_ns_b
+    v_ncables = v_nc_b
+    v_nv_last = v_nverts - 1
+    v_ns_last = v_nstruts - 1
+    v_nc_last = v_ncables - 1
+    for v_i in (0, v_nv_last, 1)
+        v_wx[v_i] = v_bx[v_i]
+        v_wy[v_i] = v_by[v_i]
+        v_wz[v_i] = v_bz[v_i]
+    endfor v_i
+    for v_i in (0, v_ns_last, 1)
+        v_sa[v_i] = v_sa_b[v_i]
+        v_sb[v_i] = v_sb_b[v_i]
+    endfor v_i
+    for v_i in (0, v_nc_last, 1)
+        v_ca[v_i] = v_ca_b[v_i]
+        v_cb[v_i] = v_cb_b[v_i]
+    endfor v_i
+    v_wire_s = v_cs_b
+    v_wire_c = v_cc_b
+    v_phase = 0
+    v_hold = 0
+    v_morph = 0
+    v_blend = 0
+    v_fade_a = 1
+    v_fade_b = 0
+}
+
+def pack_seg {
+    v_x0[v_i] = v_sx[v_a]
+    v_y0[v_i] = v_sy[v_a]
+    v_x1[v_i] = v_sx[v_b]
+    v_y1[v_i] = v_sy[v_b]
+    v_d = (v_depth[v_a] + v_depth[v_b]) * 0.5
+    v_bright = v_base + int((1.15 - v_d) * 36)
+    if v_bright < 10 then
+        v_bright = 10
+    endif
+    if v_bright > 95 then
+        v_bright = 95
+    endif
+    v_inten[v_i] = int(v_bright * v_fade * v_pulse)
+}
+
+def pack_cables_hold {
+    v_nc_last = v_ncables - 1
+    for v_i in (0, v_nc_last, 1)
+        v_a = int(v_ca[v_i])
+        v_b = int(v_cb[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+def pack_struts_hold {
+    v_ns_last = v_nstruts - 1
+    for v_i in (0, v_ns_last, 1)
+        v_a = int(v_sa[v_i])
+        v_b = int(v_sb[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+def pack_cables_a {
+    v_nc_last = v_nc_a - 1
+    for v_i in (0, v_nc_last, 1)
+        v_a = int(v_ca_a[v_i])
+        v_b = int(v_cb_a[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+def pack_struts_a {
+    v_ns_last = v_ns_a - 1
+    for v_i in (0, v_ns_last, 1)
+        v_a = int(v_sa_a[v_i])
+        v_b = int(v_sb_a[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+def pack_cables_b {
+    v_nc_last = v_nc_b - 1
+    for v_i in (0, v_nc_last, 1)
+        v_a = int(v_ca_b[v_i])
+        v_b = int(v_cb_b[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+def pack_struts_b {
+    v_ns_last = v_ns_b - 1
+    for v_i in (0, v_ns_last, 1)
+        v_a = int(v_sa_b[v_i])
+        v_b = int(v_sb_b[v_i])
+        call pack_seg
+    endfor v_i
+}
+
+print("Tensegrity Figure")
+call load_shape
+
+while true then
+    v_t = v_t + 0.012
+    if v_t > tau * 64 then
+        v_t = v_t - tau * 64
+    endif
+
+    v_spmod = 0.88 + 0.36 * (0.5 + 0.5 * sin(v_t * 0.27))
+    v_spx = (0.011 + 0.006 * sin(v_t * 0.17)) * v_spmod
+    v_spy = (0.017 + 0.008 * cos(v_t * 0.21)) * v_spmod
+    v_spz = (0.008 + 0.005 * sin(v_t * 0.15 + 0.9)) * v_spmod
+
+    v_rx = v_rx + v_spx
+    v_ry = v_ry + v_spy
+    v_rz = v_rz + v_spz
+    if v_rx > tau then
+        v_rx = v_rx - tau
+    endif
+    if v_ry > tau then
+        v_ry = v_ry - tau
+    endif
+    if v_rz > tau then
+        v_rz = v_rz - tau
+    endif
+
+    # Cable tension shimmer
+    v_pulse = 0.82 + 0.18 * (0.5 + 0.5 * sin(v_t * 1.7))
+
+    if v_phase == 0 then
+        v_hold = v_hold + 1
+        if v_hold >= v_hold_max then
+            call begin_morph
+        endif
+    else
+        v_morph = v_morph + 1
+        v_s = v_morph / v_morph_max
+        if v_s > 1 then
+            v_s = 1
+        endif
+        v_blend = v_s * v_s * (3 - 2 * v_s)
+        v_fade_a = 1 - v_blend
+        v_fade_b = v_blend
+        array_lerp(v_ax, v_bx, v_wx, v_blend, v_nverts)
+        array_lerp(v_ay, v_by, v_wy, v_blend, v_nverts)
+        array_lerp(v_az, v_bz, v_wz, v_blend, v_nverts)
+        if v_morph >= v_morph_max then
+            call finish_morph
+        endif
+    endif
+
+    v_scale = 18.5 + 2.4 * sin(v_t * 0.23)
+
+    points_project3d(v_wx, v_wy, v_wz, v_sx, v_sy, v_rx, v_ry, v_rz, v_scale, v_camera, v_cx, v_cy, v_depth, v_nverts)
+
+    begin_frame
+        if v_phase == 0 then
+            v_wire_s = v_pal_s[v_shape]
+            v_wire_c = v_pal_c[v_shape]
+
+            # Cables first (under), then struts
+            v_fade = 1
+            v_base = 18
+            call pack_cables_hold
+            v_glow = 10
+            draw_lines(v_x0, v_y0, v_x1, v_y1, v_wire_c, v_glow, v_ncables)
+            draw_lines(v_x0, v_y0, v_x1, v_y1, v_wire_c, v_inten, v_ncables)
+
+            v_fade = 1
+            v_base = 34
+            v_pulse = 1
+            call pack_struts_hold
+            v_glow = 16
+            draw_lines(v_x0, v_y0, v_x1, v_y1, v_wire_s, v_glow, v_nstruts)
+            draw_lines(v_x0, v_y0, v_x1, v_y1, v_wire_s, v_inten, v_nstruts)
+            v_pulse = 0.82 + 0.18 * (0.5 + 0.5 * sin(v_t * 1.7))
+        else
+            if v_fade_a > 0.02 then
+                v_fade = v_fade_a
+                v_base = 18
+                call pack_cables_a
+                v_glow = int(10 * v_fade_a)
+                if v_glow < 1 then
+                    v_glow = 1
+                endif
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cc_a, v_glow, v_nc_a)
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cc_a, v_inten, v_nc_a)
+
+                v_fade = v_fade_a
+                v_base = 34
+                v_pulse = 1
+                call pack_struts_a
+                v_glow = int(16 * v_fade_a)
+                if v_glow < 1 then
+                    v_glow = 1
+                endif
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cs_a, v_glow, v_ns_a)
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cs_a, v_inten, v_ns_a)
+                v_pulse = 0.82 + 0.18 * (0.5 + 0.5 * sin(v_t * 1.7))
+            endif
+            if v_fade_b > 0.02 then
+                v_fade = v_fade_b
+                v_base = 18
+                call pack_cables_b
+                v_glow = int(10 * v_fade_b)
+                if v_glow < 1 then
+                    v_glow = 1
+                endif
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cc_b, v_glow, v_nc_b)
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cc_b, v_inten, v_nc_b)
+
+                v_fade = v_fade_b
+                v_base = 34
+                v_pulse = 1
+                call pack_struts_b
+                v_glow = int(16 * v_fade_b)
+                if v_glow < 1 then
+                    v_glow = 1
+                endif
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cs_b, v_glow, v_ns_b)
+                draw_lines(v_x0, v_y0, v_x1, v_y1, v_cs_b, v_inten, v_ns_b)
+                v_pulse = 0.82 + 0.18 * (0.5 + 0.5 * sin(v_t * 1.7))
+            endif
+        endif
+
+        for v_i in (0, v_nv_last, 1)
+            v_bright = 38 + int((1.0 - v_depth[v_i]) * 48)
+            if v_bright < 18 then
+                v_bright = 18
+            endif
+            if v_bright > 100 then
+                v_bright = 100
+            endif
+            mplot(int(v_sx[v_i]), int(v_sy[v_i]), white, v_bright)
+        endfor v_i
+    end_frame
+endwhile
