@@ -1,0 +1,181 @@
+# ==============================================================================
+# STRING ART  (64x64 matrix)
+#
+# Pins on a ring; chords weave classic cardioid / envelope curves. The step
+# pattern and colors slowly shift so the figure blooms and reforms.
+# Uses draw_lines.
+# ==============================================================================
+
+clear()
+fps(60)
+throttle(0)
+
+v_pins = 48
+v_pins_last = 47
+v_cx = 32.0
+v_cy = 32.0
+v_radius = 29.0
+
+v_t = 0.0
+v_rot = 0.0
+v_step = 2.0
+v_step_target = 2.0
+v_step_timer = 0
+v_hold_max = 160
+v_morph = 0
+v_morph_max = 50
+v_phase = 0
+v_blend = 0.0
+v_step_a = 2.0
+v_step_b = 3.0
+
+v_i = 0
+v_j = 0
+v_a = 0.0
+v_bright = 0
+v_n = 0
+v_hue = 55
+v_hue2 = 70
+v_pulse = 1.0
+v_r = 0.0
+
+create_array(v_px, v_pins, numeric)
+create_array(v_py, v_pins, numeric)
+create_array(v_x0, v_pins, numeric)
+create_array(v_y0, v_pins, numeric)
+create_array(v_x1, v_pins, numeric)
+create_array(v_y1, v_pins, numeric)
+create_array(v_inten, v_pins, numeric)
+
+# Step pattern gallery (chord skip counts)
+create_array(v_steps, 8, numeric)
+v_steps[0] = 2
+v_steps[1] = 3
+v_steps[2] = 5
+v_steps[3] = 7
+v_steps[4] = 11
+v_steps[5] = 13
+v_steps[6] = 17
+v_steps[7] = 19
+v_pat = 0
+v_npat = 8
+
+print("String Art")
+
+while true then
+    v_t = v_t + 0.014
+    if v_t > tau * 64 then
+        v_t = v_t - tau * 64
+    endif
+
+    v_rot = v_rot + 0.006
+    if v_rot > tau then
+        v_rot = v_rot - tau
+    endif
+
+    # Gentle breathing of the ring
+    v_r = v_radius + 0.8 * sin(v_t * 0.55)
+    v_pulse = 0.85 + 0.15 * (0.5 + 0.5 * sin(v_t * 1.4))
+
+    if v_phase == 0 then
+        v_step_timer = v_step_timer + 1
+        v_step = v_steps[v_pat]
+        if v_step_timer >= v_hold_max then
+            v_step_a = v_steps[v_pat]
+            v_pat = v_pat + 1
+            if v_pat >= v_npat then
+                v_pat = 0
+            endif
+            v_step_b = v_steps[v_pat]
+            v_phase = 1
+            v_morph = 0
+            v_step_timer = 0
+        endif
+    else
+        v_morph = v_morph + 1
+        v_blend = v_morph / v_morph_max
+        if v_blend > 1 then
+            v_blend = 1
+        endif
+        # Smoothstep
+        v_blend = v_blend * v_blend * (3 - 2 * v_blend)
+        v_step = v_step_a + (v_step_b - v_step_a) * v_blend
+        if v_morph >= v_morph_max then
+            v_phase = 0
+            v_step = v_step_b
+            v_morph = 0
+        endif
+    endif
+
+    # Pin positions around the circle
+    for v_i in (0, v_pins_last, 1)
+        v_a = v_rot + v_i * tau / v_pins
+        v_px[v_i] = v_cx + v_r * cos(v_a)
+        v_py[v_i] = v_cy + v_r * sin(v_a)
+    endfor v_i
+
+    # Chords: pin i → pin i+step (mod N). Fractional step blends two targets.
+    v_n = 0
+    for v_i in (0, v_pins_last, 1)
+        v_j = v_i + int(v_step)
+        v_j = v_j - floor(v_j / v_pins) * v_pins
+        v_x0[v_n] = v_px[v_i]
+        v_y0[v_n] = v_py[v_i]
+        v_x1[v_n] = v_px[v_j]
+        v_y1[v_n] = v_py[v_j]
+        # Longer chords a bit dimmer; near-step brighter
+        v_bright = int((22 + 40 * v_pulse) * (0.65 + 0.35 * (1 - abs(v_step - 8) / 12)))
+        if v_bright < 14 then
+            v_bright = 14
+        endif
+        if v_bright > 78 then
+            v_bright = 78
+        endif
+        # Slight variation around the ring
+        v_bright = v_bright + int(8 * sin(v_i * 0.4 + v_t))
+        if v_bright > 85 then
+            v_bright = 85
+        endif
+        if v_bright < 12 then
+            v_bright = 12
+        endif
+        v_inten[v_n] = v_bright
+        v_n = v_n + 1
+    endfor v_i
+
+    # Color drifts slowly through the spectrum
+    v_hue = int(fmod(v_t * 4.5, 100))
+    v_hue2 = v_hue + 18
+    if v_hue2 > 99 then
+        v_hue2 = v_hue2 - 100
+    endif
+
+    begin_frame
+        # Primary envelope
+        draw_lines(v_x0, v_y0, v_x1, v_y1, v_hue, 12, v_n)
+        draw_lines(v_x0, v_y0, v_x1, v_y1, v_hue, v_inten, v_n)
+
+        # Second family: step+1 for a denser lace
+        for v_i in (0, v_pins_last, 1)
+            v_j = v_i + int(v_step) + 1
+            v_j = v_j - floor(v_j / v_pins) * v_pins
+            v_x0[v_i] = v_px[v_i]
+            v_y0[v_i] = v_py[v_i]
+            v_x1[v_i] = v_px[v_j]
+            v_y1[v_i] = v_py[v_j]
+            v_bright = int(v_inten[v_i] * 0.45)
+            if v_bright < 8 then
+                v_bright = 8
+            endif
+            v_inten[v_i] = v_bright
+        endfor v_i
+        draw_lines(v_x0, v_y0, v_x1, v_y1, v_hue2, v_inten, v_n)
+
+        # Pin heads (every other nail — readable on 64x64)
+        for v_i in (0, v_pins_last, 1)
+            if fmod(v_i, 2) == 0 then
+                plot(int(v_px[v_i]), int(v_py[v_i]), white, 55)
+            endif
+        endfor v_i
+    end_frame
+endwhile
