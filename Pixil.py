@@ -1805,6 +1805,116 @@ def process_script(filename, execute_func=None):
                     f"{cel_part}, {int(zd[i])})"
                 )
 
+    def _run_draw_lines(arg_exprs):
+        """Pack many draw_line ops from endpoint arrays into the frame draw_batch."""
+        global draw_buffer, draw_count
+        from pixil_utils.optimization_flags import ENABLE_DRAW_BATCH
+        from pixil_utils.particle_commands import (
+            _eval_number,
+            _optional_count,
+            _optional_token,
+            require_array_name,
+            require_numeric_array,
+        )
+        from pixil_utils.draw_batch_dispatch import append_draw_lines
+        from shared.mplot_protocol import normalize_mplot_color
+
+        tokens = validate_command_params(
+            "draw_lines", ", ".join(arg_exprs) if arg_exprs else ""
+        )
+        x0_name = require_array_name("draw_lines", tokens[0], "x0")
+        y0_name = require_array_name("draw_lines", tokens[1], "y0")
+        x1_name = require_array_name("draw_lines", tokens[2], "x1")
+        y1_name = require_array_name("draw_lines", tokens[3], "y1")
+        x0_arr = require_numeric_array(variables, x0_name, "draw_lines", "x0")
+        y0_arr = require_numeric_array(variables, y0_name, "draw_lines", "y0")
+        x1_arr = require_numeric_array(variables, x1_name, "draw_lines", "x1")
+        y1_arr = require_numeric_array(variables, y1_name, "draw_lines", "y1")
+        lengths = {x0_arr.size, y0_arr.size, x1_arr.size, y1_arr.size}
+        if len(lengths) != 1:
+            raise ValueError(
+                f"draw_lines: x0/y0/x1/y1 arrays must be the same length "
+                f"({x0_name}={x0_arr.size}, {y0_name}={y0_arr.size}, "
+                f"{x1_name}={x1_arr.size}, {y1_name}={y1_arr.size})"
+            )
+
+        color = normalize_mplot_color(parse_value(tokens[4], "draw_lines", 4))
+
+        inten_arr = None
+        inten_scalar = 100
+        count = None
+        tok5 = _optional_token(tokens, 5)
+        if tok5 is not None:
+            from pixil_utils.array_manager import PixilArray
+
+            stripped = tok5.strip().strip('"').strip("'")
+            inten_val = None
+            # Bare v_name: array intensity if it is a PixilArray, else scalar var
+            if stripped.startswith("v_") and stripped[2:].replace("_", "").isalnum() and " " not in stripped:
+                try:
+                    inten_val = variables.get(stripped)
+                except KeyError:
+                    inten_val = None
+
+            if isinstance(inten_val, PixilArray):
+                inten_name = require_array_name("draw_lines", tok5, "intensity")
+                inten_arr = require_numeric_array(
+                    variables, inten_name, "draw_lines", "intensity"
+                )
+                if inten_arr.size != x0_arr.size:
+                    raise ValueError(
+                        f"draw_lines: intensity array length {inten_arr.size} "
+                        f"does not match endpoint length {x0_arr.size}"
+                    )
+                count = _optional_count(
+                    "draw_lines",
+                    _optional_token(tokens, 6),
+                    variables,
+                    x0_arr.size,
+                )
+            else:
+                # Scalar intensity (literal, expression, or numeric v_ variable)
+                tok6 = _optional_token(tokens, 6)
+                if tok6 is not None:
+                    inten_scalar = int(
+                        _eval_number("draw_lines", tok5, "intensity", variables)
+                    )
+                    count = _optional_count(
+                        "draw_lines", tok6, variables, x0_arr.size
+                    )
+                else:
+                    inten_scalar = int(
+                        _eval_number("draw_lines", tok5, "intensity", variables)
+                    )
+
+        n = x0_arr.size if count is None else count
+        intensity_arg = inten_arr if inten_arr is not None else inten_scalar
+
+        if in_frame_mode and ENABLE_DRAW_BATCH:
+            added = append_draw_lines(
+                draw_buffer,
+                x0_arr,
+                y0_arr,
+                x1_arr,
+                y1_arr,
+                color,
+                intensity_arg,
+                n,
+            )
+            draw_count += added
+            return
+
+        xd0, yd0 = x0_arr.data, y0_arr.data
+        xd1, yd1 = x1_arr.data, y1_arr.data
+        idata = inten_arr.data if inten_arr is not None else None
+        color_lit = color if isinstance(color, int) else f'"{color}"'
+        for i in range(n):
+            inten = inten_scalar if idata is None else int(idata[i])
+            execute_command(
+                f"draw_line({int(xd0[i])}, {int(yd0[i])}, "
+                f"{int(xd1[i])}, {int(yd1[i])}, {color_lit}, {inten})"
+            )
+
     def _run_compiled_command(cmd_name, arg_exprs):
         global mplot_buffer, mplot_count
         if cmd_name == 'fps':
@@ -1847,6 +1957,8 @@ def process_script(filename, execute_func=None):
             run_points_command(cmd_name, arg_exprs, variables)
         elif cmd_name == 'move_sprites':
             _run_move_sprites(arg_exprs)
+        elif cmd_name == 'draw_lines':
+            _run_draw_lines(arg_exprs)
         elif cmd_name.startswith('agent_'):
             from pixil_utils.agent_commands import run_agent_command
             run_agent_command(cmd_name, arg_exprs, variables)
@@ -2110,6 +2222,11 @@ def process_script(filename, execute_func=None):
                 from pixil_utils.parameter_types import split_command_parameters
                 inner = line[line.index('(') + 1 : line.rindex(')')]
                 _run_move_sprites(split_command_parameters(inner))
+
+            elif line.startswith('draw_lines('):
+                from pixil_utils.parameter_types import split_command_parameters
+                inner = line[line.index('(') + 1 : line.rindex(')')]
+                _run_draw_lines(split_command_parameters(inner))
 
             elif (grid_fill_match := re.match(r'grid_fill\((v_\w+),\s*(.+)\)', line)):
                 array_name = grid_fill_match.group(1)

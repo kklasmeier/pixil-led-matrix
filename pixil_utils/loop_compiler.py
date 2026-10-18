@@ -78,11 +78,14 @@ _POINTS_COMMANDS = frozenset({
 _ARRAY_SPRITE_COMMANDS = frozenset({
     "move_sprites",
 })
+_ARRAY_DRAW_COMMANDS = frozenset({
+    "draw_lines",
+})
 # Must not be treated as bare procedure names (e.g. begin_frame has no parens in scripts)
 _FRAME_BUILTIN_NAMES = (
     _FRAME_NO_ARG | _FRAME_COMMANDS | _FRAME_MISC_COMMANDS
     | _PARTICLE_COMMANDS | _AGENT_COMMANDS
-    | _POINTS_COMMANDS | _ARRAY_SPRITE_COMMANDS
+    | _POINTS_COMMANDS | _ARRAY_SPRITE_COMMANDS | _ARRAY_DRAW_COMMANDS
 )
 _SPRITE_COMMANDS = frozenset({"show_sprite", "move_sprite", "hide_sprite"})
 _BARE_CALL_RESERVED = frozenset(
@@ -1118,6 +1121,7 @@ def _parse_command(line: str, allow_commands: bool) -> Optional[CommandStmt]:
         or cmd in _AGENT_COMMANDS
         or cmd in _POINTS_COMMANDS
         or cmd in _ARRAY_SPRITE_COMMANDS
+        or cmd in _ARRAY_DRAW_COMMANDS
     ):
         from .parameter_types import split_command_parameters
 

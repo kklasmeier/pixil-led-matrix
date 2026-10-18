@@ -824,6 +824,11 @@ move_sprites (Pixil.py + sprite_batch_dispatch.append_move_sprites)
   sprite_batch (instance ids 0..n-1). Avoids a Pixil for-loop of move_sprite.
   See Scripting Guide §21.
 
+draw_lines (Pixil.py + draw_batch_dispatch.append_draw_lines)
+  Producer packs N draw_line records from x0/y0/x1/y1 arrays into the frame
+  draw_batch. Shared color; intensity may be scalar or per-segment array.
+  Optional count. Fully off-panel segments are skipped. Use inside begin_frame.
+
 PIXIL.PY INTEGRATION
 --------------------
 At script load (once per program name):

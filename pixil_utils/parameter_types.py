@@ -390,6 +390,15 @@ PARAMETER_TYPES: Dict[str, CommandParams] = {
         {'name': 'z', 'type': 'str', 'position': 4, 'optional': True},
         {'name': 'count', 'type': 'int', 'position': 5, 'optional': True},
     ],
+    'draw_lines': [
+        {'name': 'x0', 'type': 'str', 'position': 0},
+        {'name': 'y0', 'type': 'str', 'position': 1},
+        {'name': 'x1', 'type': 'str', 'position': 2},
+        {'name': 'y1', 'type': 'str', 'position': 3},
+        {'name': 'color', 'type': 'color', 'position': 4},
+        {'name': 'intensity', 'type': 'str', 'position': 5, 'optional': True},
+        {'name': 'count', 'type': 'int', 'position': 6, 'optional': True},
+    ],
 }
 
 # Cache the parameter types

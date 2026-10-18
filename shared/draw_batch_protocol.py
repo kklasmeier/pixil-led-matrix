@@ -274,6 +274,37 @@ def pack_plot_record(
     return bytes([OP_PLOT]) + pack_mplot(x, y, color, intensity, burnout, burnout_mode)
 
 
+def pack_line_record(
+    x0: Any,
+    y0: Any,
+    x1: Any,
+    y1: Any,
+    color: Any,
+    intensity: Any = 100,
+    burnout: Any = None,
+    burnout_mode: Any = "instant",
+) -> bytes:
+    """Pack one OP_LINE record, or b'' when the segment is fully off-panel."""
+    clipped = clip_line_segment(x0, y0, x1, y1)
+    if clipped is None:
+        return b""
+    cx0, cy0, cx1, cy1 = clipped
+    if isinstance(burnout_mode, str):
+        burnout_mode = burnout_mode.strip('"').strip("'")
+    payload = struct.pack(
+        _LINE_FMT,
+        _coord_uint16(cx0),
+        _coord_uint16(cy0),
+        _coord_uint16(cx1),
+        _coord_uint16(cy1),
+        _color_id_from_arg(color),
+        _intensity_byte(intensity),
+        _burnout_uint(burnout),
+        get_burnout_mode_int(burnout_mode),
+    )
+    return bytes([OP_LINE]) + payload
+
+
 def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
     """
   Pack one frame draw command from already-parsed Pixil arguments.
@@ -294,19 +325,7 @@ def pack_draw_op(cmd_name: str, args: List[Any]) -> bytes:
         intensity = args[5] if len(args) > 5 else 100
         burnout = args[6] if len(args) > 6 else None
         burnout_mode = args[7] if len(args) > 7 else "instant"
-        clipped = clip_line_segment(x0, y0, x1, y1)
-        if clipped is None:
-            return b""
-        cx0, cy0, cx1, cy1 = clipped
-        payload = struct.pack(
-            _LINE_FMT,
-            _coord_uint16(cx0), _coord_uint16(cy0), _coord_uint16(cx1), _coord_uint16(cy1),
-            _color_id_from_arg(color),
-            _intensity_byte(intensity),
-            _burnout_uint(burnout),
-            get_burnout_mode_int(burnout_mode),
-        )
-        return bytes([OP_LINE]) + payload
+        return pack_line_record(x0, y0, x1, y1, color, intensity, burnout, burnout_mode)
 
     if cmd_name == "draw_rectangle":
         x, y, w, h, color = args[0], args[1], args[2], args[3], args[4]
@@ -545,6 +564,7 @@ __all__ = [
     "clip_rectangle",
     "clip_line_segment",
     "pack_draw_op",
+    "pack_line_record",
     "pack_plot_record",
     "unpack_draw_batch",
     "encode_buffer",
